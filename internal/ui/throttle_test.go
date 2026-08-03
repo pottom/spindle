@@ -158,29 +158,62 @@ func TestPremiumNoticeClearsOnSuccess(t *testing.T) {
 	}
 }
 
-// A held volume key must collapse into one request, and a settle message from an
-// earlier keystroke must not fire a stale value at the API.
-func TestVolumeDebounce(t *testing.T) {
+// Waiting out a debounce before anything is audible makes the key feel broken,
+// which is how it felt. The first press of a run goes out at once.
+func TestVolumeFirstPressIsNotDelayed(t *testing.T) {
 	m := Model{ps: &player.State{Volume: 50}}
 
-	for range 5 {
-		m.setVolume(m.ps.Volume + volumeStep)
+	if cmd := m.setVolume(55); cmd == nil {
+		t.Fatal("the first press sent nothing")
 	}
+	if m.volumeSent != 55 {
+		t.Errorf("volumeSent = %d, want 55 to have gone out immediately", m.volumeSent)
+	}
+}
+
+// The presses that follow are collapsed, so holding the key costs two requests
+// rather than one per repeat — but the value that lands is the final one.
+func TestVolumeRunIsCollapsed(t *testing.T) {
+	m := Model{ps: &player.State{Volume: 50}}
+
+	m.setVolume(55) // leading edge, sent at once
+	sentAfterFirst := m.volumeSent
+
+	for v := 60; v <= 75; v += volumeStep {
+		if cmd := m.setVolume(v); cmd == nil {
+			t.Fatal("a press produced no command at all")
+		}
+	}
+
 	if m.ps.Volume != 75 {
 		t.Errorf("volume = %d, want 75 — the reading has to move at once", m.ps.Volume)
 	}
-	if m.volumeSeq != 5 {
-		t.Errorf("volumeSeq = %d, want 5", m.volumeSeq)
+	if m.volumeSent != sentAfterFirst {
+		t.Errorf("volumeSent = %d, want the run to be collapsed rather than sent per press", m.volumeSent)
 	}
 
 	var tm tea.Model = m
-	tm, cmd := tm.Update(msg.VolumeSettled{Seq: 2})
-	if cmd != nil {
+	if _, cmd := tm.Update(msg.VolumeSettled{Seq: 2}); cmd != nil {
 		t.Error("a settle message from an earlier keystroke sent a stale volume")
 	}
 
-	if _, cmd = tm.Update(msg.VolumeSettled{Seq: 5}); cmd == nil {
-		t.Error("the newest settle message sent nothing")
+	tm, cmd := tm.Update(msg.VolumeSettled{Seq: m.volumeSeq})
+	if cmd == nil {
+		t.Fatal("the newest settle message sent nothing")
+	}
+	if got := tm.(Model).volumeSent; got != 75 {
+		t.Errorf("volumeSent = %d, want the final value 75", got)
+	}
+}
+
+// Nothing more to say once the value has already gone out.
+func TestVolumeSettleIsSkippedWhenNothingChanged(t *testing.T) {
+	m := Model{ps: &player.State{Volume: 50}}
+	m.setVolume(55)
+
+	var tm tea.Model = m
+	if _, cmd := tm.Update(msg.VolumeSettled{Seq: m.volumeSeq}); cmd != nil {
+		t.Error("sent the same volume twice")
 	}
 }
 

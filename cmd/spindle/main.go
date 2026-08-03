@@ -13,6 +13,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/auth"
+	"github.com/pottom/spindle/internal/daemon"
 	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui"
 	"github.com/pottom/spindle/internal/ui/cover"
@@ -32,11 +33,19 @@ func reportFatal(err error) {
 
 func main() {
 	// Subcommands come before flags so "spindle login" reads the way it looks.
-	if len(os.Args) > 1 && os.Args[1] == "login" {
-		if err := runLogin(context.Background()); err != nil {
-			reportFatal(err)
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "login":
+			if err := runLogin(context.Background()); err != nil {
+				reportFatal(err)
+			}
+			return
+		case "daemon":
+			if err := runDaemon(daemon.DefaultPort); err != nil {
+				reportFatal(err)
+			}
+			return
 		}
-		return
 	}
 
 	mock := flag.Bool("mock", false, "run against the offline mock backend, without auth or network")

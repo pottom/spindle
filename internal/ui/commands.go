@@ -43,8 +43,9 @@ const (
 	confirmRetry  = 200 * time.Millisecond
 	confirmWindow = 4 * time.Second
 
-	// volumeDebounce collapses a held volume key into one request.
-	volumeDebounce = 800 * time.Millisecond
+	// volumeDebounce is the quiet period after a volume request before another
+	// may go out. The first press of a run is not delayed by it — see setVolume.
+	volumeDebounce = 400 * time.Millisecond
 )
 
 func tickCmd() tea.Cmd {

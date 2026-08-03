@@ -66,8 +66,12 @@ type Model struct {
 	// fire an upload per row, only once the cursor settles.
 	coverSeq int
 
-	// volumeSeq debounces the volume keys the same way.
-	volumeSeq int
+	// volumeSeq debounces the volume keys, volumeSent is the last value actually
+	// sent and volumeSentAt is when, so a run of presses can be collapsed
+	// without delaying the first one.
+	volumeSeq    int
+	volumeSent   int
+	volumeSentAt time.Time
 
 	// rateLimitedUntil suspends polling. Spotify asked to be left alone, and
 	// carrying on regardless is how a short throttle becomes a long one.

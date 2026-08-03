@@ -109,13 +109,12 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, fetchStateCmd(m.player)
 
 	case msg.VolumeSettled:
-		if message.Seq != m.volumeSeq || m.ps == nil {
+		// Only the newest keystroke counts, and only if the value has moved
+		// since the leading request went out.
+		if message.Seq != m.volumeSeq || m.ps == nil || m.ps.Volume == m.volumeSent {
 			return m, nil
 		}
-		pct, p := m.ps.Volume, m.player
-		return m, controlCmd("set volume", func(ctx context.Context) error {
-			return p.SetVolume(ctx, pct)
-		})
+		return m, m.sendVolume()
 
 	case msg.ControlDone:
 		// Whatever was standing in the way is evidently no longer standing.
@@ -354,13 +353,33 @@ func (m *Model) seek(pos time.Duration) tea.Cmd {
 	})
 }
 
-// setVolume moves the reading immediately and sends the request once the keys
-// stop. A held key would otherwise fire twenty calls at the API.
+// setVolume moves the reading and asks the device to follow.
+//
+// The first press of a run goes out at once: waiting out a debounce before
+// anything is audible makes the key feel broken, which is exactly how it felt.
+// Presses that follow within the quiet period are collapsed into a single
+// request once they stop, so holding the key still costs two calls rather than
+// one per repeat.
 func (m *Model) setVolume(pct int) tea.Cmd {
 	m.ps.Volume = min(max(pct, 0), 100)
 	m.hold()
 	m.volumeSeq++
-	return volumeSettleCmd(m.volumeSeq)
+
+	cmds := []tea.Cmd{volumeSettleCmd(m.volumeSeq)}
+	if time.Since(m.volumeSentAt) >= volumeDebounce {
+		cmds = append(cmds, m.sendVolume())
+	}
+	return tea.Batch(cmds...)
+}
+
+// sendVolume dispatches the current reading and records what went out.
+func (m *Model) sendVolume() tea.Cmd {
+	pct, p := m.ps.Volume, m.player
+	m.volumeSent, m.volumeSentAt = pct, time.Now()
+
+	return controlCmd("set volume", func(ctx context.Context) error {
+		return p.SetVolume(ctx, pct)
+	})
 }
 
 // skip changes track and starts chasing the confirmation.
