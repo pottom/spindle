@@ -65,7 +65,7 @@ func (m *Model) transfer() tea.Cmd {
 		controlCmd("move playback", func(ctx context.Context) error {
 			return p.TransferTo(ctx, id)
 		}),
-		refetchCmd(trackChangeDelay),
+		refetchCmd(confirmFirst),
 		fetchDevicesCmd(m.player),
 		m.syncCover(),
 	)

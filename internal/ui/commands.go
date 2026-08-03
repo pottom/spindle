@@ -25,9 +25,23 @@ const (
 	// per row.
 	coverSettleDelay = 250 * time.Millisecond
 
-	// trackChangeDelay is how long to wait before confirming a skip. Spotify
-	// still reports the previous track for a moment afterwards.
-	trackChangeDelay = 400 * time.Millisecond
+	// A track change does not appear in State() the moment the command returns.
+	// Measured against a live account it took 466, 530, 564 and 678 ms — so the
+	// 400 ms single shot DESIGN.md guessed at would have confirmed the *old*
+	// track every time and left the wrong title up until the next five-second
+	// poll.
+	//
+	// Rather than pick a bigger number and still be wrong on a slow day, ask
+	// again until the answer changes: first after confirmFirst, then every
+	// confirmRetry, giving up after confirmWindow. That resolves around the
+	// median rather than the worst case, and it self-corrects when propagation
+	// is slower than anything measured here.
+	// The first ask is deliberately just under the fastest propagation seen
+	// (466 ms): asking sooner is guaranteed to come back with the old track and
+	// only spends a request to learn nothing.
+	confirmFirst  = 450 * time.Millisecond
+	confirmRetry  = 200 * time.Millisecond
+	confirmWindow = 4 * time.Second
 
 	// volumeDebounce collapses a held volume key into one request.
 	volumeDebounce = 800 * time.Millisecond

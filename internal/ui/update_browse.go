@@ -68,9 +68,15 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 
 		id, offset := m.playlists.open.ID, m.playlists.inner.cursor
 		p := m.player
-		return controlCmd("play playlist", func(ctx context.Context) error {
-			return p.PlayPlaylist(ctx, id, offset)
-		}), true
+		return tea.Batch(
+			controlCmd("play playlist", func(ctx context.Context) error {
+				return p.PlayPlaylist(ctx, id, offset)
+			}),
+			// Without this the player tab shows the previous track until the
+			// next five-second poll, and pressing enter looks like it did
+			// nothing at all.
+			m.awaitTrackChange(),
+		), true
 
 	case key.Matches(k, m.keys.Back):
 		if m.playlists.open == nil {
@@ -99,9 +105,12 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			return nil, true
 		}
 		id, p := sel.ID, m.player
-		return controlCmd("play track", func(ctx context.Context) error {
-			return p.PlayTrack(ctx, id)
-		}), true
+		return tea.Batch(
+			controlCmd("play track", func(ctx context.Context) error {
+				return p.PlayTrack(ctx, id)
+			}),
+			m.awaitTrackChange(),
+		), true
 
 	case key.Matches(k, m.keys.Back):
 		if m.search.input.Value() == "" {

@@ -35,7 +35,12 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.adopt(message.State)
 		m.noDevice = false
 		m.err = nil
-		return m, m.syncCover()
+
+		cmds := []tea.Cmd{m.syncCover()}
+		if m.stillWaitingForTrackChange(message.State) {
+			cmds = append(cmds, refetchCmd(confirmRetry))
+		}
+		return m, tea.Batch(cmds...)
 
 	case msg.NoActiveDevice:
 		// Not an error, and not worth clearing the last known track for: the
@@ -324,12 +329,36 @@ func (m *Model) setVolume(pct int) tea.Cmd {
 	return volumeSettleCmd(m.volumeSeq)
 }
 
-// skip changes track and schedules the one confirming fetch.
+// skip changes track and starts chasing the confirmation.
 func (m *Model) skip(action string, call func(context.Context) error) tea.Cmd {
 	m.localProgress = 0
 	m.ps.Progress = 0
 	m.hold()
-	return tea.Batch(controlCmd(action, call), refetchCmd(trackChangeDelay))
+	return tea.Batch(controlCmd(action, call), m.awaitTrackChange())
+}
+
+// awaitTrackChange notes which track we are leaving and asks for the first
+// confirmation. Whatever is playing now is what we expect to stop seeing.
+func (m *Model) awaitTrackChange() tea.Cmd {
+	m.awaitingTrack = ""
+	if m.ps != nil {
+		m.awaitingTrack = m.ps.TrackID
+	}
+	m.confirmUntil = time.Now().Add(confirmWindow)
+	return refetchCmd(confirmFirst)
+}
+
+// stillWaitingForTrackChange reports whether the snapshot that just arrived is
+// still the old track, and there is time left to ask again.
+func (m *Model) stillWaitingForTrackChange(st *player.State) bool {
+	if m.awaitingTrack == "" {
+		return false
+	}
+	if st == nil || st.TrackID != m.awaitingTrack || time.Now().After(m.confirmUntil) {
+		m.awaitingTrack = ""
+		return false
+	}
+	return true
 }
 
 // shouldResync decides whether this tick carries a real state fetch. Polling

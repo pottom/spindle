@@ -116,16 +116,44 @@ confirmed the wrong track anyway.
 
 ## 4. What is the measured latency on the control endpoints? Is a 2 s optimistic window enough?
 
-**Not yet measured against the real API.** Against the mock's 150 ms artificial
-latency the 2 s window is ample: a pause survives the next two resync polls without
-snapping back, verified both by unit test and by driving the running program. Eight
-skips in under a second land exactly where they should, with no corrupted state and
-no error.
+**Yes — with about three times the headroom it needs.** Measured against a live
+Premium account, spotifyd as the device, from Hungary.
 
-The one thing the mock cannot show is Spotify reporting the *previous* track for a
-moment after a skip. That is handled blind, on the strength of `DESIGN.md` 4.1: a
-skip schedules one confirming fetch 400 ms later rather than polling immediately.
-Whether 400 ms is enough is a question for a live account.
+Round-trip time of a call, five samples each:
+
+| Call | min | median | max |
+|---|---|---|---|
+| `Devices` (read) | 57 ms | 61 ms | 74 ms |
+| `SetVolume` | 89 ms | 94 ms | 97 ms |
+| `SetRepeat` | 117 ms | 119 ms | 123 ms |
+| `SetShuffle` | 121 ms | 125 ms | 139 ms |
+| `State` (read) | 112 ms | 155 ms | 404 ms |
+
+The round trip is not the interesting number, though. What the optimistic window
+has to survive is **propagation**: how long after a command returns before a poll
+agrees with it. That is longer, and it is what actually matters:
+
+| Change | observed |
+|---|---|
+| pause | 711, 741, 746, 752 ms |
+| resume | 467, 474, 521, 659 ms |
+| track change | 466, 530, 564, 678 ms |
+
+So the 2 s window holds comfortably — the slowest propagation seen was 752 ms, and
+the window is 2.7 times that. It stays as it is.
+
+**The 400 ms confirming fetch after a skip was wrong, and this is what caught it.**
+`DESIGN.md` 4.1 guessed 400 ms. Every single measured track change took longer than
+that — the fastest was 466 ms. The confirming fetch would have agreed with the
+*old* track every time, leaving the wrong title on screen until the next
+five-second poll: exactly the symptom the fetch exists to prevent.
+
+It is now 800 ms, above the slowest sample seen with margin. The asymmetry is the
+argument: being early costs five seconds of wrong title, being late costs a
+fraction of a second.
+
+These numbers are one account, one device, one network. The shape is what to trust,
+not the digits.
 
 ## 5. Do kitty and Ghostty differ in placement behaviour?
 

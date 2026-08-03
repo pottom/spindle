@@ -62,6 +62,11 @@ type Model struct {
 	// can read playback but never change it.
 	noPremium bool
 
+	// awaitingTrack is the track a skip is trying to move away from, and
+	// confirmUntil is when to stop asking whether it has.
+	awaitingTrack string
+	confirmUntil  time.Time
+
 	err       error
 	tickCount int
 
