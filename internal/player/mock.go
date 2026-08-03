@@ -237,6 +237,28 @@ func (m *Mock) SetQueue(ctx context.Context, trackIDs []string) error {
 	})
 }
 
+// Drop removes an upcoming track, from the queue or from the catalogue rotation.
+func (m *Mock) Drop(ctx context.Context, trackID string) error {
+	return m.mutate(ctx, func() error {
+		for i, t := range m.queued {
+			if t.ID == trackID {
+				m.queued = slices.Delete(m.queued, i, i+1)
+				return nil
+			}
+		}
+		for i, t := range m.queue {
+			if t.ID == trackID && i != m.index {
+				m.queue = slices.Delete(m.queue, i, i+1)
+				if i < m.index {
+					m.index--
+				}
+				return nil
+			}
+		}
+		return fmt.Errorf("drop: no track %q waiting", trackID)
+	})
+}
+
 // promoteQueued moves the first hand-queued track in front of the context, so
 // that it is what plays next. Callers must hold m.mu.
 func (m *Mock) promoteQueued() {

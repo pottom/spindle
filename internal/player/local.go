@@ -241,14 +241,17 @@ func (l *Local) PlayTrack(ctx context.Context, trackID string) error {
 	return l.web.PlayTrack(ctx, trackID)
 }
 
-// PlayFrom seeks within what is already loaded, so the rest of the album or
-// playlist survives the jump. The daemon does this itself; asking the Web API
-// would mean naming the context again from the outside.
+// PlayFrom brings an upcoming track to the front and starts it. Everything else
+// keeps its place and moves up one; nothing is discarded.
+//
+// The daemon does the whole thing itself, because only it can: the order lives
+// in its state machine, and any version assembled from the outside would be
+// three requests racing a track change.
 func (l *Local) PlayFrom(ctx context.Context, trackID string) error {
 	if l.idle() {
 		return l.web.PlayFrom(ctx, trackID)
 	}
-	return l.post(ctx, "/player/next", struct {
+	return l.post(ctx, "/player/play_from", struct {
 		Uri string `json:"uri"`
 	}{Uri: trackURI(trackID)})
 }

@@ -99,6 +99,23 @@ func (l *Local) SetQueue(ctx context.Context, trackIDs []string) error {
 	return nil
 }
 
+// Drop removes an upcoming track. The daemon does the whole thing itself: a
+// track from the context can only be skipped by moving the cursor onto it, and
+// everything passed over on the way has to be carried into the queue first.
+func (l *Local) Drop(ctx context.Context, trackID string) error {
+	err := l.post(ctx, "/player/drop", struct {
+		Uri string `json:"uri"`
+	}{Uri: trackURI(trackID)})
+	if err != nil {
+		return err
+	}
+
+	// The daemon does not announce a queue change, so nothing would tell the UI
+	// to look again.
+	l.notify()
+	return nil
+}
+
 // queueOrigins asks the daemon which upcoming tracks were queued by hand.
 func (l *Local) queueOrigins(ctx context.Context) ([]localQueueTrack, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, l.addr+"/player/queue", nil)

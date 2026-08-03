@@ -44,19 +44,37 @@ func (m *Model) queueKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	return nil, false
 }
 
-// dropQueued removes the track under the cursor. Only hand-queued tracks can go:
-// the rest belong to the album or playlist that is playing, and dropping one
-// there would mean rewriting the context itself.
+// dropQueued takes the row under the cursor out of the list. Every row can go,
+// including the one playing: not wanting to hear the rest of a track is the
+// commonest reason to reach for the key at all, and skipping it is what taking
+// it out of the list means while it is sounding.
 func (m *Model) dropQueued() tea.Cmd {
 	at := m.queueIndex()
-	if at < 0 || !m.queue[at].Queued {
+	if at < 0 {
+		p := m.player
+		cmd := m.skip("skip to next track", p.Next)
+		if next := m.takeFromQueue(); next != nil {
+			m.showTrack(next)
+			return tea.Batch(cmd, m.syncCover())
+		}
+		return cmd
+	}
+
+	editor, ok := m.player.(player.QueueEditor)
+	if !ok {
 		return nil
 	}
 
-	next := make([]player.Track, 0, len(m.queue)-1)
-	next = append(next, m.queue[:at]...)
-	next = append(next, m.queue[at+1:]...)
-	return m.commitQueue(next)
+	id := deviceID(m.queue[at])
+	rest := make([]player.Track, 0, len(m.queue)-1)
+	rest = append(rest, m.queue[:at]...)
+	rest = append(rest, m.queue[at+1:]...)
+	m.queue = rest
+	m.clampQueueCursor()
+
+	return controlCmd("remove from queue", func(ctx context.Context) error {
+		return editor.Drop(ctx, id)
+	})
 }
 
 // moveQueued shifts the track under the cursor by one place. It refuses to move
@@ -105,56 +123,30 @@ func (m *Model) commitQueue(next []player.Track) tea.Cmd {
 	})
 }
 
-// playRow brings a track forward: it goes to the top of the queue, everything
-// else slides down, and the device is told to advance into it.
+// playRow brings a track forward: it starts playing, and every other track
+// keeps its place in the list and moves up one.
 //
-// Nothing is discarded. Seeking to the track would have been the other reading
-// of "play", and it is what the official client does, but it throws away every
-// track between here and there — and those are in the list precisely because
-// they are meant to be heard. A track that came from the album stays in the
-// album as well, so it will come round again later; that is the price of not
-// losing anything, and it is the cheaper one.
+// Seeking to it would have been the other reading of "play", and is what the
+// official client does, but it throws away every track in between — and those
+// are in the list precisely because they are meant to be heard.
 func (m *Model) playRow(at int) tea.Cmd {
-	if !m.editable() {
-		// Nothing else can rewrite a queue, so against another device this is
-		// the only move left, skipped-over tracks and all.
-		id, p := deviceID(m.queue[at]), m.player
-		return tea.Batch(
-			controlCmd("play from queue", func(ctx context.Context) error {
-				return p.PlayFrom(ctx, id)
-			}),
-			m.awaitTrackChange(),
-		)
-	}
+	target := m.queue[at]
+	id, p := deviceID(target), m.player
+	cmd := m.skip("play from queue", func(ctx context.Context) error {
+		return p.PlayFrom(ctx, id)
+	})
 
-	reorder := m.commitQueue(queueWithFirst(m.queue, at))
+	// Show the result now rather than a round trip from now. The marks will be
+	// redrawn by the refresh that follows the track change; the order will not
+	// change, because this is the order the device was asked for.
+	rest := make([]player.Track, 0, len(m.queue)-1)
+	rest = append(rest, m.queue[:at]...)
+	rest = append(rest, m.queue[at+1:]...)
+	m.queue = rest
+	m.showTrack(&target)
 	m.queuePane.cursor.reset()
 
-	p := m.player
-	skip := m.skip("play from queue", p.Next)
-	if t := m.takeFromQueue(); t != nil {
-		m.showTrack(t)
-		skip = tea.Batch(skip, m.syncCover())
-	}
-	// The device has to be holding the new order before it is told to advance,
-	// or it advances into the old one.
-	return tea.Sequence(reorder, skip)
-}
-
-// queueWithFirst moves the track at index at to the front, marking it as
-// hand-queued so that it survives being sent back as the queue.
-func queueWithFirst(queue []player.Track, at int) []player.Track {
-	first := queue[at]
-	first.Queued = true
-
-	next := make([]player.Track, 0, len(queue))
-	next = append(next, first)
-	for i, t := range queue {
-		if i != at {
-			next = append(next, t)
-		}
-	}
-	return next
+	return tea.Batch(cmd, m.syncCover())
 }
 
 // deviceID is the id to speak to the playback device with, falling back to the

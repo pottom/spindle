@@ -52,17 +52,26 @@ func TestDropRemovesTheTrackImmediately(t *testing.T) {
 	}
 }
 
-// The context tracks are not the queue's to edit: they belong to whatever album
-// or playlist is playing.
-func TestDropRefusesContextTracks(t *testing.T) {
+// Every row can be taken out, whichever half of the list it came from: to the
+// user there is one list, and a track in it is one they mean to hear.
+func TestDropRemovesAContextTrackToo(t *testing.T) {
+	dropped := make(chan string, 1)
 	m := queueModel(1, "a", "b", "c")
+	m.player = recordingEditor{Player: m.player, dropped: dropped}
+	m.queue[1].DeviceID = "device-b"
 	m.queuePane.cursor.cursor = queueRowOf(1)
 
-	if cmd := m.dropQueued(); cmd != nil {
-		t.Error("dropQueued() edited a track that came from the context")
+	cmd := m.dropQueued()
+	if cmd == nil {
+		t.Fatal("dropQueued() = nil on a context track")
 	}
-	if len(m.queue) != 3 {
-		t.Errorf("queue = %v, want it untouched", ids(m.queue))
+	cmd()
+
+	if got := <-dropped; got != "device-b" {
+		t.Errorf("Drop(%q), want the device's own id", got)
+	}
+	if names := ids(m.queue); len(names) != 2 || names[0] != "a" || names[1] != "c" {
+		t.Errorf("queue = %v, want b gone and the rest in order", names)
 	}
 }
 
@@ -97,7 +106,7 @@ func TestMoveStopsAtTheContextBoundary(t *testing.T) {
 	}
 }
 
-// Only the hand-queued ids are sent: the daemon replaces that list wholesale,
+// Only the hand-queued ids are sent: the device replaces that list wholesale,
 // so including the context would make it queue the album a second time.
 func TestOnlyQueuedTracksAreSent(t *testing.T) {
 	sent := make(chan []string, 1)
@@ -105,15 +114,15 @@ func TestOnlyQueuedTracksAreSent(t *testing.T) {
 	m.player = recordingEditor{Player: m.player, sent: sent}
 	m.queuePane.cursor.cursor = queueRowOf(0)
 
-	cmd := m.dropQueued()
+	cmd := m.moveQueued(1)
 	if cmd == nil {
-		t.Fatal("dropQueued() = nil")
+		t.Fatal("moveQueued() = nil")
 	}
 	cmd()
 
 	got := <-sent
-	if len(got) != 1 || got[0] != "b" {
-		t.Errorf("SetQueue(%v), want only the remaining hand-queued track", got)
+	if len(got) != 2 || got[0] != "b" || got[1] != "a" {
+		t.Errorf("SetQueue(%v), want the two hand-queued tracks, swapped", got)
 	}
 }
 
@@ -134,11 +143,19 @@ func TestEnterPlaysFromTheQueue(t *testing.T) {
 
 type recordingEditor struct {
 	player.Player
-	sent chan []string
+	sent    chan []string
+	dropped chan string
 }
 
 func (r recordingEditor) SetQueue(_ context.Context, ids []string) error {
 	r.sent <- ids
+	return nil
+}
+
+func (r recordingEditor) Drop(_ context.Context, id string) error {
+	if r.dropped != nil {
+		r.dropped <- id
+	}
 	return nil
 }
 
@@ -252,9 +269,6 @@ func TestQueueLeadsWithThePlayingTrack(t *testing.T) {
 	if m.queueIndex() != -1 {
 		t.Errorf("queueIndex() = %d on the playing row, want -1", m.queueIndex())
 	}
-	if cmd := m.dropQueued(); cmd != nil {
-		t.Error("dropQueued() tried to remove the track that is playing")
-	}
 	if cmd := m.moveQueued(1); cmd != nil {
 		t.Error("moveQueued() tried to move the track that is playing")
 	}
@@ -278,26 +292,29 @@ func TestQueueWithoutAPlayingTrack(t *testing.T) {
 	}
 }
 
-// Bringing a track forward moves it to the top and pushes the rest down. It
-// must not drop anything: the tracks in the list are there to be heard, and
-// choosing one to hear sooner is not a decision about the others.
+// Bringing a track forward puts it on screen at once, and every other track
+// keeps its place and moves up one. Nothing may be dropped: the tracks in the
+// list are there to be heard, and choosing one to hear sooner is not a decision
+// about the others.
 func TestPlayingARowMovesItToTheTop(t *testing.T) {
-	queue := queueOf(1, "a", "b", "c", "d")
+	m := queueModel(1, "a", "b", "c", "d")
+	m.queuePane.cursor.cursor = queueRowOf(2) // "c"
 
-	got := queueWithFirst(queue, 2)
-	if names := ids(got); len(names) != 4 || names[0] != "c" {
-		t.Fatalf("queueWithFirst = %v, want c first", names)
+	var tm tea.Model = m
+	tm, cmd := tm.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("enter produced no command")
 	}
-	if names := ids(got)[1:]; names[0] != "a" || names[1] != "b" || names[2] != "d" {
-		t.Errorf("queueWithFirst = %v, want the rest in their old order", ids(got))
+
+	got := tm.(Model)
+	if got.ps.Title != "c" {
+		t.Errorf("title = %q, want the chosen track playing at once", got.ps.Title)
 	}
-	// It has to be marked, or the device would not keep it as the queue.
-	if !got[0].Queued {
-		t.Error("the track brought forward is not marked as queued")
+	if names := ids(got.queue); len(names) != 3 || names[0] != "a" || names[1] != "b" || names[2] != "d" {
+		t.Errorf("queue = %v, want the rest kept in their order", names)
 	}
-	// And the one that was already queued stays queued, right behind it.
-	if !got[1].Queued {
-		t.Error("the track that was already queued lost its mark")
+	if got.elapsed() > 100*time.Millisecond {
+		t.Errorf("elapsed = %v, want the playhead reset", got.elapsed())
 	}
 }
 
@@ -338,5 +355,21 @@ func TestTheDeviceIsAddressedInItsOwnIds(t *testing.T) {
 
 	if got := <-sent; len(got) != 1 || got[0] != "device-a" {
 		t.Errorf("SetQueue(%v), want the device's own id", got)
+	}
+}
+
+// Taking out the track that is playing means not hearing the rest of it, which
+// is a skip. The one behind it moves up and starts.
+func TestDropOnThePlayingRowSkipsIt(t *testing.T) {
+	m := queueModel(1, "a", "b")
+
+	if cmd := m.dropQueued(); cmd == nil {
+		t.Fatal("dropQueued() = nil on the playing row, want a skip")
+	}
+	if m.ps.Title != "a" {
+		t.Errorf("title = %q, want the next track playing", m.ps.Title)
+	}
+	if names := ids(m.queue); len(names) != 1 || names[0] != "b" {
+		t.Errorf("queue = %v, want a taken and b waiting", names)
 	}
 }

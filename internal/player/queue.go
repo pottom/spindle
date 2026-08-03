@@ -22,6 +22,10 @@ type QueueEditor interface {
 	// the context — the rest of an album or playlist — are left alone, since
 	// they are not the queue's to move.
 	SetQueue(ctx context.Context, trackIDs []string) error
+
+	// Drop removes an upcoming track from the list, leaving every other track
+	// and its place alone.
+	Drop(ctx context.Context, trackID string) error
 }
 
 // trackURI is how Spotify names a track everywhere except the Web API, which
