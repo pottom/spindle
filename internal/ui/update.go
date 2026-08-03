@@ -32,6 +32,18 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case msg.StateFetched:
 		m.adopt(message.State)
 		m.err = nil
+		return m, m.syncCover()
+
+	case msg.CoverReady:
+		if message.URL == m.cover.url {
+			m.cover.art = message.Art
+		}
+		return m, nil
+
+	case msg.CoverFailed:
+		if message.URL == m.cover.url {
+			m.cover.failed = true
+		}
 		return m, nil
 
 	case msg.Error:
@@ -39,6 +51,11 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case spinner.TickMsg:
+		// The spinner only exists to cover an artwork download. Letting it run
+		// otherwise would mean a redraw every 100 ms for nothing.
+		if !m.cover.loading() {
+			return m, nil
+		}
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(message)
 		return m, cmd
@@ -167,6 +184,24 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// syncCover starts an artwork load when the track's cover has changed. The
+// artwork box is a fixed size, so a resize never invalidates what is loaded.
+func (m *Model) syncCover() tea.Cmd {
+	if m.ps == nil || m.covers == nil || m.ps.CoverURL == m.cover.url {
+		return nil
+	}
+
+	m.cover = coverState{url: m.ps.CoverURL}
+	if m.cover.url == "" {
+		m.cover.failed = true
+		return nil
+	}
+	return tea.Batch(
+		coverCmd(m.covers, m.cover.url, coverCells, coverRows),
+		m.spinner.Tick,
+	)
 }
 
 // hold opens the window during which local state outranks the server's.

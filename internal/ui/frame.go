@@ -59,13 +59,40 @@ func (f frame) bottom() string {
 }
 
 // fit truncates s with an ellipsis and pads it out to exactly w cells. Styled
-// input is handled: widths and cuts are ANSI-aware.
+// input is handled: widths and cuts are ANSI-aware. A string that already fits
+// is passed through untouched, which keeps artwork escape sequences intact.
 func fit(s string, w int) string {
 	if w <= 0 {
 		return ""
 	}
-	s = ansi.Truncate(s, w, "…")
-	return s + strings.Repeat(" ", max(w-lipgloss.Width(s), 0))
+	width := lipgloss.Width(s)
+	if width > w {
+		s = ansi.Truncate(s, w, "…")
+		width = lipgloss.Width(s)
+	}
+	return s + strings.Repeat(" ", max(w-width, 0))
+}
+
+// center places lines in the middle of a w × h block, padding the rest with
+// spaces so every returned line is exactly w cells wide.
+func center(lines []string, w, h int) []string {
+	out := make([]string, h)
+	blank := strings.Repeat(" ", w)
+	for i := range out {
+		out[i] = blank
+	}
+
+	top := max((h-len(lines))/2, 0)
+	for i, line := range lines {
+		row := top + i
+		if row >= h {
+			break
+		}
+		lw := lipgloss.Width(line)
+		left := max((w-lw)/2, 0)
+		out[row] = strings.Repeat(" ", left) + line + strings.Repeat(" ", max(w-left-lw, 0))
+	}
+	return out
 }
 
 // padLeft right-aligns s inside w cells.

@@ -25,6 +25,9 @@ type Styles struct {
 	ToggleOff lipgloss.Style
 	Volume    lipgloss.Style
 
+	// Artwork box.
+	NoCover lipgloss.Style
+
 	// Standalone screens and banners.
 	Heading lipgloss.Style
 	Detail  lipgloss.Style
@@ -52,6 +55,8 @@ func New(isDark bool) Styles {
 		ToggleOn:  lipgloss.NewStyle().Foreground(t.Accent),
 		ToggleOff: lipgloss.NewStyle().Foreground(t.Faint),
 		Volume:    lipgloss.NewStyle().Foreground(t.Text),
+
+		NoCover: lipgloss.NewStyle().Foreground(t.Faint),
 
 		Heading: lipgloss.NewStyle().Foreground(t.Text),
 		Detail:  lipgloss.NewStyle().Foreground(t.Muted),

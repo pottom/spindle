@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/lipgloss/v2"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/pottom/spindle/internal/player"
 )
@@ -22,6 +22,9 @@ const (
 	iconPause = "⏸"
 	iconNext  = "⏭"
 	deviceDot = "●"
+
+	// noCoverGlyph stands in for artwork that could not be loaded. SCREENS.md 4.2.
+	noCoverGlyph = "♪"
 )
 
 func (m Model) View() tea.View {
@@ -64,26 +67,23 @@ func (m Model) renderPlayer() string {
 // body returns exactly bodyHeight interior lines: the artwork box beside the
 // track information, with the leftover height below it.
 func (m Model) body(l layout) []string {
-	var block string
+	var lines []string
 	if m.ps == nil {
-		block = m.spinner.View() + " " + m.styles.Detail.Render("Connecting…")
+		lines = []string{"", "  " + m.styles.Detail.Render("Connecting…")}
 	} else {
-		cover := lipgloss.NewStyle().
-			Border(m.styles.Border).
-			BorderForeground(m.styles.Theme.Border).
-			Width(coverBoxWidth).
-			Height(coverBoxHeight).
-			MarginLeft(leftMargin).
-			Render("")
-		info := lipgloss.NewStyle().
-			MarginLeft(columnGap).
-			Render(strings.Join(m.infoColumn(l.infoWidth), "\n"))
-		block = lipgloss.JoinHorizontal(lipgloss.Top, cover, info)
+		art := m.coverBox()
+		info := m.infoColumn(l.infoWidth)
+		margin := strings.Repeat(" ", leftMargin)
+		gap := strings.Repeat(" ", columnGap)
+
+		lines = make([]string, coverBoxHeight)
+		for i := range lines {
+			lines[i] = margin + art[i] + gap + info[i]
+		}
 	}
 
 	// A blank line above the block, but only while there is height to spare:
 	// when the expanded help squeezes the player, the artwork matters more.
-	lines := strings.Split(block, "\n")
 	if len(lines) < l.bodyHeight {
 		lines = append([]string{""}, lines...)
 	}
@@ -91,6 +91,35 @@ func (m Model) body(l layout) []string {
 		lines = append(lines, "")
 	}
 	return lines[:l.bodyHeight]
+}
+
+// coverBox draws the bordered artwork box: coverBoxHeight lines, each exactly
+// coverBoxWidth cells wide. The box never changes size, so nothing in the layout
+// moves when a cover finishes loading.
+func (m Model) coverBox() []string {
+	b := m.styles.Border
+	rule := m.styles.Rule
+	edge := strings.Repeat(b.Top, coverCells)
+
+	lines := make([]string, 0, coverBoxHeight)
+	lines = append(lines, rule.Render(b.TopLeft+edge+b.TopRight))
+	for _, row := range m.coverContent() {
+		lines = append(lines, rule.Render(b.Left)+row+rule.Render(b.Right))
+	}
+	return append(lines, rule.Render(b.BottomLeft+edge+b.BottomRight))
+}
+
+// coverContent is the interior of the artwork box: the artwork itself, a spinner
+// while it downloads, or a single note glyph when there is none.
+func (m Model) coverContent() []string {
+	switch {
+	case m.cover.art != "":
+		return center(strings.Split(m.cover.art, "\n"), coverCells, coverRows)
+	case m.cover.loading():
+		return center([]string{m.spinner.View()}, coverCells, coverRows)
+	default:
+		return center([]string{m.styles.NoCover.Render(noCoverGlyph)}, coverCells, coverRows)
+	}
 }
 
 // infoColumn is the right-hand column, always coverBoxHeight lines tall so the

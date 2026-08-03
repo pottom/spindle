@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/player"
+	"github.com/pottom/spindle/internal/ui/cover"
 	"github.com/pottom/spindle/internal/ui/style"
 )
 
@@ -27,10 +28,13 @@ const (
 // Model is the whole application state. Nothing outside Update writes to it.
 type Model struct {
 	player player.Player
+	covers *cover.Loader
 
 	ps              *player.State // last known server state
 	localProgress   time.Duration // ticked locally, not ps.Progress
 	optimisticUntil time.Time     // a poll must not overwrite before this
+
+	cover coverState
 
 	err       error
 	tickCount int
@@ -44,11 +48,12 @@ type Model struct {
 	spinner  spinner.Model
 }
 
-// New wires a model around a playback backend. The palette starts dark and is
-// corrected once the terminal reports its background colour.
-func New(p player.Player) Model {
+// New wires a model around a playback backend and an artwork loader. The palette
+// starts dark and is corrected once the terminal reports its background colour.
+func New(p player.Player, covers *cover.Loader) Model {
 	m := Model{
 		player:   p,
+		covers:   covers,
 		keys:     newKeyMap(),
 		help:     help.New(),
 		progress: progress.New(progress.WithoutPercentage(), progress.WithFillCharacters(barRune, barRune)),
@@ -71,6 +76,5 @@ func (m Model) Init() tea.Cmd {
 		tea.RequestBackgroundColor,
 		tickCmd(),
 		fetchStateCmd(m.player),
-		m.spinner.Tick,
 	)
 }

@@ -57,6 +57,7 @@ func (m *Mock) State(ctx context.Context) (*State, error) {
 		Title:      t.title,
 		Artists:    slices.Clone(t.artists),
 		Album:      t.album,
+		CoverURL:   t.cover,
 		Progress:   m.elapsed,
 		Duration:   t.duration,
 		Playing:    m.playing,

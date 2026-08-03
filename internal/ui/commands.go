@@ -8,11 +8,17 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/player"
+	"github.com/pottom/spindle/internal/ui/cover"
 	"github.com/pottom/spindle/internal/ui/msg"
 )
 
-// callTimeout bounds every backend call so a hung request cannot wedge the loop.
-const callTimeout = 10 * time.Second
+const (
+	// callTimeout bounds every backend call so a hung request cannot wedge the loop.
+	callTimeout = 10 * time.Second
+
+	// coverTimeout is more generous: it covers a download as well as the resize.
+	coverTimeout = 20 * time.Second
+)
 
 func tickCmd() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
@@ -30,6 +36,22 @@ func fetchStateCmd(p player.Player) tea.Cmd {
 			return msg.Error{Err: fmt.Errorf("fetch player state: %w", err)}
 		}
 		return msg.StateFetched{State: st}
+	}
+}
+
+// coverCmd runs the artwork pipeline off the update loop: cache lookup, download,
+// decode, resize and render. A failure is reported as a missing cover, not as an
+// error banner.
+func coverCmd(loader *cover.Loader, url string, wCells, hCells int) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), coverTimeout)
+		defer cancel()
+
+		art, err := loader.Load(ctx, url, wCells, hCells)
+		if err != nil {
+			return msg.CoverFailed{URL: url}
+		}
+		return msg.CoverReady{URL: url, Art: art}
 	}
 }
 
