@@ -20,8 +20,14 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 	m.tab = t
 
 	cmds := []tea.Cmd{m.syncCover()}
-	if t == tabPlaylists && m.playlists.items == nil {
+	switch {
+	case t == tabPlaylists && m.playlists.items == nil:
 		cmds = append(cmds, fetchPlaylistsCmd(m.player))
+	case t == tabQueue:
+		// The queue is kept for the sake of instant skipping, which only needs
+		// the first entry to be right. Looking at the whole list is a different
+		// promise, so it is fetched again.
+		cmds = append(cmds, fetchQueueCmd(m.player))
 	}
 	return tea.Batch(cmds...)
 }
@@ -30,6 +36,8 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 // returns handled=false for anything the caller should deal with itself.
 func (m *Model) browseKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	switch m.tab {
+	case tabQueue:
+		return m.queueKey(k)
 	case tabPlaylists:
 		return m.playlistKey(k)
 	case tabSearch:
@@ -78,6 +86,15 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			m.awaitTrackChange(),
 		), true
 
+	case key.Matches(k, m.keys.Enqueue):
+		if m.playlists.open == nil {
+			return nil, true
+		}
+		if i := m.playlists.inner.cursor; i >= 0 && i < len(m.playlists.tracks) {
+			return m.enqueue(m.playlists.tracks[i].ID), true
+		}
+		return nil, true
+
 	case key.Matches(k, m.keys.Back):
 		if m.playlists.open == nil {
 			return nil, true
@@ -111,6 +128,12 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			}),
 			m.awaitTrackChange(),
 		), true
+
+	case key.Matches(k, m.keys.EnqueueTyped):
+		if sel := m.search.selected(); sel != nil {
+			return m.enqueue(sel.ID), true
+		}
+		return nil, true
 
 	case key.Matches(k, m.keys.Back):
 		if m.search.input.Value() == "" {

@@ -3,17 +3,20 @@ package ui
 import "strings"
 
 // tabID identifies a screen. Each one works differently: the player shows what
-// is sounding, the playlists browse a library, the search hunts for a track.
+// is sounding, the queue what follows, the playlists browse a library, the
+// search hunts for a track.
 type tabID int
 
 const (
 	tabPlayer tabID = iota
+	tabQueue
 	tabPlaylists
 	tabSearch
 )
 
 var tabNames = [...]string{
 	tabPlayer:    "now playing",
+	tabQueue:     "queue",
 	tabPlaylists: "playlists",
 	tabSearch:    "search",
 }

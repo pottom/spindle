@@ -14,6 +14,10 @@ const (
 	rowCursor = "▸"
 	nowMark   = "♪"
 
+	// queuedMark stands where the track number would be, on the entries that
+	// were put there by hand.
+	queuedMark = "+"
+
 	// secondaryCols is the fixed middle column of a list row: the artist, or the
 	// playlist's owner. Fixed so the trailing column always lines up.
 	secondaryCols = 20
@@ -26,6 +30,8 @@ const (
 // a blank line, then as many rows as fit.
 func (m Model) browsePane(l layout, rows int) []string {
 	switch m.tab {
+	case tabQueue:
+		return m.queuePaneView(l, rows)
 	case tabPlaylists:
 		return m.playlistPaneView(l, rows)
 	case tabSearch:
@@ -33,6 +39,60 @@ func (m Model) browsePane(l layout, rows int) []string {
 	default:
 		return nil
 	}
+}
+
+func (m Model) queuePaneView(l layout, rows int) []string {
+	head := []string{
+		m.styles.Title.Render("Queue"),
+		m.styles.Album.Render(queueSubtitle(m.queue)),
+	}
+	return m.listPane(l, rows, head,
+		len(m.queue), &m.queuePane.cursor,
+		"Nothing is queued.",
+		func(i, w int, selected bool) string {
+			return m.queueRow(m.queue[i], w, selected, i+1)
+		},
+	)
+}
+
+// queueRow draws one upcoming track. Hand-queued entries are marked instead of
+// numbered: their position is not a position in anything, and they are the only
+// ones that can be moved or dropped.
+func (m Model) queueRow(t player.Track, w int, selected bool, number int) string {
+	if !t.Queued {
+		return m.trackRow(t, w, selected, number)
+	}
+
+	primary := m.styles.RowPrimary
+	if selected {
+		primary = m.styles.RowSelected
+	}
+	return m.row(w, selected,
+		m.styles.Cursor.Render(queuedMark)+" "+primary.Render(t.Title),
+		m.styles.RowSecondary.Render(strings.Join(t.Artists, ", ")),
+		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
+	)
+}
+
+func queueSubtitle(tracks []player.Track) string {
+	if len(tracks) == 0 {
+		return ""
+	}
+
+	var queued int
+	var total time.Duration
+	for _, t := range tracks {
+		total += t.Duration
+		if t.Queued {
+			queued++
+		}
+	}
+
+	out := fmt.Sprintf("%d tracks · %s", len(tracks), formatSpan(total))
+	if queued > 0 {
+		out += fmt.Sprintf(" · %d queued by hand", queued)
+	}
+	return out
 }
 
 func (m Model) playlistPaneView(l layout, rows int) []string {

@@ -65,6 +65,12 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	case msg.QueueFetched:
 		m.queue = message.Tracks
+		// Clamp rather than reset: a poll landing while the queue tab is open
+		// should not throw the cursor back to the top under the user's hand.
+		m.queuePane.cursor.move(0, len(m.queue))
+		if m.tab == tabQueue {
+			return m, m.syncCover()
+		}
 		return m, nil
 
 	case msg.CoverReady:
@@ -438,6 +444,7 @@ func (m *Model) takeFromQueue() *player.Track {
 	}
 	next := m.queue[0]
 	m.queue = m.queue[1:]
+	m.queuePane.cursor.move(0, len(m.queue))
 	return &next
 }
 

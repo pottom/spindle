@@ -1,0 +1,130 @@
+package ui
+
+import (
+	"context"
+
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/pottom/spindle/internal/player"
+)
+
+// queueKey handles the queue tab.
+func (m *Model) queueKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
+	switch {
+	case key.Matches(k, m.keys.Down), key.Matches(k, m.keys.Up):
+		delta := 1
+		if key.Matches(k, m.keys.Up) {
+			delta = -1
+		}
+		m.queuePane.cursor.move(delta, len(m.queue))
+		return m.previewCover(), true
+
+	case key.Matches(k, m.keys.Enter):
+		t := m.queuedTrack()
+		if t == nil {
+			return nil, true
+		}
+		id, p := t.ID, m.player
+		return tea.Batch(
+			controlCmd("play from queue", func(ctx context.Context) error {
+				return p.PlayFrom(ctx, id)
+			}),
+			m.awaitTrackChange(),
+		), true
+
+	case key.Matches(k, m.keys.Drop):
+		return m.dropQueued(), true
+
+	case key.Matches(k, m.keys.MoveUp):
+		return m.moveQueued(-1), true
+
+	case key.Matches(k, m.keys.MoveDn):
+		return m.moveQueued(1), true
+
+	case key.Matches(k, m.keys.Back):
+		return m.switchTab(tabPlayer), true
+	}
+	return nil, false
+}
+
+// dropQueued removes the track under the cursor. Only hand-queued tracks can go:
+// the rest belong to the album or playlist that is playing, and dropping one
+// there would mean rewriting the context itself.
+func (m *Model) dropQueued() tea.Cmd {
+	t := m.queuedTrack()
+	if t == nil || !t.Queued {
+		return nil
+	}
+
+	at := m.queuePane.cursor.cursor
+	next := make([]player.Track, 0, len(m.queue)-1)
+	next = append(next, m.queue[:at]...)
+	next = append(next, m.queue[at+1:]...)
+	return m.commitQueue(next)
+}
+
+// moveQueued shifts the track under the cursor by one place. It refuses to move
+// a hand-queued track past the context tracks: those keep their own order, and
+// swapping across the boundary would look like a move that did not take.
+func (m *Model) moveQueued(delta int) tea.Cmd {
+	t := m.queuedTrack()
+	if t == nil || !t.Queued {
+		return nil
+	}
+
+	at := m.queuePane.cursor.cursor
+	to := at + delta
+	if to < 0 || to >= len(m.queue) || !m.queue[to].Queued {
+		return nil
+	}
+
+	next := make([]player.Track, len(m.queue))
+	copy(next, m.queue)
+	next[at], next[to] = next[to], next[at]
+	m.queuePane.cursor.cursor = to
+	return m.commitQueue(next)
+}
+
+// commitQueue shows the new order at once and sends it. The list on screen is
+// the one the user just edited, so waiting for Spotify to agree before drawing
+// it would make every edit feel like it had missed.
+func (m *Model) commitQueue(next []player.Track) tea.Cmd {
+	editor, ok := m.player.(player.QueueEditor)
+	if !ok {
+		return nil
+	}
+
+	ids := make([]string, 0, len(next))
+	for _, t := range next {
+		if t.Queued {
+			ids = append(ids, t.ID)
+		}
+	}
+
+	m.queue = next
+	m.queuePane.cursor.move(0, len(m.queue))
+	return controlCmd("edit queue", func(ctx context.Context) error {
+		return editor.SetQueue(ctx, ids)
+	})
+}
+
+// enqueue appends a track and asks for the queue again, so the queue tab shows
+// it without waiting for the next track change.
+func (m *Model) enqueue(trackID string) tea.Cmd {
+	p := m.player
+	return tea.Sequence(
+		controlCmd("add to queue", func(ctx context.Context) error {
+			return p.AddToQueue(ctx, trackID)
+		}),
+		fetchQueueCmd(p),
+	)
+}
+
+// editable reports whether the queue can be reordered, which only the local
+// device allows. Elsewhere the keys are still listed but do nothing, so the
+// help has to stop offering them.
+func (m Model) editable() bool {
+	_, ok := m.player.(player.QueueEditor)
+	return ok
+}

@@ -58,6 +58,7 @@ type Model struct {
 	optimisticUntil time.Time // a poll must not overwrite before this
 
 	tab       tabID
+	queuePane queuePane
 	playlists playlistPane
 	search    searchPane
 
@@ -152,6 +153,11 @@ func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 // cursor is resting on.
 func (m Model) coverTarget() string {
 	switch m.tab {
+	case tabQueue:
+		if t := m.queuedTrack(); t != nil {
+			return t.CoverURL
+		}
+		return ""
 	case tabPlaylists:
 		return m.playlists.cover()
 	case tabSearch:
@@ -213,6 +219,10 @@ func (m Model) helpKeys() tabKeys {
 		return m.keys.forNoDevice()
 	case m.devices.open:
 		return m.keys.forDevices()
+	case m.tab == tabQueue && !m.editable():
+		// Against a device that is not ours the queue can only be read. Listing
+		// keys that do nothing would be worse than a shorter bar.
+		return m.keys.forReadOnlyQueue()
 	default:
 		return m.keys.forTab(m.tab)
 	}

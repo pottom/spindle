@@ -38,6 +38,13 @@ func (p playlistPane) cover() string {
 	return ""
 }
 
+// queuePane is the queue tab. It holds no tracks of its own: the model already
+// keeps the queue for the sake of instant skipping, and a second copy would be
+// one more thing to keep in step.
+type queuePane struct {
+	cursor listState
+}
+
 // searchPane is the search tab: a query and its results.
 type searchPane struct {
 	input   textinput.Model
@@ -70,4 +77,14 @@ func (s searchPane) cover() string {
 		return sel.CoverURL
 	}
 	return ""
+}
+
+// queuedTrack is the queue entry under the cursor, or nil when the queue is
+// empty.
+func (m Model) queuedTrack() *player.Track {
+	i := m.queuePane.cursor.cursor
+	if i < 0 || i >= len(m.queue) {
+		return nil
+	}
+	return &m.queue[i]
 }

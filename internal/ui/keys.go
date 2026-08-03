@@ -28,6 +28,16 @@ type keyMap struct {
 	Back    key.Binding
 	Devices key.Binding
 	Refresh key.Binding
+
+	// Queue editing. Only the tracks put there by hand can be moved or dropped,
+	// so these do nothing on the rest of the list.
+	Enqueue key.Binding
+	// EnqueueTyped is the same action on the search tab, where every printable
+	// key belongs to the query and cannot mean anything else.
+	EnqueueTyped key.Binding
+	Drop         key.Binding
+	MoveUp       key.Binding
+	MoveDn       key.Binding
 }
 
 func newKeyMap() keyMap {
@@ -98,6 +108,24 @@ func newKeyMap() keyMap {
 			key.WithKeys("r"),
 			key.WithHelp("r", "refresh"),
 		),
+
+		Enqueue: key.NewBinding(
+			key.WithKeys("a"),
+			key.WithHelp("a", "add to queue"),
+		),
+		EnqueueTyped: key.NewBinding(
+			key.WithKeys("ctrl+a"),
+			key.WithHelp("ctrl+a", "add to queue"),
+		),
+		Drop: key.NewBinding(
+			key.WithKeys("x"),
+			key.WithHelp("x", "remove from queue"),
+		),
+		MoveUp: key.NewBinding(key.WithKeys("K")),
+		MoveDn: key.NewBinding(
+			key.WithKeys("J"),
+			key.WithHelp("J / K", "move down / up"),
+		),
 	}
 
 	return k
@@ -151,19 +179,50 @@ func (k keyMap) forDevices() tabKeys {
 	}
 }
 
+// forReadOnlyQueue is the help for a queue that can be walked but not edited.
+func (k keyMap) forReadOnlyQueue() tabKeys {
+	return tabKeys{
+		short: []key.Binding{
+			hint("↑↓", "select"),
+			hint("enter", "play"),
+			hint("tab", "switch"),
+			hint("?", "help"),
+		},
+		full: [][]key.Binding{
+			{k.Down, k.Enter, k.NextTab},
+			{k.PlayPause, k.Next, k.Help, k.Quit},
+		},
+	}
+}
+
 func (k keyMap) forTab(t tabID) tabKeys {
 	switch t {
+	case tabQueue:
+		return tabKeys{
+			short: []key.Binding{
+				hint("↑↓", "select"),
+				hint("enter", "play"),
+				hint("x", "remove"),
+				hint("J/K", "move"),
+				hint("?", "help"),
+			},
+			full: [][]key.Binding{
+				{k.Down, k.Enter, k.Drop, k.MoveDn},
+				{k.PlayPause, k.Next, k.NextTab, k.Help},
+			},
+		}
+
 	case tabPlaylists:
 		return tabKeys{
 			short: []key.Binding{
 				hint("↑↓", "select"),
 				hint("enter", "play"),
+				hint("a", "queue"),
 				hint("esc", "back"),
-				hint("tab", "switch"),
 				hint("?", "help"),
 			},
 			full: [][]key.Binding{
-				{k.Down, k.Enter, k.Back, k.NextTab},
+				{k.Down, k.Enter, k.Enqueue, k.Back, k.NextTab},
 				{k.PlayPause, k.Next, k.Help, k.Quit},
 			},
 		}
@@ -174,10 +233,10 @@ func (k keyMap) forTab(t tabID) tabKeys {
 				hint("type", "to search"),
 				hint("↑↓", "select"),
 				hint("enter", "play"),
-				hint("tab", "switch"),
+				hint("ctrl+a", "queue"),
 			},
 			full: [][]key.Binding{
-				{k.Down, k.Enter, k.Back, k.NextTab},
+				{k.Down, k.Enter, k.EnqueueTyped, k.Back, k.NextTab},
 				{hint("ctrl+c", "quit"), k.Help},
 			},
 		}
