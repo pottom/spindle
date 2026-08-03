@@ -11,6 +11,11 @@ import (
 type CellSize struct {
 	Width  int
 	Height int
+
+	// Measured distinguishes a figure the terminal reported from the assumed
+	// fallback. When it is false, callers that care about resolution should
+	// supersample rather than trust these numbers.
+	Measured bool
 }
 
 // defaultCellSize is the 2:1 height-to-width ratio assumed when the terminal
@@ -28,7 +33,8 @@ func DetectCellSize(f *os.File) CellSize {
 		return defaultCellSize
 	}
 	return CellSize{
-		Width:  int(ws.Xpixel) / int(ws.Col),
-		Height: int(ws.Ypixel) / int(ws.Row),
+		Width:    int(ws.Xpixel) / int(ws.Col),
+		Height:   int(ws.Ypixel) / int(ws.Row),
+		Measured: true,
 	}
 }

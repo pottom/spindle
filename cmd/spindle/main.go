@@ -18,7 +18,13 @@ import (
 func main() {
 	mock := flag.Bool("mock", false, "run against the offline mock backend, without auth or network")
 	backend := flag.String("cover", "auto", "artwork backend: auto, kitty or halfblock")
+	info := flag.Bool("cover-info", false, "report what the terminal supports and exit")
 	flag.Parse()
+
+	if *info {
+		reportCoverSupport()
+		return
+	}
 
 	if !*mock {
 		fmt.Fprintln(os.Stderr, "spindle: the live Spotify backend is not wired up yet; run with --mock")
@@ -57,4 +63,27 @@ func coverRenderer(backend string) (cover.Renderer, error) {
 	default:
 		return nil, fmt.Errorf("unknown cover backend %q: want auto, kitty or halfblock", backend)
 	}
+}
+
+// reportCoverSupport prints what the terminal was found to support, so a fallback
+// to halfblock can be told apart from a kitty backend that is simply not drawing.
+func reportCoverSupport() {
+	cell := cover.DetectCellSize(os.Stdout)
+	source := "measured via TIOCGWINSZ"
+	if !cell.Measured {
+		source = "assumed; the terminal reported no pixel size"
+	}
+
+	kitty := cover.SupportsKitty(os.Stdout, os.Stdin)
+	backend := "halfblock"
+	if kitty {
+		backend = "kitty"
+	}
+
+	fmt.Printf("terminal:   TERM=%s TERM_PROGRAM=%s\n", os.Getenv("TERM"), os.Getenv("TERM_PROGRAM"))
+	fmt.Printf("cell size:  %d × %d px (%s)\n", cell.Width, cell.Height, source)
+	fmt.Printf("kitty:      %v\n", kitty)
+	fmt.Printf("backend:    %s\n", backend)
+	fmt.Printf("artwork:    %d × %d cells = %d × %d px\n",
+		20, 10, 20*cell.Width, 10*cell.Height)
 }

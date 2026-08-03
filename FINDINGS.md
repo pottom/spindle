@@ -43,7 +43,7 @@ leaves the artwork cells alone, so there is nothing to flicker. On resize the im
 is *not* re-transmitted, yet it follows the frame to its new position, because the
 placeholders are ordinary text that the diff relocates like any other.
 
-Three things that did have to be got right:
+Four things that did have to be got right:
 
 - **`q=2` on the transmission.** Without it the terminal replies with an `\x1b_G…`
   acknowledgement, and Bubble Tea reads that reply as keyboard input.
@@ -53,13 +53,26 @@ Three things that did have to be got right:
 - **A single, reused image id.** Re-transmitting under `i=1` replaces the image,
   which is exactly the behaviour wanted on a track change, and it keeps the
   terminal's image store from filling up over a long session.
+- **Detection cannot use `os.File` read deadlines.** This one cost a release: the
+  first implementation timed the reply with `os.Stdin.SetReadDeadline`, which on a
+  terminal fails outright with `file type does not support deadline`, because Go's
+  runtime poller will not accept a tty. The detector took that error as "no reply"
+  and *every* terminal was classified as unsupported, so the kitty path never ran
+  and the fallback quietly rendered 20 × 20 pixel artwork. The fix is `poll(2)` on
+  the raw descriptor. Detection is now regression-tested from both sides: a pty
+  that answers the graphics query yields the kitty backend, one that answers only
+  the device attributes query yields halfblock.
 
 Detection runs before `tea.NewProgram`, so the query and its reply cannot collide
 with the event loop. With no reply inside 200 ms the program falls back to halfblock;
 measured cost of a negative detection is the full 200 ms timeout, once, at startup.
 
+Transmission size is 113–146 KB of base64 per track change, in 4 KB chunks.
+
 **Still to confirm by eye:** that Ghostty and kitty actually *display* the result.
 Everything above is a measurement of the byte stream, not of pixels on a screen.
+`spindle --cover-info` reports the detected backend and cell size, which is how a
+fallback gets told apart from a kitty backend that is simply not drawing.
 
 ## 2. `go-termimg` or a hand-rolled implementation?
 
@@ -120,4 +133,8 @@ kitty path matters. Verified by decoding the emitted escape sequences back into 
 bitmap and comparing against the source.
 
 Scaling is aspect-correct: the cell pixel size comes from `TIOCGWINSZ`, falling back
-to a 2:1 assumption when the terminal reports zeroes.
+to a 2:1 assumption when the terminal reports zeroes. The kitty backend supersamples
+2× whenever that fallback is in play, so an unreported cell size costs payload rather
+than sharpness. A square cover in the 20 × 10 box lands on 20 × 7 cells with a
+48 px-tall cell and fills the box exactly with a 2:1 cell; the remainder is padding,
+so the box never changes size.

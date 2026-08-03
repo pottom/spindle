@@ -25,6 +25,11 @@ const (
 
 	// chunkSize is the escape-sequence payload limit the protocol imposes.
 	chunkSize = 4096
+
+	// unmeasuredSupersample is the safety factor applied when the terminal would
+	// not report its cell size. Transmitting at the assumed resolution would
+	// leave the terminal upscaling a too-small image on a HiDPI display.
+	unmeasuredSupersample = 2
 )
 
 // Kitty renders through the kitty graphics protocol in Unicode placeholder mode:
@@ -48,6 +53,14 @@ func (k *Kitty) Render(img image.Image, wCells, hCells int) (string, error) {
 	if cols == 0 || rows == 0 {
 		return "", fmt.Errorf("render kitty: image does not fit %dx%d cells", wCells, hCells)
 	}
+
+	if !k.Cell.Measured {
+		pxW *= unmeasuredSupersample
+		pxH *= unmeasuredSupersample
+	}
+	// Sending more pixels than the source has only inflates the payload.
+	b := img.Bounds()
+	pxW, pxH = min(pxW, b.Dx()), min(pxH, b.Dy())
 
 	scaled := image.NewRGBA(image.Rect(0, 0, pxW, pxH))
 	draw.CatmullRom.Scale(scaled, scaled.Bounds(), img, img.Bounds(), draw.Src, nil)
