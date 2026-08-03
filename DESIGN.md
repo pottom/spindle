@@ -12,7 +12,24 @@ internal/ui/              – Bubble Tea Model/Update/View
 internal/ui/msg/          – tea.Msg types
 internal/ui/cover/        – CoverRenderer interface + kitty/halfblock backends
 internal/ui/style/        – all Lipgloss styles in one place
+internal/xdg/             – XDG config and cache directories
 ```
+
+### Directories
+
+Everything spindle writes goes to XDG paths, not to Go's platform-conventional
+`os.UserConfigDir` and `os.UserCacheDir` — on macOS those mean `~/Library`, which
+is not where someone who keeps their dotfiles in order looks.
+
+| What | Where |
+|------|-------|
+| OAuth token | `$XDG_CONFIG_HOME/spindle/token.json`, mode 0600 |
+| Cover cache | `$XDG_CACHE_HOME/spindle/covers/` |
+
+### Portability
+
+`linux`, `darwin`, `windows` and the BSDs, on `amd64`, `arm64` and `arm`. Terminal
+syscalls live in `_unix.go` / `_windows.go` pairs; `make cross` builds the lot.
 
 ### Layering rule
 
@@ -281,7 +298,7 @@ Aspect-correct scaling needs the pixel size of a cell. In order:
 
 ### 5.5 Caching
 
-Album ID → downloaded JPEG under `os.UserCacheDir()/spindle/covers/`. Download each
+Album ID → downloaded JPEG under `$XDG_CACHE_HOME/spindle/covers/`. Download each
 album once. Also keep an in-memory LRU of 10 decoded and resized images — the resize
 is more expensive than it looks.
 

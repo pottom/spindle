@@ -2,6 +2,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -10,12 +12,33 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/pottom/spindle/internal/auth"
 	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui"
 	"github.com/pottom/spindle/internal/ui/cover"
 )
 
+// reportFatal prints an error and leaves. A missing client id is not really an
+// error so much as an unfinished setup, so it gets the instructions instead of a
+// one-line complaint.
+func reportFatal(err error) {
+	if errors.Is(err, auth.ErrNoClientID) {
+		fmt.Fprintln(os.Stderr, auth.SetupHelp())
+		os.Exit(1)
+	}
+	fmt.Fprintln(os.Stderr, "spindle:", err)
+	os.Exit(1)
+}
+
 func main() {
+	// Subcommands come before flags so "spindle login" reads the way it looks.
+	if len(os.Args) > 1 && os.Args[1] == "login" {
+		if err := runLogin(context.Background()); err != nil {
+			reportFatal(err)
+		}
+		return
+	}
+
 	mock := flag.Bool("mock", false, "run against the offline mock backend, without auth or network")
 	backend := flag.String("cover", "auto", "artwork backend: auto, kitty or halfblock")
 	info := flag.Bool("cover-info", false, "report what the terminal supports and exit")
@@ -34,14 +57,12 @@ func main() {
 	cell := cover.DetectCellSize(os.Stdout)
 	renderer, err := coverRenderer(*backend, cell)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "spindle:", err)
-		os.Exit(1)
+		reportFatal(err)
 	}
 	loader := cover.NewLoader(renderer, &http.Client{Timeout: 15 * time.Second})
 
 	if _, err := tea.NewProgram(ui.New(player.NewMock(), loader, cell)).Run(); err != nil {
-		fmt.Fprintln(os.Stderr, "spindle:", err)
-		os.Exit(1)
+		reportFatal(err)
 	}
 }
 

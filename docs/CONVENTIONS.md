@@ -7,7 +7,10 @@ resolving the four risks listed in `DESIGN.md`, not production readiness.
 
 - `make run-mock` — mock backend, no auth and no network. Use this during development.
 - `make run` — live Spotify API.
+- `make login` — run the OAuth flow and report who you are signed in as.
 - `make lint` — `go vet ./... && staticcheck ./...`
+- `make cross` — build every supported platform. Run it after touching anything
+  that talks to the terminal or the filesystem.
 
 ## Hard rules
 
@@ -18,9 +21,11 @@ resolving the four risks listed in `DESIGN.md`, not production readiness.
    `tea.Cmd` and returns as a `tea.Msg`.
 3. **No `panic` and no `log.Fatal` outside `main()`.** Errors are messages the UI
    displays.
-4. **`View()` is a pure function.** It mutates nothing, writes nothing, calls nothing
+4. **No POSIX-only syscall outside a `_unix.go` file.** Windows is a supported
+   target; `make cross` is what proves it.
+5. **`View()` is a pure function.** It mutates nothing, writes nothing, calls nothing
    remote.
-5. **Do not write code for features outside the current milestone.** No placeholders,
+6. **Do not write code for features outside the current milestone.** No placeholders,
    no TODO scaffolding, no speculative abstraction.
 
 ## Style

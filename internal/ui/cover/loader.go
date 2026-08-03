@@ -16,6 +16,8 @@ import (
 
 	_ "image/jpeg"
 	_ "image/png"
+
+	"github.com/pottom/spindle/internal/xdg"
 )
 
 const (
@@ -41,8 +43,8 @@ type Loader struct {
 // not fatal: the loader simply downloads every time.
 func NewLoader(r Renderer, client *http.Client) *Loader {
 	dir := ""
-	if base, err := os.UserCacheDir(); err == nil {
-		dir = filepath.Join(base, "spindle", "covers")
+	if base, err := xdg.CacheDir(); err == nil {
+		dir = filepath.Join(base, "covers")
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			dir = ""
 		}

@@ -125,6 +125,26 @@ A full hour of continuous running has not been measured; 200 cover swaps in a fe
 minutes is a harsher test of the cache than an idle hour would be, but it does not
 cover slow drift.
 
+## Portability
+
+Everything builds for `linux`, `darwin`, `windows`, `freebsd` and `openbsd`, on
+`amd64`, `arm64`, `arm` and `386`. `make cross` keeps it that way.
+
+Only two files ever needed splitting, both of them terminal syscalls:
+
+- **Cell pixel size.** `TIOCGWINSZ` on unix; on Windows the console API reports
+  the window in cells and never in pixels, and no Windows terminal answers the
+  `CSI 14 t` query either, so the 2:1 assumption stands and the kitty backend
+  supersamples to compensate.
+- **Graphics protocol detection.** `poll(2)` on unix. Not implemented on Windows:
+  reading the reply needs a console-specific wait that cannot be exercised from
+  here, and a probe that hangs on stdin would swallow the first keystroke. Windows
+  therefore gets halfblock automatically, and `--cover=kitty` remains available for
+  the terminals that do support it there.
+
+Nothing else was platform-specific. The artwork pipeline, the OAuth flow and the
+whole UI are portable as written.
+
 ## Halfblock backend
 
 Universal fallback, no detection required. It yields one pixel per cell across and
