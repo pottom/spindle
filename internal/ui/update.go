@@ -145,8 +145,20 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case spinner.TickMsg:
-		// The spinner only exists to cover an artwork download. Letting it run
-		// otherwise would mean a redraw every 100 ms for nothing.
+		if message.ID == m.device.ID() {
+			// Silence should cost nothing: a mark that turns while nothing plays
+			// is a redraw every 125 ms for a lie.
+			if m.ps == nil || !m.ps.Playing {
+				m.deviceRun = false
+				return m, nil
+			}
+			var cmd tea.Cmd
+			m.device, cmd = m.device.Update(message)
+			return m, cmd
+		}
+
+		// The other spinner only exists to cover an artwork download. Letting it
+		// run otherwise would mean a redraw every 100 ms for nothing.
 		if !m.cover.loading() {
 			return m, nil
 		}
@@ -170,6 +182,9 @@ func (m *Model) resize() {
 func (m Model) handleTick() (tea.Model, tea.Cmd) {
 	m.tickCount++
 	cmds := []tea.Cmd{tickCmd()}
+	if cmd := m.spinDevice(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 
 	// The tick no longer counts anything: elapsed derives the position from the
 	// clock. It is still what notices a track running out, and what keeps the
@@ -272,12 +287,12 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.ps.Playing = !m.ps.Playing
 		m.hold()
 		play := m.ps.Playing
-		return m, controlCmd("toggle playback", func(ctx context.Context) error {
+		return m, tea.Batch(m.spinDevice(), controlCmd("toggle playback", func(ctx context.Context) error {
 			if play {
 				return p.Play(ctx)
 			}
 			return p.Pause(ctx)
-		})
+		}))
 
 	case key.Matches(k, m.keys.Next):
 		cmd := m.skip("skip to next track", p.Next)
@@ -535,4 +550,15 @@ func nextRepeat(mode string) string {
 	default:
 		return player.RepeatOff
 	}
+}
+
+// spinDevice starts the device mark turning if it is not already, and returns
+// nil otherwise. Two tick loops for one spinner would make it turn twice as
+// fast, so the flag is what keeps them from doubling up.
+func (m *Model) spinDevice() tea.Cmd {
+	if m.deviceRun || m.ps == nil || !m.ps.Playing {
+		return nil
+	}
+	m.deviceRun = true
+	return m.device.Tick
 }

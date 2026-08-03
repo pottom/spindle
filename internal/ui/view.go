@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -237,7 +238,13 @@ func (m Model) statusLine() string {
 	if m.ps.Playing {
 		device = m.styles.DeviceOn
 	}
-	line := device.Render(deviceDot + " " + m.ps.DeviceName)
+	// Stopped is a state, not a moment, so the mark stops turning and settles
+	// back into a plain dot rather than freezing mid-rotation.
+	mark := deviceDot
+	if m.ps.Playing {
+		mark = m.device.View()
+	}
+	line := device.Render(mark + " " + m.ps.DeviceName)
 
 	// The bitrate is the stream actually arriving, so it only appears once one
 	// is: a rate printed over a paused device would be describing nothing.
@@ -276,4 +283,12 @@ func formatDuration(d time.Duration) string {
 		return fmt.Sprintf("%d:%02d:%02d", h, mn, sec)
 	}
 	return fmt.Sprintf("%d:%02d", mn, sec)
+}
+
+// deviceSpinner is the mark beside the device name: a quartered circle turning
+// once a second. It carries no style of its own, so the status line can colour
+// it along with the name.
+var deviceSpinner = spinner.Spinner{
+	Frames: []string{"◐", "◓", "◑", "◒"},
+	FPS:    time.Second / 8,
 }

@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
+
 	"github.com/pottom/spindle/internal/player"
 )
 
@@ -50,5 +52,43 @@ func TestStatusLineShowsTheBitrateWhilePlaying(t *testing.T) {
 	m.ps.Playing, m.ps.Bitrate = true, 0
 	if got := m.statusLine(); strings.Contains(got, "kbps") {
 		t.Errorf("statusLine() = %q, want no bitrate when unknown", got)
+	}
+}
+
+// The mark beside the device is the only thing on screen that says sound is
+// coming out right now, so it turns while playing and settles when it stops.
+func TestDeviceMarkTurnsOnlyWhilePlaying(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{DeviceName: "spindle", Playing: true}
+
+	first := m.statusLine()
+	m.device, _ = m.device.Update(m.device.Tick().(spinner.TickMsg))
+	if second := m.statusLine(); second == first {
+		t.Errorf("statusLine() = %q on two frames, want the mark to have moved", first)
+	}
+
+	m.ps.Playing = false
+	if got := m.statusLine(); !strings.Contains(got, deviceDot) {
+		t.Errorf("statusLine() = %q, want the plain dot once stopped", got)
+	}
+}
+
+// Nothing may drive the mark while the music is stopped: it would redraw the
+// screen eight times a second to say nothing.
+func TestDeviceMarkDoesNotTickWhileStopped(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{DeviceName: "spindle", Playing: false}
+
+	if cmd := m.spinDevice(); cmd != nil {
+		t.Error("spinDevice() started a tick loop while stopped")
+	}
+
+	m.ps.Playing = true
+	if cmd := m.spinDevice(); cmd == nil {
+		t.Fatal("spinDevice() = nil while playing, want a tick")
+	}
+	// And a second caller must not start a competing loop.
+	if cmd := m.spinDevice(); cmd != nil {
+		t.Error("spinDevice() started a second tick loop")
 	}
 }

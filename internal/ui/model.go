@@ -120,6 +120,12 @@ type Model struct {
 	keys    keyMap
 	help    help.Model
 	spinner spinner.Model
+
+	// device is the mark beside the device name. It turns while the music plays,
+	// which is the one part of the screen that says "sound is coming out of this
+	// machine right now" without needing to be read.
+	device    spinner.Model
+	deviceRun bool
 }
 
 // New wires a model around a playback backend and an artwork loader. The palette
@@ -134,6 +140,7 @@ func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 		help:    help.New(),
 		search:  newSearchPane(),
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
+		device:  spinner.New(spinner.WithSpinner(deviceSpinner)),
 	}
 	m.help.ShortSeparator = " · "
 	m.restyle()
