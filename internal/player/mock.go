@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 )
@@ -12,11 +13,13 @@ import (
 // is exercised against the same timing an optimistic update has to survive.
 const mockLatency = 150 * time.Millisecond
 
-// Mock is an offline backend: a fixed playlist, real-time progress and no network.
-// Its methods are called from tea.Cmd goroutines, so all state is mutex-guarded.
+// Mock is an offline backend: a fixed catalogue, real-time progress and no
+// network beyond the artwork itself. Its methods are called from tea.Cmd
+// goroutines, so all state is mutex-guarded.
 type Mock struct {
 	mu        sync.Mutex
 	now       func() time.Time
+	queue     []Track
 	index     int
 	playing   bool
 	elapsed   time.Duration // progress into the current track, as of startedAt
@@ -32,6 +35,7 @@ type Mock struct {
 func NewMock() *Mock {
 	m := &Mock{
 		now:      time.Now,
+		queue:    slices.Clone(mockCatalogue[:4]),
 		playing:  true,
 		repeat:   RepeatOff,
 		volume:   72,
@@ -50,16 +54,16 @@ func (m *Mock) State(ctx context.Context) (*State, error) {
 	defer m.mu.Unlock()
 	m.advance()
 
-	t := mockTracks[m.index]
+	t := m.queue[m.index]
 	dev := m.activeDevice()
 	return &State{
-		TrackID:    t.id,
-		Title:      t.title,
-		Artists:    slices.Clone(t.artists),
-		Album:      t.album,
-		CoverURL:   t.cover,
+		TrackID:    t.ID,
+		Title:      t.Title,
+		Artists:    slices.Clone(t.Artists),
+		Album:      t.Album,
+		CoverURL:   t.CoverURL,
 		Progress:   m.elapsed,
-		Duration:   t.duration,
+		Duration:   t.Duration,
 		Playing:    m.playing,
 		Shuffle:    m.shuffle,
 		Repeat:     m.repeat,
@@ -155,6 +159,93 @@ func (m *Mock) TransferTo(ctx context.Context, deviceID string) error {
 	})
 }
 
+// Search matches the query against the title, the artists and the album. An
+// empty query returns nothing rather than the whole catalogue.
+func (m *Mock) Search(ctx context.Context, query string) ([]Track, error) {
+	if err := m.delay(ctx); err != nil {
+		return nil, err
+	}
+
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return nil, nil
+	}
+
+	var hits []Track
+	for _, t := range mockCatalogue {
+		haystack := strings.ToLower(t.Title + " " + strings.Join(t.Artists, " ") + " " + t.Album)
+		if strings.Contains(haystack, q) {
+			hits = append(hits, t)
+		}
+	}
+	return hits, nil
+}
+
+func (m *Mock) Playlists(ctx context.Context) ([]Playlist, error) {
+	if err := m.delay(ctx); err != nil {
+		return nil, err
+	}
+
+	out := make([]Playlist, 0, len(mockPlaylists))
+	for _, def := range mockPlaylists {
+		p := def.Playlist
+		p.Tracks = len(def.trackIDs)
+		for _, t := range tracksByID(def.trackIDs) {
+			p.Duration += t.Duration
+		}
+		out = append(out, p)
+	}
+	return out, nil
+}
+
+func (m *Mock) PlaylistTracks(ctx context.Context, playlistID string) ([]Track, error) {
+	if err := m.delay(ctx); err != nil {
+		return nil, err
+	}
+
+	def := playlistByID(playlistID)
+	if def == nil {
+		return nil, fmt.Errorf("playlist tracks: unknown playlist %q", playlistID)
+	}
+	return tracksByID(def.trackIDs), nil
+}
+
+// PlayTrack queues the whole catalogue from the chosen track, so next and
+// previous still lead somewhere.
+func (m *Mock) PlayTrack(ctx context.Context, trackID string) error {
+	return m.mutate(ctx, func() error {
+		i := slices.IndexFunc(mockCatalogue, func(t Track) bool { return t.ID == trackID })
+		if i < 0 {
+			return fmt.Errorf("play track: unknown track %q", trackID)
+		}
+		m.setQueue(slices.Clone(mockCatalogue), i)
+		return nil
+	})
+}
+
+func (m *Mock) PlayPlaylist(ctx context.Context, playlistID string, offset int) error {
+	return m.mutate(ctx, func() error {
+		def := playlistByID(playlistID)
+		if def == nil {
+			return fmt.Errorf("play playlist: unknown playlist %q", playlistID)
+		}
+		m.setQueue(tracksByID(def.trackIDs), offset)
+		return nil
+	})
+}
+
+// setQueue replaces what is playing. Callers must hold m.mu.
+func (m *Mock) setQueue(tracks []Track, index int) {
+	if len(tracks) == 0 {
+		return
+	}
+	m.queue = tracks
+	m.index = min(max(index, 0), len(tracks)-1)
+	m.elapsed = 0
+	m.startedAt = m.now()
+	m.playing = true
+}
+
 // mutate pays the artificial latency, then runs fn with the lock held and the
 // track position brought up to date.
 func (m *Mock) mutate(ctx context.Context, fn func() error) error {
@@ -189,21 +280,21 @@ func (m *Mock) advance() {
 	m.startedAt = now
 
 	for {
-		d := mockTracks[m.index].duration
+		d := m.queue[m.index].Duration
 		if d <= 0 || m.elapsed < d {
 			return
 		}
 		m.elapsed -= d
 		if m.repeat != RepeatTrack {
-			m.index = wrapIndex(m.index + 1)
+			m.index = m.wrap(m.index + 1)
 		}
 	}
 }
 
 // seekTo jumps to a track and position, clamping both. Callers must hold m.mu.
 func (m *Mock) seekTo(index int, pos time.Duration) {
-	m.index = wrapIndex(index)
-	m.elapsed = min(max(pos, 0), mockTracks[m.index].duration)
+	m.index = m.wrap(index)
+	m.elapsed = min(max(pos, 0), m.queue[m.index].Duration)
 	m.startedAt = m.now()
 }
 
@@ -217,7 +308,26 @@ func (m *Mock) activeDevice() Device {
 	return Device{}
 }
 
-func wrapIndex(i int) int {
-	n := len(mockTracks)
+func (m *Mock) wrap(i int) int {
+	n := len(m.queue)
 	return ((i % n) + n) % n
+}
+
+func playlistByID(id string) *mockPlaylistDef {
+	for i := range mockPlaylists {
+		if mockPlaylists[i].ID == id {
+			return &mockPlaylists[i]
+		}
+	}
+	return nil
+}
+
+func tracksByID(ids []string) []Track {
+	out := make([]Track, 0, len(ids))
+	for _, id := range ids {
+		if i := slices.IndexFunc(mockCatalogue, func(t Track) bool { return t.ID == id }); i >= 0 {
+			out = append(out, mockCatalogue[i])
+		}
+	}
+	return out
 }

@@ -60,11 +60,17 @@ func (m Model) render() string {
 func (m Model) renderPlayer() string {
 	l := m.layout()
 
-	lines := m.body(l)
+	var lines []string
+	for _, row := range m.tabBar(l.interior - leftMargin) {
+		lines = append(lines, m.pad(row, l))
+	}
+	lines = append(lines, m.pad("", l))
+
+	lines = append(lines, m.body(l)...)
 	if m.err != nil {
 		lines = append(lines, m.pad(m.styles.Error.Render("✕ "+m.err.Error()), l))
 	}
-	for _, row := range strings.Split(m.help.View(m.keys), "\n") {
+	for _, row := range strings.Split(m.help.View(m.keys.forTab(m.tab)), "\n") {
 		lines = append(lines, m.pad(row, l))
 	}
 
@@ -81,16 +87,27 @@ func (m Model) pad(s string, l layout) string {
 // information, centred in what is left once the status line has its row.
 func (m Model) body(l layout) []string {
 	var block []string
-	if m.ps == nil {
+	if m.tab == tabPlayer && m.ps == nil {
 		block = []string{m.styles.Detail.Render("Connecting…")}
 	} else {
-		art := m.artwork(l)
-		info := stack(m.infoBlock(l.infoWidth), l.infoWidth, l.artHeight)
+		// The player centres its text against the cover; the browsing tabs give
+		// their list every row going, with the cover centred beside it.
+		rows := l.artHeight
+		art := center(strings.Split(m.artworkCells(), "\n"), l.artWidth, rows)
+		if m.tab != tabPlayer {
+			rows = max(l.bodyHeight-1, l.artHeight)
+			art = alignTop(strings.Split(m.artworkCells(), "\n"), l.artWidth, rows)
+		}
+
+		right := m.browsePane(l, rows)
+		if right == nil {
+			right = stack(m.infoBlock(l.infoWidth), l.infoWidth, rows)
+		}
 		gap := strings.Repeat(" ", columnGap)
 
-		block = make([]string, len(art))
+		block = make([]string, rows)
 		for i := range art {
-			block[i] = art[i] + gap + info[i]
+			block[i] = art[i] + gap + right[i]
 		}
 	}
 
@@ -111,17 +128,17 @@ func (m Model) body(l layout) []string {
 	return lines[:l.bodyHeight]
 }
 
-// artwork is the cover area: the picture itself, a spinner while it downloads,
-// or a single note glyph when there is none. The area is reserved whatever it
-// holds, so nothing moves when a cover finishes loading.
-func (m Model) artwork(l layout) []string {
+// artworkCells is the cover: the picture itself, a spinner while it downloads,
+// or a single note glyph when there is none. The area around it is reserved
+// whatever it holds, so nothing moves when a cover finishes loading.
+func (m Model) artworkCells() string {
 	switch {
 	case m.cover.art != "":
-		return center(strings.Split(m.cover.art, "\n"), l.artWidth, l.artHeight)
+		return m.cover.art
 	case m.cover.loading():
-		return center([]string{m.spinner.View()}, l.artWidth, l.artHeight)
+		return m.spinner.View()
 	default:
-		return center([]string{m.styles.NoCover.Render(noCoverGlyph)}, l.artWidth, l.artHeight)
+		return m.styles.NoCover.Render(noCoverGlyph)
 	}
 }
 
@@ -230,7 +247,7 @@ func (m Model) renderTooSmall() string {
 
 // helpHeight is how many lines the help bar currently occupies.
 func (m Model) helpHeight() int {
-	return lipgloss.Height(m.help.View(m.keys))
+	return lipgloss.Height(m.help.View(m.keys.forTab(m.tab)))
 }
 
 // formatDuration renders a position as m:ss, or h:mm:ss past an hour.

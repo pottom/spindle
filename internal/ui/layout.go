@@ -17,6 +17,10 @@ const (
 
 	// artMargin is the blank line kept above and below the artwork.
 	artMargin = 1
+
+	// tabBarHeight is the labels, the rule beneath the active one, and a blank
+	// line separating them from the body.
+	tabBarHeight = 3
 )
 
 // layout is the geometry of one screen, derived purely from the terminal size
@@ -31,17 +35,18 @@ type layout struct {
 
 // computeLayout resolves the frame geometry for a terminal of w × h cells. It
 // assumes the size already passed fitsMinimum.
-func computeLayout(w, h, helpHeight int, hasBanner bool, cell cover.CellSize) layout {
+func computeLayout(w, h, helpHeight int, hasBanner, browsing bool, cell cover.CellSize) layout {
 	interior := min(w, maxFrameWidth)
 
-	// A blank line and the help bar sit below the body; a banner takes one more.
-	chrome := 1 + helpHeight
+	// Above the body: the tab labels, their rule and a blank line. Below it: a
+	// blank line and the help bar, plus one more for a banner.
+	chrome := tabBarHeight + 1 + helpHeight
 	if hasBanner {
 		chrome++
 	}
 	bodyHeight := max(h-chrome, 0)
 
-	artWidth, artHeight := artworkArea(interior, bodyHeight, cell)
+	artWidth, artHeight := artworkArea(interior, bodyHeight, browsing, cell)
 	return layout{
 		interior:   interior,
 		artWidth:   artWidth,
@@ -56,9 +61,16 @@ func computeLayout(w, h, helpHeight int, hasBanner bool, cell cover.CellSize) la
 // are taller than they are wide, so a square area needs roughly twice as many
 // columns as rows.
 // The artwork never takes more than half the width: past that it stops being a
-// player and starts being a picture viewer with captions.
-func artworkArea(interior, bodyHeight int, cell cover.CellSize) (width, height int) {
-	maxWidth := max(min(interior-leftMargin-columnGap-minInfoCols-rightMargin, interior/2), 1)
+// player and starts being a picture viewer with captions. The browsing tabs give
+// it less still, because a list of titles and artists needs the room more than a
+// preview does.
+func artworkArea(interior, bodyHeight int, browsing bool, cell cover.CellSize) (width, height int) {
+	share := interior / 2
+	if browsing {
+		share = interior * 2 / 5
+	}
+
+	maxWidth := max(min(interior-leftMargin-columnGap-minInfoCols-rightMargin, share), 1)
 	maxHeight := max(bodyHeight-2*artMargin-1, 1)
 
 	height = max(min(maxHeight, maxWidth*cell.Width/cell.Height), 1)

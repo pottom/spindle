@@ -18,10 +18,13 @@ type keyMap struct {
 	Help      key.Binding
 	Quit      key.Binding
 
-	// short is the one-line help bar of SCREENS.md 4.1. It needs terser wording
-	// than the expanded table to survive a 64-column terminal, so it carries its
-	// own display bindings over the same keys.
-	short []key.Binding
+	// Navigation, shared by the browsing tabs.
+	NextTab key.Binding
+	PrevTab key.Binding
+	Up      key.Binding
+	Down    key.Binding
+	Enter   key.Binding
+	Back    key.Binding
 }
 
 func newKeyMap() keyMap {
@@ -61,24 +64,90 @@ func newKeyMap() keyMap {
 			key.WithKeys("q", "ctrl+c"),
 			key.WithHelp("q", "quit"),
 		),
+
+		NextTab: key.NewBinding(
+			key.WithKeys("tab"),
+			key.WithHelp("tab", "switch tab"),
+		),
+		PrevTab: key.NewBinding(key.WithKeys("shift+tab")),
+		Up:      key.NewBinding(key.WithKeys("up", "ctrl+p")),
+		Down: key.NewBinding(
+			key.WithKeys("down", "ctrl+n"),
+			key.WithHelp("↑↓", "select"),
+		),
+		Enter: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "play"),
+		),
+		Back: key.NewBinding(
+			key.WithKeys("esc"),
+			key.WithHelp("esc", "back"),
+		),
 	}
 
-	k.short = []key.Binding{
-		key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "play/pause")),
-		key.NewBinding(key.WithKeys("n", "p"), key.WithHelp("n/p", "track")),
-		key.NewBinding(key.WithKeys("left", "right"), key.WithHelp("←→", "seek")),
-		key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
-	}
 	return k
 }
 
-func (k keyMap) ShortHelp() []key.Binding {
-	return k.short
+// tabKeys is the help for one screen. Each tab works differently, so each gets
+// its own bar rather than a lowest common denominator.
+type tabKeys struct {
+	short []key.Binding
+	full  [][]key.Binding
 }
 
-func (k keyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{k.PlayPause, k.Next, k.SeekFwd, k.VolUp},
-		{k.Shuffle, k.Repeat, k.Help, k.Quit},
+func (t tabKeys) ShortHelp() []key.Binding  { return t.short }
+func (t tabKeys) FullHelp() [][]key.Binding { return t.full }
+
+// hint builds a display-only binding. The short bar needs terser wording than
+// the expanded table to survive a 64-column terminal.
+func hint(keys, desc string) key.Binding {
+	return key.NewBinding(key.WithKeys(keys), key.WithHelp(keys, desc))
+}
+
+func (k keyMap) forTab(t tabID) tabKeys {
+	switch t {
+	case tabPlaylists:
+		return tabKeys{
+			short: []key.Binding{
+				hint("↑↓", "select"),
+				hint("enter", "play"),
+				hint("esc", "back"),
+				hint("tab", "switch"),
+				hint("?", "help"),
+			},
+			full: [][]key.Binding{
+				{k.Down, k.Enter, k.Back, k.NextTab},
+				{k.PlayPause, k.Next, k.Help, k.Quit},
+			},
+		}
+
+	case tabSearch:
+		return tabKeys{
+			short: []key.Binding{
+				hint("type", "to search"),
+				hint("↑↓", "select"),
+				hint("enter", "play"),
+				hint("tab", "switch"),
+			},
+			full: [][]key.Binding{
+				{k.Down, k.Enter, k.Back, k.NextTab},
+				{hint("ctrl+c", "quit"), k.Help},
+			},
+		}
+
+	default:
+		return tabKeys{
+			short: []key.Binding{
+				hint("space", "play/pause"),
+				hint("n/p", "track"),
+				hint("←→", "seek"),
+				hint("tab", "switch"),
+				hint("?", "help"),
+			},
+			full: [][]key.Binding{
+				{k.PlayPause, k.Next, k.SeekFwd, k.VolUp},
+				{k.Shuffle, k.Repeat, k.NextTab, k.Quit},
+			},
+		}
 	}
 }

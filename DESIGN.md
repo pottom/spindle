@@ -39,6 +39,10 @@ Go 1.22 or later.
 
 ### 3.1 Application state machine
 
+The player, playlists and search screens are tabs of one window rather than
+states: `tab` cycles them and each keeps its own cursor. Only the states below
+take the screen over entirely.
+
 ```
         ┌────────────┐  no token / expired
         │ stateAuth  │◄────────────────────┐
@@ -92,6 +96,25 @@ type Device struct {
     Active bool
 }
 
+// Track is a list entry: identity and labels, without playback flags.
+type Track struct {
+    ID       string
+    Title    string
+    Artists  []string
+    Album    string
+    CoverURL string
+    Duration time.Duration
+}
+
+type Playlist struct {
+    ID       string
+    Name     string
+    Owner    string
+    CoverURL string
+    Tracks   int
+    Duration time.Duration
+}
+
 type Player interface {
     State(ctx context.Context) (*State, error)
     Play(ctx context.Context) error
@@ -104,6 +127,12 @@ type Player interface {
     SetRepeat(ctx context.Context, mode string) error
     Devices(ctx context.Context) ([]Device, error)
     TransferTo(ctx context.Context, deviceID string) error
+
+    Search(ctx context.Context, query string) ([]Track, error)
+    Playlists(ctx context.Context) ([]Playlist, error)
+    PlaylistTracks(ctx context.Context, playlistID string) ([]Track, error)
+    PlayTrack(ctx context.Context, trackID string) error
+    PlayPlaylist(ctx context.Context, playlistID string, offset int) error
 }
 
 var ErrNoActiveDevice = errors.New("no active playback device")

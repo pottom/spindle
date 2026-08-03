@@ -44,16 +44,30 @@ func stack(lines []string, w, h int) []string {
 	return out
 }
 
+// padLeft right-aligns s inside w cells.
+func padLeft(s string, w int) string {
+	return strings.Repeat(" ", max(w-lipgloss.Width(s), 0)) + s
+}
+
 // center places lines in the middle of a w × h block, padding the rest with
 // spaces so every returned line is exactly w cells wide.
 func center(lines []string, w, h int) []string {
+	return place(lines, w, h, max((h-len(lines))/2, 0))
+}
+
+// alignTop is center's sibling for the browsing tabs, where the artwork has to
+// start on the same row as the list heading beside it.
+func alignTop(lines []string, w, h int) []string {
+	return place(lines, w, h, 0)
+}
+
+func place(lines []string, w, h, top int) []string {
 	out := make([]string, h)
 	blank := strings.Repeat(" ", w)
 	for i := range out {
 		out[i] = blank
 	}
 
-	top := max((h-len(lines))/2, 0)
 	for i, line := range lines {
 		row := top + i
 		if row >= h {

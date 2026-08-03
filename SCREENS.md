@@ -23,6 +23,12 @@ music. Nothing else is coloured, so the accent always means "this, now".
 
 **No emoji.** Their width varies by terminal and shifts the layout.
 
+**One window, three tabs.** The player, the playlists and the search are tabs of
+the same window rather than separate screens, so `tab` never loses your place.
+The artwork stays anchored to the left on all three, which keeps the eye still
+across a switch and keeps the kitty placement from jumping around the screen.
+Each tab decides for itself what belongs in that slot — see 4.9 and 4.10.
+
 ## 2. Palette
 
 The base palette is fixed; the accent is not. `internal/ui/style` resolves both
@@ -55,8 +61,10 @@ No hex codes appear in `View()`.
 | Right margin | 2 |
 | Gap between artwork and info | 3 |
 | Info column | remainder, minimum 32 |
+| Tab header | 2 lines plus a blank: the labels and a rule under the active one |
 | Status line | 1 line at the foot of the body |
 | Help bar | 1 line, or 4 when expanded |
+| Artwork share | half the content width on the player, two fifths on the browsing tabs |
 
 Above 100 columns the layout must not stretch. A full-width TUI on an ultrawide
 monitor is unreadable.
@@ -255,6 +263,69 @@ also shrinks the artwork and triggers a re-render at the new size.
 The `bubbles/help` component does this natively with a `ShortHelp` / `FullHelp`
 pair. Do not hand-roll it.
 
+### 4.9 Playlists
+
+Two levels in one tab. `enter` opens a playlist, `esc` comes back out.
+
+```
+   now playing   playlists   search
+                 ━━━━━━━━━
+
+   ████████████████   Bowie Essentials
+   ████████████████   Spotify · 6 tracks · 27m
+   ████████████████
+   ████████████████   ▸  1  Ashes to Ashes      David Bowie        4:23
+   ████████████████      2  Life on Mars?       David Bowie        3:53
+   ████████████████   ♪  3  Heroes              David Bowie        6:11
+   ████████████████      4  Let's Dance         David Bowie        4:08
+   ████████████████      5  Rebel Rebel         David Bowie        4:30
+                         6  Under Pressure      Queen, David…      4:08
+
+   ● MacBook Pro
+   ↑↓ select · enter play · esc back · tab switch · ? help
+```
+
+- The artwork is the **playlist's**, not the playing track's — that already has a
+  tab of its own, and a cover that changes under you while you read a list is
+  noise. At the top level it follows the cursor; inside a playlist it stays put as
+  the thing you are looking at.
+- The artwork is top-aligned here, not centred: it starts on the same row as the
+  heading, so the two columns read as one block.
+- The track playing right now is marked `♪` and coloured in the accent, wherever
+  it turns up in a list.
+- Rows are cursor gutter, title, artist, duration. The artist column is dropped
+  when the pane is too narrow to carry it, rather than squeezing all three into
+  uselessness. A list longer than the pane ends in `… N more`.
+
+### 4.10 Search
+
+```
+   now playing   playlists   search
+                             ━━━━━━
+
+   ████████████████   ⌕ bowie
+   ████████████████
+   ████████████████   ▸ Under Pressure         Queen, David…      4:08
+   ████████████████     Ashes to Ashes         David Bowie        4:23
+   ████████████████     Life on Mars?          David Bowie        3:53
+   ████████████████     Heroes                 David Bowie        6:11
+   ████████████████     Let's Dance            David Bowie        4:08
+   ████████████████     Rebel Rebel            David Bowie        4:30
+
+   ● MacBook Pro
+   type to search · ↑↓ select · enter play · tab switch
+```
+
+- The field takes focus the moment the tab does: arriving at a search screen and
+  having to press a key before typing is a small insult.
+- Results follow every keystroke. Each query carries a sequence number, so a slow
+  one landing after a newer one is discarded rather than flashing stale hits.
+- The artwork previews **the highlighted result**, and the accent colour comes with
+  it — browsing recolours the whole screen. The load waits 250 ms for the cursor to
+  settle, so holding a cursor key does not queue an upload per row.
+- `esc` clears the query; on an empty query it returns to the player.
+- `q` types a q here, so quitting is `ctrl+c`. The help bar says so.
+
 ## 5. Transitions
 
 | Event | Behaviour |
@@ -280,3 +351,6 @@ are the primary enemy of kitty artwork placement.
 - [x] The artwork stays square whatever the cell aspect ratio
 - [ ] The no-device screen explains why the list may be empty
 - [ ] The status banner clears itself
+- [x] Every tab keeps its own cursor across a switch
+- [x] A list too long for the pane says so rather than silently ending
+- [x] Browsing a list does not queue an artwork upload per row

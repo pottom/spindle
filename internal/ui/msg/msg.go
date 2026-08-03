@@ -33,6 +33,32 @@ type CoverFailed struct {
 	Width, Height int
 }
 
+// PlaylistsFetched carries the library listing.
+type PlaylistsFetched struct {
+	Playlists []player.Playlist
+}
+
+// PlaylistTracksFetched carries the contents of one playlist.
+type PlaylistTracksFetched struct {
+	PlaylistID string
+	Tracks     []player.Track
+}
+
+// SearchResults carries the hits for a query. Seq identifies the query, so a
+// slow search landing after a newer one can be discarded.
+type SearchResults struct {
+	Seq     int
+	Tracks  []player.Track
+	Query   string
+	Matched bool
+}
+
+// CoverSettled fires once the browse cursor has stopped moving for long enough
+// to be worth loading artwork for.
+type CoverSettled struct {
+	Seq int
+}
+
 // Error carries a failure the UI is expected to show rather than crash on.
 type Error struct {
 	Err error

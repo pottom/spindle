@@ -18,6 +18,11 @@ const (
 
 	// coverTimeout is more generous: it covers a download as well as the resize.
 	coverTimeout = 20 * time.Second
+
+	// coverSettleDelay is how long the browse cursor has to rest before its
+	// artwork is loaded. Without it, holding a cursor key would queue an upload
+	// per row.
+	coverSettleDelay = 250 * time.Millisecond
 )
 
 func tickCmd() tea.Cmd {
@@ -53,6 +58,52 @@ func coverCmd(loader *cover.Loader, url string, wCells, hCells int) tea.Cmd {
 		}
 		return msg.CoverReady{URL: url, Width: wCells, Height: hCells, Art: art}
 	}
+}
+
+func fetchPlaylistsCmd(p player.Player) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+		defer cancel()
+
+		items, err := p.Playlists(ctx)
+		if err != nil {
+			return msg.Error{Err: fmt.Errorf("fetch playlists: %w", err)}
+		}
+		return msg.PlaylistsFetched{Playlists: items}
+	}
+}
+
+func fetchPlaylistTracksCmd(p player.Player, id string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+		defer cancel()
+
+		tracks, err := p.PlaylistTracks(ctx, id)
+		if err != nil {
+			return msg.Error{Err: fmt.Errorf("fetch playlist tracks: %w", err)}
+		}
+		return msg.PlaylistTracksFetched{PlaylistID: id, Tracks: tracks}
+	}
+}
+
+func searchCmd(p player.Player, query string, seq int) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+		defer cancel()
+
+		tracks, err := p.Search(ctx, query)
+		if err != nil {
+			return msg.Error{Err: fmt.Errorf("search: %w", err)}
+		}
+		return msg.SearchResults{Seq: seq, Tracks: tracks, Query: query, Matched: true}
+	}
+}
+
+// coverSettleCmd waits out the debounce before an artwork preview is loaded.
+func coverSettleCmd(seq int) tea.Cmd {
+	return tea.Tick(coverSettleDelay, func(time.Time) tea.Msg {
+		return msg.CoverSettled{Seq: seq}
+	})
 }
 
 // controlCmd runs a playback control call off the update loop. A successful call

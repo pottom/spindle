@@ -16,7 +16,7 @@ func newTestMock() (*Mock, func(time.Duration)) {
 
 func TestMockAdvanceRollsOverTracks(t *testing.T) {
 	m, tick := newTestMock()
-	tick(mockTracks[0].duration + 10*time.Second)
+	tick(m.queue[0].Duration + 10*time.Second)
 	m.advance()
 
 	if m.index != 1 {
@@ -30,7 +30,7 @@ func TestMockAdvanceRollsOverTracks(t *testing.T) {
 func TestMockAdvanceRepeatsOneTrack(t *testing.T) {
 	m, tick := newTestMock()
 	m.repeat = RepeatTrack
-	tick(mockTracks[0].duration + 10*time.Second)
+	tick(m.queue[0].Duration + 10*time.Second)
 	m.advance()
 
 	if m.index != 0 {
@@ -64,21 +64,21 @@ func TestMockSeekToClamps(t *testing.T) {
 	}
 
 	m.seekTo(0, time.Hour)
-	if m.elapsed != mockTracks[0].duration {
-		t.Errorf("elapsed = %v, want %v", m.elapsed, mockTracks[0].duration)
+	if m.elapsed != m.queue[0].Duration {
+		t.Errorf("elapsed = %v, want %v", m.elapsed, m.queue[0].Duration)
 	}
 }
 
 func TestMockSeekToWrapsIndex(t *testing.T) {
 	m, _ := newTestMock()
-	last := len(mockTracks) - 1
+	last := len(m.queue) - 1
 
 	m.seekTo(-1, 0)
 	if m.index != last {
 		t.Errorf("index = %d, want %d", m.index, last)
 	}
 
-	m.seekTo(len(mockTracks), 0)
+	m.seekTo(len(m.queue), 0)
 	if m.index != 0 {
 		t.Errorf("index = %d, want 0", m.index)
 	}

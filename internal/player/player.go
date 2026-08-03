@@ -23,4 +23,15 @@ type Player interface {
 	SetRepeat(ctx context.Context, mode string) error
 	Devices(ctx context.Context) ([]Device, error)
 	TransferTo(ctx context.Context, deviceID string) error
+
+	// Browsing. Search matches tracks; an empty query yields no results rather
+	// than everything.
+	Search(ctx context.Context, query string) ([]Track, error)
+	Playlists(ctx context.Context) ([]Playlist, error)
+	PlaylistTracks(ctx context.Context, playlistID string) ([]Track, error)
+
+	// PlayTrack starts one track on its own; PlayPlaylist starts a playlist at
+	// the given position.
+	PlayTrack(ctx context.Context, trackID string) error
+	PlayPlaylist(ctx context.Context, playlistID string, offset int) error
 }

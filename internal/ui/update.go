@@ -49,6 +49,27 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case msg.CoverSettled:
+		if message.Seq == m.coverSeq {
+			return m, m.syncCover()
+		}
+		return m, nil
+
+	case msg.PlaylistsFetched:
+		m.playlists.items = message.Playlists
+		m.playlists.cursor.reset()
+		return m, m.syncCover()
+
+	case msg.PlaylistTracksFetched:
+		if m.playlists.open != nil && m.playlists.open.ID == message.PlaylistID {
+			m.playlists.tracks = message.Tracks
+			m.playlists.inner.reset()
+		}
+		return m, nil
+
+	case msg.SearchResults:
+		return m, m.applySearchResults(message)
+
 	case msg.Error:
 		m.err = message.Err
 		return m, nil
@@ -116,6 +137,19 @@ func (m *Model) adopt(st *player.State) {
 }
 
 func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	// Tab switching outranks everything, including the search field: it is the
+	// one key that has to work wherever you are.
+	switch {
+	case key.Matches(k, m.keys.NextTab):
+		return m, m.switchTab(m.tab.next(1))
+	case key.Matches(k, m.keys.PrevTab):
+		return m, m.switchTab(m.tab.next(-1))
+	}
+
+	if cmd, handled := m.browseKey(k); handled {
+		return m, cmd
+	}
+
 	switch {
 	case key.Matches(k, m.keys.Quit):
 		return m, tea.Quit
@@ -193,19 +227,20 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // has changed. The artwork now scales with the window, so a resize invalidates
 // what was rendered just as a track change does.
 func (m *Model) syncCover() tea.Cmd {
-	if m.ps == nil || m.covers == nil || !fitsMinimum(m.width, m.height) {
+	if m.covers == nil || !fitsMinimum(m.width, m.height) {
 		return nil
 	}
 
 	l := m.layout()
-	if m.cover.matches(m.ps.CoverURL, l.artWidth, l.artHeight) {
+	url := m.coverTarget()
+	if m.cover.matches(url, l.artWidth, l.artHeight) {
 		return nil
 	}
 
 	// Keep the accent from the outgoing cover until the new one arrives, so the
 	// palette does not flash back to its default mid-swap.
 	m.cover = coverState{
-		url:       m.ps.CoverURL,
+		url:       url,
 		width:     l.artWidth,
 		height:    l.artHeight,
 		accent:    m.cover.accent,

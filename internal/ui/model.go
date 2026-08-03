@@ -6,6 +6,7 @@ import (
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/player"
@@ -35,7 +36,15 @@ type Model struct {
 	localProgress   time.Duration // ticked locally, not ps.Progress
 	optimisticUntil time.Time     // a poll must not overwrite before this
 
+	tab       tabID
+	playlists playlistPane
+	search    searchPane
+
 	cover coverState
+
+	// coverSeq debounces the artwork preview: arrowing down a list should not
+	// fire an upload per row, only once the cursor settles.
+	coverSeq int
 
 	err       error
 	tickCount int
@@ -59,11 +68,29 @@ func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 		isDark:  true,
 		keys:    newKeyMap(),
 		help:    help.New(),
+		search:  newSearchPane(),
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
 	}
 	m.help.ShortSeparator = " · "
 	m.restyle()
 	return m
+}
+
+// coverTarget is the artwork the current tab wants on the left. Each tab answers
+// differently: the player shows what is sounding, the browsers show what the
+// cursor is resting on.
+func (m Model) coverTarget() string {
+	switch m.tab {
+	case tabPlaylists:
+		return m.playlists.cover()
+	case tabSearch:
+		return m.search.cover()
+	default:
+		if m.ps == nil {
+			return ""
+		}
+		return m.ps.CoverURL
+	}
 }
 
 // restyle rebuilds every style from the current background and album accent.
@@ -75,12 +102,23 @@ func (m *Model) restyle() {
 	m.styles = style.New(m.isDark, accent)
 	m.help.Styles = help.DefaultStyles(m.isDark)
 	m.spinner.Style = m.styles.Detail
+
+	// The search field is a bubble with opinions of its own; overrule them so it
+	// belongs to the same screen as everything else.
+	in := textinput.DefaultStyles(m.isDark)
+	for _, s := range []*textinput.StyleState{&in.Focused, &in.Blurred} {
+		s.Text = m.styles.Query
+		s.Placeholder = m.styles.Placeholder
+		s.Prompt = m.styles.QueryPrompt
+	}
+	in.Cursor.Color = m.styles.Accent
+	m.search.input.SetStyles(in)
 }
 
 // layout resolves the current geometry. It is pure, so View and Update can both
 // ask for it without either of them owning the answer.
 func (m Model) layout() layout {
-	return computeLayout(m.width, m.height, m.helpHeight(), m.err != nil, m.cell)
+	return computeLayout(m.width, m.height, m.helpHeight(), m.err != nil, m.tab != tabPlayer, m.cell)
 }
 
 func (m Model) Init() tea.Cmd {
