@@ -62,7 +62,7 @@ func (m Model) renderPlayer() string {
 	l := m.layout()
 
 	var lines []string
-	for _, row := range m.tabBar(l.interior - leftMargin) {
+	for _, row := range m.header(l.interior - leftMargin - rightMargin) {
 		lines = append(lines, m.pad(row, l))
 	}
 	lines = append(lines, m.pad("", l))
@@ -96,7 +96,7 @@ func (m Model) body(l layout) []string {
 		block = []string{m.styles.Detail.Render("Connecting…")}
 
 	case m.tab == tabQueue:
-		block = m.queueBlock(l, max(l.bodyHeight-1, 1))
+		block = m.queueBlock(l, max(l.bodyHeight, 1))
 
 	default:
 		// The player centres its text against the cover; the browsing tabs give
@@ -124,18 +124,15 @@ func (m Model) body(l layout) []string {
 	}
 
 	lines := make([]string, 0, l.bodyHeight)
-	top := max((l.bodyHeight-1-len(block))/2, 0)
+	top := max((l.bodyHeight-len(block))/2, 0)
 	for range top {
 		lines = append(lines, m.pad("", l))
 	}
 	for _, row := range block {
 		lines = append(lines, m.pad(row, l))
 	}
-	for len(lines) < l.bodyHeight-1 {
+	for len(lines) < l.bodyHeight {
 		lines = append(lines, m.pad("", l))
-	}
-	if len(lines) < l.bodyHeight {
-		lines = append(lines, m.pad(m.statusLine(), l))
 	}
 	return lines[:l.bodyHeight]
 }

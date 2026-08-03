@@ -3,7 +3,6 @@ package ui
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -160,12 +159,9 @@ func (r recordingEditor) Drop(_ context.Context, id string) error {
 	return nil
 }
 
-// ansiEscape matches the colour sequences lipgloss writes.
-var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
-
 // plain strips the styling, so a test can assert on what the screen says rather
 // than on how it was coloured.
-func plain(s string) string { return ansiEscape.ReplaceAllString(s, "") }
+func plain(s string) string { return ansiOff(s) }
 
 func ids(tracks []player.Track) []string {
 	out := make([]string, 0, len(tracks))
