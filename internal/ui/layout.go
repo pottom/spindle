@@ -23,6 +23,17 @@ const (
 	tabBarHeight = 3
 )
 
+// layoutMode is how a screen divides its body. The three differ in what the
+// artwork is competing with: nothing on the player, a list beside it while
+// browsing, a list beneath it on the queue.
+type layoutMode int
+
+const (
+	modePlayer layoutMode = iota
+	modeBrowse
+	modeQueue
+)
+
 // layout is the geometry of one screen, derived purely from the terminal size
 // and the pixel size of a cell.
 type layout struct {
@@ -35,7 +46,7 @@ type layout struct {
 
 // computeLayout resolves the frame geometry for a terminal of w × h cells. It
 // assumes the size already passed fitsMinimum.
-func computeLayout(w, h, helpHeight int, hasBanner, browsing bool, cell cover.CellSize) layout {
+func computeLayout(w, h, helpHeight int, hasBanner bool, mode layoutMode, cell cover.CellSize) layout {
 	interior := min(w, maxFrameWidth)
 
 	// Above the body: the tab labels, their rule and a blank line. Below it: a
@@ -46,7 +57,7 @@ func computeLayout(w, h, helpHeight int, hasBanner, browsing bool, cell cover.Ce
 	}
 	bodyHeight := max(h-chrome, 0)
 
-	artWidth, artHeight := artworkArea(interior, bodyHeight, browsing, cell)
+	artWidth, artHeight := artworkArea(interior, bodyHeight, mode, cell)
 	return layout{
 		interior:   interior,
 		artWidth:   artWidth,
@@ -64,14 +75,21 @@ func computeLayout(w, h, helpHeight int, hasBanner, browsing bool, cell cover.Ce
 // player and starts being a picture viewer with captions. The browsing tabs give
 // it less still, because a list of titles and artists needs the room more than a
 // preview does.
-func artworkArea(interior, bodyHeight int, browsing bool, cell cover.CellSize) (width, height int) {
+//
+// The queue screen is the odd one out: its list is underneath rather than
+// beside, so the artwork competes for rows instead of columns and is held to a
+// third of the body. Anything more and the list it heads would be a footnote.
+func artworkArea(interior, bodyHeight int, mode layoutMode, cell cover.CellSize) (width, height int) {
 	share := interior / 2
-	if browsing {
+	if mode != modePlayer {
 		share = interior * 2 / 5
 	}
 
 	maxWidth := max(min(interior-leftMargin-columnGap-minInfoCols-rightMargin, share), 1)
 	maxHeight := max(bodyHeight-2*artMargin-1, 1)
+	if mode == modeQueue {
+		maxHeight = max(min(maxHeight, bodyHeight/3), 1)
+	}
 
 	height = max(min(maxHeight, maxWidth*cell.Width/cell.Height), 1)
 	width = max(min(height*cell.Height/cell.Width, maxWidth), 1)

@@ -20,4 +20,14 @@ type Track struct {
 	// a locally licensed copy. Playback devices still speak of the original, so
 	// it is the only thing the two can be matched on.
 	OriginID string
+
+	// The rest is detail: worth showing when a track is being looked at, never
+	// needed to list one. Everything here arrives with the track itself, so
+	// none of it costs a request.
+	Released    string // as Spotify reports it: a year, a month or a full date
+	AlbumType   string // "album", "single" or "compilation"
+	TrackNumber int
+	DiscNumber  int
+	TotalTracks int
+	Explicit    bool
 }

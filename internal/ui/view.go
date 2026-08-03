@@ -95,6 +95,9 @@ func (m Model) body(l layout) []string {
 	case m.tab == tabPlayer && m.ps == nil:
 		block = []string{m.styles.Detail.Render("Connecting…")}
 
+	case m.tab == tabQueue:
+		block = m.queueBlock(l, max(l.bodyHeight-1, 1))
+
 	default:
 		// The player centres its text against the cover; the browsing tabs give
 		// their list every row going, with the cover centred beside it.

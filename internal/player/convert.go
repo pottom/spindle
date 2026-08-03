@@ -57,6 +57,13 @@ func trackFromFull(t *spotify.FullTrack) Track {
 	if t.LinkedFrom != nil {
 		out.OriginID = t.LinkedFrom.ID.String()
 	}
+
+	out.Released = t.Album.ReleaseDate
+	out.AlbumType = t.Album.AlbumType
+	out.TrackNumber = int(t.TrackNumber)
+	out.DiscNumber = int(t.DiscNumber)
+	out.TotalTracks = int(t.Album.TotalTracks)
+	out.Explicit = t.Explicit
 	return out
 }
 

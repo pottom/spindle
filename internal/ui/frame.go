@@ -44,6 +44,11 @@ func stack(lines []string, w, h int) []string {
 	return out
 }
 
+// padRight left-aligns s inside w cells, which is what a label column wants.
+func padRight(s string, w int) string {
+	return s + strings.Repeat(" ", max(w-lipgloss.Width(s), 0))
+}
+
 // padLeft right-aligns s inside w cells.
 func padLeft(s string, w int) string {
 	return strings.Repeat(" ", max(w-lipgloss.Width(s), 0)) + s

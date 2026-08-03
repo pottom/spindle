@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -168,4 +169,57 @@ func TestQueuePaneRenders(t *testing.T) {
 	if got := len(strings.Split(out, "\n")); got != want {
 		t.Errorf("render() = %d lines, want %d as on the player tab", got, want)
 	}
+}
+
+// The panel beside the cover describes whatever the cursor is on, so moving the
+// cursor has to change it.
+func TestDetailFollowsTheCursor(t *testing.T) {
+	m := queueModel(1, "a", "b")
+	m.queue[0].Album, m.queue[1].Album = "First Album", "Second Album"
+	m.width, m.height = 100, 44
+	m.resize()
+
+	if got := strings.Join(m.trackDetail(40), "\n"); !strings.Contains(got, "First Album") {
+		t.Errorf("trackDetail() = %q, want the first track", got)
+	}
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	if got := strings.Join(tm.(Model).trackDetail(40), "\n"); !strings.Contains(got, "Second Album") {
+		t.Errorf("trackDetail() = %q, want the second track after moving down", got)
+	}
+}
+
+// Everything Spotify supplied is worth showing; everything it left blank is
+// worth leaving out, rather than printing a label with nothing after it.
+func TestFactsSkipWhatSpotifyDidNotSay(t *testing.T) {
+	full := player.Track{
+		Album: "Hot Space", Released: "1982-05-21",
+		TrackNumber: 3, TotalTracks: 11, DiscNumber: 2, Duration: 4 * time.Minute,
+	}
+	got := factLines(trackFacts(full))
+	for _, want := range []string{"Album", "Released", "Track", "Length", "Source"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("trackFacts() = %q, want a %s row", got, want)
+		}
+	}
+	if !strings.Contains(got, "3 of 11, disc 2") {
+		t.Errorf("trackFacts() = %q, want the disc named when there is more than one", got)
+	}
+	if !strings.Contains(got, "1982") || strings.Contains(got, "1982-05-21") {
+		t.Errorf("trackFacts() = %q, want just the year", got)
+	}
+
+	bare := player.Track{Album: "Unknown", Duration: time.Minute}
+	if got := factLines(trackFacts(bare)); strings.Contains(got, "Released") || strings.Contains(got, "Track ") {
+		t.Errorf("trackFacts() = %q, want no empty rows", got)
+	}
+}
+
+func factLines(facts []trackFact) string {
+	var b strings.Builder
+	for _, f := range facts {
+		b.WriteString(f.label + " " + f.value + "\n")
+	}
+	return b.String()
 }

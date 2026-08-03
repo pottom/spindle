@@ -14,6 +14,15 @@ const (
 	rowCursor = "▸"
 	nowMark   = "♪"
 
+	// explicitMark is the badge Spotify puts on a track with explicit lyrics.
+	explicitMark = "[E]"
+
+	// ordinalCols is the width of the track number column in a list.
+	ordinalCols = 2
+
+	// factLabelCols is the label column of the detail panel.
+	factLabelCols = 12
+
 	// queuedMark stands where the track number would be, on the entries that
 	// were put there by hand.
 	queuedMark = "+"
@@ -30,8 +39,6 @@ const (
 // a blank line, then as many rows as fit.
 func (m Model) browsePane(l layout, rows int) []string {
 	switch m.tab {
-	case tabQueue:
-		return m.queuePaneView(l, rows)
 	case tabPlaylists:
 		return m.playlistPaneView(l, rows)
 	case tabSearch:
@@ -41,18 +48,132 @@ func (m Model) browsePane(l layout, rows int) []string {
 	}
 }
 
-func (m Model) queuePaneView(l layout, rows int) []string {
-	head := []string{
-		m.styles.Title.Render("Queue"),
-		m.styles.Album.Render(queueSubtitle(m.queue)),
+// queueBlock is the whole queue screen: the cover and the details of whatever
+// the cursor rests on across the top, the list itself across the full width
+// below. The list is the point of the screen, so it gets the width; the detail
+// panel fills what would otherwise be empty beside the artwork.
+func (m Model) queueBlock(l layout, rows int) []string {
+	w := l.artWidth + columnGap + l.infoWidth
+
+	top := min(l.artHeight, rows)
+	art := alignTop(strings.Split(m.artworkCells(), "\n"), l.artWidth, top)
+	detail := stack(m.trackDetail(l.infoWidth), l.infoWidth, top)
+
+	out := make([]string, 0, rows)
+	gap := strings.Repeat(" ", columnGap)
+	for i := range art {
+		out = append(out, art[i]+gap+detail[i])
 	}
-	return m.listPane(l, rows, head,
-		len(m.queue), &m.queuePane.cursor,
-		"Nothing is queued.",
-		func(i, w int, selected bool) string {
-			return m.queueRow(m.queue[i], w, selected, i+1)
-		},
-	)
+	if len(out) < rows {
+		out = append(out, strings.Repeat(" ", w))
+	}
+
+	// The heading carries the count on the right, where a subtitle line would
+	// otherwise cost a row the list could use.
+	if len(out) < rows {
+		out = append(out, spread(
+			m.styles.Title.Render("Queue"),
+			m.styles.Album.Render(queueSubtitle(m.queue)),
+			w,
+		))
+	}
+	if len(out) < rows {
+		out = append(out, strings.Repeat(" ", w))
+	}
+
+	body := max(rows-len(out), 0)
+	if len(m.queue) == 0 && body > 0 {
+		out = append(out, fit(m.styles.Empty.Render("Nothing is queued."), w))
+	}
+
+	from, to := m.queuePane.cursor.window(len(m.queue), body)
+	for i := from; i < to; i++ {
+		out = append(out, fit(m.queueRow(m.queue[i], w, i == m.queuePane.cursor.cursor, i+1), w))
+	}
+	if to < len(m.queue) && len(out) > 0 {
+		out[len(out)-1] = fit(m.styles.Empty.Render(fmt.Sprintf("  … %d more", len(m.queue)-to+1)), w)
+	}
+
+	for len(out) < rows {
+		out = append(out, strings.Repeat(" ", w))
+	}
+	return out[:rows]
+}
+
+// trackDetail is everything Spotify will say about one track, laid out beside
+// the cover. It follows the player screen: the name first and large, the facts
+// beneath it in a quiet column, so the two screens read as the same program.
+func (m Model) trackDetail(w int) []string {
+	t := m.queuedTrack()
+	if t == nil {
+		return nil
+	}
+	s := m.styles
+
+	title := s.Title.Render(t.Title)
+	if t.Explicit {
+		title += "  " + s.FactLabel.Render(explicitMark)
+	}
+
+	lines := []string{
+		title,
+		s.Artist.Render(strings.Join(t.Artists, ", ")),
+		"",
+	}
+	for _, f := range trackFacts(*t) {
+		lines = append(lines, m.fact(f.label, f.value, w))
+	}
+	return lines
+}
+
+// fact is one label-and-value row of the detail panel. The label column is
+// fixed so the values line up into a second column of their own.
+func (m Model) fact(label, value string, w int) string {
+	return fit(m.styles.FactLabel.Render(padRight(label, factLabelCols))+value, w)
+}
+
+type trackFact struct{ label, value string }
+
+// trackFacts is what is worth saying about a track, in the order it is worth
+// saying it. Anything Spotify left blank is left out rather than shown empty.
+func trackFacts(t player.Track) []trackFact {
+	facts := []trackFact{{"Album", t.Album}}
+
+	if year := releaseYear(t.Released); year != "" {
+		// A single or a compilation is worth knowing and costs no room of its
+		// own; on a plain album it would be saying what the label already said.
+		if t.AlbumType != "" && t.AlbumType != "album" {
+			year += " · " + t.AlbumType
+		}
+		facts = append(facts, trackFact{"Released", year})
+	}
+	if t.TrackNumber > 0 {
+		place := fmt.Sprintf("%d", t.TrackNumber)
+		if t.TotalTracks > 0 {
+			place = fmt.Sprintf("%d of %d", t.TrackNumber, t.TotalTracks)
+		}
+		if t.DiscNumber > 1 {
+			place += fmt.Sprintf(", disc %d", t.DiscNumber)
+		}
+		facts = append(facts, trackFact{"Track", place})
+	}
+	facts = append(facts, trackFact{"Length", formatDuration(t.Duration)})
+
+	origin := "next in order"
+	if t.Queued {
+		origin = "added by hand"
+	}
+	facts = append(facts, trackFact{"Source", origin})
+	return facts
+}
+
+// releaseYear takes the year off a Spotify release date, which may be a year, a
+// month or a full date depending on how much the label bothered to record.
+func releaseYear(date string) string {
+	if len(date) < 4 {
+		return ""
+	}
+	return date[:4]
 }
 
 // queueRow draws one upcoming track. Hand-queued entries are marked instead of
@@ -67,8 +188,10 @@ func (m Model) queueRow(t player.Track, w int, selected bool, number int) string
 	if selected {
 		primary = m.styles.RowSelected
 	}
+	// The mark stands in the same columns the track number would, or the titles
+	// beside it would sit one indent out.
 	return m.row(w, selected,
-		m.styles.Cursor.Render(queuedMark)+" "+primary.Render(t.Title),
+		m.styles.Cursor.Render(padLeft(queuedMark, ordinalCols))+"  "+primary.Render(t.Title),
 		m.styles.RowSecondary.Render(strings.Join(t.Artists, ", ")),
 		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
 	)
@@ -196,7 +319,7 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 
 	title := t.Title
 	if number > 0 {
-		title = fmt.Sprintf("%2d  %s", number, t.Title)
+		title = padLeft(fmt.Sprintf("%d", number), ordinalCols) + "  " + t.Title
 	}
 	if m.ps != nil && m.ps.TrackID == t.ID {
 		title = nowMark + " " + title

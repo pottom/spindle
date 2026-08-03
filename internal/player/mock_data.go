@@ -24,6 +24,29 @@ const (
 	albumBudapest = "Hungarian Rhapsody: Queen Live in Budapest"
 )
 
+// Release dates and lengths, so the detail panel has something real to show
+// offline. The mock is where the layout is judged; blank fields would flatter it.
+var mockAlbums = map[string]struct {
+	released  string
+	tracks    int
+	albumType string
+}{
+	albumOpera:    {"1975-11-21", 12, "album"},
+	albumHotSpace: {"1982-05-21", 11, "album"},
+	albumBowie:    {"2002-10-14", 20, "compilation"},
+	albumBudapest: {"2012-11-05", 22, "album"},
+}
+
+// detail fills in what the Web API would have supplied along with the track.
+func detail(t Track, number int) Track {
+	if a, ok := mockAlbums[t.Album]; ok {
+		t.Released, t.TotalTracks, t.AlbumType = a.released, a.tracks, a.albumType
+	}
+	t.TrackNumber = number
+	t.DiscNumber = 1
+	return t
+}
+
 func secs(m, s int) time.Duration {
 	return time.Duration(m)*time.Minute + time.Duration(s)*time.Second
 }
@@ -31,28 +54,28 @@ func secs(m, s int) time.Duration {
 // mockCatalogue is everything the mock backend knows about. Playback rotates
 // through the first four entries; search and the playlists draw on all of them.
 var mockCatalogue = []Track{
-	{ID: "t01", Title: "Bohemian Rhapsody", Artists: []string{"Queen"}, Album: albumOpera, CoverURL: coverOpera, Duration: secs(5, 55)},
-	{ID: "t02", Title: "Under Pressure", Artists: []string{"Queen", "David Bowie"}, Album: albumHotSpace, CoverURL: coverHotSpace, Duration: secs(4, 8)},
-	{ID: "t03", Title: "Ashes to Ashes", Artists: []string{"David Bowie"}, Album: albumBowie, CoverURL: coverBowie, Duration: secs(4, 23)},
-	{ID: "t04", Title: "Is This the World We Created...? - Live", Artists: []string{"Queen"}, Album: albumBudapest, CoverURL: coverBudapest, Duration: secs(2, 56)},
+	detail(Track{ID: "t01", Title: "Bohemian Rhapsody", Artists: []string{"Queen"}, Album: albumOpera, CoverURL: coverOpera, Duration: secs(5, 55)}, 11),
+	detail(Track{ID: "t02", Title: "Under Pressure", Artists: []string{"Queen", "David Bowie"}, Album: albumHotSpace, CoverURL: coverHotSpace, Duration: secs(4, 8)}, 3),
+	detail(Track{ID: "t03", Title: "Ashes to Ashes", Artists: []string{"David Bowie"}, Album: albumBowie, CoverURL: coverBowie, Duration: secs(4, 23)}, 4),
+	detail(Track{ID: "t04", Title: "Is This the World We Created...? - Live", Artists: []string{"Queen"}, Album: albumBudapest, CoverURL: coverBudapest, Duration: secs(2, 56)}, 10),
 
-	{ID: "t05", Title: "Love of My Life", Artists: []string{"Queen"}, Album: albumOpera, CoverURL: coverOpera, Duration: secs(3, 39)},
-	{ID: "t06", Title: "You're My Best Friend", Artists: []string{"Queen"}, Album: albumOpera, CoverURL: coverOpera, Duration: secs(2, 52)},
-	{ID: "t07", Title: "Death on Two Legs", Artists: []string{"Queen"}, Album: albumOpera, CoverURL: coverOpera, Duration: secs(3, 43)},
+	detail(Track{ID: "t05", Title: "Love of My Life", Artists: []string{"Queen"}, Album: albumOpera, CoverURL: coverOpera, Duration: secs(3, 39)}, 5),
+	detail(Track{ID: "t06", Title: "You're My Best Friend", Artists: []string{"Queen"}, Album: albumOpera, CoverURL: coverOpera, Duration: secs(2, 52)}, 8),
+	detail(Track{ID: "t07", Title: "Death on Two Legs", Artists: []string{"Queen"}, Album: albumOpera, CoverURL: coverOpera, Duration: secs(3, 43)}, 1),
 
-	{ID: "t08", Title: "Body Language", Artists: []string{"Queen"}, Album: albumHotSpace, CoverURL: coverHotSpace, Duration: secs(4, 31)},
-	{ID: "t09", Title: "Las Palabras de Amor", Artists: []string{"Queen"}, Album: albumHotSpace, CoverURL: coverHotSpace, Duration: secs(4, 30)},
-	{ID: "t10", Title: "Staying Power", Artists: []string{"Queen"}, Album: albumHotSpace, CoverURL: coverHotSpace, Duration: secs(4, 12)},
+	detail(Track{ID: "t08", Title: "Body Language", Artists: []string{"Queen"}, Album: albumHotSpace, CoverURL: coverHotSpace, Duration: secs(4, 31)}, 4),
+	detail(Track{ID: "t09", Title: "Las Palabras de Amor", Artists: []string{"Queen"}, Album: albumHotSpace, CoverURL: coverHotSpace, Duration: secs(4, 30)}, 6),
+	detail(Track{ID: "t10", Title: "Staying Power", Artists: []string{"Queen"}, Album: albumHotSpace, CoverURL: coverHotSpace, Duration: secs(4, 12)}, 2),
 
-	{ID: "t11", Title: "Life on Mars?", Artists: []string{"David Bowie"}, Album: albumBowie, CoverURL: coverBowie, Duration: secs(3, 53)},
-	{ID: "t12", Title: "Heroes", Artists: []string{"David Bowie"}, Album: albumBowie, CoverURL: coverBowie, Duration: secs(6, 11)},
-	{ID: "t13", Title: "Let's Dance", Artists: []string{"David Bowie"}, Album: albumBowie, CoverURL: coverBowie, Duration: secs(4, 8)},
-	{ID: "t14", Title: "Rebel Rebel", Artists: []string{"David Bowie"}, Album: albumBowie, CoverURL: coverBowie, Duration: secs(4, 30)},
+	detail(Track{ID: "t11", Title: "Life on Mars?", Artists: []string{"David Bowie"}, Album: albumBowie, CoverURL: coverBowie, Duration: secs(3, 53)}, 4),
+	detail(Track{ID: "t12", Title: "Heroes", Artists: []string{"David Bowie"}, Album: albumBowie, CoverURL: coverBowie, Duration: secs(6, 11)}, 9),
+	detail(Track{ID: "t13", Title: "Let's Dance", Artists: []string{"David Bowie"}, Album: albumBowie, CoverURL: coverBowie, Duration: secs(4, 8)}, 1),
+	detail(Track{ID: "t14", Title: "Rebel Rebel", Artists: []string{"David Bowie"}, Album: albumBowie, CoverURL: coverBowie, Duration: secs(4, 30)}, 3),
 
-	{ID: "t15", Title: "Tavaszi Szél Vizet Áraszt - Live", Artists: []string{"Queen"}, Album: albumBudapest, CoverURL: coverBudapest, Duration: secs(1, 12)},
-	{ID: "t16", Title: "Now I'm Here - Live", Artists: []string{"Queen"}, Album: albumBudapest, CoverURL: coverBudapest, Duration: secs(5, 8)},
-	{ID: "t17", Title: "Friends Will Be Friends - Live", Artists: []string{"Queen"}, Album: albumBudapest, CoverURL: coverBudapest, Duration: secs(4, 2)},
-	{ID: "t18", Title: "Radio Ga Ga - Live", Artists: []string{"Queen"}, Album: albumBudapest, CoverURL: coverBudapest, Duration: secs(6, 6)},
+	detail(Track{ID: "t15", Title: "Tavaszi Szél Vizet Áraszt - Live", Artists: []string{"Queen"}, Album: albumBudapest, CoverURL: coverBudapest, Duration: secs(1, 12)}, 2),
+	detail(Track{ID: "t16", Title: "Now I'm Here - Live", Artists: []string{"Queen"}, Album: albumBudapest, CoverURL: coverBudapest, Duration: secs(5, 8)}, 5),
+	detail(Track{ID: "t17", Title: "Friends Will Be Friends - Live", Artists: []string{"Queen"}, Album: albumBudapest, CoverURL: coverBudapest, Duration: secs(4, 2)}, 9),
+	detail(Track{ID: "t18", Title: "Radio Ga Ga - Live", Artists: []string{"Queen"}, Album: albumBudapest, CoverURL: coverBudapest, Duration: secs(6, 6)}, 12),
 }
 
 // mockPlaylistDef ties a playlist's metadata to the tracks it holds.

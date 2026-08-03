@@ -228,10 +228,22 @@ func (m Model) helpKeys() tabKeys {
 	}
 }
 
+// layoutMode is how the current tab divides its body.
+func (m Model) layoutMode() layoutMode {
+	switch m.tab {
+	case tabPlayer:
+		return modePlayer
+	case tabQueue:
+		return modeQueue
+	default:
+		return modeBrowse
+	}
+}
+
 // layout resolves the current geometry. It is pure, so View and Update can both
 // ask for it without either of them owning the answer.
 func (m Model) layout() layout {
-	return computeLayout(m.width, m.height, m.helpHeight(), m.hasNotice(), m.tab != tabPlayer, m.cell)
+	return computeLayout(m.width, m.height, m.helpHeight(), m.hasNotice(), m.layoutMode(), m.cell)
 }
 
 func (m Model) Init() tea.Cmd {

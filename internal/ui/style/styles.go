@@ -51,6 +51,9 @@ type Styles struct {
 	MeterOff  lipgloss.Style
 	Volume    lipgloss.Style
 
+	// Detail panel.
+	FactLabel lipgloss.Style
+
 	// Status line.
 	DeviceOn  lipgloss.Style
 	DeviceOff lipgloss.Style
@@ -89,6 +92,8 @@ func New(isDark bool, accent color.Color) Styles {
 		RowSelected:  fg(t.Text).Bold(true),
 		RowPlaying:   fg(accent),
 		Empty:        fg(t.Faint),
+
+		FactLabel: fg(t.Faint),
 
 		Quality: fg(t.Faint),
 
