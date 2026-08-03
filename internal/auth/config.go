@@ -38,9 +38,23 @@ var Scopes = []string{
 // expected to answer it with SetupHelp rather than a bare error line.
 var ErrNoClientID = errors.New("no Spotify client id")
 
-// ClientID reads the application's client id from the environment.
+// ClientID returns the application's client id.
+//
+// The environment wins so a different application can be tried without
+// disturbing what is saved; otherwise it comes from the settings file, which is
+// where it lands after being asked for once.
 func ClientID() (string, error) {
-	id := os.Getenv(clientIDEnv)
+	if id := os.Getenv(clientIDEnv); id != "" {
+		if !clientIDPattern.MatchString(id) {
+			return "", fmt.Errorf("%w: %s is set but malformed", ErrMalformedClientID, clientIDEnv)
+		}
+		return id, nil
+	}
+
+	id, err := loadClientID()
+	if err != nil {
+		return "", err
+	}
 	if id == "" {
 		return "", ErrNoClientID
 	}
@@ -57,9 +71,10 @@ func SetupHelp() string {
        %s
 
      Spotify rejects "localhost"; it has to be the numeric form.
-  3. Copy the client id from the app's settings and export it:
+  3. Copy the client id from the app's settings.
 
-       export %s=<client id>
+Run "spindle login" and it will ask for the id once and remember it. Setting %s
+overrides what is saved, which is handy for trying a second application.
 
 The client secret is not needed: spindle authenticates with PKCE.`, RedirectURI, clientIDEnv)
 }
