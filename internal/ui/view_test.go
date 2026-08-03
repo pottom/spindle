@@ -1,8 +1,11 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/pottom/spindle/internal/player"
 )
 
 func TestFormatDuration(t *testing.T) {
@@ -26,5 +29,26 @@ func TestFormatDuration(t *testing.T) {
 		if got := formatDuration(c.in); got != c.want {
 			t.Errorf("formatDuration(%v) = %q, want %q", c.in, got, c.want)
 		}
+	}
+}
+
+// The bitrate answers "what am I actually hearing", so it belongs next to the
+// device — but only while something is arriving.
+func TestStatusLineShowsTheBitrateWhilePlaying(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{DeviceName: "spindle", Playing: true, Bitrate: 320}
+
+	if got := m.statusLine(); !strings.Contains(got, "320 kbps") {
+		t.Errorf("statusLine() = %q, want the bitrate in it", got)
+	}
+
+	m.ps.Playing = false
+	if got := m.statusLine(); strings.Contains(got, "kbps") {
+		t.Errorf("statusLine() = %q, want no bitrate while paused", got)
+	}
+
+	m.ps.Playing, m.ps.Bitrate = true, 0
+	if got := m.statusLine(); strings.Contains(got, "kbps") {
+		t.Errorf("statusLine() = %q, want no bitrate when unknown", got)
 	}
 }

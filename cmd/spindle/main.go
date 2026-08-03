@@ -40,6 +40,11 @@ func main() {
 				reportFatal(err)
 			}
 			return
+		case "quality":
+			if err := runQuality(os.Args[2:]); err != nil {
+				reportFatal(err)
+			}
+			return
 		case "daemon":
 			if err := runDaemon(os.Args[2:]); err != nil {
 				reportFatal(err)

@@ -114,3 +114,35 @@ func TestSettingsArePrivate(t *testing.T) {
 		t.Errorf("settings mode = %#o, want 0600", perm)
 	}
 }
+
+// The client id and the quality live in the same file, and neither may erase
+// the other: they are set at different moments, by different commands.
+func TestSettingsFieldsSurviveEachOther(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	const id = "0123456789abcdef0123456789abcdef"
+	if err := SaveClientID(id); err != nil {
+		t.Fatalf("SaveClientID: %v", err)
+	}
+	if err := SaveQuality("middle"); err != nil {
+		t.Fatalf("SaveQuality: %v", err)
+	}
+
+	got, err := loadClientID()
+	if err != nil || got != id {
+		t.Errorf("loadClientID() = %q, %v, want the id back", got, err)
+	}
+
+	q, err := Quality()
+	if err != nil || q != "middle" {
+		t.Errorf("Quality() = %q, %v, want middle", q, err)
+	}
+
+	// And setting the id again keeps the quality.
+	if err := SaveClientID(id); err != nil {
+		t.Fatalf("SaveClientID: %v", err)
+	}
+	if q, _ := Quality(); q != "middle" {
+		t.Errorf("Quality() = %q after re-saving the id, want middle", q)
+	}
+}

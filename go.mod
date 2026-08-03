@@ -8,6 +8,7 @@ require (
 	charm.land/lipgloss/v2 v2.0.5
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/charmbracelet/x/term v0.2.2
+	github.com/coder/websocket v1.8.15
 	github.com/devgianlu/go-librespot v0.8.0
 	github.com/gofrs/flock v0.13.0
 	github.com/zmb3/spotify/v2 v2.4.3
@@ -26,7 +27,6 @@ require (
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
-	github.com/coder/websocket v1.8.15 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/devgianlu/shannon v0.0.0-20230613115856-82ec90b7fa7e // indirect
 	github.com/godbus/dbus/v5 v5.2.0 // indirect
@@ -54,4 +54,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/devgianlu/go-librespot => github.com/pottom/go-librespot v0.8.1-0.20260803213957-b20b2585e4f2
+replace github.com/devgianlu/go-librespot => github.com/pottom/go-librespot v0.8.1-0.20260803222038-cc470ab08ad1

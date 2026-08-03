@@ -24,4 +24,8 @@ type State struct {
 	Volume     int    // 0–100
 	DeviceID   string
 	DeviceName string
+
+	// Bitrate is the stream actually playing, in kbps, or 0 when unknown. Only
+	// the local daemon can say: the Web API never reports what a device chose.
+	Bitrate int
 }

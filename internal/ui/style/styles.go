@@ -54,6 +54,7 @@ type Styles struct {
 	// Status line.
 	DeviceOn  lipgloss.Style
 	DeviceOff lipgloss.Style
+	Quality   lipgloss.Style
 	Help      lipgloss.Style
 
 	// Artwork area and standalone screens.
@@ -88,6 +89,8 @@ func New(isDark bool, accent color.Color) Styles {
 		RowSelected:  fg(t.Text).Bold(true),
 		RowPlaying:   fg(accent),
 		Empty:        fg(t.Faint),
+
+		Quality: fg(t.Faint),
 
 		Query:       fg(t.Text),
 		QueryPrompt: fg(accent),

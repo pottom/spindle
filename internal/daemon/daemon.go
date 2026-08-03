@@ -39,6 +39,9 @@ type Options struct {
 	// Port overrides DefaultPort.
 	Port int
 
+	// Quality is what to ask Spotify for. The empty value means DefaultQuality.
+	Quality Quality
+
 	// Log receives the daemon's own logging.
 	Log io.Writer
 }
@@ -76,6 +79,10 @@ func Run(ctx context.Context, opts Options) error {
 	if out == nil {
 		out = io.Discard
 	}
+	quality := opts.Quality
+	if quality == "" {
+		quality = DefaultQuality
+	}
 	log := newLogger(out)
 
 	api, err := daemon.NewApiServer(log, DefaultHost, port, "", "", "")
@@ -88,12 +95,10 @@ func Run(ctx context.Context, opts Options) error {
 		StateStore: newStore(filepath.Join(dir, "daemon.json")),
 		APIServer:  api,
 		Config: &daemon.Config{
-			DeviceName:   deviceName,
-			DeviceType:   "computer",
-			AudioBackend: audioBackend,
-			// 160 kbps is the middle rate. 320 is available but the difference
-			// is inaudible on most outputs and it triples the cache.
-			Bitrate:       160,
+			DeviceName:    deviceName,
+			DeviceType:    "computer",
+			AudioBackend:  audioBackend,
+			Bitrate:       quality.Bitrate(),
 			VolumeSteps:   100,
 			InitialVolume: 50,
 			Credentials: daemon.CredentialsConfig{

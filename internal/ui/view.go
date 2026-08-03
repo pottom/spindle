@@ -237,7 +237,14 @@ func (m Model) statusLine() string {
 	if m.ps.Playing {
 		device = m.styles.DeviceOn
 	}
-	return device.Render(deviceDot + " " + m.ps.DeviceName)
+	line := device.Render(deviceDot + " " + m.ps.DeviceName)
+
+	// The bitrate is the stream actually arriving, so it only appears once one
+	// is: a rate printed over a paused device would be describing nothing.
+	if m.ps.Playing && m.ps.Bitrate > 0 {
+		line += m.styles.Quality.Render(fmt.Sprintf("  %d kbps", m.ps.Bitrate))
+	}
+	return line
 }
 
 func (m Model) renderTooSmall() string {

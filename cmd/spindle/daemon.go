@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/pottom/spindle/internal/auth"
 	"github.com/pottom/spindle/internal/daemon"
 	"github.com/pottom/spindle/internal/xdg"
 )
@@ -27,6 +28,8 @@ func runDaemon(args []string) error {
 		switch arg {
 		case foregroundFlag, "-f":
 			foreground = true
+		case "stop":
+			return stopDaemon()
 		default:
 			return fmt.Errorf("unknown option %q for spindle daemon", arg)
 		}
@@ -39,13 +42,42 @@ func runDaemon(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	err := daemon.Run(ctx, daemon.Options{Log: os.Stderr})
+	quality, err := configuredQuality()
+	if err != nil {
+		return err
+	}
+
+	err = daemon.Run(ctx, daemon.Options{Log: os.Stderr, Quality: quality})
 	if errors.Is(err, daemon.ErrAlreadyRunning) {
 		// Nothing to complain about: the device the caller wanted exists.
 		fmt.Fprintln(os.Stderr, "spindle: a daemon is already running")
 		return nil
 	}
 	return err
+}
+
+// stopDaemon asks a running daemon to leave, and says so when there is none:
+// the user asked for silence, and silence is what they got either way.
+func stopDaemon() error {
+	err := daemon.Stop(context.Background())
+	if errors.Is(err, daemon.ErrNoDaemon) {
+		fmt.Println("spindle: no daemon is running")
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	fmt.Println("spindle: daemon stopped")
+	return nil
+}
+
+// configuredQuality reads the audio quality from the settings file.
+func configuredQuality() (daemon.Quality, error) {
+	name, err := auth.Quality()
+	if err != nil {
+		return "", err
+	}
+	return daemon.ParseQuality(name)
 }
 
 // detachDaemon re-executes spindle in the background, in its own process group

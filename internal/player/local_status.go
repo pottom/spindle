@@ -16,6 +16,10 @@ type localStatus struct {
 	ShuffleCtx    bool `json:"shuffle_context"`
 
 	Track *localTrack `json:"track"`
+
+	// Bitrate is the stream actually playing, which is not necessarily the one
+	// configured: the best available format is picked per track.
+	Bitrate int `json:"bitrate"`
 }
 
 type localTrack struct {
@@ -37,6 +41,7 @@ func (s *localStatus) toState() *State {
 		Volume:     percentOf(s.Volume, s.VolumeSteps),
 		DeviceID:   s.DeviceID,
 		DeviceName: s.DeviceName,
+		Bitrate:    s.Bitrate,
 	}
 
 	if s.Track != nil {
