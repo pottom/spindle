@@ -2,7 +2,6 @@ package player
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,10 +9,6 @@ import (
 
 	"github.com/zmb3/spotify/v2"
 )
-
-// ErrNotImplemented marks the parts of the interface the live backend has not
-// grown yet. It is a placeholder with a deadline, not an abstraction.
-var ErrNotImplemented = errors.New("not implemented for the Spotify backend")
 
 const (
 	// maxCoverPixels is the largest artwork worth fetching: past this the extra
