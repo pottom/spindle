@@ -54,10 +54,6 @@ func trackFromFull(t *spotify.FullTrack) Track {
 		CoverURL: bestImage(t.Album.Images),
 		Duration: time.Duration(t.Duration) * time.Millisecond,
 	}
-	if t.LinkedFrom != nil {
-		out.OriginID = t.LinkedFrom.ID.String()
-	}
-
 	out.Released = t.Album.ReleaseDate
 	out.AlbumType = t.Album.AlbumType
 	out.TrackNumber = int(t.TrackNumber)

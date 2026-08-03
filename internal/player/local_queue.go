@@ -19,47 +19,64 @@ type localQueueTrack struct {
 	Queued bool   `json:"queued"`
 }
 
-// Queue is the upcoming tracks, each marked with whether it was queued by hand.
+// Queue is the upcoming tracks, each marked with whether it was queued by hand
+// and carrying the id the device knows it by.
 //
 // Neither source has both halves. The Web API returns titles, artists and covers
-// but will not say where a track came from; the daemon knows exactly that but
-// holds only ids. Asking each for what it already has costs one extra local
-// request and no extra Web API quota — looking the metadata up by the daemon's
-// ids would have been tidier, but the batch endpoint is closed to applications
-// registered since late 2024.
+// but will not say where a track came from; the daemon knows exactly that, and
+// is the only one whose ids the device will answer to — the same recording can
+// carry a different id on each side, and telling the device the Web API's id
+// makes it search its context, fail, and quietly rewind to the first track.
+// Looking the metadata up by the daemon's ids instead would be tidier, but the
+// batch endpoint is closed to applications registered since late 2024.
 //
-// The two lists agree on order, so they are matched by position and checked by
-// id as they go. Where a track was relinked to a locally licensed copy the ids
-// differ, which is what OriginID is for; anything still unmatched ends the run,
-// because a mark on the wrong row would offer an edit that silently does
-// nothing.
+// The two lists describe the same sequence, so they are matched by position.
+// That only holds if nothing moved between the two requests, which is what the
+// second reading of the daemon's queue checks.
 func (l *Local) Queue(ctx context.Context) (Queue, error) {
+	if l.idle() {
+		return l.web.Queue(ctx)
+	}
+
+	before, err := l.queueOrigins(ctx)
+	if err != nil {
+		return l.web.Queue(ctx)
+	}
+
 	q, err := l.web.Queue(ctx)
-	if err != nil || len(q.Upcoming) == 0 || l.idle() {
+	if err != nil || len(q.Upcoming) == 0 {
 		return q, err
 	}
 
-	origins, err := l.queueOrigins(ctx)
-	if err != nil {
-		// Without the marks the queue is read-only, which the UI works out for
-		// itself. A queue nobody can reorder still beats no queue at all.
+	after, err := l.queueOrigins(ctx)
+	if err != nil || !sameOrigins(before, after) {
+		// The track changed under us. Without the marks the queue is read-only,
+		// which the UI works out for itself, and the next refresh is moments
+		// away — better than acting on a list that has already moved on.
 		return q, nil
 	}
 
+	if len(q.Upcoming) > len(before) {
+		q.Upcoming = q.Upcoming[:len(before)]
+	}
 	for i := range q.Upcoming {
-		if i >= len(origins) || !sameTrack(origins[i].URI, q.Upcoming[i]) {
-			break
-		}
-		q.Upcoming[i].Queued = origins[i].Queued
+		q.Upcoming[i].Queued = before[i].Queued
+		q.Upcoming[i].DeviceID = trackIDFromURI(before[i].URI)
 	}
 	return q, nil
 }
 
-// sameTrack reports whether a device's track uri names the track the Web API
-// described, allowing for relinking.
-func sameTrack(uri string, t Track) bool {
-	id := trackIDFromURI(uri)
-	return id == t.ID || (t.OriginID != "" && id == t.OriginID)
+// sameOrigins reports whether two readings of the queue describe the same one.
+func sameOrigins(a, b []localQueueTrack) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // SetQueue replaces the hand-queued tracks, leaving the context alone.

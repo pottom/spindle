@@ -277,3 +277,66 @@ func TestQueueWithoutAPlayingTrack(t *testing.T) {
 		t.Errorf("queueIndex() = %d, want the cursor to address the queue directly", m.queueIndex())
 	}
 }
+
+// Bringing a track forward moves it to the top and pushes the rest down. It
+// must not drop anything: the tracks in the list are there to be heard, and
+// choosing one to hear sooner is not a decision about the others.
+func TestPlayingARowMovesItToTheTop(t *testing.T) {
+	queue := queueOf(1, "a", "b", "c", "d")
+
+	got := queueWithFirst(queue, 2)
+	if names := ids(got); len(names) != 4 || names[0] != "c" {
+		t.Fatalf("queueWithFirst = %v, want c first", names)
+	}
+	if names := ids(got)[1:]; names[0] != "a" || names[1] != "b" || names[2] != "d" {
+		t.Errorf("queueWithFirst = %v, want the rest in their old order", ids(got))
+	}
+	// It has to be marked, or the device would not keep it as the queue.
+	if !got[0].Queued {
+		t.Error("the track brought forward is not marked as queued")
+	}
+	// And the one that was already queued stays queued, right behind it.
+	if !got[1].Queued {
+		t.Error("the track that was already queued lost its mark")
+	}
+}
+
+// Only the leading run of hand-queued tracks is the queue; the device keeps no
+// more than that, so sending a context track further down would queue the whole
+// album a second time.
+func TestOnlyTheLeadingRunIsSent(t *testing.T) {
+	sent := make(chan []string, 1)
+	m := queueModel(1, "a", "b", "c")
+	m.player = recordingEditor{Player: m.player, sent: sent}
+	m.queue[2].Queued = true // a mark past a context track, which cannot be a queue
+
+	cmd := m.commitQueue(m.queue)
+	if cmd == nil {
+		t.Fatal("commitQueue = nil")
+	}
+	cmd()
+
+	if got := <-sent; len(got) != 1 || got[0] != "a" {
+		t.Errorf("SetQueue(%v), want only the run at the front", got)
+	}
+}
+
+// Everything said to the playback device has to use the id that device knows.
+// The Web API can report a different one for the same recording, and the device
+// answers an unknown id by rewinding to the start of the album.
+func TestTheDeviceIsAddressedInItsOwnIds(t *testing.T) {
+	sent := make(chan []string, 1)
+	m := queueModel(1, "a", "b")
+	m.player = recordingEditor{Player: m.player, sent: sent}
+	m.queue[0].DeviceID = "device-a"
+
+	cmd := m.commitQueue(m.queue)
+	if cmd == nil {
+		t.Fatal("commitQueue = nil")
+	}
+	cmd()
+
+	if got := <-sent; len(got) != 1 || got[0] != "device-a" {
+		t.Errorf("SetQueue(%v), want the device's own id", got)
+	}
+}

@@ -16,10 +16,11 @@ type Track struct {
 	// context supplied. Only the former can be reordered or removed.
 	Queued bool
 
-	// OriginID is the id this track was relinked from, when Spotify substituted
-	// a locally licensed copy. Playback devices still speak of the original, so
-	// it is the only thing the two can be matched on.
-	OriginID string
+	// DeviceID is what the playback device calls this track. It is not always
+	// the Web API's id: the same recording can carry a different id in the
+	// device's context than the one the Web API reports for the same position.
+	// Anything said to the device has to use this one.
+	DeviceID string
 
 	// The rest is detail: worth showing when a track is being looked at, never
 	// needed to list one. Everything here arrives with the track itself, so
