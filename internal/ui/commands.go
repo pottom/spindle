@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -37,10 +38,26 @@ func fetchStateCmd(p player.Player) tea.Cmd {
 		defer cancel()
 
 		st, err := p.State(ctx)
+		if errors.Is(err, player.ErrNoActiveDevice) {
+			return msg.NoActiveDevice{}
+		}
 		if err != nil {
 			return msg.Error{Err: fmt.Errorf("fetch player state: %w", err)}
 		}
 		return msg.StateFetched{State: st}
+	}
+}
+
+func fetchDevicesCmd(p player.Player) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+		defer cancel()
+
+		devices, err := p.Devices(ctx)
+		if err != nil {
+			return msg.Error{Err: fmt.Errorf("fetch devices: %w", err)}
+		}
+		return msg.DevicesFetched{Devices: devices}
 	}
 }
 

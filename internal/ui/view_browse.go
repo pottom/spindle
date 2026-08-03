@@ -46,9 +46,15 @@ func (m Model) playlistPaneView(l layout, rows int) []string {
 	}
 
 	open := *m.playlists.open
+	subtitle := fmt.Sprintf("%s · %d tracks", open.Owner, open.Tracks)
+	// Spotify does not report a playlist's length; only the mock knows it.
+	if open.Duration > 0 {
+		subtitle += " · " + formatSpan(open.Duration)
+	}
+
 	head := []string{
 		m.styles.Title.Render(open.Name),
-		m.styles.Album.Render(fmt.Sprintf("%s · %d tracks · %s", open.Owner, open.Tracks, formatSpan(open.Duration))),
+		m.styles.Album.Render(subtitle),
 	}
 	return m.listPane(l, rows, head,
 		len(m.playlists.tracks), &m.playlists.inner,

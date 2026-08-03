@@ -133,40 +133,43 @@ kept so the palette does not flash back to its default mid-swap.
 
 ### 4.3 No active device
 
-Not built yet — M2 and M4. The drawings in 4.3 to 4.6 predate the move away from
-frames and are kept for their content, not their chrome: when these screens are
-built they take the frameless treatment of 4.1.
-
-This is **not an error screen**. It is the most common entry point.
+This is **not an error screen**. It is the most common entry point. It replaces
+the player tab only — the drawings in 4.4 to 4.6 are still from the framed era and
+are kept for their content, not their chrome.
 
 ```
-┌─ spindle ──────────────────────────────────────────────┐
-│                                                        │
-│   No active playback device.                           │
-│                                                        │
-│   Start Spotify on one of your devices, or pick one    │
-│   from the list below:                                 │
-│                                                        │
-│   > MacBook Pro              computer                  │
-│     iPhone                   smartphone                │
-│     Kitchen speaker          speaker                   │
-│                                                        │
-│   If the list is empty, open the Spotify app and play  │
-│   something for a moment — Spotify only reports        │
-│   devices that were recently active.                   │
-│                                                        │
-├────────────────────────────────────────────────────────┤
-│ ↑↓ select · enter activate · r refresh · q quit        │
-└────────────────────────────────────────────────────────┘
+   now playing   playlists   search
+   ━━━━━━━━━━━
+
+
+   No active playback device
+
+   Start Spotify on one of your devices, or pick one below.
+
+   ● MacBook Pro                               computer
+     iPhone                                  smartphone
+     Kitchen speaker                            speaker
+
+
+   Missing one? Spotify only lists devices that were recently
+   active — open the app on it and play something for a moment.
+
+   r refresh · tab switch · q quit
 ```
 
-The closing sentence matters. Spotify's Web API only returns recently active
-devices, so a freshly launched client often does not appear until something has
-played on it. Without that explanation this looks exactly like a bug.
+- The tabs stay live. Playlists and search need no active device, and taking them
+  away because a speaker went to sleep would be gratuitous.
+- The help bar drops the transport keys: with nothing playing they would be a lie.
+  `r` re-asks for the device list.
+- `●` marks whichever device Spotify still considers active, if any.
+- Selecting one to transfer to arrives in M4; for now the list informs.
+- The closing sentence matters. Spotify's Web API only returns recently active
+  devices, so a freshly launched client often does not appear until something has
+  played on it. Without that explanation this looks exactly like a bug.
 
 ### 4.4 Device picker overlay
 
-Opened with `d`, drawn over the player. The background stays visible but dimmed to
+Not built yet — M4. Opened with `d`, drawn over the player. The background stays visible but dimmed to
 `Faint`.
 
 ```

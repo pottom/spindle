@@ -32,8 +32,19 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	case msg.StateFetched:
 		m.adopt(message.State)
+		m.noDevice = false
 		m.err = nil
 		return m, m.syncCover()
+
+	case msg.NoActiveDevice:
+		// Not an error, and not worth clearing the last known track for: the
+		// player screen explains itself and offers the device list instead.
+		m.noDevice, m.ps, m.err = true, nil, nil
+		return m, tea.Batch(fetchDevicesCmd(m.player), m.syncCover())
+
+	case msg.DevicesFetched:
+		m.devices = message.Devices
+		return m, nil
 
 	case msg.CoverReady:
 		if m.cover.matches(message.URL, message.Width, message.Height) {
@@ -162,6 +173,14 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.syncCover()
 	}
 
+	// With nothing playing there is nothing to control, but the device list is
+	// worth another look.
+	if m.noDevice {
+		if key.Matches(k, m.keys.Repeat) {
+			return m, tea.Batch(fetchDevicesCmd(m.player), fetchStateCmd(m.player))
+		}
+		return m, nil
+	}
 	if m.ps == nil {
 		return m, nil
 	}

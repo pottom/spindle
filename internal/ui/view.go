@@ -70,7 +70,7 @@ func (m Model) renderPlayer() string {
 	if m.err != nil {
 		lines = append(lines, m.pad(m.styles.Error.Render("✕ "+m.err.Error()), l))
 	}
-	for _, row := range strings.Split(m.help.View(m.keys.forTab(m.tab)), "\n") {
+	for _, row := range strings.Split(m.help.View(m.helpKeys()), "\n") {
 		lines = append(lines, m.pad(row, l))
 	}
 
@@ -87,9 +87,14 @@ func (m Model) pad(s string, l layout) string {
 // information, centred in what is left once the status line has its row.
 func (m Model) body(l layout) []string {
 	var block []string
-	if m.tab == tabPlayer && m.ps == nil {
+	switch {
+	case m.tab == tabPlayer && m.noDevice:
+		block = m.noDevicePanel(l, max(l.bodyHeight-1, 1))
+
+	case m.tab == tabPlayer && m.ps == nil:
 		block = []string{m.styles.Detail.Render("Connecting…")}
-	} else {
+
+	default:
 		// The player centres its text against the cover; the browsing tabs give
 		// their list every row going, with the cover centred beside it.
 		rows := l.artHeight
@@ -247,7 +252,7 @@ func (m Model) renderTooSmall() string {
 
 // helpHeight is how many lines the help bar currently occupies.
 func (m Model) helpHeight() int {
-	return lipgloss.Height(m.help.View(m.keys.forTab(m.tab)))
+	return lipgloss.Height(m.help.View(m.helpKeys()))
 }
 
 // formatDuration renders a position as m:ss, or h:mm:ss past an hour.

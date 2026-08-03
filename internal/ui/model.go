@@ -40,6 +40,11 @@ type Model struct {
 	playlists playlistPane
 	search    searchPane
 
+	// noDevice is the normal entry path, not an error: nothing is playing
+	// anywhere. Only the player tab cares — browsing works regardless.
+	noDevice bool
+	devices  []player.Device
+
 	cover coverState
 
 	// coverSeq debounces the artwork preview: arrowing down a list should not
@@ -86,7 +91,7 @@ func (m Model) coverTarget() string {
 	case tabSearch:
 		return m.search.cover()
 	default:
-		if m.ps == nil {
+		if m.ps == nil || m.noDevice {
 			return ""
 		}
 		return m.ps.CoverURL
@@ -113,6 +118,14 @@ func (m *Model) restyle() {
 	}
 	in.Cursor.Color = m.styles.Accent
 	m.search.input.SetStyles(in)
+}
+
+// helpKeys is the key set the help bar should advertise right now.
+func (m Model) helpKeys() tabKeys {
+	if m.tab == tabPlayer && m.noDevice {
+		return m.keys.forNoDevice()
+	}
+	return m.keys.forTab(m.tab)
 }
 
 // layout resolves the current geometry. It is pure, so View and Update can both

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/zmb3/spotify/v2"
 
 	"github.com/pottom/spindle/internal/auth"
 	"github.com/pottom/spindle/internal/player"
@@ -49,9 +50,13 @@ func main() {
 		return
 	}
 
-	if !*mock {
-		fmt.Fprintln(os.Stderr, "spindle: the live Spotify backend is not wired up yet; run with --mock")
-		os.Exit(1)
+	ctx := context.Background()
+
+	// Authorise before Bubble Tea takes the terminal: the browser flow needs to
+	// print a URL and be readable while it waits.
+	backendPlayer, err := openBackend(ctx, *mock)
+	if err != nil {
+		reportFatal(err)
 	}
 
 	cell := cover.DetectCellSize(os.Stdout)
@@ -61,9 +66,22 @@ func main() {
 	}
 	loader := cover.NewLoader(renderer, &http.Client{Timeout: 15 * time.Second})
 
-	if _, err := tea.NewProgram(ui.New(player.NewMock(), loader, cell)).Run(); err != nil {
+	if _, err := tea.NewProgram(ui.New(backendPlayer, loader, cell)).Run(); err != nil {
 		reportFatal(err)
 	}
+}
+
+// openBackend picks between the offline mock and the live Spotify API.
+func openBackend(ctx context.Context, mock bool) (player.Player, error) {
+	if mock {
+		return player.NewMock(), nil
+	}
+
+	session, err := auth.NewSession(ctx, os.Stdout)
+	if err != nil {
+		return nil, err
+	}
+	return player.NewSpotify(spotify.New(session.Client(ctx))), nil
 }
 
 // coverRenderer picks the artwork backend. The terminal is probed before Bubble

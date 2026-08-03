@@ -56,34 +56,29 @@ Go 1.22 or later.
 
 ### 3.1 Application state machine
 
-The player, playlists and search screens are tabs of one window rather than
-states: `tab` cycles them and each keeps its own cursor. Only the states below
-take the screen over entirely.
+Authorisation happens before Bubble Tea starts: the browser flow needs a terminal
+it can print a URL to, so `main` runs it and hands the UI an already-authorised
+backend. There is no `stateAuth` inside the model.
+
+What is left is not a state machine but a tab set plus one condition:
 
 ```
-        ┌────────────┐  no token / expired
-        │ stateAuth  │◄────────────────────┐
-        └─────┬──────┘                     │
-              │ auth succeeded             │ 401
-              ▼                            │
-        ┌───────────────┐                  │
-        │ stateNoDevice │                  │
-        └─────┬─────────┘                  │
-              │ active device found        │
-              ▼                            │
-        ┌───────────────┐                  │
-        │ statePlayer   │──────────────────┘
-        └─────┬─────────┘
-              │ 'd' key
+   tab ──▶ now playing ──▶ playlists ──▶ search ──▶ (wraps)
+              │
+              │ Web API answered 204
               ▼
-        ┌───────────────┐
-        │ stateDevices  │  (overlay, ESC returns)
-        └───────────────┘
+        no active device      ← only the player tab changes;
+                                browsing works regardless
 ```
 
-`stateNoDevice` is **not an error state**. It is the normal entry path: if the user
-has no running Spotify client, the Web API returns an empty response. Show a device
-list, not an error. This is the single largest source of "it doesn't work for me".
+**"No active device" is not an error state.** It is the normal entry path: with no
+running Spotify client the Web API returns an empty response. Show a device list
+and say why it might be empty. This is the single largest source of "it doesn't
+work for me".
+
+It deliberately is not a whole-application mode. Playlists and search work without
+anything playing, and taking those away because a speaker went to sleep would be
+gratuitous.
 
 ### 3.2 The Player interface
 

@@ -33,6 +33,16 @@ type CoverFailed struct {
 	Width, Height int
 }
 
+// NoActiveDevice reports that nothing is playing anywhere. It is a normal
+// condition with its own screen, not a failure, so it is its own message rather
+// than an Error.
+type NoActiveDevice struct{}
+
+// DevicesFetched carries the list of devices playback could be moved to.
+type DevicesFetched struct {
+	Devices []player.Device
+}
+
 // PlaylistsFetched carries the library listing.
 type PlaylistsFetched struct {
 	Playlists []player.Playlist

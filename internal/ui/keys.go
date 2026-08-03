@@ -104,6 +104,21 @@ func hint(keys, desc string) key.Binding {
 	return key.NewBinding(key.WithKeys(keys), key.WithHelp(keys, desc))
 }
 
+// forNoDevice is the help while nothing is playing: the transport keys have
+// nothing to act on, so offering them would be a lie.
+func (k keyMap) forNoDevice() tabKeys {
+	return tabKeys{
+		short: []key.Binding{
+			hint("r", "refresh"),
+			hint("tab", "switch"),
+			hint("q", "quit"),
+		},
+		full: [][]key.Binding{
+			{k.Repeat, k.NextTab, k.Quit},
+		},
+	}
+}
+
 func (k keyMap) forTab(t tabID) tabKeys {
 	switch t {
 	case tabPlaylists:
