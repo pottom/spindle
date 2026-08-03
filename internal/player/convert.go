@@ -46,7 +46,7 @@ func artistNames(artists []spotify.SimpleArtist) []string {
 }
 
 func trackFromFull(t *spotify.FullTrack) Track {
-	return Track{
+	out := Track{
 		ID:       t.ID.String(),
 		Title:    t.Name,
 		Artists:  artistNames(t.Artists),
@@ -54,6 +54,10 @@ func trackFromFull(t *spotify.FullTrack) Track {
 		CoverURL: bestImage(t.Album.Images),
 		Duration: time.Duration(t.Duration) * time.Millisecond,
 	}
+	if t.LinkedFrom != nil {
+		out.OriginID = t.LinkedFrom.ID.String()
+	}
+	return out
 }
 
 func ownerName(u spotify.User) string {

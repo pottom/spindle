@@ -15,4 +15,9 @@ type Track struct {
 	// Queued marks a track put into the queue by hand, as opposed to one the
 	// context supplied. Only the former can be reordered or removed.
 	Queued bool
+
+	// OriginID is the id this track was relinked from, when Spotify substituted
+	// a locally licensed copy. Playback devices still speak of the original, so
+	// it is the only thing the two can be matched on.
+	OriginID string
 }

@@ -21,42 +21,45 @@ type localQueueTrack struct {
 
 // Queue is the upcoming tracks, each marked with whether it was queued by hand.
 //
-// The order and the marks come from the daemon, the titles from the Web API.
-// Pairing up two independently fetched lists was tried first and cannot be made
-// to work: Spotify relinks tracks to their local equivalents, so the same song
-// is a different id on each side. Asking for metadata by the daemon's own ids
-// sidesteps the question entirely.
+// Neither source has both halves. The Web API returns titles, artists and covers
+// but will not say where a track came from; the daemon knows exactly that but
+// holds only ids. Asking each for what it already has costs one extra local
+// request and no extra Web API quota — looking the metadata up by the daemon's
+// ids would have been tidier, but the batch endpoint is closed to applications
+// registered since late 2024.
+//
+// The two lists agree on order, so they are matched by position and checked by
+// id as they go. Where a track was relinked to a locally licensed copy the ids
+// differ, which is what OriginID is for; anything still unmatched ends the run,
+// because a mark on the wrong row would offer an edit that silently does
+// nothing.
 func (l *Local) Queue(ctx context.Context) ([]Track, error) {
-	if l.idle() {
-		return l.web.Queue(ctx)
+	tracks, err := l.web.Queue(ctx)
+	if err != nil || len(tracks) == 0 || l.idle() {
+		return tracks, err
 	}
 
 	origins, err := l.queueOrigins(ctx)
 	if err != nil {
-		// Falling back loses the marks, and with them the ability to edit — but
-		// a queue nobody can reorder still beats no queue at all.
-		return l.web.Queue(ctx)
-	}
-	if len(origins) == 0 {
-		return nil, nil
+		// Without the marks the queue is read-only, which the UI works out for
+		// itself. A queue nobody can reorder still beats no queue at all.
+		return tracks, nil
 	}
 
-	ids := make([]string, 0, len(origins))
-	queued := make(map[string]bool, len(origins))
-	for _, o := range origins {
-		id := trackIDFromURI(o.URI)
-		ids = append(ids, id)
-		queued[id] = o.Queued
-	}
-
-	tracks, err := l.web.TracksByID(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
 	for i := range tracks {
-		tracks[i].Queued = queued[tracks[i].ID]
+		if i >= len(origins) || !sameTrack(origins[i].URI, tracks[i]) {
+			break
+		}
+		tracks[i].Queued = origins[i].Queued
 	}
 	return tracks, nil
+}
+
+// sameTrack reports whether a device's track uri names the track the Web API
+// described, allowing for relinking.
+func sameTrack(uri string, t Track) bool {
+	id := trackIDFromURI(uri)
+	return id == t.ID || (t.OriginID != "" && id == t.OriginID)
 }
 
 // SetQueue replaces the hand-queued tracks, leaving the context alone.
