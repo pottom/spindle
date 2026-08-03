@@ -19,8 +19,8 @@ type localQueueTrack struct {
 	Queued bool   `json:"queued"`
 }
 
-// Queue is the upcoming tracks, each marked with whether it was queued by hand
-// and carrying the id the device knows it by.
+// Queue is the upcoming tracks, each carrying the id the device knows it by and
+// whether it sits in the part of the list whose order can be set outright.
 //
 // Neither source has both halves. The Web API returns titles, artists and covers
 // but will not say where a track came from; the daemon knows exactly that, and
@@ -116,7 +116,9 @@ func (l *Local) Drop(ctx context.Context, trackID string) error {
 	return nil
 }
 
-// queueOrigins asks the daemon which upcoming tracks were queued by hand.
+// queueOrigins asks the daemon which upcoming tracks are its queue rather than
+// its context. The distinction is not shown — to the user there is one list —
+// but only the queue's order can be written back wholesale.
 func (l *Local) queueOrigins(ctx context.Context) ([]localQueueTrack, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, l.addr+"/player/queue", nil)
 	if err != nil {

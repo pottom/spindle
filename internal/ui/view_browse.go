@@ -23,10 +23,6 @@ const (
 	// factLabelCols is the label column of the detail panel.
 	factLabelCols = 12
 
-	// queuedMark stands where the track number would be, on the entries that
-	// were put there by hand.
-	queuedMark = "+"
-
 	// secondaryCols is the fixed middle column of a list row: the artist, or the
 	// playlist's owner. Fixed so the trailing column always lines up.
 	secondaryCols = 20
@@ -167,15 +163,9 @@ func trackFacts(t player.Track, playing bool) []trackFact {
 		facts = append(facts, trackFact{"Track", place})
 	}
 	facts = append(facts, trackFact{"Length", formatDuration(t.Duration)})
-
-	origin := "next in order"
-	switch {
-	case playing:
-		origin = "playing now"
-	case t.Queued:
-		origin = "added by hand"
+	if playing {
+		facts = append(facts, trackFact{"Status", "playing now"})
 	}
-	facts = append(facts, trackFact{"Source", origin})
 	return facts
 }
 
@@ -189,27 +179,21 @@ func releaseYear(date string) string {
 }
 
 // queueRow draws one row of the queue. A number of 0 means the track is the one
-// playing; hand-queued entries are marked rather than numbered, since their
-// place is not a place in anything, and they are the only ones that can be
-// moved or dropped.
+// playing, which is marked rather than numbered: it is not waiting its turn.
+// Everything else is one list, numbered in the order it will be heard.
 func (m Model) queueRow(t player.Track, w int, selected bool, number int) string {
-	mark, primary := "", m.styles.RowPrimary
-	switch {
-	case number == 0:
-		mark, primary = nowMark, m.styles.RowPlaying
-	case t.Queued:
-		mark = queuedMark
-	default:
+	if number > 0 {
 		return m.trackRow(t, w, selected, number)
 	}
+
+	primary := m.styles.RowPlaying
 	if selected {
 		primary = m.styles.RowSelected
 	}
-
 	// The mark stands in the same columns the track number would, or the titles
 	// beside it would sit one indent out.
 	return m.row(w, selected,
-		m.styles.Cursor.Render(padLeft(mark, ordinalCols))+"  "+primary.Render(t.Title),
+		m.styles.Cursor.Render(padLeft(nowMark, ordinalCols))+"  "+primary.Render(t.Title),
 		m.styles.RowSecondary.Render(strings.Join(t.Artists, ", ")),
 		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
 	)
@@ -220,20 +204,11 @@ func queueSubtitle(tracks []player.Track) string {
 		return ""
 	}
 
-	var queued int
 	var total time.Duration
 	for _, t := range tracks {
 		total += t.Duration
-		if t.Queued {
-			queued++
-		}
 	}
-
-	out := fmt.Sprintf("%d tracks · %s", len(tracks), formatSpan(total))
-	if queued > 0 {
-		out += fmt.Sprintf(" · %d queued by hand", queued)
-	}
-	return out
+	return fmt.Sprintf("%d tracks · %s", len(tracks), formatSpan(total))
 }
 
 func (m Model) playlistPaneView(l layout, rows int) []string {

@@ -181,12 +181,14 @@ func TestQueuePaneRenders(t *testing.T) {
 	m.width, m.height = 100, 30
 	m.resize()
 
-	out := m.render()
+	out := plain(m.render())
 	if !strings.Contains(out, "Queue") {
 		t.Error("render() has no queue heading")
 	}
-	if !strings.Contains(out, queuedMark) {
-		t.Error("render() does not mark the hand-queued track")
+	// One list, numbered in the order it will be heard: no row carries a badge
+	// for how it got there.
+	if !strings.Contains(out, " 1  a") || !strings.Contains(out, " 2  b") {
+		t.Errorf("render() does not number the queue:\n%s", out)
 	}
 	if !strings.Contains(out, "3 tracks") {
 		t.Errorf("render() has no count in the subtitle:\n%s", out)
@@ -229,7 +231,7 @@ func TestFactsSkipWhatSpotifyDidNotSay(t *testing.T) {
 		TrackNumber: 3, TotalTracks: 11, DiscNumber: 2, Duration: 4 * time.Minute,
 	}
 	got := factLines(trackFacts(full, false))
-	for _, want := range []string{"Album", "Released", "Track", "Length", "Source"} {
+	for _, want := range []string{"Album", "Released", "Track", "Length"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("trackFacts() = %q, want a %s row", got, want)
 		}
@@ -244,6 +246,14 @@ func TestFactsSkipWhatSpotifyDidNotSay(t *testing.T) {
 	bare := player.Track{Album: "Unknown", Duration: time.Minute}
 	if got := factLines(trackFacts(bare, false)); strings.Contains(got, "Released") || strings.Contains(got, "Track ") {
 		t.Errorf("trackFacts() = %q, want no empty rows", got)
+	}
+
+	// Only the track sounding now says so; the rest need no label for waiting.
+	if got := factLines(trackFacts(full, true)); !strings.Contains(got, "playing now") {
+		t.Errorf("trackFacts() = %q, want the playing track to say so", got)
+	}
+	if got := factLines(trackFacts(full, false)); strings.Contains(got, "Status") {
+		t.Errorf("trackFacts() = %q, want no status on a waiting track", got)
 	}
 }
 
