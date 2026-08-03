@@ -43,7 +43,7 @@ type Model struct {
 	// noDevice is the normal entry path, not an error: nothing is playing
 	// anywhere. Only the player tab cares — browsing works regardless.
 	noDevice bool
-	devices  []player.Device
+	devices  devicePane
 
 	cover coverState
 
@@ -133,10 +133,14 @@ func (m *Model) restyle() {
 
 // helpKeys is the key set the help bar should advertise right now.
 func (m Model) helpKeys() tabKeys {
-	if m.tab == tabPlayer && m.noDevice {
+	switch {
+	case m.tab == tabPlayer && m.noDevice:
 		return m.keys.forNoDevice()
+	case m.devices.open:
+		return m.keys.forDevices()
+	default:
+		return m.keys.forTab(m.tab)
 	}
-	return m.keys.forTab(m.tab)
 }
 
 // layout resolves the current geometry. It is pure, so View and Update can both

@@ -44,7 +44,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(fetchDevicesCmd(m.player), m.syncCover())
 
 	case msg.DevicesFetched:
-		m.devices = message.Devices
+		m.devices.adopt(message.Devices)
 		return m, nil
 
 	case msg.CoverReady:
@@ -187,6 +187,9 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.switchTab(m.tab.next(-1))
 	}
 
+	if cmd, handled := m.deviceKey(k); handled {
+		return m, cmd
+	}
 	if cmd, handled := m.browseKey(k); handled {
 		return m, cmd
 	}
@@ -203,12 +206,8 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.syncCover()
 	}
 
-	// With nothing playing there is nothing to control, but the device list is
-	// worth another look.
+	// With nothing playing there is nothing to control.
 	if m.noDevice {
-		if key.Matches(k, m.keys.Repeat) {
-			return m, tea.Batch(fetchDevicesCmd(m.player), fetchStateCmd(m.player))
-		}
 		return m, nil
 	}
 	if m.ps == nil {

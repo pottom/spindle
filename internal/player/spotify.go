@@ -209,5 +209,9 @@ func (s *Spotify) PlayPlaylist(ctx context.Context, playlistID string, offset in
 	}))
 }
 
-// Moving playback between devices arrives in M4.
-func (s *Spotify) TransferTo(context.Context, string) error { return ErrNotImplemented }
+// TransferTo moves playback to another device, keeping whatever was playing
+// playing. Passing false here would silently pause the music the user just asked
+// to hear somewhere else.
+func (s *Spotify) TransferTo(ctx context.Context, deviceID string) error {
+	return classify("transfer playback", s.client.TransferPlayback(ctx, spotify.ID(deviceID), true))
+}

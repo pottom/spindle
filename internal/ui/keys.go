@@ -25,6 +25,8 @@ type keyMap struct {
 	Down    key.Binding
 	Enter   key.Binding
 	Back    key.Binding
+	Devices key.Binding
+	Refresh key.Binding
 }
 
 func newKeyMap() keyMap {
@@ -83,6 +85,14 @@ func newKeyMap() keyMap {
 			key.WithKeys("esc"),
 			key.WithHelp("esc", "back"),
 		),
+		Devices: key.NewBinding(
+			key.WithKeys("d"),
+			key.WithHelp("d", "devices"),
+		),
+		Refresh: key.NewBinding(
+			key.WithKeys("r"),
+			key.WithHelp("r", "refresh"),
+		),
 	}
 
 	return k
@@ -109,12 +119,29 @@ func hint(keys, desc string) key.Binding {
 func (k keyMap) forNoDevice() tabKeys {
 	return tabKeys{
 		short: []key.Binding{
+			hint("↑↓", "select"),
+			hint("enter", "play here"),
 			hint("r", "refresh"),
-			hint("tab", "switch"),
 			hint("q", "quit"),
 		},
 		full: [][]key.Binding{
-			{k.Repeat, k.NextTab, k.Quit},
+			{k.Down, k.Enter, k.Refresh},
+			{k.NextTab, k.Quit},
+		},
+	}
+}
+
+// forDevices is the help while the picker is open over the player.
+func (k keyMap) forDevices() tabKeys {
+	return tabKeys{
+		short: []key.Binding{
+			hint("↑↓", "select"),
+			hint("enter", "play here"),
+			hint("r", "refresh"),
+			hint("esc", "close"),
+		},
+		full: [][]key.Binding{
+			{k.Down, k.Enter, k.Refresh, k.Back},
 		},
 	}
 }
@@ -156,12 +183,12 @@ func (k keyMap) forTab(t tabID) tabKeys {
 				hint("space", "play/pause"),
 				hint("n/p", "track"),
 				hint("←→", "seek"),
-				hint("tab", "switch"),
+				hint("d", "devices"),
 				hint("?", "help"),
 			},
 			full: [][]key.Binding{
 				{k.PlayPause, k.Next, k.SeekFwd, k.VolUp},
-				{k.Shuffle, k.Repeat, k.NextTab, k.Quit},
+				{k.Shuffle, k.Repeat, k.Devices, k.NextTab},
 			},
 		}
 	}

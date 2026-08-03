@@ -105,7 +105,10 @@ func (m Model) body(l layout) []string {
 		}
 
 		right := m.browsePane(l, rows)
-		if right == nil {
+		switch {
+		case m.devices.open:
+			right = m.devicePicker(l.infoWidth, rows)
+		case right == nil:
 			right = stack(m.infoBlock(l.infoWidth), l.infoWidth, rows)
 		}
 		gap := strings.Repeat(" ", columnGap)

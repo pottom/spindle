@@ -154,7 +154,7 @@ are kept for their content, not their chrome.
    Missing one? Spotify only lists devices that were recently
    active — open the app on it and play something for a moment.
 
-   r refresh · tab switch · q quit
+   ↑↓ select · enter play here · r refresh · q quit
 ```
 
 - The tabs stay live. Playlists and search need no active device, and taking them
@@ -162,36 +162,51 @@ are kept for their content, not their chrome.
 - The help bar drops the transport keys: with nothing playing they would be a lie.
   `r` re-asks for the device list.
 - `●` marks whichever device Spotify still considers active, if any.
-- Selecting one to transfer to arrives in M4; for now the list informs.
+- `↑↓` and `enter` work here exactly as in the picker: this screen is where you
+  choose where to start.
 - The closing sentence matters. Spotify's Web API only returns recently active
   devices, so a freshly launched client often does not appear until something has
   played on it. Without that explanation this looks exactly like a bug.
 
-### 4.4 Device picker overlay
+### 4.4 Device picker
 
-Not built yet — M4. Opened with `d`, drawn over the player. The background stays visible but dimmed to
-`Faint`.
+Opened with `d`. It takes the information column, not a floating box: there is no
+border language left to draw an overlay in, and dimming the background is not an
+option while the artwork is a graphics protocol placement rather than text.
 
 ```
-┌─ spindle ────────────────────────────── ● MacBook Pro ─┐
-│                                                        │
-│  ┌───────────────┐  ╔══════════════════════════════╗   │
-│  │               │  ║  Devices                     ║   │
-│  │               │  ║                              ║   │
-│  │               │  ║  > ● MacBook Pro    computer ║   │
-│  │               │  ║      iPhone       smartphone ║   │
-│  │               │  ║      Kitchen         speaker ║   │
-│  └───────────────┘  ║                              ║   │
-│                     ║  ↑↓ · enter · esc            ║   │
-│                     ╚══════════════════════════════╝   │
-├────────────────────────────────────────────────────────┤
+   now playing   playlists   search
+   ━━━━━━━━━━━
+
+
+   ████████████████████   Devices
+   ████████████████████   Move playback somewhere else
+   ████████████████████
+   ████████████████████   ▸ ● MacBook Pro                  computer
+   ████████████████████       iPhone                     smartphone
+   ████████████████████       Kitchen speaker                speaker
+   ████████████████████
+
+   ● MacBook Pro
+   ↑↓ select · enter play here · r refresh · esc close
 ```
 
-- Overlay frame in `BorderFocus`.
-- Active device prefixed with `●` in `Accent`.
-- Cursor `>` in `Accent`.
-- On selection the overlay closes immediately and the header shows a transferring
-  indicator until the next fetch confirms.
+- The artwork stays exactly where it was, so the eye has an anchor and the kitty
+  placement does not have to move.
+- **Two marks, two questions.** `●` in the accent says where playback is now; the
+  `▸` cursor says what you are about to choose. Conflating them would hide the
+  difference between "already there" and "about to go there".
+- The heading and the help bar carry the mode. Nothing else needs to.
+- Enter transfers and closes at once, then re-asks for both the state and the
+  device list — Spotify takes a moment to agree, so the confirming fetch is
+  delayed by the same 400 ms a skip uses.
+- The cursor follows the *device*, not the row index: Spotify returns devices in
+  whatever order it likes, and a cursor that stays put by index is how playback
+  ends up on the wrong speaker.
+- `d` works from the player and playlists tabs. On search it types a `d`.
+
+The **no active device** screen (4.3) is this same list with nothing behind it to
+close, which is why `esc` does nothing there and the help says `q quit` instead.
 
 ### 4.5 Login
 
@@ -233,7 +248,7 @@ visible above it.
 | Anything else that failed | `Error` | `✕ <the error>` | M3 |
 | Network down | `Warning` | `⚠ Offline — retrying in Ns` | M6 |
 | Token refresh in flight | — | not shown, silent | — |
-| Device disappeared | `Warning` | `⚠ Device is gone — press d to switch` | M4 |
+| Device disappeared | — | falls back to the no-device screen (4.3) | M3 |
 
 Only one line is ever shown. A throttle outranks the rest: it is transient and it
 explains why nothing is moving right now.

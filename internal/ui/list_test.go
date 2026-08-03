@@ -1,6 +1,10 @@
 package ui
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/pottom/spindle/internal/ui/cover"
+)
 
 func TestListMoveClamps(t *testing.T) {
 	var l listState
@@ -73,3 +77,7 @@ func TestListWindowHandlesNothingToShow(t *testing.T) {
 		t.Errorf("window = %d..%d, want 0..0 with no room", from, to)
 	}
 }
+
+// defaultTestCell is a measured cell of the shape a modern terminal reports, so
+// layout-dependent tests do not silently exercise the fallback.
+var defaultTestCell = cover.CellSize{Width: 17, Height: 41, Measured: true}

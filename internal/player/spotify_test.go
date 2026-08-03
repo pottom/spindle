@@ -163,9 +163,20 @@ func TestPlaylistTracksSkipsWhatIsNotATrack(t *testing.T) {
 	}
 }
 
-func TestTransferIsNotImplementedYet(t *testing.T) {
-	s := NewSpotify(&http.Client{})
-	if err := s.TransferTo(context.Background(), "d1"); !errors.Is(err, ErrNotImplemented) {
-		t.Errorf("TransferTo returned %v, want ErrNotImplemented", err)
+// Transferring must not pause what it moves: play=false would silence the music
+// the user just asked to hear somewhere else.
+func TestTransferKeepsPlaying(t *testing.T) {
+	s, got := newRecorder(t)
+
+	if err := s.TransferTo(context.Background(), "dev2"); err != nil {
+		t.Fatal(err)
+	}
+	if got.body["play"] != true {
+		t.Errorf("play = %v, want true", got.body["play"])
+	}
+
+	ids, ok := got.body["device_ids"].([]any)
+	if !ok || len(ids) != 1 || ids[0] != "dev2" {
+		t.Errorf("device_ids = %v, want [dev2]", got.body["device_ids"])
 	}
 }
