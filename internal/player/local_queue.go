@@ -33,26 +33,26 @@ type localQueueTrack struct {
 // differ, which is what OriginID is for; anything still unmatched ends the run,
 // because a mark on the wrong row would offer an edit that silently does
 // nothing.
-func (l *Local) Queue(ctx context.Context) ([]Track, error) {
-	tracks, err := l.web.Queue(ctx)
-	if err != nil || len(tracks) == 0 || l.idle() {
-		return tracks, err
+func (l *Local) Queue(ctx context.Context) (Queue, error) {
+	q, err := l.web.Queue(ctx)
+	if err != nil || len(q.Upcoming) == 0 || l.idle() {
+		return q, err
 	}
 
 	origins, err := l.queueOrigins(ctx)
 	if err != nil {
 		// Without the marks the queue is read-only, which the UI works out for
 		// itself. A queue nobody can reorder still beats no queue at all.
-		return tracks, nil
+		return q, nil
 	}
 
-	for i := range tracks {
-		if i >= len(origins) || !sameTrack(origins[i].URI, tracks[i]) {
+	for i := range q.Upcoming {
+		if i >= len(origins) || !sameTrack(origins[i].URI, q.Upcoming[i]) {
 			break
 		}
-		tracks[i].Queued = origins[i].Queued
+		q.Upcoming[i].Queued = origins[i].Queued
 	}
-	return tracks, nil
+	return q, nil
 }
 
 // sameTrack reports whether a device's track uri names the track the Web API

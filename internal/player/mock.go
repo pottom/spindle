@@ -162,21 +162,25 @@ func (m *Mock) TransferTo(ctx context.Context, deviceID string) error {
 }
 
 // Queue is whatever follows the current track, wrapping round the end.
-func (m *Mock) Queue(ctx context.Context) ([]Track, error) {
+func (m *Mock) Queue(ctx context.Context) (Queue, error) {
 	if err := m.delay(ctx); err != nil {
-		return nil, err
+		return Queue{}, err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.advance()
 
-	out := make([]Track, 0, len(m.queued)+len(m.queue)-1)
+	current := m.queue[m.index]
+	out := Queue{
+		Current:  &current,
+		Upcoming: make([]Track, 0, len(m.queued)+len(m.queue)-1),
+	}
 	for _, t := range m.queued {
 		t.Queued = true
-		out = append(out, t)
+		out.Upcoming = append(out.Upcoming, t)
 	}
 	for i := 1; i < len(m.queue); i++ {
-		out = append(out, m.queue[m.wrap(m.index+i)])
+		out.Upcoming = append(out.Upcoming, m.queue[m.wrap(m.index+i)])
 	}
 	return out, nil
 }

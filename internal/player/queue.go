@@ -2,6 +2,14 @@ package player
 
 import "context"
 
+// Queue is what a device is playing and what it will play next. The two are
+// fetched together because Spotify reports them together, and because a queue
+// screen that could not name the track it follows would be half a screen.
+type Queue struct {
+	Current  *Track
+	Upcoming []Track
+}
+
 // QueueEditor is implemented by backends that can rewrite the queue, not just
 // append to it. Spotify's Web API cannot: it offers no way to remove or reorder
 // what is waiting, so only the local daemon can do this.

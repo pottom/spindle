@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -24,19 +25,24 @@ func queueOf(handAdded int, ids ...string) []player.Track {
 	return out
 }
 
+// queueModel builds a queue tab with something playing, so the cursor starts on
+// the now-playing row exactly as it does in use. queueRow(n) is the row of the
+// nth queue entry.
 func queueModel(handAdded int, ids ...string) Model {
 	m := New(player.NewMock(), nil, defaultTestCell)
-	m.ps = &player.State{TrackID: "now", Playing: true}
+	m.ps = &player.State{TrackID: "now", Title: "playing", Playing: true}
 	m.tab = tabQueue
 	m.queue = queueOf(handAdded, ids...)
 	return m
 }
 
+func queueRowOf(n int) int { return n + 1 }
+
 // Removing a track must take it off the screen at once. Waiting for the round
 // trip would make every x look like it had missed.
 func TestDropRemovesTheTrackImmediately(t *testing.T) {
 	m := queueModel(2, "a", "b", "c")
-	m.queuePane.cursor.cursor = 0
+	m.queuePane.cursor.cursor = queueRowOf(0)
 
 	if cmd := m.dropQueued(); cmd == nil {
 		t.Fatal("dropQueued() = nil, want the edit to be sent")
@@ -50,7 +56,7 @@ func TestDropRemovesTheTrackImmediately(t *testing.T) {
 // or playlist is playing.
 func TestDropRefusesContextTracks(t *testing.T) {
 	m := queueModel(1, "a", "b", "c")
-	m.queuePane.cursor.cursor = 1
+	m.queuePane.cursor.cursor = queueRowOf(1)
 
 	if cmd := m.dropQueued(); cmd != nil {
 		t.Error("dropQueued() edited a track that came from the context")
@@ -62,7 +68,7 @@ func TestDropRefusesContextTracks(t *testing.T) {
 
 func TestMoveSwapsWithinTheQueuedBlock(t *testing.T) {
 	m := queueModel(3, "a", "b", "c", "d")
-	m.queuePane.cursor.cursor = 0
+	m.queuePane.cursor.cursor = queueRowOf(0)
 
 	if cmd := m.moveQueued(1); cmd == nil {
 		t.Fatal("moveQueued(1) = nil, want the edit to be sent")
@@ -71,8 +77,8 @@ func TestMoveSwapsWithinTheQueuedBlock(t *testing.T) {
 		t.Errorf("queue = %v, want a and b swapped", got)
 	}
 	// The cursor follows the track, or a second press would move a different one.
-	if m.queuePane.cursor.cursor != 1 {
-		t.Errorf("cursor = %d, want it to follow the track to 1", m.queuePane.cursor.cursor)
+	if want := queueRowOf(1); m.queuePane.cursor.cursor != want {
+		t.Errorf("cursor = %d, want it to follow the track to %d", m.queuePane.cursor.cursor, want)
 	}
 }
 
@@ -81,7 +87,7 @@ func TestMoveSwapsWithinTheQueuedBlock(t *testing.T) {
 // that is refused.
 func TestMoveStopsAtTheContextBoundary(t *testing.T) {
 	m := queueModel(1, "a", "b", "c")
-	m.queuePane.cursor.cursor = 0
+	m.queuePane.cursor.cursor = queueRowOf(0)
 
 	if cmd := m.moveQueued(1); cmd != nil {
 		t.Error("moveQueued(1) crossed into the context tracks")
@@ -97,7 +103,7 @@ func TestOnlyQueuedTracksAreSent(t *testing.T) {
 	sent := make(chan []string, 1)
 	m := queueModel(2, "a", "b", "c")
 	m.player = recordingEditor{Player: m.player, sent: sent}
-	m.queuePane.cursor.cursor = 0
+	m.queuePane.cursor.cursor = queueRowOf(0)
 
 	cmd := m.dropQueued()
 	if cmd == nil {
@@ -114,7 +120,7 @@ func TestOnlyQueuedTracksAreSent(t *testing.T) {
 // Pressing enter on a queue entry jumps to it, keeping whatever it belongs to.
 func TestEnterPlaysFromTheQueue(t *testing.T) {
 	m := queueModel(1, "a", "b")
-	m.queuePane.cursor.cursor = 1
+	m.queuePane.cursor.cursor = queueRowOf(1)
 
 	var tm tea.Model = m
 	tm, cmd := tm.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -135,6 +141,13 @@ func (r recordingEditor) SetQueue(_ context.Context, ids []string) error {
 	r.sent <- ids
 	return nil
 }
+
+// ansiEscape matches the colour sequences lipgloss writes.
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+// plain strips the styling, so a test can assert on what the screen says rather
+// than on how it was coloured.
+func plain(s string) string { return ansiEscape.ReplaceAllString(s, "") }
 
 func ids(tracks []player.Track) []string {
 	out := make([]string, 0, len(tracks))
@@ -176,6 +189,7 @@ func TestQueuePaneRenders(t *testing.T) {
 func TestDetailFollowsTheCursor(t *testing.T) {
 	m := queueModel(1, "a", "b")
 	m.queue[0].Album, m.queue[1].Album = "First Album", "Second Album"
+	m.queuePane.cursor.cursor = queueRowOf(0)
 	m.width, m.height = 100, 44
 	m.resize()
 
@@ -197,7 +211,7 @@ func TestFactsSkipWhatSpotifyDidNotSay(t *testing.T) {
 		Album: "Hot Space", Released: "1982-05-21",
 		TrackNumber: 3, TotalTracks: 11, DiscNumber: 2, Duration: 4 * time.Minute,
 	}
-	got := factLines(trackFacts(full))
+	got := factLines(trackFacts(full, false))
 	for _, want := range []string{"Album", "Released", "Track", "Length", "Source"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("trackFacts() = %q, want a %s row", got, want)
@@ -211,7 +225,7 @@ func TestFactsSkipWhatSpotifyDidNotSay(t *testing.T) {
 	}
 
 	bare := player.Track{Album: "Unknown", Duration: time.Minute}
-	if got := factLines(trackFacts(bare)); strings.Contains(got, "Released") || strings.Contains(got, "Track ") {
+	if got := factLines(trackFacts(bare, false)); strings.Contains(got, "Released") || strings.Contains(got, "Track ") {
 		t.Errorf("trackFacts() = %q, want no empty rows", got)
 	}
 }
@@ -222,4 +236,44 @@ func factLines(facts []trackFact) string {
 		b.WriteString(f.label + " " + f.value + "\n")
 	}
 	return b.String()
+}
+
+// The queue is read downwards from what is sounding now, so that is the first
+// row — marked, unnumbered, and not something that can be edited out.
+func TestQueueLeadsWithThePlayingTrack(t *testing.T) {
+	m := queueModel(1, "a", "b")
+	m.width, m.height = 100, 44
+	m.resize()
+
+	rows := m.queueRows()
+	if len(rows) != 3 || rows[0].ID != "now" {
+		t.Fatalf("queueRows() = %v, want the playing track first", ids(rows))
+	}
+	if m.queueIndex() != -1 {
+		t.Errorf("queueIndex() = %d on the playing row, want -1", m.queueIndex())
+	}
+	if cmd := m.dropQueued(); cmd != nil {
+		t.Error("dropQueued() tried to remove the track that is playing")
+	}
+	if cmd := m.moveQueued(1); cmd != nil {
+		t.Error("moveQueued() tried to move the track that is playing")
+	}
+
+	out := plain(m.render())
+	if !strings.Contains(out, nowMark+"  playing") {
+		t.Errorf("render() does not mark the playing track:\n%s", out)
+	}
+}
+
+// Nothing playing means no leading row, and the queue is the whole list.
+func TestQueueWithoutAPlayingTrack(t *testing.T) {
+	m := queueModel(1, "a", "b")
+	m.ps = nil
+
+	if rows := m.queueRows(); len(rows) != 2 || rows[0].ID != "a" {
+		t.Errorf("queueRows() = %v, want just the queue", ids(rows))
+	}
+	if m.queueIndex() != 0 {
+		t.Errorf("queueIndex() = %d, want the cursor to address the queue directly", m.queueIndex())
+	}
 }

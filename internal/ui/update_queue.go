@@ -17,12 +17,14 @@ func (m *Model) queueKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		if key.Matches(k, m.keys.Up) {
 			delta = -1
 		}
-		m.queuePane.cursor.move(delta, len(m.queue))
+		m.queuePane.cursor.move(delta, len(m.queueRows()))
 		return m.previewCover(), true
 
 	case key.Matches(k, m.keys.Enter):
+		// The top row is already playing; restarting it is not what "play"
+		// means to anyone pressing enter on the track they are listening to.
 		t := m.queuedTrack()
-		if t == nil {
+		if t == nil || m.queueIndex() < 0 {
 			return nil, true
 		}
 		id, p := t.ID, m.player
@@ -52,12 +54,11 @@ func (m *Model) queueKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 // the rest belong to the album or playlist that is playing, and dropping one
 // there would mean rewriting the context itself.
 func (m *Model) dropQueued() tea.Cmd {
-	t := m.queuedTrack()
-	if t == nil || !t.Queued {
+	at := m.queueIndex()
+	if at < 0 || !m.queue[at].Queued {
 		return nil
 	}
 
-	at := m.queuePane.cursor.cursor
 	next := make([]player.Track, 0, len(m.queue)-1)
 	next = append(next, m.queue[:at]...)
 	next = append(next, m.queue[at+1:]...)
@@ -68,12 +69,11 @@ func (m *Model) dropQueued() tea.Cmd {
 // a hand-queued track past the context tracks: those keep their own order, and
 // swapping across the boundary would look like a move that did not take.
 func (m *Model) moveQueued(delta int) tea.Cmd {
-	t := m.queuedTrack()
-	if t == nil || !t.Queued {
+	at := m.queueIndex()
+	if at < 0 || !m.queue[at].Queued {
 		return nil
 	}
 
-	at := m.queuePane.cursor.cursor
 	to := at + delta
 	if to < 0 || to >= len(m.queue) || !m.queue[to].Queued {
 		return nil
@@ -82,7 +82,7 @@ func (m *Model) moveQueued(delta int) tea.Cmd {
 	next := make([]player.Track, len(m.queue))
 	copy(next, m.queue)
 	next[at], next[to] = next[to], next[at]
-	m.queuePane.cursor.cursor = to
+	m.queuePane.cursor.cursor += delta
 	return m.commitQueue(next)
 }
 
@@ -103,7 +103,7 @@ func (m *Model) commitQueue(next []player.Track) tea.Cmd {
 	}
 
 	m.queue = next
-	m.queuePane.cursor.move(0, len(m.queue))
+	m.clampQueueCursor()
 	return controlCmd("edit queue", func(ctx context.Context) error {
 		return editor.SetQueue(ctx, ids)
 	})

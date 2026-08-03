@@ -28,9 +28,10 @@ type Player interface {
 	// not part of this interface: see QueueEditor.
 	AddToQueue(ctx context.Context, trackID string) error
 
-	// Queue is what comes next. Knowing it is what lets the UI show a skip
-	// instantly instead of waiting for Spotify to admit it happened.
-	Queue(ctx context.Context) ([]Track, error)
+	// Queue is what is playing and what comes next. Knowing what comes next is
+	// what lets the UI show a skip instantly instead of waiting for Spotify to
+	// admit it happened.
+	Queue(ctx context.Context) (Queue, error)
 
 	// Browsing. Search matches tracks; an empty query yields no results rather
 	// than everything.

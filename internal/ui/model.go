@@ -106,6 +106,11 @@ type Model struct {
 	queue    []player.Track
 	queueFor string
 
+	// nowQueued is the playing track as the queue reported it. The daemon says
+	// what is playing sooner and more often, but only this carries the release
+	// date and the rest of the detail panel's material.
+	nowQueued *player.Track
+
 	// stopDaemon records that the user asked to take the music with them. It is
 	// read after the program ends rather than acted on inside it: stopping the
 	// device while its own UI is still drawing would be a race for no reason.

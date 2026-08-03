@@ -111,11 +111,15 @@ func fetchQueueCmd(p player.Player) tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 		defer cancel()
 
-		tracks, err := p.Queue(ctx)
+		q, err := p.Queue(ctx)
 		if err != nil {
 			return msg.QueueFetched{}
 		}
-		return msg.QueueFetched{Tracks: tracks}
+		out := msg.QueueFetched{Tracks: q.Upcoming}
+		if q.Current != nil {
+			out.Current = []player.Track{*q.Current}
+		}
+		return out
 	}
 }
 

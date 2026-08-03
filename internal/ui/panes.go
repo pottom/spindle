@@ -79,12 +79,66 @@ func (s searchPane) cover() string {
 	return ""
 }
 
-// queuedTrack is the queue entry under the cursor, or nil when the queue is
-// empty.
+// queueRows is what the queue tab lists: the track sounding now, then what
+// follows it. The playing track is not part of the queue and never becomes one,
+// so it is prepended here rather than kept in it — the skip logic depends on
+// the queue starting at what comes next.
+func (m Model) queueRows() []player.Track {
+	now, ok := m.nowPlayingRow()
+	if !ok {
+		return m.queue
+	}
+	rows := make([]player.Track, 0, len(m.queue)+1)
+	return append(append(rows, now), m.queue...)
+}
+
+// nowPlayingRow is the track sounding now. Its identity comes from the player
+// state, which the daemon updates the moment anything changes; the queue's own
+// copy is only borrowed for the detail it carries, and only while the two agree
+// about what is playing.
+func (m Model) nowPlayingRow() (player.Track, bool) {
+	if m.ps == nil || m.ps.TrackID == "" {
+		return player.Track{}, false
+	}
+	if m.nowQueued != nil && m.nowQueued.ID == m.ps.TrackID {
+		return *m.nowQueued, true
+	}
+	return player.Track{
+		ID:       m.ps.TrackID,
+		Title:    m.ps.Title,
+		Artists:  m.ps.Artists,
+		Album:    m.ps.Album,
+		CoverURL: m.ps.CoverURL,
+		Duration: m.ps.Duration,
+	}, true
+}
+
+// queuedTrack is the row under the cursor, or nil when there is nothing to
+// point at.
 func (m Model) queuedTrack() *player.Track {
+	rows := m.queueRows()
 	i := m.queuePane.cursor.cursor
-	if i < 0 || i >= len(m.queue) {
+	if i < 0 || i >= len(rows) {
 		return nil
 	}
-	return &m.queue[i]
+	return &rows[i]
+}
+
+// queueIndex maps the row under the cursor onto the queue itself, or -1 when
+// the cursor is on the track already playing — which is in no queue, and so
+// cannot be moved or dropped.
+func (m Model) queueIndex() int {
+	i := m.queuePane.cursor.cursor
+	if _, playing := m.nowPlayingRow(); playing {
+		i--
+	}
+	if i < 0 || i >= len(m.queue) {
+		return -1
+	}
+	return i
+}
+
+// clampQueueCursor keeps the cursor inside the list after it changes length.
+func (m *Model) clampQueueCursor() {
+	m.queuePane.cursor.move(0, len(m.queueRows()))
 }

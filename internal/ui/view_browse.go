@@ -81,17 +81,25 @@ func (m Model) queueBlock(l layout, rows int) []string {
 		out = append(out, strings.Repeat(" ", w))
 	}
 
+	rowsOf := m.queueRows()
 	body := max(rows-len(out), 0)
-	if len(m.queue) == 0 && body > 0 {
+	if len(rowsOf) == 0 && body > 0 {
 		out = append(out, fit(m.styles.Empty.Render("Nothing is queued."), w))
 	}
 
-	from, to := m.queuePane.cursor.window(len(m.queue), body)
+	// The playing track heads the list and is not numbered: it is not waiting
+	// for its turn, so a place in the running order would be a lie.
+	_, playing := m.nowPlayingRow()
+	from, to := m.queuePane.cursor.window(len(rowsOf), body)
 	for i := from; i < to; i++ {
-		out = append(out, fit(m.queueRow(m.queue[i], w, i == m.queuePane.cursor.cursor, i+1), w))
+		number := i + 1
+		if playing {
+			number = i
+		}
+		out = append(out, fit(m.queueRow(rowsOf[i], w, i == m.queuePane.cursor.cursor, number), w))
 	}
-	if to < len(m.queue) && len(out) > 0 {
-		out[len(out)-1] = fit(m.styles.Empty.Render(fmt.Sprintf("  … %d more", len(m.queue)-to+1)), w)
+	if to < len(rowsOf) && len(out) > 0 {
+		out[len(out)-1] = fit(m.styles.Empty.Render(fmt.Sprintf("  … %d more", len(rowsOf)-to+1)), w)
 	}
 
 	for len(out) < rows {
@@ -120,7 +128,8 @@ func (m Model) trackDetail(w int) []string {
 		s.Artist.Render(strings.Join(t.Artists, ", ")),
 		"",
 	}
-	for _, f := range trackFacts(*t) {
+	_, hasNow := m.nowPlayingRow()
+	for _, f := range trackFacts(*t, hasNow && m.queuePane.cursor.cursor == 0) {
 		lines = append(lines, m.fact(f.label, f.value, w))
 	}
 	return lines
@@ -136,7 +145,7 @@ type trackFact struct{ label, value string }
 
 // trackFacts is what is worth saying about a track, in the order it is worth
 // saying it. Anything Spotify left blank is left out rather than shown empty.
-func trackFacts(t player.Track) []trackFact {
+func trackFacts(t player.Track, playing bool) []trackFact {
 	facts := []trackFact{{"Album", t.Album}}
 
 	if year := releaseYear(t.Released); year != "" {
@@ -160,7 +169,10 @@ func trackFacts(t player.Track) []trackFact {
 	facts = append(facts, trackFact{"Length", formatDuration(t.Duration)})
 
 	origin := "next in order"
-	if t.Queued {
+	switch {
+	case playing:
+		origin = "playing now"
+	case t.Queued:
 		origin = "added by hand"
 	}
 	facts = append(facts, trackFact{"Source", origin})
@@ -176,22 +188,28 @@ func releaseYear(date string) string {
 	return date[:4]
 }
 
-// queueRow draws one upcoming track. Hand-queued entries are marked instead of
-// numbered: their position is not a position in anything, and they are the only
-// ones that can be moved or dropped.
+// queueRow draws one row of the queue. A number of 0 means the track is the one
+// playing; hand-queued entries are marked rather than numbered, since their
+// place is not a place in anything, and they are the only ones that can be
+// moved or dropped.
 func (m Model) queueRow(t player.Track, w int, selected bool, number int) string {
-	if !t.Queued {
+	mark, primary := "", m.styles.RowPrimary
+	switch {
+	case number == 0:
+		mark, primary = nowMark, m.styles.RowPlaying
+	case t.Queued:
+		mark = queuedMark
+	default:
 		return m.trackRow(t, w, selected, number)
 	}
-
-	primary := m.styles.RowPrimary
 	if selected {
 		primary = m.styles.RowSelected
 	}
+
 	// The mark stands in the same columns the track number would, or the titles
 	// beside it would sit one indent out.
 	return m.row(w, selected,
-		m.styles.Cursor.Render(padLeft(queuedMark, ordinalCols))+"  "+primary.Render(t.Title),
+		m.styles.Cursor.Render(padLeft(mark, ordinalCols))+"  "+primary.Render(t.Title),
 		m.styles.RowSecondary.Render(strings.Join(t.Artists, ", ")),
 		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
 	)

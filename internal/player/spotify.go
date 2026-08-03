@@ -89,18 +89,22 @@ func (s *Spotify) Devices(ctx context.Context) ([]Device, error) {
 }
 
 // Queue returns the tracks lined up after the current one.
-func (s *Spotify) Queue(ctx context.Context) ([]Track, error) {
+func (s *Spotify) Queue(ctx context.Context) (Queue, error) {
 	q, err := s.client.GetQueue(ctx)
 	if err != nil {
-		return nil, classify("fetch queue", err)
+		return Queue{}, classify("fetch queue", err)
 	}
 	if q == nil {
-		return nil, nil
+		return Queue{}, nil
 	}
 
-	out := make([]Track, 0, len(q.Items))
+	out := Queue{Upcoming: make([]Track, 0, len(q.Items))}
+	if q.CurrentlyPlaying.ID != "" {
+		current := trackFromFull(&q.CurrentlyPlaying)
+		out.Current = &current
+	}
 	for i := range q.Items {
-		out = append(out, trackFromFull(&q.Items[i]))
+		out.Upcoming = append(out.Upcoming, trackFromFull(&q.Items[i]))
 	}
 	return out, nil
 }
