@@ -28,8 +28,20 @@ is not where someone who keeps their dotfiles in order looks.
 
 ### Portability
 
-`linux`, `darwin`, `windows` and the BSDs, on `amd64`, `arm64` and `arm`. Terminal
-syscalls live in `_unix.go` / `_windows.go` pairs; `make cross` builds the lot.
+Today: `linux`, `darwin`, `windows` and the BSDs, on `amd64`, `arm64` and `arm`.
+Terminal syscalls live in `_unix.go` / `_windows.go` pairs; `make cross` builds
+the lot, with no CGO anywhere.
+
+**This narrows to Linux and macOS on `amd64` and `arm64` once the embedded
+playback device lands.** The public Web API cannot edit a queue — it offers only
+Get Queue and Add Item, with no reorder, remove or jump — so spindle has to speak
+Spotify's internal protocol through `go-librespot`, and audio output drags in CGO:
+libvorbis and libFLAC for decoding, ALSA on Linux, AudioToolbox on macOS.
+
+Windows drops out because `go-librespot` has no output backend for it: the ALSA
+driver excludes it by build tag, there is no WASAPI driver, and even its pipe
+driver fails to compile there. Raspberry Pi is not a target either, so upstream's
+armv6 variants can be ignored.
 
 ### Layering rule
 
