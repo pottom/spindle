@@ -47,9 +47,15 @@ type Model struct {
 	covers *cover.Loader
 	cell   cover.CellSize
 
-	ps              *player.State // last known server state
-	localProgress   time.Duration // ticked locally, not ps.Progress
-	optimisticUntil time.Time     // a poll must not overwrite before this
+	ps *player.State // last known server state
+
+	// progressAt is when ps.Progress was true. The position on screen is the
+	// two of them added together rather than a counter of its own: a counter
+	// and a poll are two answers to the same question, and they disagree by
+	// whatever the tick has drifted — which is visible as the playhead jumping
+	// backwards every time the poll wins.
+	progressAt      time.Time
+	optimisticUntil time.Time // a poll must not overwrite before this
 
 	tab       tabID
 	playlists playlistPane
@@ -175,6 +181,23 @@ func (m *Model) restyle() {
 
 // StopDaemonRequested reports whether the session ended with Q rather than q.
 func (m Model) StopDaemonRequested() bool { return m.stopDaemon }
+
+// elapsed is where the current track has reached: the last position the backend
+// reported, carried forward by the clock.
+func (m Model) elapsed() time.Duration {
+	if m.ps == nil {
+		return 0
+	}
+
+	pos := m.ps.Progress
+	if m.ps.Playing && !m.progressAt.IsZero() {
+		pos += time.Since(m.progressAt)
+	}
+	if m.ps.Duration > 0 && pos > m.ps.Duration {
+		pos = m.ps.Duration
+	}
+	return max(pos, 0)
+}
 
 // helpKeys is the key set the help bar should advertise right now.
 func (m Model) helpKeys() tabKeys {

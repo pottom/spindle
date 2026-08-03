@@ -171,13 +171,12 @@ func (m Model) handleTick() (tea.Model, tea.Cmd) {
 	m.tickCount++
 	cmds := []tea.Cmd{tickCmd()}
 
-	if m.ps != nil && m.ps.Playing {
-		m.localProgress += time.Second
-		if m.ps.Duration > 0 && m.localProgress >= m.ps.Duration {
-			m.localProgress = m.ps.Duration
-			if cmd := m.trackRanOut(); cmd != nil {
-				cmds = append(cmds, cmd)
-			}
+	// The tick no longer counts anything: elapsed derives the position from the
+	// clock. It is still what notices a track running out, and what keeps the
+	// screen redrawing once a second.
+	if m.ps != nil && m.ps.Playing && m.ps.Duration > 0 && m.elapsed() >= m.ps.Duration {
+		if cmd := m.trackRanOut(); cmd != nil {
+			cmds = append(cmds, cmd)
 		}
 	}
 
@@ -204,7 +203,7 @@ func (m *Model) adopt(st *player.State) {
 	}
 	if m.ps == nil || !time.Now().Before(m.optimisticUntil) {
 		m.ps = st
-		m.localProgress = st.Progress
+		m.progressAt = time.Now()
 		return
 	}
 
@@ -264,6 +263,11 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	p := m.player
 	switch {
 	case key.Matches(k, m.keys.PlayPause):
+		// Pin the position before the flag flips. Pausing stops the clock from
+		// being carried forward, so the anchor has to already hold everything
+		// that had accumulated, or the playhead drops back to wherever the last
+		// poll left it.
+		m.setProgress(m.elapsed())
 		m.ps.Playing = !m.ps.Playing
 		m.hold()
 		play := m.ps.Playing
@@ -288,10 +292,10 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.skip("skip to previous track", p.Previous)
 
 	case key.Matches(k, m.keys.SeekFwd):
-		return m, m.seek(m.localProgress + seekStep)
+		return m, m.seek(m.elapsed() + seekStep)
 
 	case key.Matches(k, m.keys.SeekBack):
-		return m, m.seek(m.localProgress - seekStep)
+		return m, m.seek(m.elapsed() - seekStep)
 
 	case key.Matches(k, m.keys.VolUp):
 		return m, m.setVolume(m.ps.Volume + volumeStep)
@@ -352,6 +356,13 @@ func (m *Model) syncCover() tea.Cmd {
 	)
 }
 
+// setProgress records a position and when it was true, which is what elapsed
+// carries forward.
+func (m *Model) setProgress(pos time.Duration) {
+	m.ps.Progress = pos
+	m.progressAt = time.Now()
+}
+
 // hold opens the window during which local state outranks the server's.
 func (m *Model) hold() {
 	m.optimisticUntil = time.Now().Add(optimisticWindow)
@@ -359,8 +370,7 @@ func (m *Model) hold() {
 
 func (m *Model) seek(pos time.Duration) tea.Cmd {
 	pos = min(max(pos, 0), m.ps.Duration)
-	m.localProgress = pos
-	m.ps.Progress = pos
+	m.setProgress(pos)
 	m.hold()
 
 	p := m.player
@@ -400,8 +410,7 @@ func (m *Model) sendVolume() tea.Cmd {
 
 // skip changes track and starts chasing the confirmation.
 func (m *Model) skip(action string, call func(context.Context) error) tea.Cmd {
-	m.localProgress = 0
-	m.ps.Progress = 0
+	m.setProgress(0)
 	m.hold()
 	return tea.Batch(controlCmd(action, call), m.awaitTrackChange())
 }
@@ -428,8 +437,7 @@ func (m *Model) showTrack(t *player.Track) {
 	m.ps.Album = t.Album
 	m.ps.CoverURL = t.CoverURL
 	m.ps.Duration = t.Duration
-	m.ps.Progress = 0
-	m.localProgress = 0
+	m.setProgress(0)
 }
 
 // awaitTrackChange notes which track we are leaving and asks for the first

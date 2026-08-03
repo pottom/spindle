@@ -147,3 +147,54 @@ func TestNotifyCoalesces(t *testing.T) {
 	default:
 	}
 }
+
+// The daemon only speaks when something happens, so between events its reported
+// position is frozen at whenever it was taken. Handing that back unchanged made
+// the progress bar tick forward and snap back on every poll.
+func TestPositionCarriesForwardBetweenEvents(t *testing.T) {
+	l := &Local{
+		snapshot: &localStatus{
+			DeviceName: "spindle", VolumeSteps: 100,
+			Track: &localTrack{URI: "spotify:track:x", Position: 60000, Duration: 300000},
+		},
+		snapshotAt: time.Now().Add(-2 * time.Second),
+	}
+
+	st := l.localState()
+	if st == nil {
+		t.Fatal("localState = nil")
+	}
+	if st.Progress < 61500*time.Millisecond || st.Progress > 62500*time.Millisecond {
+		t.Errorf("progress = %v, want about 62s — a minute in plus the two elapsed", st.Progress)
+	}
+}
+
+// A paused track does not move, however long ago the snapshot was taken.
+func TestPausedPositionStaysPut(t *testing.T) {
+	l := &Local{
+		snapshot: &localStatus{
+			DeviceName: "spindle", VolumeSteps: 100, Paused: true,
+			Track: &localTrack{URI: "spotify:track:x", Position: 60000, Duration: 300000},
+		},
+		snapshotAt: time.Now().Add(-30 * time.Second),
+	}
+
+	if st := l.localState(); st.Progress != time.Minute {
+		t.Errorf("progress = %v, want it unchanged at 1m while paused", st.Progress)
+	}
+}
+
+// A stale snapshot must not run past the end of the track.
+func TestPositionStopsAtTheEnd(t *testing.T) {
+	l := &Local{
+		snapshot: &localStatus{
+			DeviceName: "spindle", VolumeSteps: 100,
+			Track: &localTrack{URI: "spotify:track:x", Position: 290000, Duration: 300000},
+		},
+		snapshotAt: time.Now().Add(-time.Hour),
+	}
+
+	if st := l.localState(); st.Progress != 300*time.Second {
+		t.Errorf("progress = %v, want it clamped to the 5m duration", st.Progress)
+	}
+}

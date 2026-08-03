@@ -164,7 +164,7 @@ func (m Model) infoBlock(w int) []string {
 		"",
 		m.progressLine(w),
 		spread(
-			s.Time.Render(formatDuration(m.localProgress)),
+			s.Time.Render(formatDuration(m.elapsed())),
 			s.Time.Render(formatDuration(ps.Duration)),
 			w,
 		),
@@ -184,7 +184,7 @@ func (m Model) progressLine(w int) string {
 
 	var fraction float64
 	if m.ps.Duration > 0 {
-		fraction = min(float64(m.localProgress)/float64(m.ps.Duration), 1)
+		fraction = min(float64(m.elapsed())/float64(m.ps.Duration), 1)
 	}
 
 	// The playhead takes a cell of its own, so the bar is one shorter.

@@ -27,8 +27,9 @@ type Local struct {
 	addr string
 	http *http.Client
 
-	mu       sync.RWMutex
-	snapshot *localStatus
+	mu         sync.RWMutex
+	snapshot   *localStatus
+	snapshotAt time.Time
 
 	changes chan struct{}
 }
@@ -68,13 +69,26 @@ func (l *Local) State(ctx context.Context) (*State, error) {
 // kept current by the event stream, so this costs no network at all.
 func (l *Local) localState() *State {
 	l.mu.RLock()
-	snapshot := l.snapshot
+	snapshot, taken := l.snapshot, l.snapshotAt
 	l.mu.RUnlock()
 
 	if snapshot == nil || snapshot.Stopped {
 		return nil
 	}
-	return snapshot.toState()
+
+	st := snapshot.toState()
+
+	// The daemon only speaks when something happens, so between events the
+	// snapshot's position is frozen at whenever it was taken. Returning it
+	// as-is makes the progress bar tick forward and then snap back on every
+	// poll. Carry the clock forward instead.
+	if st.Playing {
+		st.Progress += time.Since(taken)
+		if st.Duration > 0 && st.Progress > st.Duration {
+			st.Progress = st.Duration
+		}
+	}
+	return st
 }
 
 // refresh pulls a fresh status from the daemon.
@@ -100,7 +114,7 @@ func (l *Local) refresh(ctx context.Context) error {
 	}
 
 	l.mu.Lock()
-	l.snapshot = &status
+	l.snapshot, l.snapshotAt = &status, time.Now()
 	l.mu.Unlock()
 
 	l.notify()

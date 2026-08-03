@@ -63,6 +63,8 @@ func TestTrackRunningOutAdvancesLikeASkip(t *testing.T) {
 	m := Model{
 		ps:    &player.State{TrackID: "a", Title: "first", Playing: true, Duration: 2 * time.Second},
 		queue: []player.Track{{ID: "b", Title: "second"}},
+		// The clock, not the tick count, is what says the track is over.
+		progressAt: time.Now().Add(-3 * time.Second),
 	}
 
 	var tm tea.Model = m
@@ -90,7 +92,8 @@ func TestTrackRunningOutUnderRepeatOne(t *testing.T) {
 			TrackID: "a", Title: "first", Playing: true,
 			Duration: 2 * time.Second, Repeat: player.RepeatTrack,
 		},
-		queue: []player.Track{{ID: "b", Title: "second"}},
+		queue:      []player.Track{{ID: "b", Title: "second"}},
+		progressAt: time.Now().Add(-3 * time.Second),
 	}
 
 	var tm tea.Model = m

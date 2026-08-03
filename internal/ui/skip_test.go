@@ -29,8 +29,8 @@ func TestSkipShowsTheQueuedTrackAtOnce(t *testing.T) {
 	if got.ps.Title != "second" {
 		t.Errorf("title = %q, want the queued track straight away", got.ps.Title)
 	}
-	if got.localProgress != 0 {
-		t.Errorf("localProgress = %v, want it reset", got.localProgress)
+	if got.elapsed() > 100*time.Millisecond {
+		t.Errorf("elapsed = %v, want it reset", got.elapsed())
 	}
 	if len(got.queue) != 1 || got.queue[0].ID != "c" {
 		t.Errorf("queue = %v, want the track just used to be gone", got.queue)
