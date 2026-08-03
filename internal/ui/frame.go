@@ -44,6 +44,16 @@ func stack(lines []string, w, h int) []string {
 	return out
 }
 
+// scrollRange sizes and positions a scrollbar thumb: its size is the fraction
+// of the list on screen, its place the fraction already scrolled past.
+func scrollRange(rows, total, offset int) (start, size int) {
+	size = min(max(rows*rows/total, 1), rows)
+	if span := total - rows; span > 0 {
+		start = offset * (rows - size) / span
+	}
+	return min(max(start, 0), rows-size), size
+}
+
 // padRight left-aligns s inside w cells, which is what a label column wants.
 func padRight(s string, w int) string {
 	return s + strings.Repeat(" ", max(w-lipgloss.Width(s), 0))

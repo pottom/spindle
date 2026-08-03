@@ -14,6 +14,14 @@ const (
 	rowCursor = "▸"
 	nowMark   = "♪"
 
+	// The scrollbar: a lit thumb over a faint track, one cell wide.
+	scrollThumb = "┃"
+	scrollTrack = "│"
+
+	// scrollCols is what a list gives up to carry the bar: the bar itself and a
+	// blank column, so it does not touch the durations.
+	scrollCols = 2
+
 	// explicitMark is the badge Spotify puts on a track with explicit lyrics.
 	explicitMark = "[E]"
 
@@ -87,21 +95,48 @@ func (m Model) queueBlock(l layout, rows int) []string {
 	// for its turn, so a place in the running order would be a lie.
 	_, playing := m.nowPlayingRow()
 	from, to := m.queuePane.cursor.window(len(rowsOf), body)
+	bar := m.scrollColumn(body, len(rowsOf), m.queuePane.cursor.top)
+	rowWidth := w
+	if bar != nil {
+		rowWidth = w - scrollCols
+	}
+
 	for i := from; i < to; i++ {
 		number := i + 1
 		if playing {
 			number = i
 		}
-		out = append(out, fit(m.queueRow(rowsOf[i], w, i == m.queuePane.cursor.cursor, number), w))
-	}
-	if to < len(rowsOf) && len(out) > 0 {
-		out[len(out)-1] = fit(m.styles.Empty.Render(fmt.Sprintf("  … %d more", len(rowsOf)-to+1)), w)
+		row := fit(m.queueRow(rowsOf[i], rowWidth, i == m.queuePane.cursor.cursor, number), rowWidth)
+		if bar != nil {
+			row += " " + bar[i-from]
+		}
+		out = append(out, row)
 	}
 
 	for len(out) < rows {
 		out = append(out, strings.Repeat(" ", w))
 	}
 	return out[:rows]
+}
+
+// scrollColumn is the thin bar down the right of a list, one glyph per visible
+// row. It is nil when the whole list fits: a bar that can never move says
+// nothing, and the row it would sit beside is worth more.
+func (m Model) scrollColumn(rows, total, offset int) []string {
+	if rows <= 0 || total <= rows {
+		return nil
+	}
+
+	start, size := scrollRange(rows, total, offset)
+	out := make([]string, rows)
+	for i := range out {
+		if i >= start && i < start+size {
+			out[i] = m.styles.ScrollThumb.Render(scrollThumb)
+			continue
+		}
+		out[i] = m.styles.ScrollTrack.Render(scrollTrack)
+	}
+	return out
 }
 
 // trackDetail is everything Spotify will say about one track, laid out beside
@@ -272,13 +307,18 @@ func (m Model) listPane(l layout, height int, head []string, count int, state *l
 	}
 
 	from, to := state.window(count, rows)
-	for i := from; i < to; i++ {
-		lines = append(lines, fit(row(i, w, i == state.cursor), w))
+	bar := m.scrollColumn(rows, count, state.top)
+	rowWidth := w
+	if bar != nil {
+		rowWidth = w - scrollCols
 	}
 
-	// A hint that the list runs on past the bottom of the pane.
-	if to < count && len(lines) > 0 {
-		lines[len(lines)-1] = fit(m.styles.Empty.Render(fmt.Sprintf("  … %d more", count-to+1)), w)
+	for i := from; i < to; i++ {
+		line := fit(row(i, rowWidth, i == state.cursor), rowWidth)
+		if bar != nil {
+			line += " " + bar[i-from]
+		}
+		lines = append(lines, line)
 	}
 
 	for len(lines) < height {

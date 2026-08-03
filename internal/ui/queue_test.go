@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -381,5 +382,48 @@ func TestDropOnThePlayingRowSkipsIt(t *testing.T) {
 	}
 	if names := ids(m.queue); len(names) != 1 || names[0] != "b" {
 		t.Errorf("queue = %v, want a taken and b waiting", names)
+	}
+}
+
+// The bar says two things at a glance: how much of the list is on screen, and
+// where in it you are. Both have to be true at the ends, which is where an
+// off-by-one shows up as a list that looks unfinished.
+func TestScrollRange(t *testing.T) {
+	// Ten rows on screen out of forty: a thumb a quarter of the way down the
+	// track, at the top when unscrolled and flush with the bottom at the end.
+	start, size := scrollRange(10, 40, 0)
+	if size != 2 || start != 0 {
+		t.Errorf("scrollRange(10, 40, 0) = %d, %d; want a thumb of 2 at the top", start, size)
+	}
+	if start, size := scrollRange(10, 40, 30); start+size != 10 {
+		t.Errorf("scrollRange(10, 40, 30) = %d, %d; want it flush with the bottom", start, size)
+	}
+	// A list barely longer than the pane still gets a thumb that can be seen.
+	if _, size := scrollRange(20, 400, 0); size < 1 {
+		t.Error("scrollRange lost the thumb on a long list")
+	}
+	// And one that cannot scroll never leaves the top.
+	if start, size := scrollRange(10, 11, 0); start != 0 || size < 1 {
+		t.Errorf("scrollRange(10, 11, 0) = %d, %d", start, size)
+	}
+}
+
+// A list that fits gets no bar: furniture that can never move is worth less
+// than the column it takes from the durations.
+func TestScrollbarOnlyWhenItCanScroll(t *testing.T) {
+	m := queueModel(0, "a", "b", "c")
+	m.width, m.height = 96, 30
+	m.resize()
+
+	if got := plain(m.render()); strings.Contains(got, scrollThumb) {
+		t.Errorf("render() drew a scrollbar for a list that fits:\n%s", got)
+	}
+
+	for i := 0; i < 40; i++ {
+		m.queue = append(m.queue, trackAt(fmt.Sprintf("x%d", i), "filler"))
+	}
+	out := plain(m.render())
+	if !strings.Contains(out, scrollThumb) || !strings.Contains(out, scrollTrack) {
+		t.Errorf("render() drew no scrollbar for a list that overflows:\n%s", out)
 	}
 }

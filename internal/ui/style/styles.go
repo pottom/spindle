@@ -54,6 +54,10 @@ type Styles struct {
 	// Detail panel.
 	FactLabel lipgloss.Style
 
+	// Scrollbar.
+	ScrollThumb lipgloss.Style
+	ScrollTrack lipgloss.Style
+
 	// Status line.
 	DeviceOn  lipgloss.Style
 	DeviceOff lipgloss.Style
@@ -94,6 +98,9 @@ func New(isDark bool, accent color.Color) Styles {
 		Empty:        fg(t.Faint),
 
 		FactLabel: fg(t.Faint),
+
+		ScrollThumb: fg(accent),
+		ScrollTrack: fg(t.Faint),
 
 		Quality: fg(t.Faint),
 
