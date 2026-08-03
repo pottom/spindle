@@ -74,6 +74,10 @@ type CoverSettled struct {
 	Seq int
 }
 
+// StateChanged reports that the backend noticed something move without being
+// asked. Only the local daemon can say this; the Web API has no push.
+type StateChanged struct{}
+
 // Refetch asks for a fresh player state now. It is sent on a delay after a
 // track change, because Spotify needs a moment to catch up with itself.
 type Refetch struct{}

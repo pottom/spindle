@@ -99,6 +99,11 @@ type Model struct {
 	queue    []player.Track
 	queueFor string
 
+	// stopDaemon records that the user asked to take the music with them. It is
+	// read after the program ends rather than acted on inside it: stopping the
+	// device while its own UI is still drawing would be a race for no reason.
+	stopDaemon bool
+
 	err       error
 	tickCount int
 
@@ -168,6 +173,9 @@ func (m *Model) restyle() {
 	m.search.input.SetStyles(in)
 }
 
+// StopDaemonRequested reports whether the session ended with Q rather than q.
+func (m Model) StopDaemonRequested() bool { return m.stopDaemon }
+
 // helpKeys is the key set the help bar should advertise right now.
 func (m Model) helpKeys() tabKeys {
 	switch {
@@ -187,9 +195,14 @@ func (m Model) layout() layout {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(
+	cmds := []tea.Cmd{
 		tea.RequestBackgroundColor,
 		tickCmd(),
 		fetchStateCmd(m.player),
-	)
+	}
+	// A backend that reports its own changes is followed rather than polled.
+	if w, ok := m.player.(player.Watcher); ok {
+		cmds = append(cmds, watchCmd(w))
+	}
+	return tea.Batch(cmds...)
 }

@@ -12,8 +12,18 @@ internal/ui/              – Bubble Tea Model/Update/View
 internal/ui/msg/          – tea.Msg types
 internal/ui/cover/        – CoverRenderer interface + kitty/halfblock backends
 internal/ui/style/        – all Lipgloss styles in one place
-internal/xdg/             – XDG config and cache directories
+internal/xdg/             – XDG config, cache and state directories
+internal/daemon/          – the Connect device: librespot session, audio, local API
 ```
+
+### Two processes
+
+`spindle daemon` is the playback device. `spindle` is the TUI, and starts one if
+it cannot find a running one — detached, in its own process group, so closing the
+terminal leaves the music playing. `q` quits the TUI; `Q` takes the daemon with it.
+
+The daemon is found by asking its API, not by looking for a process or a lock
+file. Both of those were once true of a daemon that answered nothing at all.
 
 ### Directories
 
@@ -165,7 +175,30 @@ type Player interface {
 var ErrNoActiveDevice = errors.New("no active playback device")
 ```
 
-Two implementations: `player.NewSpotify(client)` and `player.NewMock()`.
+Three implementations: `player.NewSpotify(client)`, `player.NewMock()`, and
+`player.NewLocal(web, addr, client)`.
+
+`Local` is a composition rather than a replacement. The daemon owns playback on
+this machine and is the only thing that can push state or edit a queue; it cannot
+search and knows nothing of playlists or other devices. Those keep coming from
+the Web API behind the same interface, so the UI never learns there are two
+sources. When playback is elsewhere the daemon has nothing to report and `State`
+falls through to the Web API — push gives way to polling for as long as that
+lasts.
+
+Push does not belong in `Player`: only the daemon can do it, and making every
+backend pretend would mean the mock and the Web API growing channels that never
+fire. It is an optional capability instead:
+
+```go
+type Watcher interface {
+    Changes() <-chan struct{}
+}
+```
+
+The UI subscribes if the backend implements it, and polls regardless — every
+event says only that something moved, so a missed one would otherwise go
+unnoticed.
 
 ### 3.3 UI model
 

@@ -13,6 +13,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/auth"
+	"github.com/pottom/spindle/internal/daemon"
 	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui"
 	"github.com/pottom/spindle/internal/ui/cover"
@@ -57,7 +58,8 @@ func main() {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, stopWatching := context.WithCancel(context.Background())
+	defer stopWatching()
 
 	// Authorise before Bubble Tea takes the terminal: the browser flow needs to
 	// print a URL and be readable while it waits.
@@ -73,12 +75,28 @@ func main() {
 	}
 	loader := cover.NewLoader(renderer, &http.Client{Timeout: 15 * time.Second})
 
-	if _, err := tea.NewProgram(ui.New(backendPlayer, loader, cell)).Run(); err != nil {
+	final, err := tea.NewProgram(ui.New(backendPlayer, loader, cell)).Run()
+	if err != nil {
 		reportFatal(err)
+	}
+
+	// Quitting leaves the music playing; Q asks for it to stop as well. Acting
+	// on it here rather than inside Update keeps the shutdown out of a UI that
+	// is still drawing.
+	if m, ok := final.(ui.Model); ok && m.StopDaemonRequested() {
+		stopWatching()
+		if err := daemon.Stop(context.Background()); err != nil && !errors.Is(err, daemon.ErrNoDaemon) {
+			fmt.Fprintln(os.Stderr, "spindle:", err)
+		}
 	}
 }
 
-// openBackend picks between the offline mock and the live Spotify API.
+// openBackend picks between the offline mock, the local daemon and the bare
+// Web API.
+//
+// The daemon is started if it is not already up. Failing to start one is not
+// fatal: everything except queue editing and instant updates works without it,
+// and refusing to run would be a worse answer than saying so.
 func openBackend(ctx context.Context, mock bool) (player.Player, error) {
 	if mock {
 		return player.NewMock(), nil
@@ -88,7 +106,18 @@ func openBackend(ctx context.Context, mock bool) (player.Player, error) {
 	if err != nil {
 		return nil, err
 	}
-	return player.NewSpotify(session.Client(ctx)), nil
+	web := player.NewSpotify(session.Client(ctx))
+
+	if !daemon.Running() {
+		if err := detachDaemon(); err != nil {
+			fmt.Fprintln(os.Stderr, "spindle: no local playback device:", err)
+			return web, nil
+		}
+	}
+
+	local := player.NewLocal(web, daemon.Addr(), nil)
+	go local.Watch(ctx)
+	return local, nil
 }
 
 // coverRenderer picks the artwork backend. The terminal is probed before Bubble

@@ -17,6 +17,7 @@ type keyMap struct {
 	Repeat    key.Binding
 	Help      key.Binding
 	Quit      key.Binding
+	QuitAll   key.Binding
 
 	// Navigation, shared by the browsing tabs.
 	NextTab key.Binding
@@ -65,6 +66,10 @@ func newKeyMap() keyMap {
 		Quit: key.NewBinding(
 			key.WithKeys("q", "ctrl+c"),
 			key.WithHelp("q", "quit"),
+		),
+		QuitAll: key.NewBinding(
+			key.WithKeys("Q"),
+			key.WithHelp("Q", "quit and stop playback"),
 		),
 
 		NextTab: key.NewBinding(
@@ -189,6 +194,7 @@ func (k keyMap) forTab(t tabID) tabKeys {
 			full: [][]key.Binding{
 				{k.PlayPause, k.Next, k.SeekFwd, k.VolUp},
 				{k.Shuffle, k.Repeat, k.Devices, k.NextTab},
+				{k.Quit, k.QuitAll},
 			},
 		}
 	}

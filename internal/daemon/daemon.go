@@ -63,6 +63,11 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	defer lock.Unlock() //nolint:errcheck // the process is ending anyway
 
+	if err := writePID(); err != nil {
+		return err
+	}
+	defer removePID()
+
 	port := opts.Port
 	if port == 0 {
 		port = DefaultPort

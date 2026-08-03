@@ -189,6 +189,15 @@ func controlCmd(action string, call func(context.Context) error) tea.Cmd {
 	}
 }
 
+// watchCmd waits for the backend to report a change. It re-arms itself on every
+// wake-up, so the UI follows the daemon without polling it at all.
+func watchCmd(w player.Watcher) tea.Cmd {
+	return func() tea.Msg {
+		<-w.Changes()
+		return msg.StateChanged{}
+	}
+}
+
 // refetchCmd asks for a fresh state after a delay. Spotify reports the old track
 // for a moment after a skip, so an immediate poll would confirm the wrong thing.
 func refetchCmd(d time.Duration) tea.Cmd {

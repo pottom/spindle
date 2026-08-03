@@ -102,6 +102,16 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case msg.SearchResults:
 		return m, m.applySearchResults(message)
 
+	case msg.StateChanged:
+		// Re-arm before fetching: the next change may land while this one is
+		// still being read, and a dropped wake-up would stall the screen until
+		// the next unprompted poll.
+		cmds := []tea.Cmd{fetchStateCmd(m.player)}
+		if w, ok := m.player.(player.Watcher); ok {
+			cmds = append(cmds, watchCmd(w))
+		}
+		return m, tea.Batch(cmds...)
+
 	case msg.Refetch:
 		if m.throttled() {
 			return m, nil
@@ -226,6 +236,12 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch {
+	case key.Matches(k, m.keys.QuitAll):
+		// Leaving is the common case and gets the easy key; taking the music
+		// with you has to be asked for.
+		m.stopDaemon = true
+		return m, tea.Quit
+
 	case key.Matches(k, m.keys.Quit):
 		return m, tea.Quit
 
