@@ -10,20 +10,100 @@ import (
 	"github.com/pottom/spindle/internal/ui/msg"
 )
 
-// Polling once a second would hit the rate limit; once every fifth tick is the
-// cadence DESIGN.md 4.1 settled on.
-func TestResyncEveryFifthTick(t *testing.T) {
+// The resting cadence is one call per five seconds: DESIGN.md 4.1 picked it as
+// the point where drift is invisible and the quota is comfortable.
+func TestRestingCadence(t *testing.T) {
 	var m Model
-	var fetches int
+	m.notePolled()
 
-	for range 20 {
-		m.tickCount++
-		if m.shouldResync() {
-			fetches++
-		}
+	if m.shouldResync() {
+		t.Error("polled again immediately")
 	}
-	if fetches != 4 {
-		t.Errorf("20 ticks produced %d fetches, want 4", fetches)
+	m.nextPollAt = time.Now().Add(-time.Millisecond)
+	if !m.shouldResync() {
+		t.Error("did not poll once due")
+	}
+
+	m.notePolled()
+	if got := time.Until(m.nextPollAt); got < 4*time.Second || got > idlePoll {
+		t.Errorf("next poll due in %v, want about %v", got, idlePoll)
+	}
+}
+
+// A change nobody here asked for means someone is using another device. Making
+// them wait out the resting cadence for every following change is what makes a
+// remote skip feel slow.
+func TestFollowsAnotherDeviceClosely(t *testing.T) {
+	m := Model{ps: &player.State{TrackID: "a", Playing: true}}
+
+	if !m.drivenFromElsewhere(&player.State{TrackID: "b", Playing: true}) {
+		t.Error("a track change we did not cause went unnoticed")
+	}
+	if !m.drivenFromElsewhere(&player.State{TrackID: "a", Playing: false}) {
+		t.Error("a pause we did not cause went unnoticed")
+	}
+
+	// Our own optimistic change must not be mistaken for someone else's.
+	m.optimisticUntil = time.Now().Add(optimisticWindow)
+	if m.drivenFromElsewhere(&player.State{TrackID: "a", Playing: false}) {
+		t.Error("our own change was read as a remote one")
+	}
+
+	m.optimisticUntil = time.Time{}
+	m.followUntil = time.Now().Add(followWindow)
+	m.notePolled()
+	if got := time.Until(m.nextPollAt); got > activePoll {
+		t.Errorf("next poll due in %v, want the faster %v while following", got, activePoll)
+	}
+}
+
+// A track finishing by itself is a skip nobody pressed. The clock knows when it
+// happened and the queue knows what follows, so it should behave like one.
+func TestTrackRunningOutAdvancesLikeASkip(t *testing.T) {
+	m := Model{
+		ps:    &player.State{TrackID: "a", Title: "first", Playing: true, Duration: 2 * time.Second},
+		queue: []player.Track{{ID: "b", Title: "second"}},
+	}
+
+	var tm tea.Model = m
+	for range 3 {
+		tm, _ = tm.Update(msg.Tick{})
+	}
+
+	got := tm.(Model)
+	if got.ps.Title != "second" {
+		t.Errorf("title = %q, want the queued track once the clock ran out", got.ps.Title)
+	}
+	if got.awaitingTrack != "a" {
+		t.Errorf("awaitingTrack = %q, want the finished track", got.awaitingTrack)
+	}
+	if len(got.queue) != 0 {
+		t.Errorf("queue = %v, want the used track gone", got.queue)
+	}
+}
+
+// Under repeat-one the same track starts again, so guessing from the queue would
+// put the wrong title up.
+func TestTrackRunningOutUnderRepeatOne(t *testing.T) {
+	m := Model{
+		ps: &player.State{
+			TrackID: "a", Title: "first", Playing: true,
+			Duration: 2 * time.Second, Repeat: player.RepeatTrack,
+		},
+		queue: []player.Track{{ID: "b", Title: "second"}},
+	}
+
+	var tm tea.Model = m
+	for range 3 {
+		tm, _ = tm.Update(msg.Tick{})
+	}
+
+	got := tm.(Model)
+	if got.ps.Title != "first" {
+		t.Errorf("title = %q, want the same track under repeat-one", got.ps.Title)
+	}
+	if len(got.queue) != 1 {
+		t.Errorf("queue = %v, want it left alone", got.queue)
 	}
 }
 
@@ -32,14 +112,12 @@ func TestThrottleSuspendsPolling(t *testing.T) {
 	m := Model{rateLimitedUntil: time.Now().Add(time.Minute)}
 
 	for range 20 {
-		m.tickCount++
 		if m.shouldResync() {
 			t.Fatal("polled while rate limited")
 		}
 	}
 
 	m.rateLimitedUntil = time.Now().Add(-time.Second)
-	m.tickCount = resyncEvery
 	if !m.shouldResync() {
 		t.Error("polling did not resume once the throttle expired")
 	}

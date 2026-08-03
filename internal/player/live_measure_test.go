@@ -187,3 +187,14 @@ func TestLivePollingCadence(t *testing.T) {
 		t.Errorf("the shipping cadence was rate limited %d times", throttles)
 	}
 }
+
+// TestLiveRemoteSkip issues a single skip and returns. Run it while spindle is
+// open to see how long an outside change takes to reach the screen.
+func TestLiveRemoteSkip(t *testing.T) {
+	if os.Getenv("SPINDLE_REMOTE_SKIP") == "" {
+		t.Skip("set SPINDLE_REMOTE_SKIP to poke the account from outside")
+	}
+	if err := liveBackend(t).Next(context.Background()); err != nil {
+		t.Fatalf("skip: %v", err)
+	}
+}

@@ -32,6 +32,10 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleTick()
 
 	case msg.StateFetched:
+		if m.drivenFromElsewhere(message.State) {
+			m.followUntil = time.Now().Add(followWindow)
+			m.nextPollAt = time.Now().Add(activePoll)
+		}
 		m.adopt(message.State)
 		m.noDevice = false
 		m.err = nil
@@ -156,15 +160,20 @@ func (m *Model) resize() {
 // handleTick advances the local clock and resynchronises every fifth second.
 func (m Model) handleTick() (tea.Model, tea.Cmd) {
 	m.tickCount++
+	cmds := []tea.Cmd{tickCmd()}
+
 	if m.ps != nil && m.ps.Playing {
 		m.localProgress += time.Second
-		if m.localProgress > m.ps.Duration {
+		if m.ps.Duration > 0 && m.localProgress >= m.ps.Duration {
 			m.localProgress = m.ps.Duration
+			if cmd := m.trackRanOut(); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
 		}
 	}
 
-	cmds := []tea.Cmd{tickCmd()}
 	if m.shouldResync() {
+		m.notePolled()
 		cmds = append(cmds, fetchStateCmd(m.player))
 	}
 	return m, tea.Batch(cmds...)
@@ -415,7 +424,57 @@ func (m *Model) stillWaitingForTrackChange(st *player.State) bool {
 // shouldResync decides whether this tick carries a real state fetch. Polling
 // through a throttle is how a short one becomes a long one.
 func (m Model) shouldResync() bool {
-	return m.tickCount%resyncEvery == 0 && !m.throttled()
+	if m.throttled() {
+		return false
+	}
+	return !time.Now().Before(m.nextPollAt)
+}
+
+// trackRanOut handles a track finishing on its own. It is a skip nobody pressed:
+// the local clock knows when it happened, and the queue knows what follows, so
+// the next track goes up at once and the confirmation follows. Waiting for the
+// resting poll would leave the finished track on screen for seconds.
+func (m *Model) trackRanOut() tea.Cmd {
+	if m.endPolledFor == m.ps.TrackID {
+		return nil
+	}
+	m.endPolledFor = m.ps.TrackID
+
+	cmd := m.awaitTrackChange()
+
+	// Under repeat-one the same track starts again, so the queue says nothing
+	// useful about what is coming.
+	if m.ps.Repeat == player.RepeatTrack {
+		return cmd
+	}
+	if next := m.takeFromQueue(); next != nil {
+		m.showTrack(next)
+		return tea.Batch(cmd, m.syncCover())
+	}
+	return cmd
+}
+
+// notePolled records that a poll has just gone out and works out when the next
+// resting one is due.
+func (m *Model) notePolled() {
+	interval := idlePoll
+	if time.Now().Before(m.followUntil) {
+		interval = activePoll
+	}
+	m.nextPollAt = time.Now().Add(interval)
+}
+
+// drivenFromElsewhere reports that the snapshot differs from what is on screen
+// in a way nothing here asked for. Someone is using another device, so follow
+// them closely for a while rather than making them wait out the resting cadence.
+func (m Model) drivenFromElsewhere(st *player.State) bool {
+	if st == nil || m.ps == nil {
+		return false
+	}
+	if m.awaitingTrack != "" || time.Now().Before(m.optimisticUntil) {
+		return false
+	}
+	return st.TrackID != m.ps.TrackID || st.Playing != m.ps.Playing
 }
 
 // throttled reports whether Spotify has asked to be left alone.

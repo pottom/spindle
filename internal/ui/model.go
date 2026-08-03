@@ -19,8 +19,22 @@ const (
 	// still in flight may report. See DESIGN.md 4.2.
 	optimisticWindow = 2 * time.Second
 
-	// resyncEvery is measured in ticks: one real State() call per five seconds.
-	resyncEvery = 5
+	// idlePoll is the resting cadence: one real State() call per five seconds.
+	// DESIGN.md 4.1 picked it as the point where drift is invisible and the
+	// quota is comfortable.
+	idlePoll = 5 * time.Second
+
+	// activePoll is used for a while after a change nobody here asked for.
+	// Somebody is driving from another device, and the next thing they do
+	// should not take five seconds to arrive.
+	activePoll = 1500 * time.Millisecond
+
+	// followWindow is how long that lasts after the last such change.
+	followWindow = 30 * time.Second
+
+	// A track running out is the most common change nobody pressed a key for,
+	// and it is the one whose timing the local clock already knows. It is
+	// handled as an unpressed skip rather than by polling harder.
 
 	seekStep   = 5 * time.Second
 	volumeStep = 5
@@ -66,6 +80,13 @@ type Model struct {
 	// confirmUntil is when to stop asking whether it has.
 	awaitingTrack string
 	confirmUntil  time.Time
+
+	// nextPollAt is when the resting poll is next due, followUntil is how long
+	// to keep the faster cadence, and endPolledFor stops a track that has run
+	// out from being handled again on every following tick.
+	nextPollAt   time.Time
+	followUntil  time.Time
+	endPolledFor string
 
 	// queue is what Spotify says comes next. It exists so that pressing n can
 	// put the right title on screen at once rather than half a second later.
