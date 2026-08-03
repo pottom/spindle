@@ -25,6 +25,9 @@ is not where someone who keeps their dotfiles in order looks.
 |------|-------|
 | OAuth token | `$XDG_CONFIG_HOME/spindle/token.json`, mode 0600 |
 | Cover cache | `$XDG_CACHE_HOME/spindle/covers/` |
+| Client id | `$XDG_CONFIG_HOME/spindle/config.json`, mode 0600 |
+| Daemon session | `$XDG_CONFIG_HOME/spindle/daemon.json`, mode 0600 |
+| Daemon log | `$XDG_STATE_HOME/spindle/daemon.log` |
 
 ### Portability
 

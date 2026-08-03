@@ -13,7 +13,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/auth"
-	"github.com/pottom/spindle/internal/daemon"
 	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui"
 	"github.com/pottom/spindle/internal/ui/cover"
@@ -41,7 +40,7 @@ func main() {
 			}
 			return
 		case "daemon":
-			if err := runDaemon(daemon.DefaultPort); err != nil {
+			if err := runDaemon(os.Args[2:]); err != nil {
 				reportFatal(err)
 			}
 			return

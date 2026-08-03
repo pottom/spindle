@@ -8,6 +8,8 @@ resolving the four risks listed in `DESIGN.md`, not production readiness.
 - `make run-mock` — mock backend, no auth and no network. Use this during development.
 - `make run` — live Spotify API.
 - `make login` — run the OAuth flow and report who you are signed in as.
+- `spindle daemon` — start the Connect device in the background.
+  `spindle daemon --foreground` keeps it in the terminal, where Ctrl-C stops it.
 - `make lint` — `go vet ./... && staticcheck ./...`
 - `make cross` — build every supported platform. Run it after touching anything
   that talks to the terminal or the filesystem.
