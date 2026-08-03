@@ -67,8 +67,8 @@ func (m Model) renderPlayer() string {
 	lines = append(lines, m.pad("", l))
 
 	lines = append(lines, m.body(l)...)
-	if m.err != nil {
-		lines = append(lines, m.pad(m.styles.Error.Render("✕ "+m.err.Error()), l))
+	if text, style, ok := m.notice(); ok {
+		lines = append(lines, m.pad(style.Render(text), l))
 	}
 	for _, row := range strings.Split(m.help.View(m.helpKeys()), "\n") {
 		lines = append(lines, m.pad(row, l))

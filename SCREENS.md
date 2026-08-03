@@ -226,15 +226,22 @@ visible above it.
    space play/pause · n/p track · ←→ seek · ? help
 ```
 
-| Condition | Colour | Text |
-|-----------|--------|------|
-| Network down | `Warning` | `⚠ Offline — retrying in Ns` |
-| Rate limited | `Warning` | `⚠ Rate limited — pausing for Ns` |
-| No Premium | `Error` | `✕ Playback control requires Spotify Premium` |
-| Token refresh in flight | — | not shown, silent |
-| Device disappeared | `Warning` | `⚠ Device is gone — press d to switch` |
+| Condition | Colour | Text | Built |
+|-----------|--------|------|-------|
+| Rate limited | `Warning` | `⚠ Rate limited — pausing for Ns` | M3 |
+| No Premium | `Error` | `✕ Playback control requires Spotify Premium` | M3 |
+| Anything else that failed | `Error` | `✕ <the error>` | M3 |
+| Network down | `Warning` | `⚠ Offline — retrying in Ns` | M6 |
+| Token refresh in flight | — | not shown, silent | — |
+| Device disappeared | `Warning` | `⚠ Device is gone — press d to switch` | M4 |
+
+Only one line is ever shown. A throttle outranks the rest: it is transient and it
+explains why nothing is moving right now.
 
 The banner **clears itself** when the cause resolves. It never needs acknowledging.
+"Resolves" means something specific in each case: the throttle expires on its own
+clock, and the Premium notice lifts the moment a control call succeeds — which for
+a free account is never, so it stands as the explanation it is.
 
 ### 4.7 Terminal too small
 

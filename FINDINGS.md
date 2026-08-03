@@ -87,14 +87,45 @@ The generated table is `internal/ui/cover/diacritics.go`, derived from kitty's
 
 ## 3. What is the smallest polling interval that avoids 429? What is the real quota?
 
-**Open.** Needs the live Web API — M2/M3. The current cadence is the 1 s local tick
-with a real `State()` call every fifth tick, per `DESIGN.md` 4.1.
+**Still needs a live account to answer with numbers**, but the machinery to survive
+being wrong about it is in place.
+
+The cadence is unchanged: a 1 s local tick with a real `State()` call every fifth,
+per `DESIGN.md` 4.1. What M3 added is what happens when that turns out to be too
+often.
+
+Spotify's own client library is no help here: it decodes the error body and throws
+the `Retry-After` header away with it, and its built-in retry silently blocks the
+calling goroutine instead of telling anyone. So the transport is wrapped, and a 429
+becomes a typed `RateLimitedError` carrying the header before the client ever sees
+the response. `http.Client` wraps transport errors in `*url.Error`, which
+`errors.As` sees straight through.
+
+Polling then stops for exactly as long as Spotify asked. Carrying on regardless is
+how a short throttle becomes a long one. The banner counts the wait down and clears
+itself.
+
+A header that is missing, zero, negative or not a whole number of seconds falls
+back to 5 s rather than to zero — waiting zero would send us straight back into the
+limit.
+
+Reducing the request count also helped on its own: a held volume key used to be one
+request per keypress and is now one per 800 ms, and a skip now costs one control
+call plus one confirming fetch rather than an immediate poll that would have
+confirmed the wrong track anyway.
 
 ## 4. What is the measured latency on the control endpoints? Is a 2 s optimistic window enough?
 
-**Open for the real API.** Against the mock's 150 ms artificial latency the 2 s
-window is ample: a pause survives the next two resync polls without snapping back,
-verified both by unit test and by driving the running program.
+**Not yet measured against the real API.** Against the mock's 150 ms artificial
+latency the 2 s window is ample: a pause survives the next two resync polls without
+snapping back, verified both by unit test and by driving the running program. Eight
+skips in under a second land exactly where they should, with no corrupted state and
+no error.
+
+The one thing the mock cannot show is Spotify reporting the *previous* track for a
+moment after a skip. That is handled blind, on the strength of `DESIGN.md` 4.1: a
+skip schedules one confirming fetch 400 ms later rather than polling immediately.
+Whether 400 ms is enough is a question for a live account.
 
 ## 5. Do kitty and Ghostty differ in placement behaviour?
 

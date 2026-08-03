@@ -24,6 +24,13 @@ const (
 	// artwork is loaded. Without it, holding a cursor key would queue an upload
 	// per row.
 	coverSettleDelay = 250 * time.Millisecond
+
+	// trackChangeDelay is how long to wait before confirming a skip. Spotify
+	// still reports the previous track for a moment afterwards.
+	trackChangeDelay = 400 * time.Millisecond
+
+	// volumeDebounce collapses a held volume key into one request.
+	volumeDebounce = 800 * time.Millisecond
 )
 
 func tickCmd() tea.Cmd {
@@ -40,6 +47,10 @@ func fetchStateCmd(p player.Player) tea.Cmd {
 		st, err := p.State(ctx)
 		if errors.Is(err, player.ErrNoActiveDevice) {
 			return msg.NoActiveDevice{}
+		}
+		var limited *player.RateLimitedError
+		if errors.As(err, &limited) {
+			return msg.RateLimited{RetryAfter: limited.RetryAfter}
 		}
 		if err != nil {
 			return msg.Error{Err: fmt.Errorf("fetch player state: %w", err)}
@@ -123,16 +134,39 @@ func coverSettleCmd(seq int) tea.Cmd {
 	})
 }
 
-// controlCmd runs a playback control call off the update loop. A successful call
-// produces no message: the next poll is what confirms it.
+// controlCmd runs a playback control call off the update loop. The result is
+// classified here so the UI can tell "Spotify is throttling us" and "this account
+// cannot do that" apart from an ordinary failure.
 func controlCmd(action string, call func(context.Context) error) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 		defer cancel()
 
-		if err := call(ctx); err != nil {
-			return msg.Error{Err: fmt.Errorf("%s: %w", action, err)}
+		err := call(ctx)
+		if err == nil {
+			return msg.ControlDone{}
 		}
-		return nil
+
+		var limited *player.RateLimitedError
+		if errors.As(err, &limited) {
+			return msg.RateLimited{RetryAfter: limited.RetryAfter}
+		}
+		if errors.Is(err, player.ErrNoActiveDevice) {
+			return msg.NoActiveDevice{}
+		}
+		return msg.Error{Err: fmt.Errorf("%s: %w", action, err)}
 	}
+}
+
+// refetchCmd asks for a fresh state after a delay. Spotify reports the old track
+// for a moment after a skip, so an immediate poll would confirm the wrong thing.
+func refetchCmd(d time.Duration) tea.Cmd {
+	return tea.Tick(d, func(time.Time) tea.Msg { return msg.Refetch{} })
+}
+
+// volumeSettleCmd waits out the volume debounce.
+func volumeSettleCmd(seq int) tea.Cmd {
+	return tea.Tick(volumeDebounce, func(time.Time) tea.Msg {
+		return msg.VolumeSettled{Seq: seq}
+	})
 }

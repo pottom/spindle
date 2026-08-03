@@ -51,6 +51,17 @@ type Model struct {
 	// fire an upload per row, only once the cursor settles.
 	coverSeq int
 
+	// volumeSeq debounces the volume keys the same way.
+	volumeSeq int
+
+	// rateLimitedUntil suspends polling. Spotify asked to be left alone, and
+	// carrying on regardless is how a short throttle becomes a long one.
+	rateLimitedUntil time.Time
+
+	// noPremium is a standing explanation, not a transient error: a free account
+	// can read playback but never change it.
+	noPremium bool
+
 	err       error
 	tickCount int
 
@@ -131,7 +142,7 @@ func (m Model) helpKeys() tabKeys {
 // layout resolves the current geometry. It is pure, so View and Update can both
 // ask for it without either of them owning the answer.
 func (m Model) layout() layout {
-	return computeLayout(m.width, m.height, m.helpHeight(), m.err != nil, m.tab != tabPlayer, m.cell)
+	return computeLayout(m.width, m.height, m.helpHeight(), m.hasNotice(), m.tab != tabPlayer, m.cell)
 }
 
 func (m Model) Init() tea.Cmd {

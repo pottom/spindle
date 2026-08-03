@@ -61,6 +61,7 @@ type Styles struct {
 	Heading lipgloss.Style
 	Detail  lipgloss.Style
 	Error   lipgloss.Style
+	Warning lipgloss.Style
 }
 
 // New builds the styles for the given terminal background. A nil accent falls
@@ -116,5 +117,6 @@ func New(isDark bool, accent color.Color) Styles {
 		Heading: fg(t.Text),
 		Detail:  fg(t.Muted),
 		Error:   fg(t.Error),
+		Warning: fg(t.Warning),
 	}
 }

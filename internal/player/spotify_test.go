@@ -16,7 +16,7 @@ func newStub(t *testing.T, handler http.HandlerFunc) *Spotify {
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
-	return NewSpotify(spotify.New(srv.Client(), spotify.WithBaseURL(srv.URL+"/")))
+	return NewSpotify(srv.Client(), spotify.WithBaseURL(srv.URL+"/"))
 }
 
 // Spotify answers "nothing is playing" with 204 and an empty body, which the
@@ -163,25 +163,9 @@ func TestPlaylistTracksSkipsWhatIsNotATrack(t *testing.T) {
 	}
 }
 
-func TestControlIsNotImplementedYet(t *testing.T) {
-	s := NewSpotify(nil)
-	ctx := context.Background()
-
-	calls := map[string]error{
-		"Play":       s.Play(ctx),
-		"Pause":      s.Pause(ctx),
-		"Next":       s.Next(ctx),
-		"Previous":   s.Previous(ctx),
-		"Seek":       s.Seek(ctx, time.Second),
-		"SetVolume":  s.SetVolume(ctx, 50),
-		"SetShuffle": s.SetShuffle(ctx, true),
-		"SetRepeat":  s.SetRepeat(ctx, RepeatOff),
-		"TransferTo": s.TransferTo(ctx, "d1"),
-		"PlayTrack":  s.PlayTrack(ctx, "t1"),
-	}
-	for name, err := range calls {
-		if !errors.Is(err, ErrNotImplemented) {
-			t.Errorf("%s returned %v, want ErrNotImplemented", name, err)
-		}
+func TestTransferIsNotImplementedYet(t *testing.T) {
+	s := NewSpotify(&http.Client{})
+	if err := s.TransferTo(context.Background(), "d1"); !errors.Is(err, ErrNotImplemented) {
+		t.Errorf("TransferTo returned %v, want ErrNotImplemented", err)
 	}
 }

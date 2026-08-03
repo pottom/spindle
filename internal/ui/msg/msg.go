@@ -69,6 +69,25 @@ type CoverSettled struct {
 	Seq int
 }
 
+// Refetch asks for a fresh player state now. It is sent on a delay after a
+// track change, because Spotify needs a moment to catch up with itself.
+type Refetch struct{}
+
+// VolumeSettled fires once the volume keys have stopped moving, so a held key
+// sends one request instead of twenty.
+type VolumeSettled struct {
+	Seq int
+}
+
+// ControlDone reports that a control call succeeded, which is what clears a
+// standing complaint about the account not being able to control playback.
+type ControlDone struct{}
+
+// RateLimited reports that Spotify wants to be left alone for a while.
+type RateLimited struct {
+	RetryAfter time.Duration
+}
+
 // Error carries a failure the UI is expected to show rather than crash on.
 type Error struct {
 	Err error

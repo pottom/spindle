@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"charm.land/bubbles/v2/key"
@@ -81,7 +82,36 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case msg.SearchResults:
 		return m, m.applySearchResults(message)
 
+	case msg.Refetch:
+		if m.throttled() {
+			return m, nil
+		}
+		return m, fetchStateCmd(m.player)
+
+	case msg.VolumeSettled:
+		if message.Seq != m.volumeSeq || m.ps == nil {
+			return m, nil
+		}
+		pct, p := m.ps.Volume, m.player
+		return m, controlCmd("set volume", func(ctx context.Context) error {
+			return p.SetVolume(ctx, pct)
+		})
+
+	case msg.ControlDone:
+		// Whatever was standing in the way is evidently no longer standing.
+		m.noPremium, m.err = false, nil
+		return m, nil
+
+	case msg.RateLimited:
+		m.rateLimitedUntil = time.Now().Add(message.RetryAfter)
+		m.err = nil
+		return m, nil
+
 	case msg.Error:
+		if errors.Is(message.Err, player.ErrPremiumRequired) {
+			m.noPremium = true
+			return m, nil
+		}
 		m.err = message.Err
 		return m, nil
 
@@ -118,7 +148,7 @@ func (m Model) handleTick() (tea.Model, tea.Cmd) {
 	}
 
 	cmds := []tea.Cmd{tickCmd()}
-	if m.tickCount%resyncEvery == 0 {
+	if m.shouldResync() {
 		cmds = append(cmds, fetchStateCmd(m.player))
 	}
 	return m, tea.Batch(cmds...)
@@ -199,16 +229,10 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		})
 
 	case key.Matches(k, m.keys.Next):
-		m.localProgress = 0
-		m.ps.Progress = 0
-		m.hold()
-		return m, controlCmd("skip to next track", p.Next)
+		return m, m.skip("skip to next track", p.Next)
 
 	case key.Matches(k, m.keys.Prev):
-		m.localProgress = 0
-		m.ps.Progress = 0
-		m.hold()
-		return m, controlCmd("skip to previous track", p.Previous)
+		return m, m.skip("skip to previous track", p.Previous)
 
 	case key.Matches(k, m.keys.SeekFwd):
 		return m, m.seek(m.localProgress + seekStep)
@@ -292,15 +316,32 @@ func (m *Model) seek(pos time.Duration) tea.Cmd {
 	})
 }
 
+// setVolume moves the reading immediately and sends the request once the keys
+// stop. A held key would otherwise fire twenty calls at the API.
 func (m *Model) setVolume(pct int) tea.Cmd {
-	pct = min(max(pct, 0), 100)
-	m.ps.Volume = pct
+	m.ps.Volume = min(max(pct, 0), 100)
 	m.hold()
+	m.volumeSeq++
+	return volumeSettleCmd(m.volumeSeq)
+}
 
-	p := m.player
-	return controlCmd("set volume", func(ctx context.Context) error {
-		return p.SetVolume(ctx, pct)
-	})
+// skip changes track and schedules the one confirming fetch.
+func (m *Model) skip(action string, call func(context.Context) error) tea.Cmd {
+	m.localProgress = 0
+	m.ps.Progress = 0
+	m.hold()
+	return tea.Batch(controlCmd(action, call), refetchCmd(trackChangeDelay))
+}
+
+// shouldResync decides whether this tick carries a real state fetch. Polling
+// through a throttle is how a short one becomes a long one.
+func (m Model) shouldResync() bool {
+	return m.tickCount%resyncEvery == 0 && !m.throttled()
+}
+
+// throttled reports whether Spotify has asked to be left alone.
+func (m Model) throttled() bool {
+	return time.Now().Before(m.rateLimitedUntil)
 }
 
 func nextRepeat(mode string) string {

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/zmb3/spotify/v2"
 
 	"github.com/pottom/spindle/internal/auth"
 	"github.com/pottom/spindle/internal/player"
@@ -81,7 +80,7 @@ func openBackend(ctx context.Context, mock bool) (player.Player, error) {
 	if err != nil {
 		return nil, err
 	}
-	return player.NewSpotify(spotify.New(session.Client(ctx))), nil
+	return player.NewSpotify(session.Client(ctx)), nil
 }
 
 // coverRenderer picks the artwork backend. The terminal is probed before Bubble

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -30,9 +31,13 @@ type Spotify struct {
 	client *spotify.Client
 }
 
-// NewSpotify wraps an authenticated client.
-func NewSpotify(client *spotify.Client) *Spotify {
-	return &Spotify{client: client}
+// NewSpotify builds the backend around an authenticated HTTP client. The
+// transport is wrapped so a 429 becomes a typed error with its Retry-After
+// intact; the Spotify client would otherwise discard the header.
+func NewSpotify(httpClient *http.Client, opts ...spotify.ClientOption) *Spotify {
+	wrapped := *httpClient
+	wrapped.Transport = &rateLimiter{base: httpClient.Transport}
+	return &Spotify{client: spotify.New(&wrapped, opts...)}
 }
 
 // State reports what the active device is doing. Spotify answers 204 when
@@ -153,17 +158,56 @@ func (s *Spotify) PlaylistTracks(ctx context.Context, playlistID string) ([]Trac
 	return out, nil
 }
 
-// Playback control arrives in M3.
+func (s *Spotify) Play(ctx context.Context) error {
+	return classify("resume playback", s.client.Play(ctx))
+}
 
-func (s *Spotify) Play(context.Context) error                { return ErrNotImplemented }
-func (s *Spotify) Pause(context.Context) error               { return ErrNotImplemented }
-func (s *Spotify) Next(context.Context) error                { return ErrNotImplemented }
-func (s *Spotify) Previous(context.Context) error            { return ErrNotImplemented }
-func (s *Spotify) Seek(context.Context, time.Duration) error { return ErrNotImplemented }
-func (s *Spotify) SetVolume(context.Context, int) error      { return ErrNotImplemented }
-func (s *Spotify) SetShuffle(context.Context, bool) error    { return ErrNotImplemented }
-func (s *Spotify) SetRepeat(context.Context, string) error   { return ErrNotImplemented }
-func (s *Spotify) TransferTo(context.Context, string) error  { return ErrNotImplemented }
-func (s *Spotify) PlayTrack(context.Context, string) error   { return ErrNotImplemented }
+func (s *Spotify) Pause(ctx context.Context) error {
+	return classify("pause playback", s.client.Pause(ctx))
+}
 
-func (s *Spotify) PlayPlaylist(context.Context, string, int) error { return ErrNotImplemented }
+func (s *Spotify) Next(ctx context.Context) error {
+	return classify("skip to next track", s.client.Next(ctx))
+}
+
+func (s *Spotify) Previous(ctx context.Context) error {
+	return classify("skip to previous track", s.client.Previous(ctx))
+}
+
+func (s *Spotify) Seek(ctx context.Context, pos time.Duration) error {
+	return classify("seek", s.client.Seek(ctx, int(pos.Milliseconds())))
+}
+
+func (s *Spotify) SetVolume(ctx context.Context, pct int) error {
+	return classify("set volume", s.client.Volume(ctx, min(max(pct, 0), 100)))
+}
+
+func (s *Spotify) SetShuffle(ctx context.Context, on bool) error {
+	return classify("set shuffle", s.client.Shuffle(ctx, on))
+}
+
+func (s *Spotify) SetRepeat(ctx context.Context, mode string) error {
+	return classify("set repeat", s.client.Repeat(ctx, repeatFromSpotify(mode)))
+}
+
+// PlayTrack starts one track on its own, with no surrounding context.
+func (s *Spotify) PlayTrack(ctx context.Context, trackID string) error {
+	uri := spotify.URI("spotify:track:" + trackID)
+	return classify("play track", s.client.PlayOpt(ctx, &spotify.PlayOptions{
+		URIs: []spotify.URI{uri},
+	}))
+}
+
+// PlayPlaylist starts a playlist at the given position, so the rest of it stays
+// queued behind the track that was chosen.
+func (s *Spotify) PlayPlaylist(ctx context.Context, playlistID string, offset int) error {
+	uri := spotify.URI("spotify:playlist:" + playlistID)
+	pos := max(offset, 0)
+	return classify("play playlist", s.client.PlayOpt(ctx, &spotify.PlayOptions{
+		PlaybackContext: &uri,
+		PlaybackOffset:  &spotify.PlaybackOffset{Position: &pos},
+	}))
+}
+
+// Moving playback between devices arrives in M4.
+func (s *Spotify) TransferTo(context.Context, string) error { return ErrNotImplemented }
