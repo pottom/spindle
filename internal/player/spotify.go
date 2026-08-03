@@ -88,6 +88,23 @@ func (s *Spotify) Devices(ctx context.Context) ([]Device, error) {
 	return out, nil
 }
 
+// Queue returns the tracks lined up after the current one.
+func (s *Spotify) Queue(ctx context.Context) ([]Track, error) {
+	q, err := s.client.GetQueue(ctx)
+	if err != nil {
+		return nil, classify("fetch queue", err)
+	}
+	if q == nil {
+		return nil, nil
+	}
+
+	out := make([]Track, 0, len(q.Items))
+	for i := range q.Items {
+		out = append(out, trackFromFull(&q.Items[i]))
+	}
+	return out, nil
+}
+
 func (s *Spotify) Search(ctx context.Context, query string) ([]Track, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {

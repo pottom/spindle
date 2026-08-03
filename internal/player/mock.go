@@ -159,6 +159,22 @@ func (m *Mock) TransferTo(ctx context.Context, deviceID string) error {
 	})
 }
 
+// Queue is whatever follows the current track, wrapping round the end.
+func (m *Mock) Queue(ctx context.Context) ([]Track, error) {
+	if err := m.delay(ctx); err != nil {
+		return nil, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.advance()
+
+	out := make([]Track, 0, len(m.queue)-1)
+	for i := 1; i < len(m.queue); i++ {
+		out = append(out, m.queue[m.wrap(m.index+i)])
+	}
+	return out, nil
+}
+
 // Search matches the query against the title, the artists and the album. An
 // empty query returns nothing rather than the whole catalogue.
 func (m *Mock) Search(ctx context.Context, query string) ([]Track, error) {

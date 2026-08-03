@@ -102,6 +102,22 @@ func coverCmd(loader *cover.Loader, url string, wCells, hCells int) tea.Cmd {
 	}
 }
 
+// fetchQueueCmd asks what comes next, so a skip can be shown before Spotify has
+// caught up with it. A failure is silent: the queue is an optimisation, and the
+// confirming fetch still puts the truth on screen.
+func fetchQueueCmd(p player.Player) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+		defer cancel()
+
+		tracks, err := p.Queue(ctx)
+		if err != nil {
+			return msg.QueueFetched{}
+		}
+		return msg.QueueFetched{Tracks: tracks}
+	}
+}
+
 func fetchPlaylistsCmd(p player.Player) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)

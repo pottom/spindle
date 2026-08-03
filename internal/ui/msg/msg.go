@@ -43,6 +43,11 @@ type DevicesFetched struct {
 	Devices []player.Device
 }
 
+// QueueFetched carries what is lined up after the current track.
+type QueueFetched struct {
+	Tracks []player.Track
+}
+
 // PlaylistsFetched carries the library listing.
 type PlaylistsFetched struct {
 	Playlists []player.Playlist

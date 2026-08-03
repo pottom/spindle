@@ -67,6 +67,12 @@ type Model struct {
 	awaitingTrack string
 	confirmUntil  time.Time
 
+	// queue is what Spotify says comes next. It exists so that pressing n can
+	// put the right title on screen at once rather than half a second later.
+	// queueFor is the track it was fetched for.
+	queue    []player.Track
+	queueFor string
+
 	err       error
 	tickCount int
 

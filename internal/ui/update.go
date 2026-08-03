@@ -40,6 +40,13 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if m.stillWaitingForTrackChange(message.State) {
 			cmds = append(cmds, refetchCmd(confirmRetry))
 		}
+		// Keep the queue tied to whatever the server says is playing. Comparing
+		// against the confirmed track rather than the displayed one stops an
+		// optimistic skip from re-asking for a queue it already has.
+		if message.State != nil && message.State.TrackID != m.queueFor {
+			m.queueFor = message.State.TrackID
+			cmds = append(cmds, fetchQueueCmd(m.player))
+		}
 		return m, tea.Batch(cmds...)
 
 	case msg.NoActiveDevice:
@@ -50,6 +57,10 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	case msg.DevicesFetched:
 		m.devices.adopt(message.Devices)
+		return m, nil
+
+	case msg.QueueFetched:
+		m.queue = message.Tracks
 		return m, nil
 
 	case msg.CoverReady:
@@ -166,6 +177,13 @@ func (m *Model) adopt(st *player.State) {
 	if st == nil {
 		return
 	}
+
+	// While a skip is in flight, a snapshot still showing the track we are
+	// leaving is stale by definition. Adopting it would undo what the queue
+	// already told us and flash the old title back onto the screen.
+	if m.awaitingTrack != "" && st.TrackID == m.awaitingTrack {
+		return
+	}
 	if m.ps == nil || !time.Now().Before(m.optimisticUntil) {
 		m.ps = st
 		m.localProgress = st.Progress
@@ -233,7 +251,14 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		})
 
 	case key.Matches(k, m.keys.Next):
-		return m, m.skip("skip to next track", p.Next)
+		cmd := m.skip("skip to next track", p.Next)
+		// The queue already says what is coming, so show it now instead of
+		// half a second from now. The confirming fetch demotes to a check.
+		if next := m.takeFromQueue(); next != nil {
+			m.showTrack(next)
+			return m, tea.Batch(cmd, m.syncCover())
+		}
+		return m, cmd
 
 	case key.Matches(k, m.keys.Prev):
 		return m, m.skip("skip to previous track", p.Previous)
@@ -335,6 +360,32 @@ func (m *Model) skip(action string, call func(context.Context) error) tea.Cmd {
 	m.ps.Progress = 0
 	m.hold()
 	return tea.Batch(controlCmd(action, call), m.awaitTrackChange())
+}
+
+// takeFromQueue pops the next track off the local queue, if there is one.
+func (m *Model) takeFromQueue() *player.Track {
+	if len(m.queue) == 0 {
+		return nil
+	}
+	next := m.queue[0]
+	m.queue = m.queue[1:]
+	return &next
+}
+
+// showTrack puts a track on screen before the server has confirmed it. Only the
+// metadata is touched: the playback flags stay whatever they were.
+func (m *Model) showTrack(t *player.Track) {
+	if m.ps == nil {
+		return
+	}
+	m.ps.TrackID = t.ID
+	m.ps.Title = t.Title
+	m.ps.Artists = t.Artists
+	m.ps.Album = t.Album
+	m.ps.CoverURL = t.CoverURL
+	m.ps.Duration = t.Duration
+	m.ps.Progress = 0
+	m.localProgress = 0
 }
 
 // awaitTrackChange notes which track we are leaving and asks for the first

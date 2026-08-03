@@ -155,6 +155,36 @@ fraction of a second.
 These numbers are one account, one device, one network. The shape is what to trust,
 not the digits.
 
+### What the measurements changed
+
+Timing the round trip was the least useful part. Two things came out of it that
+actually altered the program.
+
+**A skip used to take about five seconds to show on screen.** Pressing `enter` on
+a search result or a playlist track sent the play command and then asked for
+nothing, so the player tab kept the previous track until the next five-second
+poll. It looked like the key had done nothing. Both now ask for confirmation.
+
+**Guessing a delay was the wrong shape of answer.** A single fetch at a fixed
+offset is either too early (confirms the old track, and you wait for the poll
+anyway) or needlessly late. Asking repeatedly until the answer changes — first at
+450 ms, then every 200 ms, giving up after 4 s — resolves near the median instead
+of the worst case and survives a slow day. Measured on screen, a skip went from
+~5 s to 1212 ms with the naive retry, then to ~650 ms once the first ask was
+moved just under the fastest propagation seen.
+
+**Then the queue removed the wait entirely.** `/v1/me/player/queue` says what is
+coming, so a skip does not have to ask Spotify anything to know what to draw. The
+next track's title, artist and artwork go up immediately and the confirming fetch
+demotes to a check. Measured on screen: **37 ms**, which is the measurement
+harness, not the program.
+
+That required one guard worth recording: inside the optimistic window `adopt` was
+taking over metadata from any snapshot that arrived, including one that still
+showed the track being left. It would have flashed the old title back a moment
+after the skip. A snapshot still reporting the track we are leaving is stale by
+definition and is now ignored.
+
 ## 5. Do kitty and Ghostty differ in placement behaviour?
 
 **Open.** Only Ghostty is available on this machine, and the verification so far is

@@ -24,6 +24,10 @@ type Player interface {
 	Devices(ctx context.Context) ([]Device, error)
 	TransferTo(ctx context.Context, deviceID string) error
 
+	// Queue is what comes next. Knowing it is what lets the UI show a skip
+	// instantly instead of waiting for Spotify to admit it happened.
+	Queue(ctx context.Context) ([]Track, error)
+
 	// Browsing. Search matches tracks; an empty query yields no results rather
 	// than everything.
 	Search(ctx context.Context, query string) ([]Track, error)
