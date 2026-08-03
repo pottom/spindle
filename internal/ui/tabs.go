@@ -30,6 +30,15 @@ var tabNames = [...]string{
 
 func (t tabID) String() string { return tabNames[t] }
 
+// tabAt maps a digit onto the tab drawn in that place, counting from one.
+func tabAt(digit string) (tabID, bool) {
+	n := int(digit[0] - '1')
+	if len(digit) != 1 || n < 0 || n >= len(tabNames) {
+		return 0, false
+	}
+	return tabID(n), true
+}
+
 // next cycles through the tabs, wrapping in either direction.
 func (t tabID) next(delta int) tabID {
 	n := len(tabNames)

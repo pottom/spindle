@@ -68,6 +68,10 @@ func (m Model) renderPlayer() string {
 	lines = append(lines, m.pad("", l))
 
 	lines = append(lines, m.body(l)...)
+
+	// A blank row before the bottom block, so the help never reads as one more
+	// entry in whatever list ends above it.
+	lines = append(lines, m.pad("", l))
 	if text, style, ok := m.notice(); ok {
 		lines = append(lines, m.pad(style.Render(text), l))
 	}

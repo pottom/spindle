@@ -251,6 +251,12 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.switchTab(m.tab.next(1))
 	case key.Matches(k, m.keys.PrevTab):
 		return m, m.switchTab(m.tab.next(-1))
+	case key.Matches(k, m.keys.GoTab) && m.tab != tabSearch:
+		// Not on the search tab: there the digits belong to the query, and a
+		// key that types on one screen must not navigate on it.
+		if t, ok := tabAt(k.String()); ok {
+			return m, m.switchTab(t)
+		}
 	}
 
 	if cmd, handled := m.deviceKey(k); handled {

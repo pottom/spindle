@@ -1,12 +1,15 @@
 package ui
 
 import (
+	"context"
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
 	"github.com/pottom/spindle/internal/player"
@@ -149,5 +152,73 @@ func TestHeaderKeepsTheTabsWhole(t *testing.T) {
 	}
 	if !strings.Contains(top, "…") {
 		t.Errorf("header row = %q, want the device name cut instead", top)
+	}
+}
+
+// The help belongs on the bottom row of the terminal with clear space above it.
+// Butted straight against a list it reads as one more entry in it.
+func TestHelpSitsOnTheLastRowWithSpaceAbove(t *testing.T) {
+	p := player.NewMock()
+	st, err := p.State(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	q, err := p.Queue(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, size := range [][2]int{{minWidth, minHeight}, {96, 28}, {120, 44}} {
+		for _, tab := range []tabID{tabPlayer, tabQueue, tabPlaylists, tabSearch} {
+			m := New(p, nil, defaultTestCell)
+			m.ps, m.tab, m.queue = st, tab, q.Upcoming
+			// A queue longer than the pane, so the list runs to the last row
+			// it is given and cannot leave a gap of its own.
+			for i := range 40 {
+				m.queue = append(m.queue, trackAt(fmt.Sprintf("f%d", i), "filler"))
+			}
+			m.width, m.height = size[0], size[1]
+			m.resize()
+
+			rows := strings.Split(ansiOff(m.render()), "\n")
+			if len(rows) != m.height {
+				t.Errorf("%dx%d %v: render() = %d rows, want %d", size[0], size[1], tab, len(rows), m.height)
+				continue
+			}
+			if strings.TrimSpace(rows[len(rows)-1]) == "" {
+				t.Errorf("%dx%d %v: last row is blank, want the help", size[0], size[1], tab)
+			}
+			if got := strings.TrimSpace(rows[len(rows)-2]); got != "" {
+				t.Errorf("%dx%d %v: row above the help = %q, want it blank", size[0], size[1], tab, got)
+			}
+		}
+	}
+}
+
+// The digits go straight to a screen, which is faster than tabbing round to it
+// — except on the search tab, where a digit is something you are typing.
+func TestDigitsSwitchTabs(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
+	if got := tm.(Model).tab; got != tabPlaylists {
+		t.Errorf("tab = %v after 3, want playlists", got)
+	}
+
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: '1', Text: "1"})
+	if got := tm.(Model).tab; got != tabPlayer {
+		t.Errorf("tab = %v after 1, want now playing", got)
+	}
+
+	// On the search tab the digit is a query, not a destination.
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: '4', Text: "4"})
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
+	got := tm.(Model)
+	if got.tab != tabSearch {
+		t.Errorf("tab = %v, want the digit to stay in the query", got.tab)
+	}
+	if q := got.search.input.Value(); q != "2" {
+		t.Errorf("query = %q, want the digit typed", q)
 	}
 }

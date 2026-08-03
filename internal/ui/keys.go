@@ -22,6 +22,8 @@ type keyMap struct {
 	// Navigation, shared by the browsing tabs.
 	NextTab key.Binding
 	PrevTab key.Binding
+	// GoTab is the digits: one per screen, in the order they are drawn.
+	GoTab   key.Binding
 	Up      key.Binding
 	Down    key.Binding
 	Enter   key.Binding
@@ -84,10 +86,14 @@ func newKeyMap() keyMap {
 
 		NextTab: key.NewBinding(
 			key.WithKeys("tab"),
-			key.WithHelp("tab", "switch tab"),
+			key.WithHelp("tab", "next tab"),
 		),
 		PrevTab: key.NewBinding(key.WithKeys("shift+tab")),
-		Up:      key.NewBinding(key.WithKeys("up", "ctrl+p")),
+		GoTab: key.NewBinding(
+			key.WithKeys("1", "2", "3", "4"),
+			key.WithHelp("1–4", "go to tab"),
+		),
+		Up: key.NewBinding(key.WithKeys("up", "ctrl+p")),
 		Down: key.NewBinding(
 			key.WithKeys("down", "ctrl+n"),
 			key.WithHelp("↑↓", "select"),
@@ -189,7 +195,7 @@ func (k keyMap) forReadOnlyQueue() tabKeys {
 			hint("?", "help"),
 		},
 		full: [][]key.Binding{
-			{k.Down, k.Enter, k.NextTab},
+			{k.Down, k.Enter, k.NextTab, k.GoTab},
 			{k.PlayPause, k.Next, k.Help, k.Quit},
 		},
 	}
@@ -208,7 +214,7 @@ func (k keyMap) forTab(t tabID) tabKeys {
 			},
 			full: [][]key.Binding{
 				{k.Down, k.Enter, k.Drop, k.MoveDn},
-				{k.PlayPause, k.Next, k.NextTab, k.Help},
+				{k.PlayPause, k.Next, k.NextTab, k.GoTab, k.Help},
 			},
 		}
 
@@ -223,7 +229,7 @@ func (k keyMap) forTab(t tabID) tabKeys {
 			},
 			full: [][]key.Binding{
 				{k.Down, k.Enter, k.Enqueue, k.Back, k.NextTab},
-				{k.PlayPause, k.Next, k.Help, k.Quit},
+				{k.GoTab, k.PlayPause, k.Next, k.Help, k.Quit},
 			},
 		}
 
@@ -252,7 +258,7 @@ func (k keyMap) forTab(t tabID) tabKeys {
 			},
 			full: [][]key.Binding{
 				{k.PlayPause, k.Next, k.SeekFwd, k.VolUp},
-				{k.Shuffle, k.Repeat, k.Devices, k.NextTab},
+				{k.Shuffle, k.Repeat, k.Devices, k.NextTab, k.GoTab},
 				{k.Quit, k.QuitAll},
 			},
 		}
