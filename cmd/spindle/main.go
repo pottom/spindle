@@ -31,14 +31,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	renderer, err := coverRenderer(*backend)
+	cell := cover.DetectCellSize(os.Stdout)
+	renderer, err := coverRenderer(*backend, cell)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "spindle:", err)
 		os.Exit(1)
 	}
 	loader := cover.NewLoader(renderer, &http.Client{Timeout: 15 * time.Second})
 
-	if _, err := tea.NewProgram(ui.New(player.NewMock(), loader)).Run(); err != nil {
+	if _, err := tea.NewProgram(ui.New(player.NewMock(), loader, cell)).Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "spindle:", err)
 		os.Exit(1)
 	}
@@ -47,9 +48,7 @@ func main() {
 // coverRenderer picks the artwork backend. The terminal is probed before Bubble
 // Tea claims it, so the query and its reply cannot collide with the event loop's
 // own input handling.
-func coverRenderer(backend string) (cover.Renderer, error) {
-	cell := cover.DetectCellSize(os.Stdout)
-
+func coverRenderer(backend string, cell cover.CellSize) (cover.Renderer, error) {
 	switch backend {
 	case "halfblock":
 		return cover.NewHalfblock(cell), nil

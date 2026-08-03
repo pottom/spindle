@@ -11,26 +11,40 @@ import (
 	"github.com/pottom/spindle/internal/player"
 )
 
-// barRune fills both halves of the progress bar; only the colour differs between
-// the played and the remaining part.
-const barRune = '━'
-
-// Transport glyphs. SCREENS.md 4.1.
+// Glyphs. The screen carries no box drawing: hierarchy comes from colour and
+// space, so the only line work is the progress and volume meters.
 const (
 	iconPrev  = "⏮"
 	iconPlay  = "⏵"
 	iconPause = "⏸"
 	iconNext  = "⏭"
-	deviceDot = "●"
+	iconShuf  = "⇄"
+	iconRep   = "↻"
 
-	// noCoverGlyph stands in for artwork that could not be loaded. SCREENS.md 4.2.
+	meterFull  = "━"
+	meterEmpty = "─"
+	knob       = "●"
+	deviceDot  = "●"
+
+	// noCoverGlyph stands in for artwork that could not be loaded.
 	noCoverGlyph = "♪"
+
+	// volumeCells is the width of the little bar beside the volume reading.
+	volumeCells = 8
 )
 
 func (m Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
+	v.WindowTitle = m.windowTitle()
 	return v
+}
+
+func (m Model) windowTitle() string {
+	if m.ps == nil || m.ps.Title == "" {
+		return "spindle"
+	}
+	return m.ps.Title + " · " + strings.Join(m.ps.Artists, ", ")
 }
 
 func (m Model) render() string {
@@ -44,191 +58,174 @@ func (m Model) render() string {
 }
 
 func (m Model) renderPlayer() string {
-	l := computeLayout(m.width, m.height, m.helpHeight(), m.err != nil)
-	f := frame{styles: m.styles, width: l.frameWidth}
+	l := m.layout()
 
-	lines := []string{f.top(m.deviceLabel(), m.deviceStyle())}
-	for _, row := range m.body(l) {
-		lines = append(lines, f.row(row))
-	}
+	lines := m.body(l)
 	if m.err != nil {
-		lines = append(lines, f.separator())
-		lines = append(lines, f.row(" "+m.styles.Error.Render("✕ "+m.err.Error())))
+		lines = append(lines, m.pad(m.styles.Error.Render("✕ "+m.err.Error()), l))
 	}
-	lines = append(lines, f.separator())
 	for _, row := range strings.Split(m.help.View(m.keys), "\n") {
-		lines = append(lines, f.row(" "+row))
+		lines = append(lines, m.pad(row, l))
 	}
-	lines = append(lines, f.bottom())
 
 	return lipgloss.PlaceHorizontal(m.width, lipgloss.Center, strings.Join(lines, "\n"))
 }
 
-// body returns exactly bodyHeight interior lines: the artwork box beside the
-// track information, with the leftover height below it.
+// pad indents one line to the left margin and squares it off to the content
+// width, so every row of the screen is the same length.
+func (m Model) pad(s string, l layout) string {
+	return fit(strings.Repeat(" ", leftMargin)+s, l.interior)
+}
+
+// body is everything above the help bar: the artwork beside the track
+// information, centred in what is left once the status line has its row.
 func (m Model) body(l layout) []string {
-	var lines []string
+	var block []string
 	if m.ps == nil {
-		lines = []string{"", "  " + m.styles.Detail.Render("Connecting…")}
+		block = []string{m.styles.Detail.Render("Connecting…")}
 	} else {
-		art := m.coverBox()
-		info := m.infoColumn(l.infoWidth)
-		margin := strings.Repeat(" ", leftMargin)
+		art := m.artwork(l)
+		info := stack(m.infoBlock(l.infoWidth), l.infoWidth, l.artHeight)
 		gap := strings.Repeat(" ", columnGap)
 
-		lines = make([]string, coverBoxHeight)
-		for i := range lines {
-			lines[i] = margin + art[i] + gap + info[i]
+		block = make([]string, len(art))
+		for i := range art {
+			block[i] = art[i] + gap + info[i]
 		}
 	}
 
-	// A blank line above the block, but only while there is height to spare:
-	// when the expanded help squeezes the player, the artwork matters more.
-	if len(lines) < l.bodyHeight {
-		lines = append([]string{""}, lines...)
+	lines := make([]string, 0, l.bodyHeight)
+	top := max((l.bodyHeight-1-len(block))/2, 0)
+	for range top {
+		lines = append(lines, m.pad("", l))
 	}
-	for len(lines) < l.bodyHeight {
-		lines = append(lines, "")
+	for _, row := range block {
+		lines = append(lines, m.pad(row, l))
+	}
+	for len(lines) < l.bodyHeight-1 {
+		lines = append(lines, m.pad("", l))
+	}
+	if len(lines) < l.bodyHeight {
+		lines = append(lines, m.pad(m.statusLine(), l))
 	}
 	return lines[:l.bodyHeight]
 }
 
-// coverBox draws the bordered artwork box: coverBoxHeight lines, each exactly
-// coverBoxWidth cells wide. The box never changes size, so nothing in the layout
-// moves when a cover finishes loading.
-func (m Model) coverBox() []string {
-	b := m.styles.Border
-	rule := m.styles.Rule
-	edge := strings.Repeat(b.Top, coverCells)
-
-	lines := make([]string, 0, coverBoxHeight)
-	lines = append(lines, rule.Render(b.TopLeft+edge+b.TopRight))
-	for _, row := range m.coverContent() {
-		lines = append(lines, rule.Render(b.Left)+row+rule.Render(b.Right))
-	}
-	return append(lines, rule.Render(b.BottomLeft+edge+b.BottomRight))
-}
-
-// coverContent is the interior of the artwork box: the artwork itself, a spinner
-// while it downloads, or a single note glyph when there is none.
-func (m Model) coverContent() []string {
+// artwork is the cover area: the picture itself, a spinner while it downloads,
+// or a single note glyph when there is none. The area is reserved whatever it
+// holds, so nothing moves when a cover finishes loading.
+func (m Model) artwork(l layout) []string {
 	switch {
 	case m.cover.art != "":
-		return center(strings.Split(m.cover.art, "\n"), coverCells, coverRows)
+		return center(strings.Split(m.cover.art, "\n"), l.artWidth, l.artHeight)
 	case m.cover.loading():
-		return center([]string{m.spinner.View()}, coverCells, coverRows)
+		return center([]string{m.spinner.View()}, l.artWidth, l.artHeight)
 	default:
-		return center([]string{m.styles.NoCover.Render(noCoverGlyph)}, coverCells, coverRows)
+		return center([]string{m.styles.NoCover.Render(noCoverGlyph)}, l.artWidth, l.artHeight)
 	}
 }
 
-// infoColumn is the right-hand column, always coverBoxHeight lines tall so the
-// layout cannot jump when a field is empty.
-func (m Model) infoColumn(w int) []string {
-	s := m.styles
-	ps := m.ps
+// infoBlock is the text beside the artwork, as a compact run of lines. The
+// caller centres it against the cover rather than stretching it, so the two
+// columns read as one composition instead of two edges with a hole between them.
+func (m Model) infoBlock(w int) []string {
+	s, ps := m.styles, m.ps
 
-	rows := make([]string, coverBoxHeight)
-	rows[0] = s.Title.Render(ps.Title)
-	rows[1] = s.Artist.Render(strings.Join(ps.Artists, ", "))
-	rows[2] = s.Album.Render(ps.Album)
-	rows[5] = m.progressBar(w)
-	rows[6] = m.timeRow(w)
-	rows[9] = m.transportRow()
-	rows[10] = padLeft(s.Volume.Render(fmt.Sprintf("vol %d", ps.Volume)), w)
-
-	for i, row := range rows {
-		rows[i] = fit(row, w)
+	return []string{
+		s.Title.Render(ps.Title),
+		s.Artist.Render(strings.Join(ps.Artists, ", ")),
+		s.Album.Render(ps.Album),
+		"",
+		"",
+		m.progressLine(w),
+		spread(
+			s.Time.Render(formatDuration(m.localProgress)),
+			s.Time.Render(formatDuration(ps.Duration)),
+			w,
+		),
+		"",
+		"",
+		m.transportLine(w),
 	}
-	return rows
 }
 
-func (m Model) progressBar(w int) string {
-	bar := m.progress
-	bar.SetWidth(w)
-	bar.EmptyColor = m.styles.Theme.Border
-	bar.FullColor = m.styles.Theme.Accent
+// progressLine is a thin rule with the playhead riding on it. Paused, the whole
+// thing goes grey: the state has to be readable without hunting for an icon.
+func (m Model) progressLine(w int) string {
+	elapsed, remaining := m.styles.Elapsed, m.styles.Knob
 	if !m.ps.Playing {
-		bar.FullColor = m.styles.Theme.Muted
+		elapsed, remaining = m.styles.Time, m.styles.Time
 	}
 
-	var percent float64
+	var fraction float64
 	if m.ps.Duration > 0 {
-		percent = min(float64(m.localProgress)/float64(m.ps.Duration), 1)
+		fraction = min(float64(m.localProgress)/float64(m.ps.Duration), 1)
 	}
-	return bar.ViewAs(percent)
+
+	// The playhead takes a cell of its own, so the bar is one shorter.
+	bar := max(w-1, 1)
+	filled := min(max(int(fraction*float64(bar)+0.5), 0), bar)
+	return elapsed.Render(strings.Repeat(meterFull, filled)) +
+		remaining.Render(knob) +
+		m.styles.Remaining.Render(strings.Repeat(meterEmpty, bar-filled))
 }
 
-func (m Model) timeRow(w int) string {
-	left := m.styles.Time.Render(formatDuration(m.localProgress))
-	right := m.styles.Time.Render(formatDuration(m.ps.Duration))
-	gap := max(w-lipgloss.Width(left)-lipgloss.Width(right), 1)
-	return left + strings.Repeat(" ", gap) + right
-}
-
-func (m Model) transportRow() string {
+// transportLine holds the transport icons, the shuffle and repeat state, and the
+// volume, all on one row.
+func (m Model) transportLine(w int) string {
 	s := m.styles
+
 	playPause := iconPause
 	if !m.ps.Playing {
 		playPause = iconPlay
 	}
+	transport := s.Controls.Render(iconPrev + "   " + playPause + "   " + iconNext)
 
-	transport := s.Controls.Render(iconPrev + "  " + playPause + "  " + iconNext)
-	return transport +
-		s.Rule.Render(" "+s.Border.Left+" ") +
-		m.toggle("shuf", m.ps.Shuffle) + "  " +
-		m.toggle("rep", m.ps.Repeat != player.RepeatOff)
+	// Both toggles keep a fixed two-cell slot, so turning one on cannot nudge
+	// the rest of the row sideways.
+	shuffle := s.ToggleOff.Render(iconShuf + " ")
+	if m.ps.Shuffle {
+		shuffle = s.ToggleOn.Render(iconShuf + " ")
+	}
+	repeat := s.ToggleOff.Render(iconRep + " ")
+	switch m.ps.Repeat {
+	case player.RepeatContext:
+		repeat = s.ToggleOn.Render(iconRep + " ")
+	case player.RepeatTrack:
+		repeat = s.ToggleOn.Render(iconRep + "1")
+	}
+
+	volume := meter(float64(m.ps.Volume)/100, volumeCells, s.MeterOn, s.MeterOff) +
+		s.Volume.Render(fmt.Sprintf(" %d", m.ps.Volume))
+
+	return spread(transport+"    "+shuffle+"  "+repeat, volume, w)
 }
 
-// toggle renders a shuffle or repeat label: Accent when on, Faint when off.
-func (m Model) toggle(label string, on bool) string {
-	text := label + " off"
-	if on {
-		text = label + " on"
-	}
-	if label == "rep" && m.ps.Repeat != player.RepeatOff {
-		text = label + " " + m.ps.Repeat
-	}
-	if on {
-		return m.styles.ToggleOn.Render(text)
-	}
-	return m.styles.ToggleOff.Render(text)
-}
-
-func (m Model) deviceLabel() string {
+// statusLine names the device on the left and leaves the right to whatever the
+// screen still owes the user.
+func (m Model) statusLine() string {
 	if m.ps == nil || m.ps.DeviceName == "" {
 		return ""
 	}
-	return deviceDot + " " + m.ps.DeviceName
-}
 
-func (m Model) deviceStyle() lipgloss.Style {
-	if m.ps != nil && m.ps.Playing {
-		return m.styles.DeviceOn
+	device := m.styles.DeviceOff
+	if m.ps.Playing {
+		device = m.styles.DeviceOn
 	}
-	return m.styles.DeviceOff
+	return device.Render(deviceDot + " " + m.ps.DeviceName)
 }
 
 func (m Model) renderTooSmall() string {
-	if m.width < tooSmallMinWidth || m.height < tooSmallBoxHeight {
-		return m.styles.Heading.Render(fmt.Sprintf("need %dx%d", minWidth, minHeight))
-	}
-
 	lines := []string{
+		m.styles.Heading.Render("Window too small"),
 		"",
-		"  " + m.styles.Heading.Render("Window too small"),
-		"",
-		"  " + m.styles.Detail.Render(fmt.Sprintf("current:  %d × %d", m.width, m.height)),
-		"  " + m.styles.Detail.Render(fmt.Sprintf("needed:   %d × %d", minWidth, minHeight)),
-		"",
+		m.styles.Detail.Render(fmt.Sprintf("current   %d × %d", m.width, m.height)),
+		m.styles.Detail.Render(fmt.Sprintf("needed    %d × %d", minWidth, minHeight)),
 	}
-	box := lipgloss.NewStyle().
-		Border(m.styles.Border).
-		BorderForeground(m.styles.Theme.Border).
-		Width(min(tooSmallBoxWidth, m.width)).
-		Render(strings.Join(lines, "\n"))
-
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+	if m.width < 26 {
+		lines = []string{m.styles.Heading.Render(fmt.Sprintf("need %dx%d", minWidth, minHeight))}
+	}
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, strings.Join(lines, "\n"))
 }
 
 // helpHeight is how many lines the help bar currently occupies.

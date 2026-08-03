@@ -17,10 +17,11 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = message.Width, message.Height
 		m.resize()
-		return m, nil
+		return m, m.syncCover()
 
 	case tea.BackgroundColorMsg:
-		m.applyBackground(message.IsDark())
+		m.isDark = message.IsDark()
+		m.restyle()
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -35,13 +36,15 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.syncCover()
 
 	case msg.CoverReady:
-		if message.URL == m.cover.url {
-			m.cover.art = message.Art
+		if m.cover.matches(message.URL, message.Width, message.Height) {
+			m.cover.art = message.Art.Cells
+			m.cover.accent, m.cover.hasAccent = message.Art.Accent, message.Art.HasAccent
+			m.restyle()
 		}
 		return m, nil
 
 	case msg.CoverFailed:
-		if message.URL == m.cover.url {
+		if m.cover.matches(message.URL, message.Width, message.Height) {
 			m.cover.failed = true
 		}
 		return m, nil
@@ -69,9 +72,7 @@ func (m *Model) resize() {
 	if !fitsMinimum(m.width, m.height) {
 		return
 	}
-	l := computeLayout(m.width, m.height, m.helpHeight(), m.err != nil)
-	m.help.SetWidth(l.interior - 2)
-	m.progress.SetWidth(l.infoWidth)
+	m.help.SetWidth(min(m.width, maxFrameWidth) - leftMargin - rightMargin)
 }
 
 // handleTick advances the local clock and resynchronises every fifth second.
@@ -120,9 +121,11 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case key.Matches(k, m.keys.Help):
+		// Expanding the help shortens the body, which shrinks the artwork, so
+		// the cover has to be rendered again at the new size.
 		m.help.ShowAll = !m.help.ShowAll
 		m.resize()
-		return m, nil
+		return m, m.syncCover()
 	}
 
 	if m.ps == nil {
@@ -186,20 +189,34 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// syncCover starts an artwork load when the track's cover has changed. The
-// artwork box is a fixed size, so a resize never invalidates what is loaded.
+// syncCover starts an artwork load whenever the cover or the area it has to fill
+// has changed. The artwork now scales with the window, so a resize invalidates
+// what was rendered just as a track change does.
 func (m *Model) syncCover() tea.Cmd {
-	if m.ps == nil || m.covers == nil || m.ps.CoverURL == m.cover.url {
+	if m.ps == nil || m.covers == nil || !fitsMinimum(m.width, m.height) {
 		return nil
 	}
 
-	m.cover = coverState{url: m.ps.CoverURL}
+	l := m.layout()
+	if m.cover.matches(m.ps.CoverURL, l.artWidth, l.artHeight) {
+		return nil
+	}
+
+	// Keep the accent from the outgoing cover until the new one arrives, so the
+	// palette does not flash back to its default mid-swap.
+	m.cover = coverState{
+		url:       m.ps.CoverURL,
+		width:     l.artWidth,
+		height:    l.artHeight,
+		accent:    m.cover.accent,
+		hasAccent: m.cover.hasAccent,
+	}
 	if m.cover.url == "" {
 		m.cover.failed = true
 		return nil
 	}
 	return tea.Batch(
-		coverCmd(m.covers, m.cover.url, coverCells, coverRows),
+		coverCmd(m.covers, m.cover.url, l.artWidth, l.artHeight),
 		m.spinner.Tick,
 	)
 }

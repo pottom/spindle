@@ -1,17 +1,17 @@
 package style
 
-import "charm.land/lipgloss/v2"
+import (
+	"image/color"
 
-// Styles is every Lipgloss style the UI renders with, derived from a Theme.
+	"charm.land/lipgloss/v2"
+)
+
+// Styles is every Lipgloss style the UI renders with. The accent is not fixed:
+// it is taken from the album artwork, so the whole screen picks up the colour of
+// whatever is playing.
 type Styles struct {
 	Theme  Theme
-	Border lipgloss.Border
-
-	// Frame.
-	Rule      lipgloss.Style // border runes
-	AppName   lipgloss.Style // "spindle" in the top border
-	DeviceOn  lipgloss.Style // device dot and name while playing
-	DeviceOff lipgloss.Style // device dot and name while paused
+	Accent color.Color
 
 	// Track information.
 	Title  lipgloss.Style
@@ -19,47 +19,67 @@ type Styles struct {
 	Album  lipgloss.Style
 	Time   lipgloss.Style
 
+	// Progress line.
+	Elapsed   lipgloss.Style
+	Remaining lipgloss.Style
+	Knob      lipgloss.Style
+
 	// Transport row.
 	Controls  lipgloss.Style
 	ToggleOn  lipgloss.Style
 	ToggleOff lipgloss.Style
+	MeterOn   lipgloss.Style
+	MeterOff  lipgloss.Style
 	Volume    lipgloss.Style
 
-	// Artwork box.
-	NoCover lipgloss.Style
+	// Status line.
+	DeviceOn  lipgloss.Style
+	DeviceOff lipgloss.Style
+	Help      lipgloss.Style
 
-	// Standalone screens and banners.
+	// Artwork area and standalone screens.
+	NoCover lipgloss.Style
 	Heading lipgloss.Style
 	Detail  lipgloss.Style
 	Error   lipgloss.Style
 }
 
-// New builds the styles for the given terminal background.
-func New(isDark bool) Styles {
+// New builds the styles for the given terminal background. A nil accent falls
+// back to the theme's own, for the moments before any artwork has loaded.
+func New(isDark bool, accent color.Color) Styles {
 	t := NewTheme(isDark)
+	if accent == nil {
+		accent = t.Accent
+	}
+	fg := func(c color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(c) }
+
 	return Styles{
 		Theme:  t,
-		Border: lipgloss.NormalBorder(),
+		Accent: accent,
 
-		Rule:      lipgloss.NewStyle().Foreground(t.Border),
-		AppName:   lipgloss.NewStyle().Foreground(t.Text),
-		DeviceOn:  lipgloss.NewStyle().Foreground(t.Accent),
-		DeviceOff: lipgloss.NewStyle().Foreground(t.Muted),
+		Title:  fg(t.Text).Bold(true),
+		Artist: fg(accent),
+		Album:  fg(t.Muted),
+		Time:   fg(t.Muted),
 
-		Title:  lipgloss.NewStyle().Foreground(t.Text),
-		Artist: lipgloss.NewStyle().Foreground(t.Accent),
-		Album:  lipgloss.NewStyle().Foreground(t.Muted),
-		Time:   lipgloss.NewStyle().Foreground(t.Muted),
+		Elapsed:   fg(accent),
+		Remaining: fg(t.Border),
+		Knob:      fg(accent),
 
-		Controls:  lipgloss.NewStyle().Foreground(t.Text),
-		ToggleOn:  lipgloss.NewStyle().Foreground(t.Accent),
-		ToggleOff: lipgloss.NewStyle().Foreground(t.Faint),
-		Volume:    lipgloss.NewStyle().Foreground(t.Text),
+		Controls:  fg(t.Text),
+		ToggleOn:  fg(accent),
+		ToggleOff: fg(t.Faint),
+		MeterOn:   fg(t.Muted),
+		MeterOff:  fg(t.Border),
+		Volume:    fg(t.Muted),
 
-		NoCover: lipgloss.NewStyle().Foreground(t.Faint),
+		DeviceOn:  fg(accent),
+		DeviceOff: fg(t.Faint),
+		Help:      fg(t.Faint),
 
-		Heading: lipgloss.NewStyle().Foreground(t.Text),
-		Detail:  lipgloss.NewStyle().Foreground(t.Muted),
-		Error:   lipgloss.NewStyle().Foreground(t.Error),
+		NoCover: fg(t.Faint),
+		Heading: fg(t.Text),
+		Detail:  fg(t.Muted),
+		Error:   fg(t.Error),
 	}
 }

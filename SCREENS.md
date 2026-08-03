@@ -7,10 +7,16 @@ authoritative.** Where they disagree, the table wins.
 
 **The terminal background stays the user's background.** Never paint a full-screen
 background — it looks wrong in every theme and defeats the user's transparency
-settings. Set foreground colours and borders only.
+settings. Set foreground colours only.
 
-**One accent colour.** Green means "active / happening now". Nothing else is green.
-If three things are green, none of them is emphasised.
+**No frames.** Hierarchy comes from colour, weight and whitespace. Box drawing is
+reserved for things that are genuinely meters: the progress line and the volume
+bar. A terminal full of `┌──┐` reads as a form, not as a player.
+
+**The accent colour comes from the album.** Each cover is sampled for the hue it
+reads as, and that colour drives the artist name, the played part of the progress
+line, the active toggles and the device dot. The screen changes character with the
+music. Nothing else is coloured, so the accent always means "this, now".
 
 **Icons need an ASCII fallback.** `⏸ ⏭ ⏮` are missing from many fonts. Under
 `--ascii`, use `||`, `>>`, `<<`.
@@ -19,86 +25,109 @@ If three things are green, none of them is emphasised.
 
 ## 2. Palette
 
-Use Lipgloss `AdaptiveColor` so light terminals stay readable.
+The base palette is fixed; the accent is not. `internal/ui/style` resolves both
+against the terminal background, which Bubble Tea reports as `BackgroundColorMsg`.
 
 | Role | Dark | Light | Used for |
 |------|------|-------|----------|
-| `Accent` | `#1DB954` | `#128A3E` | active device dot, artist name, filled progress, focused element |
-| `AccentDim` | `#14833B` | `#1DB954` | unfocused accent |
-| `Text` | `#E8E8E8` | `#1A1A1A` | track title, volume value |
-| `Muted` | `#8B949E` | `#57606A` | album name, timestamps |
-| `Faint` | `#484F58` | `#8C959F` | help bar, disabled shuffle/repeat |
-| `Border` | `#30363D` | `#D0D7DE` | frames, separators, empty progress |
-| `BorderFocus` | `#1DB954` | `#128A3E` | focused overlay frame |
-| `Error` | `#F85149` | `#CF222E` | error banner |
-| `Warning` | `#D29922` | `#9A6700` | rate limit, offline banner |
+| `Accent` | from the artwork, else `#1DB954` | from the artwork, else `#128A3E` | artist name, played progress, active toggles, device dot |
+| `Text` | `#E8E8E8` | `#1A1A1A` | track title |
+| `Muted` | `#8B949E` | `#57606A` | album name, timestamps, volume |
+| `Faint` | `#484F58` | `#8C959F` | help bar, inactive toggles, missing cover |
+| `Border` | `#30363D` | `#D0D7DE` | unplayed progress, empty volume |
+| `Error` | `#F85149` | `#CF222E` | error line |
+| `Warning` | `#D29922` | `#9A6700` | rate limit, offline |
 
-All of this lives in `internal/ui/style/style.go` as a `Theme` struct. No hex codes
-appear in `View()`.
+An artwork accent is pushed to a lightness that stands out against the background
+and given a saturation floor, so a muddy sleeve still yields something readable. A
+cover with no usable colour at all keeps the default green.
+
+No hex codes appear in `View()`.
 
 ## 3. Dimensions
 
 | Element | Value |
 |---------|-------|
 | Minimum terminal | 64 × 20 |
-| Outer frame | full width, capped at 100 columns, centred above that |
-| Artwork | 20 × 10 cells |
-| Left margin | 2 |
+| Content width | full width, capped at 100 columns, centred above that |
+| Artwork | scales with the window: as tall as the body allows, never wider than half the content, always square on screen |
+| Left margin | 3 |
+| Right margin | 2 |
 | Gap between artwork and info | 3 |
-| Info column | remainder, minimum 28 |
-| Help bar | 1 line, separator above |
+| Info column | remainder, minimum 32 |
+| Status line | 1 line at the foot of the body |
+| Help bar | 1 line, or 4 when expanded |
 
 Above 100 columns the layout must not stretch. A full-width TUI on an ultrawide
 monitor is unreadable.
+
+Squareness needs the pixel size of a cell, which is why `cover.DetectCellSize`
+feeds the layout: a 41px-tall cell needs roughly 2.4 columns per row to look square.
 
 ## 4. Screens
 
 ### 4.1 Player — the main screen
 
 ```
-┌─ spindle ────────────────────────────── ● MacBook Pro ─┐
-│                                                        │
-│  ┌──────────────────┐   Bohemian Rhapsody              │
-│  │                  │   Queen                          │
-│  │                  │   A Night at the Opera           │
-│  │   ALBUM ART      │                                  │
-│  │   20 × 10        │   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━   │
-│  │                  │   2:14                     5:55  │
-│  │                  │                                  │
-│  └──────────────────┘   ⏮  ⏸  ⏭ │ shuf off  rep off   │
-│                                          vol 72        │
-│                                                        │
-├────────────────────────────────────────────────────────┤
-│ space play/pause · n/p track · ←→ seek · d devices · ? │
-└────────────────────────────────────────────────────────┘
+
+   ████████████████████████████████████
+   ████████████████████████████████████
+   ████████████████████████████████████
+   ████████████████████████████████████   Bohemian Rhapsody
+   ████████████████████████████████████   Queen
+   ████████████████████████████████████   A Night at the Opera
+   ████████████████████████████████████
+   ████████████████████████████████████
+   ████████████████████████████████████   ━━━━━━●───────────────────────
+   ████████████████████████████████████   2:14                     5:55
+   ████████████████████████████████████
+   ████████████████████████████████████
+   ████████████████████████████████████   ⏮   ⏸   ⏭    ⇄   ↻   ━━━━━── 72
+   ████████████████████████████████████
+   ████████████████████████████████████
+
+   ● MacBook Pro
+   space play/pause · n/p track · ←→ seek · ? help
 ```
 
-- Title in `Text`, artist in `Accent`, album in `Muted`. This three-level hierarchy
-  carries the rhythm of the whole screen.
+- Title in `Text` and bold, artist in the album accent, album in `Muted`. That
+  three-level hierarchy carries the whole screen; nothing else competes.
+- The text block is centred against the artwork rather than stretched to its
+  height. Two columns anchored at their extremes with a hole between them reads as
+  a bug; a centred block reads as a decision.
 - Long titles truncate with `…`. **Never wrap** — wrapping changes height, and
   height changes make the layout jump.
-- Filled progress is `Accent`, empty is `Border`.
-- **When paused, the progress bar turns `Muted`.** State should be readable at a
-  glance, not only from a 3-character icon.
-- Shuffle and repeat labels are `Faint` when off, `Accent` when on.
-- Device name sits in the top border, preceded by `●`: `Accent` when playing,
-  `Muted` when paused.
+- The progress line is a rule with the playhead `●` riding on it: played part in
+  the accent, the rest in `Border`. **Paused, the whole line goes `Muted`,**
+  playhead included. State has to be readable at a glance, not only from an icon.
+- Shuffle `⇄` and repeat `↻` sit in fixed two-cell slots, `Faint` when off and
+  accent when on, so turning one on cannot nudge the row sideways. Repeat-one is
+  `↻1`.
+- Volume is a short meter in `Muted` over `Border`, with the number beside it.
+- The device sits on the status line at the foot: `●` in the accent while playing,
+  `Faint` when paused.
+- The window title carries `Title · Artist`, so the app stays identifiable without
+  spending a row on its own name.
 
 ### 4.2 Artwork loading
 
-```
-│  ┌──────────────────┐   Bohemian Rhapsody              │
-│  │                  │   Queen                          │
-│  │        ⠋         │   A Night at the Opera           │
-```
+Spinner centred in the artwork area. **The area does not change size** — if the
+placeholder were smaller than the image, the layout would jump when loading
+finishes.
 
-Spinner centred in the artwork box. **The box does not change size** — if the
-placeholder were smaller than the image, the layout would jump when loading finishes.
+If the download fails, replace the spinner with `♪` in `Faint`. Do not show an
+error message; a missing cover is not important enough to interrupt use.
 
-If the download fails, replace the spinner with `♪` in `Faint`. Do not show an error
-message; a missing cover is not important enough to interrupt use.
+The artwork is re-rendered whenever the area changes size, which means on a window
+resize and when the expanded help pushes the body shorter. Until the new render
+arrives the area shows the spinner again, and the accent from the outgoing cover is
+kept so the palette does not flash back to its default mid-swap.
 
 ### 4.3 No active device
+
+Not built yet — M2 and M4. The drawings in 4.3 to 4.6 predate the move away from
+frames and are kept for their content, not their chrome: when these screens are
+built they take the frameless treatment of 4.1.
 
 This is **not an error screen**. It is the most common entry point.
 
@@ -177,14 +206,13 @@ the only path that works, and `xdg-open` fails silently there.
 
 ### 4.6 Status banner
 
-Not a separate screen: one line above the help bar, player still visible beneath.
+Not a separate screen: one line between the player and the help bar, player still
+visible above it.
 
 ```
-├────────────────────────────────────────────────────────┤
-│ ⚠ Offline — retrying in 8s                             │
-├────────────────────────────────────────────────────────┤
-│ space play/pause · n/p track · ←→ seek · d devices · ? │
-└────────────────────────────────────────────────────────┘
+   ● MacBook Pro
+   ⚠ Offline — retrying in 8s
+   space play/pause · n/p track · ←→ seek · ? help
 ```
 
 | Condition | Colour | Text |
@@ -199,32 +227,29 @@ The banner **clears itself** when the cause resolves. It never needs acknowledgi
 
 ### 4.7 Terminal too small
 
+Centred in the window, nothing else on screen.
+
 ```
-┌──────────────────────────┐
-│                          │
-│  Window too small        │
-│                          │
-│  current:  52 × 16       │
-│  needed:   64 × 20       │
-│                          │
-└──────────────────────────┘
+                    Window too small
+
+                    current   52 × 16
+                    needed    64 × 20
 ```
 
-Updates live while resizing. Below 26 columns, drop the frame and show only
-`need 64x20`.
+Updates live while resizing. Below 26 columns there is no room for the table, so
+show only `need 64x20`.
 
 ### 4.8 Expanded help
 
-`?` expands the help bar into a full table; the player compresses above it.
+`?` expands the help bar into a full table; the body compresses above it, which
+also shrinks the artwork and triggers a re-render at the new size.
 
 ```
-├────────────────────────────────────────────────────────┤
-│  space   play / pause      s      shuffle              │
-│  n / p   next / previous   r      cycle repeat         │
-│  ← / →   seek ∓5s          d      devices              │
-│  ↑ / ↓   volume ±5         ?      close help           │
-│                            q      quit                 │
-└────────────────────────────────────────────────────────┘
+   ● MacBook Pro
+   space play / pause       s shuffle
+   n / p next / previous    r cycle repeat
+   ← / → seek ∓5s           ? help
+   ↑ / ↓ volume ±5          q quit
 ```
 
 The `bubbles/help` component does this natively with a `ShortHelp` / `FullHelp`
@@ -245,11 +270,13 @@ are the primary enemy of kitty artwork placement.
 
 ## 6. Implementation checklist
 
-- [ ] Every colour readable in a light terminal
-- [ ] Layout holds at 64×20; at 63×20 the "too small" screen appears
-- [ ] Long track titles truncate, never wrap
+- [x] Every colour readable in a light terminal
+- [x] Layout holds at 64×20; at 63×20 the "too small" screen appears
+- [x] Long track titles truncate, never wrap
 - [ ] Usable with `--ascii` in a font without box-drawing glyphs
-- [ ] Artwork box is the same size while loading
-- [ ] Paused state readable at a glance, not only from the icon
+- [x] Artwork area is the same size while loading
+- [x] Paused state readable at a glance, not only from the icon
+- [x] An artwork accent stays readable on both light and dark backgrounds
+- [x] The artwork stays square whatever the cell aspect ratio
 - [ ] The no-device screen explains why the list may be empty
 - [ ] The status banner clears itself

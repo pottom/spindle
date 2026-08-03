@@ -5,58 +5,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-
-	"github.com/pottom/spindle/internal/ui/style"
 )
-
-const appName = "spindle"
-
-// frame draws the outer chrome of SCREENS.md 4.1 one line at a time, so the
-// content rows stay plain strings the rest of the view can compose freely.
-type frame struct {
-	styles style.Styles
-	width  int // including both border columns
-}
-
-// top renders the header, optionally with a right-aligned label such as the
-// active device.
-func (f frame) top(right string, rightStyle lipgloss.Style) string {
-	b := f.styles.Border
-	head := b.Top + " " + appName + " "
-	tail := ""
-	if right != "" {
-		tail = " " + right + " " + b.Top
-	}
-	fill := max(f.width-2-lipgloss.Width(head)-lipgloss.Width(tail), 0)
-
-	var sb strings.Builder
-	sb.WriteString(f.styles.Rule.Render(b.TopLeft + b.Top + " "))
-	sb.WriteString(f.styles.AppName.Render(appName))
-	sb.WriteString(f.styles.Rule.Render(" " + strings.Repeat(b.Top, fill)))
-	if right != "" {
-		sb.WriteString(f.styles.Rule.Render(" "))
-		sb.WriteString(rightStyle.Render(right))
-		sb.WriteString(f.styles.Rule.Render(" " + b.Top))
-	}
-	sb.WriteString(f.styles.Rule.Render(b.TopRight))
-	return sb.String()
-}
-
-// row wraps one line of content, fitting it to the interior width.
-func (f frame) row(content string) string {
-	b := f.styles.Border
-	return f.styles.Rule.Render(b.Left) + fit(content, f.width-2) + f.styles.Rule.Render(b.Right)
-}
-
-func (f frame) separator() string {
-	b := f.styles.Border
-	return f.styles.Rule.Render(b.MiddleLeft + strings.Repeat(b.Top, f.width-2) + b.MiddleRight)
-}
-
-func (f frame) bottom() string {
-	b := f.styles.Border
-	return f.styles.Rule.Render(b.BottomLeft + strings.Repeat(b.Top, f.width-2) + b.BottomRight)
-}
 
 // fit truncates s with an ellipsis and pads it out to exactly w cells. Styled
 // input is handled: widths and cuts are ANSI-aware. A string that already fits
@@ -71,6 +20,28 @@ func fit(s string, w int) string {
 		width = lipgloss.Width(s)
 	}
 	return s + strings.Repeat(" ", max(w-width, 0))
+}
+
+// spread puts left and right on one line of w cells with the gap between them.
+func spread(left, right string, w int) string {
+	gap := max(w-lipgloss.Width(left)-lipgloss.Width(right), 1)
+	return fit(left+strings.Repeat(" ", gap)+right, w)
+}
+
+// stack centres lines vertically in an h-row block of w cells, leaving them left
+// aligned. Used for text, where centring the lines themselves would look sloppy.
+func stack(lines []string, w, h int) []string {
+	out := make([]string, h)
+	top := max((h-len(lines))/2, 0)
+	for i := range out {
+		row := i - top
+		if row >= 0 && row < len(lines) {
+			out[i] = fit(lines[row], w)
+			continue
+		}
+		out[i] = strings.Repeat(" ", w)
+	}
+	return out
 }
 
 // center places lines in the middle of a w × h block, padding the rest with
@@ -88,14 +59,20 @@ func center(lines []string, w, h int) []string {
 		if row >= h {
 			break
 		}
-		lw := lipgloss.Width(line)
+		lw := min(lipgloss.Width(line), w)
 		left := max((w-lw)/2, 0)
-		out[row] = strings.Repeat(" ", left) + line + strings.Repeat(" ", max(w-left-lw, 0))
+		out[row] = fit(strings.Repeat(" ", left)+line, w)
 	}
 	return out
 }
 
-// padLeft right-aligns s inside w cells.
-func padLeft(s string, w int) string {
-	return strings.Repeat(" ", max(w-lipgloss.Width(s), 0)) + s
+// meter draws a filled bar of w cells, using the two styles for the played and
+// the remaining part.
+func meter(fraction float64, w int, on, off lipgloss.Style) string {
+	if w <= 0 {
+		return ""
+	}
+	filled := min(max(int(fraction*float64(w)+0.5), 0), w)
+	return on.Render(strings.Repeat(meterFull, filled)) +
+		off.Render(strings.Repeat(meterEmpty, w-filled))
 }

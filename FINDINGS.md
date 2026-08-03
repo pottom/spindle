@@ -21,7 +21,7 @@ What was verified by parsing the bytes Bubble Tea actually wrote to the tty:
 
 | Property | Result |
 |---|---|
-| Placeholder cells emitted | 200 — exactly 20 × 10 |
+| Placeholder cells emitted | one per cell of the artwork area, exactly |
 | Cells with both combining marks intact | 200 / 200 |
 | Row indices decoded | 0–9, twenty cells each |
 | Column indices decoded in row order | 0–19, in sequence |
@@ -127,14 +127,14 @@ cover slow drift.
 
 ## Halfblock backend
 
-Universal fallback, no detection required. At the 20 × 10 cell artwork box it
-produces a 20 × 20 pixel image — recognisable but coarse, which is precisely why the
-kitty path matters. Verified by decoding the emitted escape sequences back into a
-bitmap and comparing against the source.
+Universal fallback, no detection required. It yields one pixel per cell across and
+two down, so even a large artwork area stays coarse — a 50 × 20 cell area is a
+50 × 40 pixel picture. That is precisely why the kitty path matters. Verified by
+decoding the emitted escape sequences back into a bitmap and comparing against the
+source.
 
 Scaling is aspect-correct: the cell pixel size comes from `TIOCGWINSZ`, falling back
 to a 2:1 assumption when the terminal reports zeroes. The kitty backend supersamples
 2× whenever that fallback is in play, so an unreported cell size costs payload rather
-than sharpness. A square cover in the 20 × 10 box lands on 20 × 7 cells with a
-48 px-tall cell and fills the box exactly with a 2:1 cell; the remainder is padding,
-so the box never changes size.
+than sharpness. The artwork area itself is sized from the cell
+aspect ratio, so a square cover stays square whatever the terminal's cell shape.

@@ -1,5 +1,7 @@
 package ui
 
+import "github.com/pottom/spindle/internal/ui/cover"
+
 // Dimensions from SCREENS.md section 3. The table is authoritative; the ASCII
 // drawings are not.
 const (
@@ -8,50 +10,60 @@ const (
 
 	maxFrameWidth = 100
 
-	coverCells  = 20 // artwork is 20 × 10 cells
-	coverRows   = 10
-	leftMargin  = 2
+	leftMargin  = 3
 	rightMargin = 2
 	columnGap   = 3
-	minInfoCols = 28
+	minInfoCols = 32
 
-	// The artwork sits in a bordered box, so it claims one extra cell per side.
-	coverBoxWidth  = coverCells + 2
-	coverBoxHeight = coverRows + 2
-
-	// Geometry of the "window too small" screen, SCREENS.md 4.7.
-	tooSmallBoxWidth  = 28
-	tooSmallBoxHeight = 8
-	tooSmallMinWidth  = 26
+	// artMargin is the blank line kept above and below the artwork.
+	artMargin = 1
 )
 
-// layout is the geometry of one frame, derived purely from the terminal size.
+// layout is the geometry of one screen, derived purely from the terminal size
+// and the pixel size of a cell.
 type layout struct {
-	frameWidth int // including both border columns
-	interior   int // frame width minus the borders
+	interior   int // content width, capped so an ultrawide terminal stays readable
+	artWidth   int // artwork area, in cells
+	artHeight  int
 	infoWidth  int // the column next to the artwork
-	bodyHeight int // rows available between the top border and the separator
+	bodyHeight int // rows above the help bar
 }
 
 // computeLayout resolves the frame geometry for a terminal of w × h cells. It
 // assumes the size already passed fitsMinimum.
-func computeLayout(w, h int, helpHeight int, hasBanner bool) layout {
-	frameWidth := min(w, maxFrameWidth)
-	interior := frameWidth - 2
+func computeLayout(w, h, helpHeight int, hasBanner bool, cell cover.CellSize) layout {
+	interior := min(w, maxFrameWidth)
 
-	// Top border, separator above the help bar, help bar, bottom border. A
-	// banner adds its own line plus the separator that divides it off.
-	chrome := 3 + helpHeight
+	// A blank line and the help bar sit below the body; a banner takes one more.
+	chrome := 1 + helpHeight
 	if hasBanner {
-		chrome += 2
+		chrome++
 	}
+	bodyHeight := max(h-chrome, 0)
 
+	artWidth, artHeight := artworkArea(interior, bodyHeight, cell)
 	return layout{
-		frameWidth: frameWidth,
 		interior:   interior,
-		infoWidth:  interior - leftMargin - coverBoxWidth - columnGap - rightMargin,
-		bodyHeight: max(h-chrome, 0),
+		artWidth:   artWidth,
+		artHeight:  artHeight,
+		infoWidth:  interior - leftMargin - artWidth - columnGap - rightMargin,
+		bodyHeight: bodyHeight,
 	}
+}
+
+// artworkArea gives the artwork as much room as the frame can spare while keeping
+// it square on screen and leaving the information column its minimum width. Cells
+// are taller than they are wide, so a square area needs roughly twice as many
+// columns as rows.
+// The artwork never takes more than half the width: past that it stops being a
+// player and starts being a picture viewer with captions.
+func artworkArea(interior, bodyHeight int, cell cover.CellSize) (width, height int) {
+	maxWidth := max(min(interior-leftMargin-columnGap-minInfoCols-rightMargin, interior/2), 1)
+	maxHeight := max(bodyHeight-2*artMargin-1, 1)
+
+	height = max(min(maxHeight, maxWidth*cell.Width/cell.Height), 1)
+	width = max(min(height*cell.Height/cell.Width, maxWidth), 1)
+	return width, height
 }
 
 // fitsMinimum reports whether the player screen can be drawn at all.

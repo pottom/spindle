@@ -49,9 +49,9 @@ func coverCmd(loader *cover.Loader, url string, wCells, hCells int) tea.Cmd {
 
 		art, err := loader.Load(ctx, url, wCells, hCells)
 		if err != nil {
-			return msg.CoverFailed{URL: url}
+			return msg.CoverFailed{URL: url, Width: wCells, Height: hCells}
 		}
-		return msg.CoverReady{URL: url, Art: art}
+		return msg.CoverReady{URL: url, Width: wCells, Height: hCells, Art: art}
 	}
 }
 

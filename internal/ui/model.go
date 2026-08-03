@@ -1,10 +1,10 @@
 package ui
 
 import (
+	"image/color"
 	"time"
 
 	"charm.land/bubbles/v2/help"
-	"charm.land/bubbles/v2/progress"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
@@ -29,6 +29,7 @@ const (
 type Model struct {
 	player player.Player
 	covers *cover.Loader
+	cell   cover.CellSize
 
 	ps              *player.State // last known server state
 	localProgress   time.Duration // ticked locally, not ps.Progress
@@ -40,35 +41,46 @@ type Model struct {
 	tickCount int
 
 	width, height int
+	isDark        bool
 
-	styles   style.Styles
-	keys     keyMap
-	help     help.Model
-	progress progress.Model
-	spinner  spinner.Model
+	styles  style.Styles
+	keys    keyMap
+	help    help.Model
+	spinner spinner.Model
 }
 
 // New wires a model around a playback backend and an artwork loader. The palette
 // starts dark and is corrected once the terminal reports its background colour.
-func New(p player.Player, covers *cover.Loader) Model {
+func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 	m := Model{
-		player:   p,
-		covers:   covers,
-		keys:     newKeyMap(),
-		help:     help.New(),
-		progress: progress.New(progress.WithoutPercentage(), progress.WithFillCharacters(barRune, barRune)),
-		spinner:  spinner.New(spinner.WithSpinner(spinner.Dot)),
+		player:  p,
+		covers:  covers,
+		cell:    cell,
+		isDark:  true,
+		keys:    newKeyMap(),
+		help:    help.New(),
+		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
 	}
 	m.help.ShortSeparator = " · "
-	m.applyBackground(true)
+	m.restyle()
 	return m
 }
 
-// applyBackground rebuilds every style that depends on the terminal background.
-func (m *Model) applyBackground(isDark bool) {
-	m.styles = style.New(isDark)
-	m.help.Styles = help.DefaultStyles(isDark)
+// restyle rebuilds every style from the current background and album accent.
+func (m *Model) restyle() {
+	var accent color.Color
+	if m.cover.hasAccent {
+		accent = cover.Readable(m.cover.accent, m.isDark)
+	}
+	m.styles = style.New(m.isDark, accent)
+	m.help.Styles = help.DefaultStyles(m.isDark)
 	m.spinner.Style = m.styles.Detail
+}
+
+// layout resolves the current geometry. It is pure, so View and Update can both
+// ask for it without either of them owning the answer.
+func (m Model) layout() layout {
+	return computeLayout(m.width, m.height, m.helpHeight(), m.err != nil, m.cell)
 }
 
 func (m Model) Init() tea.Cmd {

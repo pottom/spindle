@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"image"
+	"image/color"
 	"io"
 	"net/http"
 	"os"
@@ -54,25 +55,39 @@ func NewLoader(r Renderer, client *http.Client) *Loader {
 	}
 }
 
+// Art is a rendered cover together with what the UI needs to colour itself after
+// the artwork.
+type Art struct {
+	// Cells is the rendered artwork, ready to embed in a view.
+	Cells string
+
+	// Accent is the colour the cover reads as; HasAccent is false for artwork
+	// with no usable colour, such as a black and white sleeve.
+	Accent    color.RGBA
+	HasAccent bool
+}
+
 // Renderer reports which backend is in use, for FINDINGS.md and diagnostics.
 func (l *Loader) Renderer() Renderer { return l.renderer }
 
 // Load returns artwork ready to embed in a view. It blocks on I/O and must never
 // be called from Update.
-func (l *Loader) Load(ctx context.Context, url string, wCells, hCells int) (string, error) {
+func (l *Loader) Load(ctx context.Context, url string, wCells, hCells int) (Art, error) {
 	if url == "" {
-		return "", fmt.Errorf("load cover: no artwork url")
+		return Art{}, fmt.Errorf("load cover: no artwork url")
 	}
 
 	img, err := l.image(ctx, url)
 	if err != nil {
-		return "", err
+		return Art{}, err
 	}
-	art, err := l.renderer.Render(img, wCells, hCells)
+	cells, err := l.renderer.Render(img, wCells, hCells)
 	if err != nil {
-		return "", fmt.Errorf("load cover: %w", err)
+		return Art{}, fmt.Errorf("load cover: %w", err)
 	}
-	return art, nil
+
+	accent, ok := DominantColor(img)
+	return Art{Cells: cells, Accent: accent, HasAccent: ok}, nil
 }
 
 // image returns the decoded cover, consulting the in-memory cache, then the disk
