@@ -11,4 +11,8 @@ type Track struct {
 	Album    string
 	CoverURL string
 	Duration time.Duration
+
+	// Queued marks a track put into the queue by hand, as opposed to one the
+	// context supplied. Only the former can be reordered or removed.
+	Queued bool
 }

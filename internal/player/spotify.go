@@ -19,6 +19,9 @@ const (
 	// generous; the lists are for finding something, not for reading end to end.
 	searchLimit = 50
 	listLimit   = 50
+
+	// tracksPerRequest is what a single /tracks lookup accepts.
+	tracksPerRequest = 50
 )
 
 // Spotify drives playback through the Spotify Web API.
@@ -103,6 +106,45 @@ func (s *Spotify) Queue(ctx context.Context) ([]Track, error) {
 		out = append(out, trackFromFull(&q.Items[i]))
 	}
 	return out, nil
+}
+
+// TracksByID looks up tracks by id, in the order asked for. Unlike the rest of
+// the catalogue calls it passes no market, so Spotify returns exactly the tracks
+// named rather than the local equivalents it would relink them to.
+func (s *Spotify) TracksByID(ctx context.Context, ids []string) ([]Track, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	if len(ids) > tracksPerRequest {
+		ids = ids[:tracksPerRequest]
+	}
+
+	want := make([]spotify.ID, 0, len(ids))
+	for _, id := range ids {
+		want = append(want, spotify.ID(id))
+	}
+
+	full, err := s.client.GetTracks(ctx, want)
+	if err != nil {
+		return nil, classify("fetch tracks", err)
+	}
+
+	out := make([]Track, 0, len(full))
+	for _, t := range full {
+		// Spotify answers with a null for every id it does not recognise.
+		if t == nil {
+			continue
+		}
+		out = append(out, trackFromFull(t))
+	}
+	return out, nil
+}
+
+func (s *Spotify) AddToQueue(ctx context.Context, trackID string) error {
+	if err := s.client.QueueSong(ctx, spotify.ID(trackID)); err != nil {
+		return classify("add to queue", err)
+	}
+	return nil
 }
 
 func (s *Spotify) Search(ctx context.Context, query string) ([]Track, error) {
@@ -207,6 +249,27 @@ func (s *Spotify) PlayTrack(ctx context.Context, trackID string) error {
 	uri := spotify.URI("spotify:track:" + trackID)
 	return classify("play track", s.client.PlayOpt(ctx, &spotify.PlayOptions{
 		URIs: []spotify.URI{uri},
+	}))
+}
+
+// PlayFrom jumps to a track inside whatever is playing. The context has to be
+// named again: Spotify treats a bare track as a one-track context and forgets
+// the rest.
+func (s *Spotify) PlayFrom(ctx context.Context, trackID string) error {
+	cur, err := s.client.PlayerState(ctx)
+	if err != nil {
+		return classify("play from queue", err)
+	}
+	if cur == nil || cur.PlaybackContext.URI == "" {
+		// Nothing to preserve, so the plain track is the honest answer.
+		return s.PlayTrack(ctx, trackID)
+	}
+
+	uri := cur.PlaybackContext.URI
+	track := spotify.URI(trackURI(trackID))
+	return classify("play from queue", s.client.PlayOpt(ctx, &spotify.PlayOptions{
+		PlaybackContext: &uri,
+		PlaybackOffset:  &spotify.PlaybackOffset{URI: track},
 	}))
 }
 

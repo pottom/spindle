@@ -24,6 +24,10 @@ type Player interface {
 	Devices(ctx context.Context) ([]Device, error)
 	TransferTo(ctx context.Context, deviceID string) error
 
+	// AddToQueue puts a track at the end of the queue. Rewriting the queue is
+	// not part of this interface: see QueueEditor.
+	AddToQueue(ctx context.Context, trackID string) error
+
 	// Queue is what comes next. Knowing it is what lets the UI show a skip
 	// instantly instead of waiting for Spotify to admit it happened.
 	Queue(ctx context.Context) ([]Track, error)
@@ -37,5 +41,9 @@ type Player interface {
 	// PlayTrack starts one track on its own; PlayPlaylist starts a playlist at
 	// the given position.
 	PlayTrack(ctx context.Context, trackID string) error
+
+	// PlayFrom jumps to a track already coming up, keeping the album or
+	// playlist it belongs to. PlayTrack would drop everything behind it.
+	PlayFrom(ctx context.Context, trackID string) error
 	PlayPlaylist(ctx context.Context, playlistID string, offset int) error
 }

@@ -241,6 +241,18 @@ func (l *Local) PlayTrack(ctx context.Context, trackID string) error {
 	return l.web.PlayTrack(ctx, trackID)
 }
 
+// PlayFrom seeks within what is already loaded, so the rest of the album or
+// playlist survives the jump. The daemon does this itself; asking the Web API
+// would mean naming the context again from the outside.
+func (l *Local) PlayFrom(ctx context.Context, trackID string) error {
+	if l.idle() {
+		return l.web.PlayFrom(ctx, trackID)
+	}
+	return l.post(ctx, "/player/next", struct {
+		Uri string `json:"uri"`
+	}{Uri: trackURI(trackID)})
+}
+
 func (l *Local) PlayPlaylist(ctx context.Context, playlistID string, offset int) error {
 	return l.web.PlayPlaylist(ctx, playlistID, offset)
 }
@@ -251,7 +263,9 @@ func (l *Local) Devices(ctx context.Context) ([]Device, error) { return l.web.De
 func (l *Local) TransferTo(ctx context.Context, id string) error {
 	return l.web.TransferTo(ctx, id)
 }
-func (l *Local) Queue(ctx context.Context) ([]Track, error) { return l.web.Queue(ctx) }
+func (l *Local) AddToQueue(ctx context.Context, trackID string) error {
+	return l.web.AddToQueue(ctx, trackID)
+}
 func (l *Local) Search(ctx context.Context, q string) ([]Track, error) {
 	return l.web.Search(ctx, q)
 }

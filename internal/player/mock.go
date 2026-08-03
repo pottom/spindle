@@ -20,6 +20,7 @@ type Mock struct {
 	mu        sync.Mutex
 	now       func() time.Time
 	queue     []Track
+	queued    []Track // put there by hand, played before the rest
 	index     int
 	playing   bool
 	elapsed   time.Duration // progress into the current track, as of startedAt
@@ -92,6 +93,7 @@ func (m *Mock) Pause(ctx context.Context) error {
 
 func (m *Mock) Next(ctx context.Context) error {
 	return m.mutate(ctx, func() error {
+		m.promoteQueued()
 		m.seekTo(m.index+1, 0)
 		return nil
 	})
@@ -168,11 +170,88 @@ func (m *Mock) Queue(ctx context.Context) ([]Track, error) {
 	defer m.mu.Unlock()
 	m.advance()
 
-	out := make([]Track, 0, len(m.queue)-1)
+	out := make([]Track, 0, len(m.queued)+len(m.queue)-1)
+	for _, t := range m.queued {
+		t.Queued = true
+		out = append(out, t)
+	}
 	for i := 1; i < len(m.queue); i++ {
 		out = append(out, m.queue[m.wrap(m.index+i)])
 	}
 	return out, nil
+}
+
+// PlayFrom jumps to an upcoming track, taking the hand-queued ones that sit in
+// front of it along the way.
+func (m *Mock) PlayFrom(ctx context.Context, trackID string) error {
+	return m.mutate(ctx, func() error {
+		for i, t := range m.queued {
+			if t.ID != trackID {
+				continue
+			}
+			m.queued = m.queued[i:]
+			m.promoteQueued()
+			m.seekTo(m.index+1, 0)
+			return nil
+		}
+		for i := range m.queue {
+			if m.queue[i].ID == trackID {
+				m.seekTo(i, 0)
+				return nil
+			}
+		}
+		return fmt.Errorf("play from queue: no track %q", trackID)
+	})
+}
+
+// AddToQueue appends a track from the catalogue.
+func (m *Mock) AddToQueue(ctx context.Context, trackID string) error {
+	return m.mutate(ctx, func() error {
+		t, ok := findMockTrack(trackID)
+		if !ok {
+			return fmt.Errorf("add to queue: no track %q", trackID)
+		}
+		m.queued = append(m.queued, t)
+		return nil
+	})
+}
+
+// SetQueue replaces the hand-queued tracks, so the mock can exercise the same
+// edits the daemon allows.
+func (m *Mock) SetQueue(ctx context.Context, trackIDs []string) error {
+	return m.mutate(ctx, func() error {
+		next := make([]Track, 0, len(trackIDs))
+		for _, id := range trackIDs {
+			t, ok := findMockTrack(id)
+			if !ok {
+				return fmt.Errorf("set queue: no track %q", id)
+			}
+			next = append(next, t)
+		}
+		m.queued = next
+		return nil
+	})
+}
+
+// promoteQueued moves the first hand-queued track in front of the context, so
+// that it is what plays next. Callers must hold m.mu.
+func (m *Mock) promoteQueued() {
+	if len(m.queued) == 0 {
+		return
+	}
+	at := m.wrap(m.index + 1)
+	m.queue = slices.Insert(m.queue, at, m.queued[0])
+	m.queued = m.queued[1:]
+}
+
+// findMockTrack looks a track up in the catalogue.
+func findMockTrack(id string) (Track, bool) {
+	for _, t := range mockCatalogue {
+		if t.ID == id {
+			return t, true
+		}
+	}
+	return Track{}, false
 }
 
 // Search matches the query against the title, the artists and the album. An
@@ -302,6 +381,7 @@ func (m *Mock) advance() {
 		}
 		m.elapsed -= d
 		if m.repeat != RepeatTrack {
+			m.promoteQueued()
 			m.index = m.wrap(m.index + 1)
 		}
 	}
