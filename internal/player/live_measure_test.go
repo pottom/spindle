@@ -149,10 +149,22 @@ func TestLivePollingCadence(t *testing.T) {
 		t.Skip("set SPINDLE_LIVE_LONG for the ten minute soak")
 	}
 
-	const (
-		interval = 5 * time.Second
-		duration = 10 * time.Minute
-	)
+	interval := 5 * time.Second
+	if v := os.Getenv("SPINDLE_LIVE_INTERVAL"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			t.Fatalf("SPINDLE_LIVE_INTERVAL: %v", err)
+		}
+		interval = d
+	}
+	duration := 10 * time.Minute
+	if v := os.Getenv("SPINDLE_LIVE_DURATION"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			t.Fatalf("SPINDLE_LIVE_DURATION: %v", err)
+		}
+		duration = d
+	}
 
 	var calls, throttles, failures int
 	var samples []time.Duration

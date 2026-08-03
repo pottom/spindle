@@ -19,10 +19,11 @@ const (
 	// still in flight may report. See DESIGN.md 4.2.
 	optimisticWindow = 2 * time.Second
 
-	// idlePoll is the resting cadence: one real State() call per five seconds.
-	// DESIGN.md 4.1 picked it as the point where drift is invisible and the
-	// quota is comfortable.
-	idlePoll = 5 * time.Second
+	// idlePoll is the resting cadence. DESIGN.md 4.1 picked five seconds without
+	// measuring; against a live account both five and two seconds ran with zero
+	// 429s, so three keeps a comfortable margin over the fastest rate proved
+	// safe while cutting the wait before an outside change is noticed.
+	idlePoll = 3 * time.Second
 
 	// activePoll is used for a while after a change nobody here asked for.
 	// Somebody is driving from another device, and the next thing they do

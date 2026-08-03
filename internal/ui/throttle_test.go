@@ -25,7 +25,7 @@ func TestRestingCadence(t *testing.T) {
 	}
 
 	m.notePolled()
-	if got := time.Until(m.nextPollAt); got < 4*time.Second || got > idlePoll {
+	if got := time.Until(m.nextPollAt); got > idlePoll || got < idlePoll-time.Second {
 		t.Errorf("next poll due in %v, want about %v", got, idlePoll)
 	}
 }
