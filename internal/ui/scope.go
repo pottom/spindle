@@ -135,17 +135,20 @@ func (m Model) scopeAvailable() bool {
 		return false
 	}
 	l := m.layout()
-	switch m.tab {
-	case tabPlayer:
+	if m.tab == tabPlayer {
 		return m.scopeRoom(l) >= scopeRows+scopeChrome
-	case tabQueue:
-		// On the queue the room is beside the artwork rather than beneath it:
-		// the detail panel has never filled that column, and the list below is
-		// not moved by anything put there.
-		return queueScopeWidth(l) > 0 && l.artHeight >= scopeRows
-	default:
-		return false
 	}
+	// On a list screen the room is beside the artwork rather than beneath it:
+	// the detail panel has never filled that column, and the list below is not
+	// moved by anything put there.
+	return m.listTab() && queueScopeWidth(l) > 0 && l.artHeight >= scopeRows
+}
+
+// listTab reports whether the current screen is one of the lists, which all
+// share a composition: the cover and a detail panel across the top, the list
+// itself below.
+func (m Model) listTab() bool {
+	return m.tab == tabQueue || m.tab == tabPlaylists
 }
 
 // scopeMode is the visualiser the current tab is set to.

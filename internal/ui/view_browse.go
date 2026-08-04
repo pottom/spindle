@@ -65,21 +65,22 @@ const (
 // browsePane is the right-hand side of the playlists and search tabs: a heading,
 // a blank line, then as many rows as fit.
 func (m Model) browsePane(l layout, rows int) []string {
-	switch m.tab {
-	case tabPlaylists:
-		return m.playlistPaneView(l, rows)
-	case tabSearch:
+	if m.tab == tabSearch {
 		return m.searchPaneView(l, rows)
-	default:
-		return nil
 	}
+	return nil
 }
 
-// queueBlock is the whole queue screen: the cover and the details of whatever
-// the cursor rests on across the top, the list itself across the full width
-// below. The list is the point of the screen, so it gets the width; the detail
-// panel fills what would otherwise be empty beside the artwork.
-func (m Model) queueBlock(l layout, rows int) []string {
+// listBlock is the shape every list screen shares: the cover and the details of
+// whatever the cursor rests on across the top, a heading, then the list itself
+// across the full width below. The list is the point of the screen, so it gets
+// the width; the detail panel fills what would otherwise be empty beside the
+// artwork.
+//
+// One shape for all of them is the point. The queue, the library and the search
+// results are the same act — looking down a list of tracks — and three
+// compositions for one act made the tabs read as three programs.
+func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	w := queueBlockWidth(l)
 
 	top := min(l.artHeight, rows)
@@ -99,7 +100,7 @@ func (m Model) queueBlock(l layout, rows int) []string {
 		detailWidth = queueDetailWidth(l)
 		trace = stack(m.scopeRender(queueScopeWidth(l)), queueScopeWidth(l), top)
 	}
-	detail := stack(m.trackDetail(detailWidth, foot), detailWidth, foot)
+	detail := stack(opts.detail(detailWidth, foot), detailWidth, foot)
 	for len(detail) < top {
 		detail = append(detail, strings.Repeat(" ", detailWidth))
 	}
@@ -120,35 +121,23 @@ func (m Model) queueBlock(l layout, rows int) []string {
 	// The heading carries the count on the right, where a subtitle line would
 	// otherwise cost a row the list could use.
 	if len(out) < rows {
-		out = append(out, spread(
-			m.styles.Title.Render("Queue"),
-			m.styles.Album.Render(queueSubtitle(m.queue)),
-			w,
-		))
+		out = append(out, spread(opts.heading(w), opts.subtitle(), w))
 	}
 	if len(out) < rows {
 		out = append(out, strings.Repeat(" ", w))
 	}
 
-	rowsOf := m.queueRows()
 	body := max(rows-len(out), 0)
-	if len(rowsOf) == 0 && body > 0 {
-		out = append(out, fit(m.styles.Empty.Render("Nothing is queued."), w))
+	if opts.count == 0 && body > 0 {
+		out = append(out, fit(m.styles.Empty.Render(opts.empty), w))
 	}
 
-	// The playing track heads the list and is not numbered: it is not waiting
-	// for its turn, so a place in the running order would be a lie.
-	_, playing := m.nowPlayingRow()
-	from, to := m.queuePane.cursor.window(len(rowsOf), body)
-	bar := m.scrollColumn(body, len(rowsOf), m.queuePane.cursor.top)
+	from, to := opts.state.window(opts.count, body)
+	bar := m.scrollColumn(body, opts.count, opts.state.top)
 	rowWidth := queueRowWidth(l)
 
 	for i := from; i < to; i++ {
-		number := i + 1
-		if playing {
-			number = i
-		}
-		row := fit(m.queueRow(rowsOf[i], rowWidth, i == m.queuePane.cursor.cursor, number), rowWidth)
+		row := fit(opts.row(i, rowWidth, i == opts.state.cursor), rowWidth)
 		if bar != nil {
 			row += " " + bar[i-from]
 		}
@@ -159,6 +148,45 @@ func (m Model) queueBlock(l layout, rows int) []string {
 		out = append(out, strings.Repeat(" ", w))
 	}
 	return out[:rows]
+}
+
+// listScreen is what one list screen puts into that shape.
+type listScreen struct {
+	// detail is the panel beside the artwork, given its width and the rows it
+	// may fill. heading and subtitle are the line under it, the subtitle set to
+	// the right.
+	detail   func(w, rows int) []string
+	heading  func(w int) string
+	subtitle func() string
+
+	count int
+	state *listState
+	empty string
+	row   func(i, w int, selected bool) string
+}
+
+// queueBlock is the queue screen. The playing track heads the list and is not
+// numbered: it is not waiting for its turn, so a place in the running order
+// would be a lie.
+func (m Model) queueBlock(l layout, rows int) []string {
+	rowsOf := m.queueRows()
+	_, playing := m.nowPlayingRow()
+
+	return m.listBlock(l, rows, listScreen{
+		detail:   m.trackDetail,
+		heading:  func(int) string { return m.styles.Title.Render("Queue") },
+		subtitle: func() string { return m.styles.Album.Render(queueSubtitle(m.queue)) },
+		count:    len(rowsOf),
+		state:    &m.queuePane.cursor,
+		empty:    "Nothing is queued.",
+		row: func(i, w int, selected bool) string {
+			number := i + 1
+			if playing {
+				number = i
+			}
+			return m.queueRow(rowsOf[i], w, selected, number)
+		},
+	})
 }
 
 // scrollColumn is the thin bar down the right of a list, one glyph per visible
@@ -186,7 +214,7 @@ func (m Model) scrollColumn(rows, total, offset int) []string {
 // beneath it in a quiet column, so the two screens read as the same program.
 // rows is how tall the panel is; the playhead is only drawn where it fits.
 func (m Model) trackDetail(w, rows int) []string {
-	t := m.queuedTrack()
+	t := m.cursorTrack()
 	if t == nil {
 		return nil
 	}
@@ -377,32 +405,84 @@ func queueSubtitle(tracks []player.Track) string {
 
 func (m Model) playlistPaneView(l layout, rows int) []string {
 	if m.playlists.open == nil {
-		return m.listPane(l, rows,
-			[]string{m.styles.Title.Render("Playlists"), m.styles.Album.Render(playlistSubtitle(m.playlists.items))},
-			len(m.playlists.items), &m.playlists.cursor,
-			"No playlists.",
-			func(i, w int, selected bool) string { return m.playlistRow(m.playlists.items[i], w, selected) },
-		)
+		return m.listBlock(l, rows, listScreen{
+			detail:   m.playlistDetail,
+			heading:  func(int) string { return m.styles.Title.Render("Playlists") },
+			subtitle: func() string { return m.styles.Album.Render(playlistSubtitle(m.playlists.items)) },
+			count:    len(m.playlists.items),
+			state:    &m.playlists.cursor,
+			empty:    "No playlists.",
+			row: func(i, w int, selected bool) string {
+				return m.playlistRow(m.playlists.items[i], w, selected)
+			},
+		})
 	}
 
 	open := *m.playlists.open
-	subtitle := fmt.Sprintf("%s · %d tracks", open.Owner, open.Tracks)
-	// Spotify does not report a playlist's length; only the mock knows it.
-	if open.Duration > 0 {
-		subtitle += " · " + formatSpan(open.Duration)
-	}
-
-	head := []string{
-		m.styles.Title.Render(open.Name),
-		m.styles.Album.Render(subtitle),
-	}
-	return m.listPane(l, rows, head,
-		len(m.playlists.tracks), &m.playlists.inner,
-		"This playlist is empty.",
-		func(i, w int, selected bool) string {
+	return m.listBlock(l, rows, listScreen{
+		detail:   m.trackDetail,
+		heading:  func(w int) string { return fit(m.styles.Title.Render(open.Name), max(w/2, 1)) },
+		subtitle: func() string { return m.styles.Album.Render(openPlaylistSubtitle(open, m.playlists.tracks)) },
+		count:    len(m.playlists.tracks),
+		state:    &m.playlists.inner,
+		empty:    "This playlist is empty.",
+		row: func(i, w int, selected bool) string {
 			return m.trackRow(m.playlists.tracks[i], w, selected, i+1)
 		},
-	)
+	})
+}
+
+// playlistDetail is the panel beside the cover at the top level: what the
+// cursor is resting on, laid out like a track's so the two levels of the tab
+// read as one screen.
+func (m Model) playlistDetail(w, rows int) []string {
+	p := m.playlists.selected()
+	if p == nil {
+		return nil
+	}
+	s := m.styles
+
+	lines := []string{
+		s.Title.Render(p.Name),
+		s.Artist.Render(p.Owner),
+		"",
+	}
+	if p.Description != "" {
+		// Room for what is left: the facts under it, and a blank either side.
+		room := max(rows-len(lines)-3, 0)
+		if wrapped := wrapWords(s.Detail.Render(p.Description), w); room > 0 && len(wrapped) > 0 {
+			lines = append(lines, wrapped[:min(len(wrapped), room)]...)
+			lines = append(lines, "")
+		}
+	}
+	lines = append(lines, m.fact("Tracks", fmt.Sprintf("%d", p.Tracks), w))
+	if p.Duration > 0 {
+		lines = append(lines, m.fact("Length", formatSpan(p.Duration), w))
+	}
+	return lines
+}
+
+// openPlaylistSubtitle is what an open playlist says about itself beside its
+// name: whose it is, how much of it there is.
+func openPlaylistSubtitle(p player.Playlist, tracks []player.Track) string {
+	out := p.Owner
+	if p.Tracks > 0 {
+		out += fmt.Sprintf(" · %d tracks", p.Tracks)
+	}
+
+	// Spotify does not report a playlist's length, so it is added up from the
+	// tracks that have arrived — and only once they all have, because a growing
+	// number beside a fixed one reads as a mistake rather than as progress.
+	if len(tracks) == p.Tracks {
+		var total time.Duration
+		for _, t := range tracks {
+			total += t.Duration
+		}
+		if total > 0 {
+			out += " · " + formatSpan(total)
+		}
+	}
+	return out
 }
 
 func (m Model) searchPaneView(l layout, rows int) []string {
@@ -508,9 +588,7 @@ func (m Model) tempoCell(t player.Track) string {
 // right-hand columns are dropped when the pane is too narrow to carry them,
 // rather than squeezing every column into uselessness.
 func (m Model) row(w int, selected bool, primary, secondary, trailing string) string {
-	// A playlist's owner is a name, not a list of them, so the second column is
-	// left at its usual width however wide the terminal is.
-	return m.rowCols(w, selected, primary, secondary, "", trailing, false)
+	return m.rowCols(w, selected, primary, secondary, "", trailing)
 }
 
 const (
@@ -527,12 +605,12 @@ const (
 // the duration. The tempo's column is held whether the track has one or not, so
 // the durations stay in line down the list instead of stepping in and out.
 //
-// share lets the artists grow past their usual cap once the row has room to
-// spare. A title is rarely long enough to earn twice the artists' room, and on a
-// wide terminal the gap it leaves in the middle of the row is the widest thing
-// on the screen. The growth is eased in from the cap and stops at an even split,
-// so a resize moves the column rather than jumping it.
-func rowWidths(body int, share bool) (main, second, beat int) {
+// The second column grows past its usual cap once the row has room to spare: a
+// title is rarely long enough to earn twice the artists' room, and on a wide
+// terminal the gap it leaves in the middle of the row is the widest thing on the
+// screen. The growth is eased in from the cap and stops at an even split, so a
+// resize moves the column rather than jumping it.
+func rowWidths(body int) (main, second, beat int) {
 	second = min(body/3, secondaryCols)
 
 	beat = tempoCols
@@ -546,11 +624,9 @@ func rowWidths(body int, share bool) (main, second, beat int) {
 		return body - trailingCols - 1, 0, 0
 	}
 
-	if share {
-		free := body - beat - trailingCols - 2
-		if grown := min(secondaryCols+(body-shareAbove)/2, free/2); grown > second {
-			second, main = grown, free-grown
-		}
+	free := body - beat - trailingCols - 2
+	if grown := min(secondaryCols+(body-shareAbove)/2, free/2); grown > second {
+		second, main = grown, free-grown
 	}
 	return main, second, beat
 }
@@ -559,7 +635,7 @@ func rowWidths(body int, share bool) (main, second, beat int) {
 // start of the row. The queue hangs its trace from the same line, so the screen
 // reads as two columns rather than four.
 func rowSecondaryAt(w int) int {
-	main, second, _ := rowWidths(w-rowGutter, true)
+	main, second, _ := rowWidths(w - rowGutter)
 	if second == 0 {
 		return w
 	}
@@ -570,10 +646,10 @@ func rowSecondaryAt(w int) int {
 // An empty tempo still holds its column, so the durations stay in line whether
 // a track has been heard before or not.
 func (m Model) rowWithTempo(w int, selected bool, primary, secondary, tempo, trailing string) string {
-	return m.rowCols(w, selected, primary, secondary, tempo, trailing, true)
+	return m.rowCols(w, selected, primary, secondary, tempo, trailing)
 }
 
-func (m Model) rowCols(w int, selected bool, primary, secondary, tempo, trailing string, share bool) string {
+func (m Model) rowCols(w int, selected bool, primary, secondary, tempo, trailing string) string {
 	gutter := "  "
 	if selected {
 		gutter = m.styles.Cursor.Render(rowCursor) + " "
@@ -590,7 +666,7 @@ func (m Model) rowCols(w int, selected bool, primary, secondary, tempo, trailing
 		return gutter + fit(primary, max(body, 0))
 	}
 
-	main, second, beat := rowWidths(body, share)
+	main, second, beat := rowWidths(body)
 
 	line := gutter + fit(primary, max(main, 0)) + " "
 	if second > 0 {

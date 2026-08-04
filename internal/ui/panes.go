@@ -30,6 +30,13 @@ func (p playlistPane) selected() *player.Playlist {
 // it already has a whole tab of its own.
 func (p playlistPane) cover() string {
 	if p.open != nil {
+		// Inside a playlist the panel describes the track under the cursor, so
+		// the picture beside it has to be that track's. The playlist's own
+		// cover is a picture of a list, which says nothing about the row being
+		// read.
+		if t := at(p.tracks, p.inner.cursor); t != nil {
+			return t.CoverURL
+		}
 		return p.open.CoverURL
 	}
 	if sel := p.selected(); sel != nil {
@@ -121,6 +128,30 @@ func (m Model) nowPlayingRow() (player.Track, bool) {
 
 // queuedTrack is the row under the cursor, or nil when there is nothing to
 // point at.
+// cursorTrack is the track the current screen's cursor rests on, whichever
+// screen that is. The panel above every list describes it, so the panel does
+// not need to know which list it came from.
+func (m Model) cursorTrack() *player.Track {
+	switch {
+	case m.tab == tabQueue:
+		return m.queuedTrack()
+	case m.tab == tabPlaylists && m.playlists.open != nil:
+		return at(m.playlists.tracks, m.playlists.inner.cursor)
+	case m.tab == tabSearch:
+		return at(m.search.results, m.search.cursor.cursor)
+	default:
+		return nil
+	}
+}
+
+// at is the element under an index, or nil when the cursor has outrun the list.
+func at(tracks []player.Track, i int) *player.Track {
+	if i < 0 || i >= len(tracks) {
+		return nil
+	}
+	return &tracks[i]
+}
+
 func (m Model) queuedTrack() *player.Track {
 	rows := m.queueRows()
 	i := m.queuePane.cursor.cursor

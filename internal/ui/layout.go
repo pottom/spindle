@@ -71,15 +71,14 @@ func tierFor(w int) widthTier {
 	}
 }
 
-// layoutMode is how a screen divides its body. The three differ in what the
-// artwork is competing with: nothing on the player, a list beside it while
-// browsing, a list beneath it on the queue.
+// layoutMode is how a screen divides its body. The two differ in what the
+// artwork is competing with: nothing on the player, and a list beneath it on
+// every screen that is a list.
 type layoutMode int
 
 const (
 	modePlayer layoutMode = iota
-	modeBrowse
-	modeQueue
+	modeList
 )
 
 // layout is the geometry of one screen, derived purely from the terminal size
@@ -146,9 +145,9 @@ func computeLayout(w, h, helpHeight int, hasBanner bool, mode layoutMode, cell c
 // it less still, because a list of titles and artists needs the room more than a
 // preview does.
 //
-// The queue screen is the odd one out: its list is underneath rather than
-// beside, so the artwork competes for rows instead of columns and is held to a
-// third of the body. Anything more and the list it heads would be a footnote.
+// A list screen puts its list underneath rather than beside, so the artwork
+// competes for rows instead of columns and is held to a third of the body.
+// Anything more and the list it heads would be a footnote.
 func artworkArea(interior, bodyHeight int, mode layoutMode, cell cover.CellSize) (width, height int) {
 	share := interior / 2
 	switch {
@@ -171,7 +170,7 @@ func artworkArea(interior, bodyHeight int, mode layoutMode, cell cover.CellSize)
 	if mode == modePlayer {
 		maxHeight = max(min(maxHeight, bodyHeight*2/3), 1)
 	}
-	if mode == modeQueue {
+	if mode == modeList {
 		maxHeight = max(min(maxHeight, bodyHeight/3), 1)
 	}
 

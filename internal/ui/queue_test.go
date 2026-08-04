@@ -762,3 +762,69 @@ func TestQueuePlayheadDoesNotFlickerAsTheCoverLoads(t *testing.T) {
 		t.Errorf("the panel is %d rows while the cover loads and %d once it has", loading, loaded)
 	}
 }
+
+// Every list screen is the same act — looking down a list of tracks — and has
+// to be the same composition: the cover and a detail panel across the top, the
+// list across the full width below.
+func TestPlaylistsUseTheSameShapeAsTheQueue(t *testing.T) {
+	p := player.NewMock()
+	m := New(p, nil, defaultTestCell)
+	m.ps = &player.State{TrackID: "t01", Playing: true}
+	m.tab = tabPlaylists
+	lists, err := p.Playlists(t.Context())
+	if err != nil {
+		t.Fatalf("Playlists: %v", err)
+	}
+	m.playlists.items = lists
+	m.width, m.height = 200, 45
+	m.resize()
+
+	l := m.layout()
+	block := m.playlistPaneView(l, l.bodyHeight)
+	if len(block) != l.bodyHeight {
+		t.Fatalf("the block is %d rows, want the whole body of %d", len(block), l.bodyHeight)
+	}
+
+	// The panel beside the cover describes what the cursor rests on.
+	head := plain(strings.Join(block[:l.artRows], "\n"))
+	if !strings.Contains(head, lists[0].Name) || !strings.Contains(head, "Tracks") {
+		t.Errorf("the panel = %q, want the playlist under the cursor described", head)
+	}
+
+	// The list starts below the artwork and runs the whole width.
+	row := plain(block[l.artHeight+3])
+	if !strings.Contains(row, lists[0].Name) {
+		t.Errorf("row = %q, want the list under the heading", row)
+	}
+	if at := strings.Index(row, lists[0].Owner); at < len(row)/3 {
+		t.Errorf("the owner sits at column %d of %d, want it out where the artists are", at, len(row))
+	}
+}
+
+// Inside a playlist the panel describes the track under the cursor, so the
+// picture beside it has to be that track's.
+func TestOpenPlaylistFollowsTheCursor(t *testing.T) {
+	p := player.NewMock()
+	m := New(p, nil, defaultTestCell)
+	m.tab = tabPlaylists
+	lists, _ := p.Playlists(t.Context())
+	open := lists[0]
+	m.playlists.open = &open
+	tracks, err := p.PlaylistTracks(t.Context(), open.ID)
+	if err != nil || len(tracks) < 2 {
+		t.Fatalf("PlaylistTracks: %v (%d tracks)", err, len(tracks))
+	}
+	m.playlists.tracks = tracks
+
+	if got := m.cursorTrack(); got == nil || got.ID != tracks[0].ID {
+		t.Fatalf("cursorTrack = %v, want the first track", got)
+	}
+	if got := m.coverTarget(); got != tracks[0].CoverURL {
+		t.Errorf("coverTarget = %q, want the track's own cover", got)
+	}
+
+	m.playlists.inner.move(1, len(tracks))
+	if got := m.cursorTrack(); got == nil || got.ID != tracks[1].ID {
+		t.Errorf("cursorTrack = %v, want the panel to follow the cursor", got)
+	}
+}

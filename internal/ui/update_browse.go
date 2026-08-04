@@ -61,7 +61,7 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		if m.playlists.open != nil {
 			m.playlists.inner.move(delta, len(m.playlists.tracks))
-			return nil, true
+			return m.previewCover(), true
 		}
 		m.playlists.cursor.move(delta, len(m.playlists.items))
 		return m.previewCover(), true

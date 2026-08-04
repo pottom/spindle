@@ -111,6 +111,9 @@ func (m Model) body(l layout) []string {
 	case m.tab == tabQueue:
 		block = m.queueBlock(l, max(l.bodyHeight, 1))
 
+	case m.tab == tabPlaylists && !m.devices.open:
+		block = m.playlistPaneView(l, max(l.bodyHeight, 1))
+
 	default:
 		// The player centres its text against the cover. The browsing tabs, and
 		// the player once the words are showing, give the right-hand column

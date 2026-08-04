@@ -287,17 +287,22 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 		}
 
 	case tabPlaylists:
+		short := []key.Binding{
+			hint("↑↓", "select"),
+			hint("enter", "play"),
+			hint("a", "queue"),
+			hint("esc", "back"),
+		}
+		second := []key.Binding{k.GoTab, k.PlayPause, k.Next, k.Help, k.Quit}
+		if scope {
+			short = append(short, hint("v", "waveform"))
+			second = append(second, k.Scope)
+		}
 		return tabKeys{
-			short: []key.Binding{
-				hint("↑↓", "select"),
-				hint("enter", "play"),
-				hint("a", "queue"),
-				hint("esc", "back"),
-				hint("?", "help"),
-			},
+			short: append(short, hint("?", "help")),
 			full: [][]key.Binding{
 				{k.Down, k.Enter, k.Enqueue, k.Back, k.NextTab},
-				{k.GoTab, k.PlayPause, k.Next, k.Help, k.Quit},
+				second,
 			},
 		}
 

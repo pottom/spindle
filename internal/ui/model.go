@@ -169,7 +169,11 @@ func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 		// The waveform is on to begin with: it is the thing that makes the
 		// screen feel alive, and a feature nobody knows to ask for may as well
 		// not exist. The key is there to put it away.
-		scope:   scopeState{modes: [tabCount]scopeMode{tabPlayer: scopeWave, tabQueue: scopeWave}},
+		scope: scopeState{modes: [tabCount]scopeMode{
+			tabPlayer:    scopeWave,
+			tabQueue:     scopeWave,
+			tabPlaylists: scopeWave,
+		}},
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
 		device:  spinner.New(spinner.WithSpinner(deviceSpinner)),
 	}
@@ -271,14 +275,10 @@ func (m Model) helpKeys() tabKeys {
 
 // layoutMode is how the current tab divides its body.
 func (m Model) layoutMode() layoutMode {
-	switch m.tab {
-	case tabPlayer:
+	if m.tab == tabPlayer {
 		return modePlayer
-	case tabQueue:
-		return modeQueue
-	default:
-		return modeBrowse
 	}
+	return modeList
 }
 
 // layout resolves the current geometry. It is pure, so View and Update can both

@@ -149,11 +149,12 @@ func (s *Spotify) Playlists(ctx context.Context) ([]Playlist, error) {
 	out := make([]Playlist, 0, len(page.Playlists))
 	for _, p := range page.Playlists {
 		out = append(out, Playlist{
-			ID:       p.ID.String(),
-			Name:     p.Name,
-			Owner:    ownerName(p.Owner),
-			CoverURL: bestImage(p.Images),
-			Tracks:   int(p.Tracks.Total),
+			ID:          p.ID.String(),
+			Name:        p.Name,
+			Owner:       ownerName(p.Owner),
+			CoverURL:    bestImage(p.Images),
+			Tracks:      int(p.Tracks.Total),
+			Description: plainText(p.Description),
 			// Spotify does not report a playlist's total duration, and adding it
 			// up would mean fetching every track. The UI omits what is zero.
 		})
