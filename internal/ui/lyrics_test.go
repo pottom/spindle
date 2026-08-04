@@ -252,11 +252,15 @@ func TestFadeCurvesLikeACylinder(t *testing.T) {
 			t.Errorf("step %d is no darker than %d", i, i-1)
 		}
 	}
-	// And falling faster at the edge than beside the centre.
-	near := lum(1) - lum(2)
-	edge := lum(len(fade)-2) - lum(len(fade)-1)
-	if edge <= near {
-		t.Errorf("the fade drops %.3f at the centre and %.3f at the edge, want the edge steeper", near, edge)
+	// And the fall starts at once: without that, three or four rows around the
+	// middle sit at almost one strength and the block flattens out.
+	if drop := lum(1) - lum(2); drop < 0.08 {
+		t.Errorf("the first step away drops only %.3f, want the fall to start at once", drop)
+	}
+	// The furthest row has to be genuinely faint, or the window has no edge.
+	if lum(len(fade)-1) > lum(1)/3 {
+		t.Errorf("the outermost row is %.3f against %.3f at the centre, want it far darker",
+			lum(len(fade)-1), lum(1))
 	}
 }
 

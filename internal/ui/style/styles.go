@@ -284,7 +284,14 @@ func blend(a, b color.Color, t float64) color.Color {
 // lyricFadeSteps is how many strengths a lyric is drawn in: one for the line
 // being sung and one for each row between it and the edge of the window. Fewer
 // and the fall shows as bands; more and the deepest are never reached.
-const lyricFadeSteps = 6
+const (
+	lyricFadeSteps = 6
+
+	// lyricFadeBias pulls the fall toward the middle of the window. Below one,
+	// the rows next to the current line start receding at once instead of
+	// holding their strength for two or three rows.
+	lyricFadeBias = 0.6
+)
 
 // lyricFade builds the fade: the line being sung in the artwork's accent, then
 // a fall away from it that keeps going past the theme's faintest text.
@@ -301,7 +308,13 @@ func lyricFade(t Theme, accent color.Color) []lipgloss.Style {
 	out[0] = lipgloss.NewStyle().Foreground(accent).Bold(true)
 	for i := 1; i < lyricFadeSteps; i++ {
 		t := float64(i-1) / float64(lyricFadeSteps-2)
-		f := 1 - math.Cos(t*math.Pi/2)
+
+		// The curve is biased toward the edge before the cosine is taken. A
+		// plain cosine leaves three or four rows sitting at almost the same
+		// strength around the middle, which flattens the very roundness it is
+		// there to give; this pulls the fall forward so only the line being
+		// sung and its immediate neighbour stay bright.
+		f := 1 - math.Cos(math.Pow(t, lyricFadeBias)*math.Pi/2)
 		out[i] = lipgloss.NewStyle().Foreground(blend(near, far, f))
 	}
 	return out
