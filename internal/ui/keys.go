@@ -147,10 +147,10 @@ func newKeyMap() keyMap {
 			key.WithKeys("x"),
 			key.WithHelp("x", "remove from queue"),
 		),
-		MoveUp: key.NewBinding(key.WithKeys("K")),
+		MoveUp: key.NewBinding(key.WithKeys("k")),
 		MoveDn: key.NewBinding(
-			key.WithKeys("J"),
-			key.WithHelp("J / K", "move down / up"),
+			key.WithKeys("j"),
+			key.WithHelp("j / k", "move down / up"),
 		),
 	}
 
@@ -271,7 +271,7 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 			hint("↑↓", "select"),
 			hint("enter", "play"),
 			hint("x", "remove"),
-			hint("J/K", "move"),
+			hint("j/k", "move"),
 		}
 		second := []key.Binding{k.PlayPause, k.Next, k.NextTab, k.GoTab, k.Help}
 		if scope {
