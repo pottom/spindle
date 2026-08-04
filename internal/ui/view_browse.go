@@ -563,6 +563,23 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 	}
 
 	found := m.search.current()
+
+	// With nothing found there is nothing for the panel to describe and no
+	// cover to show, so the band they live in is not reserved: the field goes
+	// to the top of the screen, where a search box belongs, rather than sitting
+	// halfway down behind a wall of blank rows.
+	if found.count() == 0 {
+		w := queueBlockWidth(l)
+		out := []string{
+			fit(m.searchField(max(w/3, 8)), w),
+			strings.Repeat(" ", w),
+			fit(m.styles.Empty.Render(empty), w),
+		}
+		for len(out) < rows {
+			out = append(out, strings.Repeat(" ", w))
+		}
+		return out[:rows]
+	}
 	return m.listBlock(l, rows, listScreen{
 		detail: m.searchDetail,
 		// The field is the heading: it is what the screen is about, and it has

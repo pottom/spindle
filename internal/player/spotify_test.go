@@ -185,19 +185,22 @@ func newQueryStub(t *testing.T, body string) (*Spotify, *url.Values) {
 // backend settled on.
 func TestPagingSendsOffsetAndLimit(t *testing.T) {
 	cases := []struct {
-		name string
-		body string
-		call func(*Spotify) error
+		name  string
+		body  string
+		limit int
+		call  func(*Spotify) error
 	}{
-		{"search", `{"tracks":{"items":[]}}`, func(s *Spotify) error {
+		// Search is the one with a limit of its own: Spotify refuses more than
+		// ten there, and answers fifty everywhere else.
+		{"search", `{"tracks":{"items":[]}}`, searchLimit, func(s *Spotify) error {
 			_, err := s.SearchPage(context.Background(), "bowie", 150)
 			return err
 		}},
-		{"playlists", `{"items":[]}`, func(s *Spotify) error {
+		{"playlists", `{"items":[]}`, pageLimit, func(s *Spotify) error {
 			_, err := s.PlaylistsPage(context.Background(), 150)
 			return err
 		}},
-		{"playlist tracks", `{"items":[]}`, func(s *Spotify) error {
+		{"playlist tracks", `{"items":[]}`, pageLimit, func(s *Spotify) error {
 			_, err := s.PlaylistTracksPage(context.Background(), "p1", 150)
 			return err
 		}},
@@ -212,10 +215,25 @@ func TestPagingSendsOffsetAndLimit(t *testing.T) {
 			if got.Get("offset") != "150" {
 				t.Errorf("offset = %q, want 150", got.Get("offset"))
 			}
-			if want := strconv.Itoa(pageLimit); got.Get("limit") != want {
+			if want := strconv.Itoa(c.limit); got.Get("limit") != want {
 				t.Errorf("limit = %q, want %q", got.Get("limit"), want)
 			}
 		})
+	}
+}
+
+// Spotify answers a search only as far as offset 1000, and its own next link
+// keeps pointing past that — so walking a long result list to the end would end
+// in a 400 rather than in the end of the list.
+func TestSearchStopsAtTheWindow(t *testing.T) {
+	s, _ := newQueryStub(t, `{"tracks":{"items":[{"id":"t1","name":"Heroes","artists":[{"name":"Bowie"}],"album":{"name":"a"}}],"next":"https://api.spotify.com/v1/search?offset=1000"}}`)
+
+	page, err := s.SearchPage(context.Background(), "bowie", searchWindow-searchLimit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.More {
+		t.Error("the last page inside the window still claims there is more")
 	}
 }
 

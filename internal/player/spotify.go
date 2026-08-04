@@ -17,10 +17,23 @@ const (
 	maxCoverPixels = 640
 
 	// pageLimit is how much of a browsing list one request asks for. Fifty is
-	// the most the Web API hands back for a search, for the user's playlists and
-	// for a playlist's items alike, so anything smaller would only mean more
-	// round trips for the same list.
+	// the most the Web API hands back for the user's playlists and for a
+	// playlist's items, so anything smaller would only mean more round trips
+	// for the same list.
 	pageLimit = 50
+
+	// searchLimit is the same for a search, and it is not fifty.
+	//
+	// Measured 2026-08-04 against a live account: /v1/search answers a limit of
+	// ten and refuses eleven with 400 "Invalid limit", whatever is being
+	// searched for, while every other list still takes fifty. It is not
+	// documented anywhere; asking for fifty simply makes every search fail.
+	searchLimit = 10
+
+	// searchWindow is as far into a search as Spotify will go: offset 900 with
+	// a limit of ten answers, and offset 1000 is refused. Paging has to stop
+	// there rather than walk into a 400 at the end of a long list.
+	searchWindow = 1000
 )
 
 // Spotify drives playback through the Spotify Web API.
@@ -144,7 +157,11 @@ func (s *Spotify) Search(ctx context.Context, query string, kind SearchKind, off
 	}
 
 	start := max(offset, 0)
-	res, err := s.client.Search(ctx, query, want, spotify.Limit(pageLimit), spotify.Offset(start))
+	if start >= searchWindow {
+		return Results{}, nil
+	}
+
+	res, err := s.client.Search(ctx, query, want, spotify.Limit(searchLimit), spotify.Offset(start))
 	if err != nil {
 		return Results{}, fmt.Errorf("search: %w", err)
 	}
@@ -152,34 +169,39 @@ func (s *Spotify) Search(ctx context.Context, query string, kind SearchKind, off
 		return Results{}, nil
 	}
 
+	// Spotify's own "next" link keeps pointing past the window it will answer,
+	// so the end of the window is where paging stops, not where it is told to.
+	next := start + searchLimit
+	more := next < searchWindow
+
 	out := Results{}
 	if res.Tracks != nil {
 		items := make([]Track, 0, len(res.Tracks.Tracks))
 		for i := range res.Tracks.Tracks {
 			items = append(items, trackFromFull(&res.Tracks.Tracks[i]))
 		}
-		out.Tracks = Page[Track]{Items: items, More: res.Tracks.Next != "", Next: start + pageLimit}
+		out.Tracks = Page[Track]{Items: items, More: more && res.Tracks.Next != "", Next: next}
 	}
 	if res.Albums != nil {
 		items := make([]Album, 0, len(res.Albums.Albums))
 		for i := range res.Albums.Albums {
 			items = append(items, albumFromSimple(&res.Albums.Albums[i]))
 		}
-		out.Albums = Page[Album]{Items: items, More: res.Albums.Next != "", Next: start + pageLimit}
+		out.Albums = Page[Album]{Items: items, More: more && res.Albums.Next != "", Next: next}
 	}
 	if res.Artists != nil {
 		items := make([]Artist, 0, len(res.Artists.Artists))
 		for i := range res.Artists.Artists {
 			items = append(items, artistFromFull(&res.Artists.Artists[i]))
 		}
-		out.Artists = Page[Artist]{Items: items, More: res.Artists.Next != "", Next: start + pageLimit}
+		out.Artists = Page[Artist]{Items: items, More: more && res.Artists.Next != "", Next: next}
 	}
 	if res.Playlists != nil {
 		items := make([]Playlist, 0, len(res.Playlists.Playlists))
 		for i := range res.Playlists.Playlists {
 			items = append(items, playlistFromSimple(&res.Playlists.Playlists[i]))
 		}
-		out.Playlists = Page[Playlist]{Items: items, More: res.Playlists.Next != "", Next: start + pageLimit}
+		out.Playlists = Page[Playlist]{Items: items, More: more && res.Playlists.Next != "", Next: next}
 	}
 	return out, nil
 }
