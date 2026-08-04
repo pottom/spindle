@@ -391,6 +391,9 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(k, m.keys.SeekBack):
 		return m, m.seek(m.elapsed() - seekStep)
 
+	case key.Matches(k, m.keys.Mute):
+		return m, m.toggleMute()
+
 	case key.Matches(k, m.keys.VolUp):
 		return m, m.setVolume(m.ps.Volume + volumeStep)
 
@@ -473,6 +476,23 @@ func (m *Model) seek(pos time.Duration) tea.Cmd {
 	})
 }
 
+// toggleMute silences the device and remembers what to come back to. The music
+// carries on: this is the volume control, not the transport.
+func (m *Model) toggleMute() tea.Cmd {
+	if m.mutedFrom > 0 {
+		back := m.mutedFrom
+		m.mutedFrom = 0
+		return m.setVolume(back)
+	}
+	if m.ps.Volume == 0 {
+		// Already silent by hand. Nothing to remember and nothing to do.
+		return nil
+	}
+
+	m.mutedFrom = m.ps.Volume
+	return m.setVolume(0)
+}
+
 // setVolume moves the reading and asks the device to follow.
 //
 // The first press of a run goes out at once: waiting out a debounce before
@@ -481,6 +501,11 @@ func (m *Model) seek(pos time.Duration) tea.Cmd {
 // request once they stop, so holding the key still costs two calls rather than
 // one per repeat.
 func (m *Model) setVolume(pct int) tea.Cmd {
+	if pct > 0 {
+		// Reaching for the volume is a decision about the level, so there is
+		// nothing left to come back to.
+		m.mutedFrom = 0
+	}
 	m.ps.Volume = min(max(pct, 0), 100)
 	m.hold()
 	m.volumeSeq++

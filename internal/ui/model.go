@@ -80,6 +80,11 @@ type Model struct {
 	volumeSent   int
 	volumeSentAt time.Time
 
+	// mutedFrom is the volume to come back to, or zero when nothing is muted.
+	// Muting is not the same as turning the volume down: the level that was
+	// chosen is worth keeping, and the music keeps playing either way.
+	mutedFrom int
+
 	// rateLimitedUntil suspends polling. Spotify asked to be left alone, and
 	// carrying on regardless is how a short throttle becomes a long one.
 	rateLimitedUntil time.Time

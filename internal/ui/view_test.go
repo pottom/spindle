@@ -308,3 +308,41 @@ func TestTransportIsAccent(t *testing.T) {
 		t.Error("the transport row is not drawn in that colour")
 	}
 }
+
+// Muting silences the device and remembers what to come back to. The music
+// carries on: this is the volume control, not the transport.
+func TestMuteRemembersTheLevel(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{Volume: 70, Playing: true, Duration: time.Minute}
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	got := tm.(Model)
+	if got.ps.Volume != 0 {
+		t.Errorf("volume = %d after muting, want 0", got.ps.Volume)
+	}
+	if !got.ps.Playing {
+		t.Error("muting stopped the music")
+	}
+
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	if v := tm.(Model).ps.Volume; v != 70 {
+		t.Errorf("volume = %d after unmuting, want the level it was at", v)
+	}
+}
+
+// Reaching for the volume is a decision about the level, so there is nothing
+// left to come back to.
+func TestVolumeKeyClearsTheMute(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{Volume: 70, Playing: true, Duration: time.Minute}
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+
+	if v := tm.(Model).ps.Volume; v == 70 {
+		t.Error("the old level came back after the volume had been set by hand")
+	}
+}

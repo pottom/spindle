@@ -33,6 +33,7 @@ type keyMap struct {
 	Scope   key.Binding
 	Lyrics  key.Binding
 	Peek    key.Binding
+	Mute    key.Binding
 
 	// Queue editing. Only the tracks put there by hand can be moved or dropped,
 	// so these do nothing on the rest of the list.
@@ -128,6 +129,10 @@ func newKeyMap() keyMap {
 		Peek: key.NewBinding(
 			key.WithKeys("u"),
 			key.WithHelp("u", "up next"),
+		),
+		Mute: key.NewBinding(
+			key.WithKeys("m"),
+			key.WithHelp("m", "mute"),
 		),
 
 		Enqueue: key.NewBinding(
