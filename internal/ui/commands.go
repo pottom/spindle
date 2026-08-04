@@ -58,6 +58,13 @@ const (
 	// unlike the volume there is no leading request — the run goes out once,
 	// when it is clear where the track was meant to end up.
 	orderDebounce = 400 * time.Millisecond
+
+	// playFloor is the shortest gap between two track starts. Each one asks
+	// Spotify for an audio key, and asking too fast is answered with a refusal
+	// that lasts — measured, a burst of starts leaves every following track
+	// unplayable for a while. Holding the key down is not a reason to punish
+	// the next minute of listening.
+	playFloor = 700 * time.Millisecond
 )
 
 // lyricsCmd fetches the words of a track. A failure is reported as a track
@@ -282,6 +289,12 @@ func orderSettleCmd(seq int) tea.Cmd {
 	return tea.Tick(orderDebounce, func(time.Time) tea.Msg {
 		return msg.OrderSettled{Seq: seq}
 	})
+}
+
+// playFloorCmd waits out the gap between two track starts, and then reports as
+// an answer would, so the pending request goes out through the same door.
+func playFloorCmd() tea.Cmd {
+	return tea.Tick(playFloor, func(time.Time) tea.Msg { return msg.PlayDone{} })
 }
 
 // volumeSettleCmd waits out the volume debounce.

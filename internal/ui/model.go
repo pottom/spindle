@@ -97,6 +97,7 @@ type Model struct {
 	// one waiting behind it.
 	playInFlight bool
 	playPending  *playRequest
+	playSentAt   time.Time
 
 	// awaitingTrack is the track a skip is trying to move away from, and
 	// confirmUntil is when to stop asking whether it has. expecting is the one

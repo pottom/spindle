@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -197,8 +198,14 @@ func (m *Model) startPlay(req playRequest) tea.Cmd {
 	track := req.track
 	m.showTrack(&track)
 
-	if m.playInFlight {
+	// One at a time, and never faster than the floor: both the answer and the
+	// clock have to be in before the next one goes out.
+	if m.playInFlight || time.Since(m.playSentAt) < playFloor {
 		m.playPending = &req
+		if !m.playInFlight {
+			m.playInFlight = true
+			return tea.Batch(playFloorCmd(), m.syncCover())
+		}
 		return m.syncCover()
 	}
 	m.playInFlight = true
@@ -207,6 +214,7 @@ func (m *Model) startPlay(req playRequest) tea.Cmd {
 
 func (m *Model) sendPlay(req playRequest) tea.Cmd {
 	p, call := m.player, req.call
+	m.playSentAt = time.Now()
 	return tea.Batch(
 		playCmd(req.action, func(ctx context.Context) error { return call(ctx, p) }),
 		// Without this the player tab shows the previous track until the next

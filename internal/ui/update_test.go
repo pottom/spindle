@@ -298,3 +298,44 @@ func (r *recordingPlayer) PlayTrack(ctx context.Context, trackID string) error {
 	r.played <- trackID
 	return nil
 }
+
+// Hammering a play key must not turn into a burst of track starts. Each one
+// asks Spotify for an audio key, and asking too fast is answered with refusals
+// that outlast the burst — measured against a live account, which is where the
+// floor comes from.
+func TestPlayRequestsAreHeldToAFloor(t *testing.T) {
+	sent := make(chan string, 16)
+	m := New(&recordingPlayer{Player: player.NewMock(), played: sent}, nil, defaultTestCell)
+	m.ps = &player.State{TrackID: "a", Title: "a", Playing: true}
+
+	ask := func(id string) tea.Cmd {
+		return m.startPlay(playRequest{
+			action: "play track",
+			track:  player.Track{ID: id, Title: id},
+			call:   func(ctx context.Context, p player.Player) error { return p.PlayTrack(ctx, id) },
+		})
+	}
+
+	runPlay(t, ask("b")) // the first goes out at once
+	if got := <-sent; got != "b" {
+		t.Fatalf("first request was for %q, want b", got)
+	}
+
+	// Everything within the floor is held, however much of it there is.
+	for _, id := range []string{"c", "d", "e", "f"} {
+		cmd := ask(id)
+		if cmd == nil {
+			continue
+		}
+		runPlay(t, cmd)
+	}
+	if len(sent) != 0 {
+		t.Errorf("%d requests went out inside the floor, want none", len(sent))
+	}
+	if m.playPending == nil || m.playPending.track.ID != "f" {
+		t.Error("the last press is not the one waiting")
+	}
+	if got := m.ps.TrackID; got != "f" {
+		t.Errorf("the mark is on %q, want the last press", got)
+	}
+}
