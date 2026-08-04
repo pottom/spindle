@@ -75,6 +75,10 @@ const (
 	// does not fetch the whole of it.
 	pageAhead = 10
 
+	// saidWindow is how long a line about something that just happened stays up.
+	// Long enough to read, short enough that it is gone before it is furniture.
+	saidWindow = 4 * time.Second
+
 	// unplayableWindow is how long to keep saying that a track was skipped. It
 	// is news rather than a state: nothing is wrong now, and the line would
 	// otherwise sit there over music that is playing perfectly well.

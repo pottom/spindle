@@ -99,6 +99,14 @@ type Model struct {
 	playPending  *playRequest
 	playSentAt   time.Time
 
+	// actions is the menu of verbs for whatever the cursor is on.
+	actions actionsPane
+
+	// said is a line about something that just happened and needs no answer,
+	// and when it was said. It fades on its own, like the skipped notice.
+	said   string
+	saidAt time.Time
+
 	// skipped is the track the device could not play, and when it said so. It
 	// is shown for a moment and then let go: it is news, not a state.
 	skipped   string

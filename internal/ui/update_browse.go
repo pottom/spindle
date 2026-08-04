@@ -96,6 +96,10 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		return m.startPlay(play), true
 
+	case key.Matches(k, m.keys.Actions):
+		m.openActions()
+		return nil, true
+
 	case key.Matches(k, m.keys.PlayOne):
 		// Enter plays the list from here, which is what the official client
 		// does and what makes the rest of it follow. This is the other reading:
@@ -151,6 +155,10 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			track:  *sel,
 			call:   func(ctx context.Context, p player.Player) error { return p.PlayNow(ctx, id) },
 		}), true
+
+	case key.Matches(k, m.keys.ActionsTyped):
+		m.openActions()
+		return nil, true
 
 	case key.Matches(k, m.keys.EnqueueTyped):
 		if sel := m.search.selected(); sel != nil {

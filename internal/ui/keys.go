@@ -48,6 +48,11 @@ type keyMap struct {
 
 	// Queue editing. Only the tracks put there by hand can be moved or dropped,
 	// so these do nothing on the rest of the list.
+	// Actions opens the menu of verbs for the item under the cursor. It has a
+	// second binding for the search tab, where every printable key is the query.
+	Actions      key.Binding
+	ActionsTyped key.Binding
+
 	Enqueue key.Binding
 	// PlayOne plays the track under the cursor and nothing else, where enter
 	// would have played the list it belongs to.
@@ -161,6 +166,14 @@ func newKeyMap() keyMap {
 			key.WithHelp("m", "mute"),
 		),
 
+		Actions: key.NewBinding(
+			key.WithKeys("."),
+			key.WithHelp(".", "actions"),
+		),
+		ActionsTyped: key.NewBinding(
+			key.WithKeys("ctrl+o"),
+			key.WithHelp("ctrl+o", "actions"),
+		),
 		Enqueue: key.NewBinding(
 			key.WithKeys("a"),
 			key.WithHelp("a", "add to queue"),
@@ -325,10 +338,11 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 		short := []key.Binding{
 			selectHint,
 			hint("enter", "play"),
+			hint(".", "actions"),
 			hint("x", "remove"),
 			hint("j/k", "move"),
 		}
-		second := []key.Binding{k.PlayPause, k.Next, k.NextTab, k.GoTab, k.Help}
+		second := []key.Binding{k.Actions, k.PlayPause, k.Next, k.NextTab, k.Help}
 		if scope {
 			short = append(short, hint("v", "waveform"))
 			second = append(second, k.Scope)
@@ -346,11 +360,11 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 		short := []key.Binding{
 			selectHint,
 			hint("enter", "play"),
-			hint("o", "only this"),
+			hint(".", "actions"),
 			hint("a", "queue"),
 			hint("esc", "back"),
 		}
-		second := []key.Binding{k.GoTab, k.PlayOne, k.PlayPause, k.Next, k.Help}
+		second := []key.Binding{k.Actions, k.PlayOne, k.PlayPause, k.Next, k.Help}
 		if scope {
 			short = append(short, hint("v", "waveform"))
 			second = append(second, k.Scope)
@@ -370,10 +384,11 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 				hint("type", "to search"),
 				selectHint,
 				hint("enter", "play"),
+				hint("ctrl+o", "actions"),
 				hint("ctrl+a", "queue"),
 			},
 			full: [][]key.Binding{
-				{k.Down, k.Enter, k.EnqueueTyped, k.Back, k.NextTab},
+				{k.Down, k.Enter, k.ActionsTyped, k.EnqueueTyped, k.Back},
 				{hint("ctrl+c", "quit"), k.Help},
 				// No g and G here: the query has them.
 				k.moveKeys(false),

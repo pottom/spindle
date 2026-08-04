@@ -19,6 +19,10 @@ const (
 // track and a throttle are both news about this moment; the explanations behind
 // them are true either way and will still be there.
 func (m Model) notice() (string, lipgloss.Style, bool) {
+	if m.said != "" && time.Since(m.saidAt) < saidWindow {
+		return m.said, m.styles.Detail, true
+	}
+
 	if name, ok := m.unplayableNotice(); ok {
 		return fmt.Sprintf("%s Spotify would not play %s here — skipped", warnGlyph, name),
 			m.styles.Warning, true

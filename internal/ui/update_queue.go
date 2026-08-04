@@ -25,6 +25,10 @@ func (m *Model) queueKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		return m.playRow(at), true
 
+	case key.Matches(k, m.keys.Actions):
+		m.openActions()
+		return nil, true
+
 	case key.Matches(k, m.keys.Drop):
 		return m.dropQueued(), true
 

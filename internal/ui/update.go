@@ -416,6 +416,11 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// The menu answers everything while it is up: nothing underneath may act on
+	// a screen that is not the one being looked at.
+	if cmd, handled := m.actionsKey(k); handled {
+		return m, cmd
+	}
 	if cmd, handled := m.deviceKey(k); handled {
 		return m, cmd
 	}

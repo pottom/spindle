@@ -1062,3 +1062,69 @@ func TestALaterPageIsAppended(t *testing.T) {
 		t.Errorf("the cursor moved to %d when the page arrived, want it left alone", got.search.cursor.cursor)
 	}
 }
+
+// A player gathers verbs faster than it has keys for them, and a key that works
+// on one screen only is a key nobody finds.
+func TestTheActionsMenuOffersWhatTheScreenAllows(t *testing.T) {
+	m := queueModel(1, "a", "b")
+	m.queuePane.cursor.cursor = queueRowOf(0)
+	m.width, m.height = 120, 36
+	m.resize()
+
+	if !m.openActions() {
+		t.Fatal("the menu would not open over a track")
+	}
+	labels := func() string {
+		var out []string
+		for _, v := range m.actions.verbs {
+			out = append(out, v.label)
+		}
+		return strings.Join(out, " | ")
+	}
+	if got := labels(); !strings.Contains(got, "Remove from the queue") {
+		t.Errorf("on the queue the menu offers %q, want removing", got)
+	}
+	if !strings.Contains(plain(m.render()), "Copy the Spotify link") {
+		t.Error("the menu is not on screen")
+	}
+
+	// The same track in the library cannot be taken out of a queue it is not in.
+	lib := New(player.NewMock(), nil, defaultTestCell)
+	lib.tab = tabLibrary
+	open := player.Playlist{ID: "p1", Name: "one"}
+	lib.playlists.open = &open
+	lib.playlists.tracks = []player.Track{{ID: "t1", Title: "one"}}
+	if !lib.openActions() {
+		t.Fatal("the menu would not open in the library")
+	}
+	for _, v := range lib.actions.verbs {
+		if strings.Contains(v.label, "Remove from the queue") {
+			t.Error("the library offers removing from a queue the track is not in")
+		}
+	}
+}
+
+// While the menu is up it answers every key: nothing underneath may act on a
+// screen that is not the one being looked at.
+func TestTheMenuHoldsTheKeyboard(t *testing.T) {
+	m := queueModel(1, "a", "b")
+	m.queuePane.cursor.cursor = queueRowOf(0)
+	m.openActions()
+	was := m.queuePane.cursor.cursor
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	got := tm.(Model)
+	if got.queuePane.cursor.cursor != was {
+		t.Error("the list moved under the menu")
+	}
+	if got.actions.state.cursor != 1 {
+		t.Errorf("the menu's own cursor is at %d, want it to have moved", got.actions.state.cursor)
+	}
+
+	// And esc puts it away without doing anything.
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	if tm.(Model).actions.open {
+		t.Error("esc left the menu up")
+	}
+}
