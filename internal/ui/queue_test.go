@@ -90,18 +90,57 @@ func TestMoveSwapsWithinTheQueuedBlock(t *testing.T) {
 	}
 }
 
-// A hand-queued track cannot be pushed past the context: the two halves keep
-// their own order, and a move that looks like it did nothing is worse than one
-// that is refused.
-func TestMoveStopsAtTheContextBoundary(t *testing.T) {
+// A track from the album or the playlist moves like any other. Reordering it
+// means lifting it out of the context, and everything ahead of it has to travel
+// too, or it would be pushed behind the tracks that moved.
+func TestMoveCrossesIntoTheContext(t *testing.T) {
+	reordered := make(chan []string, 1)
 	m := queueModel(1, "a", "b", "c")
-	m.queuePane.cursor.cursor = queueRowOf(0)
+	m.player = recordingEditor{Player: m.player, reordered: reordered}
+	m.queuePane.cursor.cursor = queueRowOf(2) // c, a context track
 
-	if cmd := m.moveQueued(1); cmd != nil {
-		t.Error("moveQueued(1) crossed into the context tracks")
+	cmd := m.moveQueued(-1)
+	if cmd == nil {
+		t.Fatal("moveQueued(-1) = nil on a context track")
 	}
-	if got := ids(m.queue); got[0] != "a" {
-		t.Errorf("queue = %v, want it untouched", got)
+	cmd()
+
+	if got := <-reordered; len(got) != 3 || got[0] != "a" || got[1] != "c" || got[2] != "b" {
+		t.Errorf("Reorder(%v), want the whole run down to the edit, in its new order", got)
+	}
+	if got := ids(m.queue); got[1] != "c" || got[2] != "b" {
+		t.Errorf("queue = %v, want c ahead of b", got)
+	}
+	// They are the queue's now, so the next press can move them freely.
+	for i, track := range m.queue {
+		if !track.Queued {
+			t.Errorf("track %d is still marked as the context's after being reordered", i)
+		}
+	}
+	if want := queueRowOf(1); m.queuePane.cursor.cursor != want {
+		t.Errorf("cursor = %d, want it to follow the track to %d", m.queuePane.cursor.cursor, want)
+	}
+}
+
+// The run stops at the deepest edit: sending the whole list would drag tracks
+// out of the context that nobody asked to move.
+func TestMoveSendsOnlyAsFarAsTheEdit(t *testing.T) {
+	reordered := make(chan []string, 1)
+	m := queueModel(0, "a", "b", "c", "d")
+	m.player = recordingEditor{Player: m.player, reordered: reordered}
+	m.queuePane.cursor.cursor = queueRowOf(1)
+
+	cmd := m.moveQueued(-1)
+	if cmd == nil {
+		t.Fatal("moveQueued(-1) = nil")
+	}
+	cmd()
+
+	if got := <-reordered; len(got) != 2 || got[0] != "b" || got[1] != "a" {
+		t.Errorf("Reorder(%v), want the two tracks that moved and no more", got)
+	}
+	if m.queue[3].Queued {
+		t.Error("a track past the edit was lifted out of the context")
 	}
 }
 
@@ -142,8 +181,16 @@ func TestEnterPlaysFromTheQueue(t *testing.T) {
 
 type recordingEditor struct {
 	player.Player
-	sent    chan []string
-	dropped chan string
+	sent      chan []string
+	reordered chan []string
+	dropped   chan string
+}
+
+func (r recordingEditor) Reorder(_ context.Context, ids []string) error {
+	if r.reordered != nil {
+		r.reordered <- ids
+	}
+	return nil
 }
 
 func (r recordingEditor) SetQueue(_ context.Context, ids []string) error {

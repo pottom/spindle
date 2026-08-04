@@ -83,3 +83,44 @@ func TestMockSeekToWrapsIndex(t *testing.T) {
 		t.Errorf("index = %d, want 0", m.index)
 	}
 }
+
+// Reordering a track that came from the rotation has to lift it out: leaving it
+// there would play it twice, once where it was moved to and once where it was.
+func TestMockReorderTakesTracksOutOfTheRotation(t *testing.T) {
+	m, _ := newTestMock()
+	ctx := t.Context()
+
+	before, err := m.Queue(ctx)
+	if err != nil {
+		t.Fatalf("Queue: %v", err)
+	}
+	if len(before.Upcoming) < 3 {
+		t.Fatalf("the mock has %d tracks coming, want at least 3", len(before.Upcoming))
+	}
+	first, second := before.Upcoming[0].ID, before.Upcoming[1].ID
+
+	if err := m.Reorder(ctx, []string{second, first}); err != nil {
+		t.Fatalf("Reorder: %v", err)
+	}
+
+	after, err := m.Queue(ctx)
+	if err != nil {
+		t.Fatalf("Queue: %v", err)
+	}
+	if after.Upcoming[0].ID != second || after.Upcoming[1].ID != first {
+		t.Errorf("upcoming starts %s, %s — want them swapped", after.Upcoming[0].ID, after.Upcoming[1].ID)
+	}
+
+	seen := map[string]int{}
+	for _, t := range after.Upcoming {
+		seen[t.ID]++
+	}
+	for id, n := range seen {
+		if n > 1 {
+			t.Errorf("%s is waiting %d times, want once", id, n)
+		}
+	}
+	if len(after.Upcoming) != len(before.Upcoming) {
+		t.Errorf("%d tracks coming after the move, want the %d there were", len(after.Upcoming), len(before.Upcoming))
+	}
+}

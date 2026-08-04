@@ -77,17 +77,17 @@ func (m *Model) dropQueued() tea.Cmd {
 	})
 }
 
-// moveQueued shifts the track under the cursor by one place. It refuses to move
-// a hand-queued track past the context tracks: those keep their own order, and
-// swapping across the boundary would look like a move that did not take.
+// moveQueued shifts the track under the cursor by one place. Any row can move,
+// not only the hand-queued ones: an album or a playlist has one order of its
+// own, and lifting a track out of it is the only way to hear it in another.
 func (m *Model) moveQueued(delta int) tea.Cmd {
 	at := m.queueIndex()
-	if at < 0 || !m.queue[at].Queued {
+	if at < 0 {
 		return nil
 	}
 
 	to := at + delta
-	if to < 0 || to >= len(m.queue) || !m.queue[to].Queued {
+	if to < 0 || to >= len(m.queue) {
 		return nil
 	}
 
@@ -95,7 +95,37 @@ func (m *Model) moveQueued(delta int) tea.Cmd {
 	copy(next, m.queue)
 	next[at], next[to] = next[to], next[at]
 	m.queuePane.cursor.cursor += delta
-	return m.commitQueue(next)
+
+	if next[at].Queued && next[to].Queued {
+		// Both are already the queue's to order: a cheaper edit that leaves the
+		// context where it stands.
+		return m.commitQueue(next)
+	}
+	return m.commitOrder(next, max(at, to))
+}
+
+// commitOrder shows the new order at once and sends the run that has to travel
+// with it: every track from the front of the list down to the deepest edit.
+// Anything left out would be pushed behind the run rather than staying put.
+func (m *Model) commitOrder(next []player.Track, deepest int) tea.Cmd {
+	editor, ok := m.player.(player.QueueEditor)
+	if !ok {
+		return nil
+	}
+
+	ids := make([]string, 0, deepest+1)
+	for i := range deepest + 1 {
+		ids = append(ids, next[i].ID)
+		// They are lifted out of the context to be reordered, and the list has
+		// to say so: they can be moved freely from here on.
+		next[i].Queued = true
+	}
+
+	m.queue = next
+	m.clampQueueCursor()
+	return controlCmd("reorder queue", func(ctx context.Context) error {
+		return editor.Reorder(ctx, ids)
+	})
 }
 
 // commitQueue shows the new order at once and sends it. The list on screen is

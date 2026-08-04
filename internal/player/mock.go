@@ -238,6 +238,66 @@ func (m *Mock) SetQueue(ctx context.Context, trackIDs []string) error {
 	})
 }
 
+// Reorder puts the named tracks at the head of what is coming, in the order
+// given, taking any that came from the catalogue rotation out of it. That is
+// the same trade the daemon makes: the queue is the only part of the list whose
+// order can be set, so a track has to be lifted into it to be moved.
+func (m *Mock) Reorder(ctx context.Context, trackIDs []string) error {
+	return m.mutate(ctx, func() error {
+		want := make(map[string]int, len(trackIDs))
+		for i, id := range trackIDs {
+			want[id] = i
+		}
+		found := make([]Track, len(trackIDs))
+		left := len(trackIDs)
+		take := func(t Track) bool {
+			i, ok := want[t.ID]
+			if !ok || found[i].ID != "" {
+				return false
+			}
+			found[i], left = t, left-1
+			return true
+		}
+
+		var spare []Track
+		for _, t := range m.queued {
+			if !take(t) {
+				spare = append(spare, t)
+			}
+		}
+
+		var passed []Track
+		taken := make(map[int]bool)
+		for step := 1; left > 0 && step < len(m.queue); step++ {
+			at := m.wrap(m.index + step)
+			t := m.queue[at]
+			taken[at] = true
+			if !take(t) {
+				passed = append(passed, t)
+			}
+		}
+		if left > 0 {
+			return fmt.Errorf("reorder: %d of the tracks are not waiting", left)
+		}
+
+		m.queued = append(append(found, spare...), passed...)
+
+		// Everything lifted out leaves the rotation, which is what stops it
+		// being heard a second time when the rotation comes round again. What
+		// is playing is never taken, so it is still there to point at.
+		current := m.queue[m.index]
+		kept := make([]Track, 0, len(m.queue))
+		for i, t := range m.queue {
+			if !taken[i] {
+				kept = append(kept, t)
+			}
+		}
+		m.queue = kept
+		m.index = slices.IndexFunc(kept, func(t Track) bool { return t.ID == current.ID })
+		return nil
+	})
+}
+
 // Drop removes an upcoming track, from the queue or from the catalogue rotation.
 func (m *Mock) Drop(ctx context.Context, trackID string) error {
 	return m.mutate(ctx, func() error {

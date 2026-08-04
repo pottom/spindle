@@ -23,6 +23,16 @@ type QueueEditor interface {
 	// they are not the queue's to move.
 	SetQueue(ctx context.Context, trackIDs []string) error
 
+	// Reorder puts the named tracks at the head of what is coming, in the order
+	// given, and leaves the rest of the list alone. Unlike SetQueue it can move
+	// a track that came from the context: the daemon lifts it out and carries
+	// everything it passed into the queue, so nothing is lost or heard twice.
+	//
+	// The caller has to name every track from the front of the list down to the
+	// deepest one it is moving. Anything left unnamed in between would be
+	// pushed behind the run rather than staying where it was.
+	Reorder(ctx context.Context, trackIDs []string) error
+
 	// Drop removes an upcoming track from the list, leaving every other track
 	// and its place alone.
 	Drop(ctx context.Context, trackID string) error

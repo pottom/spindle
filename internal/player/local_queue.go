@@ -144,6 +144,29 @@ func (l *Local) SetQueue(ctx context.Context, trackIDs []string) error {
 	return nil
 }
 
+// Reorder puts the named tracks at the head of what is coming. The daemon does
+// the whole thing itself, for the same reason Drop does: a track that came from
+// the context can only be moved by lifting it out and carrying everything it
+// passed into the queue.
+func (l *Local) Reorder(ctx context.Context, trackIDs []string) error {
+	uris := make([]string, 0, len(trackIDs))
+	for _, id := range trackIDs {
+		uris = append(uris, trackURI(id))
+	}
+
+	err := l.post(ctx, "/player/reorder", struct {
+		Uris []string `json:"uris"`
+	}{Uris: uris})
+	if err != nil {
+		return err
+	}
+
+	// The daemon does not announce a queue change, so nothing would tell the UI
+	// to look again.
+	l.notify()
+	return nil
+}
+
 // Drop removes an upcoming track. The daemon does the whole thing itself: a
 // track from the context can only be skipped by moving the cursor onto it, and
 // everything passed over on the way has to be carried into the queue first.
