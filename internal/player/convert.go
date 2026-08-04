@@ -63,6 +63,51 @@ func trackFromFull(t *spotify.FullTrack) Track {
 	return out
 }
 
+// trackFromSimple is trackFromFull for the endpoints that answer with the
+// slimmer object: an album's own track list, and the listening history.
+//
+// An album's tracks carry no album of their own — Spotify does not repeat the
+// record's name and cover on each of its tracks — so those fields stay empty
+// unless the source did send them, as the history does.
+func trackFromSimple(t *spotify.SimpleTrack) Track {
+	return Track{
+		ID:          t.ID.String(),
+		Title:       t.Name,
+		Artists:     artistNames(t.Artists),
+		Album:       t.Album.Name,
+		CoverURL:    bestImage(t.Album.Images),
+		Duration:    time.Duration(t.Duration) * time.Millisecond,
+		Released:    t.Album.ReleaseDate,
+		AlbumType:   t.Album.AlbumType,
+		TrackNumber: int(t.TrackNumber),
+		DiscNumber:  int(t.DiscNumber),
+		TotalTracks: int(t.Album.TotalTracks),
+		Explicit:    t.Explicit,
+	}
+}
+
+func albumFromSimple(a *spotify.SimpleAlbum) Album {
+	return Album{
+		ID:        a.ID.String(),
+		Name:      a.Name,
+		Artists:   artistNames(a.Artists),
+		CoverURL:  bestImage(a.Images),
+		Released:  a.ReleaseDate,
+		Tracks:    int(a.TotalTracks),
+		AlbumType: a.AlbumType,
+	}
+}
+
+func artistFromFull(a *spotify.FullArtist) Artist {
+	return Artist{
+		ID:        a.ID.String(),
+		Name:      a.Name,
+		ImageURL:  bestImage(a.Images),
+		Genres:    a.Genres,
+		Followers: int(a.Followers.Count),
+	}
+}
+
 func ownerName(u spotify.User) string {
 	if u.DisplayName != "" {
 		return u.DisplayName

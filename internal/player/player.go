@@ -47,6 +47,31 @@ type Player interface {
 	PlaylistsPage(ctx context.Context, offset int) (Page[Playlist], error)
 	PlaylistTracksPage(ctx context.Context, playlistID string, offset int) (Page[Track], error)
 
+	// The library, on the same terms: an offset counting items, Page.Next to
+	// follow and Page.More to say whether to.
+	LikedTracks(ctx context.Context, offset int) (Page[Track], error)
+	SavedAlbums(ctx context.Context, offset int) (Page[Album], error)
+	FollowedArtists(ctx context.Context, offset int) (Page[Artist], error)
+
+	// What one album or one artist holds. An album's tracks can arrive without
+	// the album on them — the Web API does not repeat its name and cover on
+	// every row — and that costs nothing, because a caller that asked for one
+	// album has both already.
+	//
+	// An artist's own recordings are what ArtistAlbums lists. What the artist is
+	// best known for is a separate question, and one no backend is obliged to
+	// answer: see ArtistTopTracks.
+	AlbumTracks(ctx context.Context, albumID string, offset int) (Page[Track], error)
+	ArtistAlbums(ctx context.Context, artistID string, offset int) (Page[Album], error)
+
+	// RecentlyPlayed is the listening history, most recently played first, and
+	// is the one list here that is not a page. Spotify keeps some fifty entries
+	// and walks them by timestamp rather than by offset, so there is a limit to
+	// ask for and nothing to scroll into. A track played twice appears twice:
+	// that is what a history is, and folding the repeats together would be a
+	// different list than the one asked for.
+	RecentlyPlayed(ctx context.Context, limit int) ([]Track, error)
+
 	// PlayTrack starts one track on its own; PlayPlaylist starts a playlist at
 	// the given position.
 	PlayTrack(ctx context.Context, trackID string) error
