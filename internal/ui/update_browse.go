@@ -20,6 +20,11 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 	m.tab = t
 
 	cmds := []tea.Cmd{m.syncCover()}
+	// Coming back to the player is the common way the trace becomes visible
+	// again; waiting for the next second would be a visible gap.
+	if cmd := m.startScope(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 	switch {
 	case t == tabPlaylists && m.playlists.items == nil:
 		cmds = append(cmds, fetchPlaylistsCmd(m.player))

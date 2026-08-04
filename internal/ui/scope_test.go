@@ -218,3 +218,54 @@ func TestHelpHeightDoesNotDependOnTheScope(t *testing.T) {
 		}
 	}
 }
+
+// The trace stops whenever it leaves the screen, and nothing else would start
+// it again: leaving for a playlist and coming back used to kill it until it was
+// switched off and on by hand.
+func TestScopeResumesOnItsOwn(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.scope.on = true
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(msg.WaveformReady{Samples: []float32{0.5, -0.5}})
+
+	// Away to another tab: the frame in flight is the last one.
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
+	tm, cmd := tm.Update(msg.WaveformReady{})
+	if cmd != nil || tm.(Model).scope.running {
+		t.Fatal("the trace kept running after leaving the player")
+	}
+
+	// Back again, and it picks itself up without being asked.
+	tm, cmd = tm.Update(tea.KeyPressMsg{Code: '1', Text: "1"})
+	if cmd == nil {
+		t.Fatal("returning to the player did not restart the trace")
+	}
+	if !tm.(Model).scope.running {
+		t.Error("the trace is not running after returning to the player")
+	}
+}
+
+// A device arriving, or the first state landing, also leaves the trace stopped.
+// The one-second tick is the safety net for everything the tab switch misses.
+func TestScopeResumesOnTheTick(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.scope.on = true
+	m.noDevice = true
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(msg.WaveformReady{})
+	if tm.(Model).scope.running {
+		t.Fatal("the trace ran with no device")
+	}
+
+	got := tm.(Model)
+	got.noDevice = false
+	tm, cmd := tea.Model(got).Update(msg.Tick{})
+	if cmd == nil {
+		t.Fatal("the tick produced no command")
+	}
+	if !tm.(Model).scope.running {
+		t.Error("the tick did not pick the trace back up")
+	}
+}

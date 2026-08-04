@@ -206,6 +206,13 @@ func (m Model) handleTick() (tea.Model, tea.Cmd) {
 	if cmd := m.spinDevice(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
+	// The trace stops whenever it leaves the screen — another tab, no device,
+	// no state yet — and nothing else would ever start it again. Picking it up
+	// here means it resumes on its own rather than waiting to be switched off
+	// and on.
+	if cmd := m.startScope(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 	// A banner appearing or clearing changes the height of the body, and with
 	// it the artwork area. Nothing else notices, and a cover drawn into an area
 	// that has since changed size is shown with a corner cut off. This costs
