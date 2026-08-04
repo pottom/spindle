@@ -55,6 +55,10 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if message.State != nil && message.State.TrackID != m.queueFor {
 			m.queueFor = message.State.TrackID
 			cmds = append(cmds, fetchQueueCmd(m.player))
+		} else if m.ps != nil && m.ps.Title == "" && m.ps.Playing {
+			// Nothing to go on and music coming out: the queue is the only
+			// other thing that knows what is on.
+			cmds = append(cmds, fetchQueueCmd(m.player))
 		}
 		return m, tea.Batch(cmds...)
 
