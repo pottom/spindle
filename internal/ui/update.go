@@ -636,7 +636,15 @@ func (m *Model) sendVolume() tea.Cmd {
 func (m *Model) skip(action string, call func(context.Context) error) tea.Cmd {
 	m.setProgress(0)
 	m.hold()
-	return tea.Batch(controlCmd(action, call), m.awaitTrackChange())
+
+	// Through the same gate as everything else that starts a track. Spotify's
+	// audio key service is what actually limits this, and it does not care
+	// which key was pressed: fourteen starts in six seconds took the session
+	// down with it, measured. See startPlay.
+	return m.startPlay(playRequest{
+		action: action,
+		call:   func(ctx context.Context, _ player.Player) error { return call(ctx) },
+	})
 }
 
 // takeFromQueue pops the next track off the local queue, if there is one.

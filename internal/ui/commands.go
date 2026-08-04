@@ -59,12 +59,15 @@ const (
 	// when it is clear where the track was meant to end up.
 	orderDebounce = 400 * time.Millisecond
 
-	// playFloor is the shortest gap between two track starts. Each one asks
-	// Spotify for an audio key, and asking too fast is answered with a refusal
-	// that lasts — measured, a burst of starts leaves every following track
-	// unplayable for a while. Holding the key down is not a reason to punish
-	// the next minute of listening.
-	playFloor = 700 * time.Millisecond
+	// playFloor is the shortest gap between two track starts, whichever key
+	// asked for one. Each start asks Spotify for an audio key, and asking too
+	// fast is answered with refusals that outlast the burst — holding a key
+	// down is not a reason to lose the next minute of listening.
+	// Measured against a live account: twelve starts a second apart are fine
+	// twice over, six 400ms apart are refused, and fourteen at that rate reset
+	// the connection. One a second is the shape of it; half again on top is the
+	// margin for the ones we do not send.
+	playFloor = 1500 * time.Millisecond
 
 	// unplayableWindow is how long to keep saying that a track was skipped. It
 	// is news rather than a state: nothing is wrong now, and the line would

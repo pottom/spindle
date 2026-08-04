@@ -366,3 +366,18 @@ func TestASkippedTrackIsSaidOutLoud(t *testing.T) {
 		t.Error("the line was still there long after the skip")
 	}
 }
+
+// Every key that starts a track goes through the same gate. Spotify's audio key
+// service is what limits this, and it does not care which key was pressed.
+func TestSkipKeysShareThePlayFloor(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{TrackID: "a", Title: "a", Playing: true}
+	m.playSentAt = time.Now()
+
+	if cmd := m.skip("skip to next track", func(context.Context) error { return nil }); cmd == nil {
+		t.Fatal("the skip returned nothing at all")
+	}
+	if m.playPending == nil {
+		t.Error("a skip inside the floor went straight out")
+	}
+}

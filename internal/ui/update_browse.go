@@ -195,8 +195,12 @@ type playRequest struct {
 // for first. Holding the newest back until the last is answered makes the last
 // press win, and collapses a run of them into two requests rather than one each.
 func (m *Model) startPlay(req playRequest) tea.Cmd {
-	track := req.track
-	m.showTrack(&track)
+	// A request that already knows what will be playing says so at once; a skip
+	// does not, and lets the answer tell it.
+	if req.track.ID != "" {
+		track := req.track
+		m.showTrack(&track)
+	}
 
 	// One at a time, and never faster than the floor: both the answer and the
 	// clock have to be in before the next one goes out.
