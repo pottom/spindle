@@ -42,7 +42,6 @@ func TestSaveClientIDRejectsNonsense(t *testing.T) {
 	tempConfig(t)
 
 	bad := map[string]string{
-		"empty":           "",
 		"too short":       "1c227ccd43c64c89918ce162bfc38c7",
 		"too long":        "1c227ccd43c64c89918ce162bfc38c7bb",
 		"uppercase":       "1C227CCD43C64C89918CE162BFC38C7B",

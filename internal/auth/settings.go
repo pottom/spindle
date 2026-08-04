@@ -94,9 +94,10 @@ func loadClientID() (string, error) {
 	return s.ClientID, nil
 }
 
-// SaveClientID validates and stores the client id, leaving the rest alone.
+// SaveClientID validates and stores the client id, leaving the rest alone. The
+// empty string forgets it, which is how one goes back to DefaultClientID.
 func SaveClientID(id string) error {
-	if !clientIDPattern.MatchString(id) {
+	if id != "" && !clientIDPattern.MatchString(id) {
 		return fmt.Errorf("%w: expected 32 hexadecimal characters, got %d", ErrMalformedClientID, len(id))
 	}
 
