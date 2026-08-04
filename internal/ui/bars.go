@@ -64,12 +64,18 @@ func (m Model) barsLines(w int) []string {
 		paint[i] = -1
 	}
 
-	// Each band gets as even a share of the width as it can, with a blank
-	// column between: a solid block reads as one shape, not as a spectrum.
+	// Every band is the same width, with a blank column between: a solid block
+	// reads as one shape, not as a spectrum. Sharing the width out by division
+	// gave some bands a cell more than others, and a meter whose columns are
+	// not the same size reads as a meter that is wrong. What will not divide is
+	// left as a margin, split between the two ends.
 	n := len(m.scope.bands)
+	pitch := max(w/n, 1)
+	left := max((w-pitch*n)/2, 0)
+
 	for b := range n {
-		from := b * w / n
-		to := max((b+1)*w/n-barsGap, from+1)
+		from := left + b*pitch
+		to := max(from+pitch-barsGap, from+1)
 
 		height := int(float64(m.scope.bands[b]) * float64(dotsY))
 		peak := int(float64(m.scope.peaks[b]) * float64(dotsY))
