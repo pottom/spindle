@@ -1,6 +1,7 @@
 package player
 
 import (
+	"slices"
 	"testing"
 	"time"
 )
@@ -165,6 +166,83 @@ func TestMockReorderDropsTheSecondCopy(t *testing.T) {
 	}
 	if seen != 1 {
 		t.Errorf("%s is waiting %d times after the reorder, want once", twice, seen)
+	}
+}
+
+// The mock is what --mock and most of the tests run against, so it has to page
+// the way the real backends do rather than hand the whole list over at once.
+// Its page is small enough that its own short catalogue reaches a second one.
+func TestMockPagesAPlaylist(t *testing.T) {
+	m, _ := newTestMock()
+	whole, err := m.PlaylistTracksPage(t.Context(), "p4", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !whole.More {
+		t.Fatalf("p4 fits in one page of %d, so it cannot exercise paging", mockPageLimit)
+	}
+
+	cases := []struct {
+		name   string
+		offset int
+		want   int
+		more   bool
+	}{
+		{"the first page", 0, mockPageLimit, true},
+		{"the rest of it", mockPageLimit, 9 - mockPageLimit, false},
+		{"exactly past the end", 9, 0, false},
+		{"far past the end", 500, 0, false},
+		{"an offset that went negative", -5, mockPageLimit, true},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			page, err := m.PlaylistTracksPage(t.Context(), "p4", c.offset)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(page.Items) != c.want {
+				t.Errorf("%d tracks at offset %d, want %d", len(page.Items), c.offset, c.want)
+			}
+			if page.More != c.more {
+				t.Errorf("More = %v at offset %d, want %v", page.More, c.offset, c.more)
+			}
+		})
+	}
+}
+
+// A caller that walks the pages until there are no more must end up with every
+// match, each of them once. A page boundary that repeated or skipped an item
+// would show up here and nowhere else.
+func TestMockSearchPagesCoverEveryMatch(t *testing.T) {
+	m, _ := newTestMock()
+
+	var walked []string
+	for offset := 0; ; {
+		page, err := m.SearchPage(t.Context(), "queen", offset)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, track := range page.Items {
+			walked = append(walked, track.ID)
+		}
+		if !page.More {
+			break
+		}
+		offset = page.Next
+	}
+
+	var want []string
+	for _, track := range mockCatalogue {
+		if slices.Contains(track.Artists, "Queen") {
+			want = append(want, track.ID)
+		}
+	}
+	if len(want) <= mockPageLimit {
+		t.Fatalf("%d matches fit in one page, so the walk proves nothing", len(want))
+	}
+	if !slices.Equal(walked, want) {
+		t.Errorf("walking the pages gave %v, want %v", walked, want)
 	}
 }
 

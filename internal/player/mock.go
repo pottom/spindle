@@ -354,13 +354,18 @@ func findMockTrack(id string) (Track, bool) {
 // Search matches the query against the title, the artists and the album. An
 // empty query returns nothing rather than the whole catalogue.
 func (m *Mock) Search(ctx context.Context, query string) ([]Track, error) {
+	page, err := m.SearchPage(ctx, query, 0)
+	return page.Items, err
+}
+
+func (m *Mock) SearchPage(ctx context.Context, query string, offset int) (Page[Track], error) {
 	if err := m.delay(ctx); err != nil {
-		return nil, err
+		return Page[Track]{}, err
 	}
 
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
-		return nil, nil
+		return Page[Track]{}, nil
 	}
 
 	var hits []Track
@@ -370,12 +375,17 @@ func (m *Mock) Search(ctx context.Context, query string) ([]Track, error) {
 			hits = append(hits, t)
 		}
 	}
-	return hits, nil
+	return mockPage(hits, offset), nil
 }
 
 func (m *Mock) Playlists(ctx context.Context) ([]Playlist, error) {
+	page, err := m.PlaylistsPage(ctx, 0)
+	return page.Items, err
+}
+
+func (m *Mock) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist], error) {
 	if err := m.delay(ctx); err != nil {
-		return nil, err
+		return Page[Playlist]{}, err
 	}
 
 	out := make([]Playlist, 0, len(mockPlaylists))
@@ -387,19 +397,39 @@ func (m *Mock) Playlists(ctx context.Context) ([]Playlist, error) {
 		}
 		out = append(out, p)
 	}
-	return out, nil
+	return mockPage(out, offset), nil
 }
 
 func (m *Mock) PlaylistTracks(ctx context.Context, playlistID string) ([]Track, error) {
+	page, err := m.PlaylistTracksPage(ctx, playlistID, 0)
+	return page.Items, err
+}
+
+func (m *Mock) PlaylistTracksPage(ctx context.Context, playlistID string, offset int) (Page[Track], error) {
 	if err := m.delay(ctx); err != nil {
-		return nil, err
+		return Page[Track]{}, err
 	}
 
 	def := playlistByID(playlistID)
 	if def == nil {
-		return nil, fmt.Errorf("playlist tracks: unknown playlist %q", playlistID)
+		return Page[Track]{}, fmt.Errorf("playlist tracks: unknown playlist %q", playlistID)
 	}
-	return tracksByID(def.trackIDs), nil
+	return mockPage(tracksByID(def.trackIDs), offset), nil
+}
+
+// mockPageLimit is how much of a list one mock page holds. It is deliberately
+// smaller than the live page size: the catalogue is eighteen tracks and the
+// longest playlist nine, so a page of fifty would mean the mock never once
+// answered that there is more, and the paging above it would only ever be
+// exercised against the real API.
+const mockPageLimit = 5
+
+// mockPage cuts one page out of a list the mock holds whole, so that --mock
+// walks the same offsets a real account would.
+func mockPage[T any](items []T, offset int) Page[T] {
+	start := min(max(offset, 0), len(items))
+	end := min(start+mockPageLimit, len(items))
+	return Page[T]{Items: items[start:end], More: end < len(items), Next: end}
 }
 
 // PlayTrack queues the whole catalogue from the chosen track, so next and
