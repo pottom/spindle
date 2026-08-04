@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -201,35 +202,42 @@ type localContext struct {
 // than an application and the protocol it speaks has no such rule, so it is
 // asked first and the Web API kept only for when there is no daemon at all.
 func (l *Local) PlaylistTracks(ctx context.Context, playlistID string) ([]Track, error) {
-	tracks, err := l.contextTracks(ctx, "spotify:playlist:"+playlistID)
-	if err == nil {
-		return tracks, nil
-	}
-	return l.web.PlaylistTracks(ctx, playlistID)
+	page, err := l.PlaylistTracksPage(ctx, playlistID, 0)
+	return page.Items, err
 }
 
-func (l *Local) contextTracks(ctx context.Context, uri string) ([]Track, error) {
+func (l *Local) PlaylistTracksPage(ctx context.Context, playlistID string, offset int) (Page[Track], error) {
+	page, err := l.contextTracks(ctx, "spotify:playlist:"+playlistID, offset)
+	if err == nil {
+		return page, nil
+	}
+	return l.web.PlaylistTracksPage(ctx, playlistID, offset)
+}
+
+func (l *Local) contextTracks(ctx context.Context, uri string, offset int) (Page[Track], error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, l.addr+"/player/context", nil)
 	if err != nil {
-		return nil, fmt.Errorf("build context request: %w", err)
+		return Page[Track]{}, fmt.Errorf("build context request: %w", err)
 	}
 	q := req.URL.Query()
 	q.Set("uri", uri)
+	q.Set("offset", strconv.Itoa(max(offset, 0)))
+	q.Set("limit", strconv.Itoa(pageLimit))
 	req.URL.RawQuery = q.Encode()
 
 	resp, err := l.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("fetch %s: %w", uri, err)
+		return Page[Track]{}, fmt.Errorf("fetch %s: %w", uri, err)
 	}
 	defer resp.Body.Close() //nolint:errcheck // read-only request
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetch %s: unexpected status %s", uri, resp.Status)
+		return Page[Track]{}, fmt.Errorf("fetch %s: unexpected status %s", uri, resp.Status)
 	}
 
 	var page localContext
 	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
-		return nil, fmt.Errorf("decode %s: %w", uri, err)
+		return Page[Track]{}, fmt.Errorf("decode %s: %w", uri, err)
 	}
 
 	out := make([]Track, 0, len(page.Tracks))
@@ -239,5 +247,11 @@ func (l *Local) contextTracks(ctx context.Context, uri string) ([]Track, error) 
 		track.Queued = false
 		out = append(out, track)
 	}
-	return out, nil
+
+	// The daemon reports neither a total nor a link onwards: it walks the
+	// context until it has the tracks that were asked for and stops there. A
+	// full answer is therefore the only sign that more exist, and the price is
+	// one empty request at the end of a list whose length divides by the page
+	// size.
+	return Page[Track]{Items: out, More: len(out) == pageLimit}, nil
 }

@@ -33,11 +33,25 @@ type Player interface {
 	// admit it happened.
 	Queue(ctx context.Context) (Queue, error)
 
-	// Browsing. Search matches tracks; an empty query yields no results rather
-	// than everything.
+	// Browsing, the first page of it. Search matches tracks; an empty query
+	// yields no results rather than everything.
 	Search(ctx context.Context, query string) ([]Track, error)
 	Playlists(ctx context.Context) ([]Playlist, error)
 	PlaylistTracks(ctx context.Context, playlistID string) ([]Track, error)
+
+	// The same three lists read from anywhere in them. None of the three is
+	// short on a real account — a library runs to hundreds of playlists and a
+	// playlist to thousands of tracks — and every backend answers with a page,
+	// so a caller that never asks for the second one is showing a list that has
+	// been cut without saying so.
+	//
+	// The offset counts items, not pages, and each call decides the page size
+	// itself: it is what its source will hand over in one request, which is not
+	// the same number for the Web API and the daemon. The caller advances by
+	// what it was given and stops when More is false.
+	SearchPage(ctx context.Context, query string, offset int) (Page[Track], error)
+	PlaylistsPage(ctx context.Context, offset int) (Page[Playlist], error)
+	PlaylistTracksPage(ctx context.Context, playlistID string, offset int) (Page[Track], error)
 
 	// PlayTrack starts one track on its own; PlayPlaylist starts a playlist at
 	// the given position.
