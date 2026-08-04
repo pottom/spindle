@@ -336,10 +336,19 @@ func (m Model) queuedColumn(t player.Track) string {
 		// would be a column of dots.
 		return ""
 	}
-	if !m.isQueued(t.ID) {
+
+	switch {
+	case m.ps != nil && m.ps.TrackID == t.ID:
+		// The track sounding takes the same column, and keeps its place in the
+		// list: a library is numbered so it can be counted, and a row that
+		// gives up its ordinal to say what it is doing leaves a hole where the
+		// number should be.
+		return m.styles.Cursor.Render(nowMark) + " "
+	case m.isQueued(t.ID):
+		return m.styles.Queued.Render(queuedMark) + " "
+	default:
 		return "  "
 	}
-	return m.styles.Queued.Render(queuedMark) + " "
 }
 
 // isQueued reports whether a track is one of those waiting by hand. Only those:
@@ -612,7 +621,9 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 
 	title := m.queuedColumn(t) + m.withMark(t, primary.Render(t.Title))
 	switch {
-	case m.ps != nil && m.ps.TrackID == t.ID:
+	case m.tab == tabQueue && m.ps != nil && m.ps.TrackID == t.ID:
+		// On the queue the playing track is marked rather than numbered: it is
+		// not waiting its turn, so a place in the running order would be a lie.
 		title = m.leadIn(m.styles.Cursor.Render(nowMark)) + title
 	case number > 0:
 		title = m.leadIn(primary.Render(fmt.Sprintf("%d", number))) + title

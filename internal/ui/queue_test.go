@@ -919,3 +919,37 @@ func TestQueuedTracksAreMarkedWhereverTheyAreListed(t *testing.T) {
 		t.Error("a track the context supplied is marked as queued by hand")
 	}
 }
+
+// The track sounding is marked in the library too, in the same column as the
+// rest of the marks — and keeps its number, because a library is numbered so it
+// can be counted and a missing ordinal reads as a missing track.
+func TestTheLibraryMarksWhatIsPlaying(t *testing.T) {
+	p := player.NewMock()
+	m := New(p, nil, defaultTestCell)
+	m.tab = tabLibrary
+	lists, _ := p.Playlists(t.Context())
+	open := lists[0]
+	m.playlists.open = &open
+	tracks, _ := p.PlaylistTracks(t.Context(), open.ID)
+	m.playlists.tracks = tracks
+	m.ps = &player.State{TrackID: tracks[3].ID, Playing: true}
+	m.width, m.height = 160, 40
+	m.resize()
+
+	var row string
+	for _, line := range strings.Split(plain(m.render()), "\n") {
+		if strings.Contains(line, tracks[3].Title) {
+			row = line
+			break
+		}
+	}
+	if row == "" {
+		t.Fatal("the playing track is not listed at all")
+	}
+	if !strings.Contains(row, nowMark) {
+		t.Errorf("row = %q, want the playing track marked", strings.TrimSpace(row))
+	}
+	if !strings.Contains(row, "4 ") {
+		t.Errorf("row = %q, want it to keep its place in the list", strings.TrimSpace(row))
+	}
+}
