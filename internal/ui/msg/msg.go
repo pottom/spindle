@@ -65,24 +65,35 @@ type QueueFetched struct {
 	Tracks  []player.Track
 }
 
-// PlaylistsFetched carries the library listing.
+// PlaylistsFetched carries one page of the library listing. Offset says where
+// the page starts, so a page that arrives out of order can be told from the
+// first one and appended rather than replacing what is already read.
 type PlaylistsFetched struct {
 	Playlists []player.Playlist
+	Offset    int
+	More      bool
+	Next      int
 }
 
-// PlaylistTracksFetched carries the contents of one playlist.
+// PlaylistTracksFetched carries one page of a playlist's contents.
 type PlaylistTracksFetched struct {
 	PlaylistID string
 	Tracks     []player.Track
+	Offset     int
+	More       bool
+	Next       int
 }
 
-// SearchResults carries the hits for a query. Seq identifies the query, so a
-// slow search landing after a newer one can be discarded.
+// SearchResults carries one page of hits for a query. Seq identifies the query,
+// so a slow search landing after a newer one can be discarded.
 type SearchResults struct {
 	Seq     int
 	Tracks  []player.Track
 	Query   string
 	Matched bool
+	Offset  int
+	More    bool
+	Next    int
 }
 
 // CoverSettled fires once the browse cursor has stopped moving for long enough

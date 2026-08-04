@@ -111,14 +111,27 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case msg.PlaylistsFetched:
-		m.playlists.items = message.Playlists
-		m.playlists.cursor.reset()
+		// The first page replaces what was read; a later one is added to it. The
+		// cursor is only sent home for the first, or reading past fifty would
+		// throw the reader back to the top of the library.
+		if message.Offset == 0 {
+			m.playlists.items = message.Playlists
+			m.playlists.cursor.reset()
+		} else {
+			m.playlists.items = append(m.playlists.items, message.Playlists...)
+		}
+		m.playlists.pages.took(message.More, message.Next)
 		return m, m.syncCover()
 
 	case msg.PlaylistTracksFetched:
 		if m.playlists.open != nil && m.playlists.open.ID == message.PlaylistID {
-			m.playlists.tracks = message.Tracks
-			m.playlists.inner.reset()
+			if message.Offset == 0 {
+				m.playlists.tracks = message.Tracks
+				m.playlists.inner.reset()
+			} else {
+				m.playlists.tracks = append(m.playlists.tracks, message.Tracks...)
+			}
+			m.playlists.within.took(message.More, message.Next)
 		}
 		return m, nil
 

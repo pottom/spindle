@@ -28,8 +28,12 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 		cmds = append(cmds, cmd)
 	}
 	switch {
-	case t == tabLibrary && m.playlists.items == nil:
-		cmds = append(cmds, fetchPlaylistsCmd(m.player))
+	case t == tabLibrary:
+		// Fetched every time rather than once: a playlist made or renamed
+		// elsewhere would otherwise never appear until spindle was restarted,
+		// and one page of a library is a cheap answer.
+		m.playlists.pages.loading = true
+		cmds = append(cmds, fetchPlaylistsCmd(m.player, 0))
 	case t == tabQueue:
 		// The queue is kept for the sake of instant skipping, which only needs
 		// the first entry to be right. Looking at the whole list is a different
@@ -62,7 +66,7 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		state, count = &m.playlists.inner, len(m.playlists.tracks)
 	}
 	if m.listKey(k, state, count, true) {
-		return m.previewCover(), true
+		return tea.Batch(m.previewCover(), m.readAhead()), true
 	}
 
 	switch {
@@ -76,7 +80,8 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			m.playlists.open = &open
 			m.playlists.tracks = nil
 			m.playlists.inner.reset()
-			return tea.Batch(fetchPlaylistTracksCmd(m.player, open.ID), m.syncCover()), true
+			m.playlists.within = paging{loading: true}
+			return tea.Batch(fetchPlaylistTracksCmd(m.player, open.ID, 0), m.syncCover()), true
 		}
 
 		id, offset := m.playlists.open.ID, m.playlists.inner.cursor
@@ -131,7 +136,7 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	// No g and G on this tab: they are letters, and every letter here is part
 	// of the query.
 	if m.listKey(k, &m.search.cursor, len(m.search.results), false) {
-		return m.previewCover(), true
+		return tea.Batch(m.previewCover(), m.readAhead()), true
 	}
 
 	switch {
@@ -174,7 +179,8 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		return cmd, true
 	}
 	m.search.seq++
-	return tea.Batch(cmd, searchCmd(m.player, m.search.input.Value(), m.search.seq)), true
+	m.search.pages = paging{loading: true}
+	return tea.Batch(cmd, searchCmd(m.player, m.search.input.Value(), m.search.seq, 0)), true
 }
 
 // playRequest is an ask for something to start, and the track it will land on.
@@ -223,6 +229,40 @@ func (m *Model) sendPlay(req playRequest) tea.Cmd {
 	)
 }
 
+// readAhead sends for the next page of whatever list is being scrolled, once the
+// cursor has come near enough to the end of what is loaded.
+//
+// Scrolling is the only way these lists are read, so it is also the only signal
+// there is that more of them is wanted. Asking on the cursor rather than on a
+// key of its own means nobody has to know the list was ever cut.
+func (m *Model) readAhead() tea.Cmd {
+	switch {
+	case m.tab == tabLibrary && m.playlists.open != nil:
+		if !m.playlists.within.wants(m.playlists.inner.cursor, len(m.playlists.tracks)) {
+			return nil
+		}
+		m.playlists.within.loading = true
+		return fetchPlaylistTracksCmd(m.player, m.playlists.open.ID, m.playlists.within.next)
+
+	case m.tab == tabLibrary:
+		if !m.playlists.pages.wants(m.playlists.cursor.cursor, len(m.playlists.items)) {
+			return nil
+		}
+		m.playlists.pages.loading = true
+		return fetchPlaylistsCmd(m.player, m.playlists.pages.next)
+
+	case m.tab == tabSearch:
+		if !m.search.pages.wants(m.search.cursor.cursor, len(m.search.results)) {
+			return nil
+		}
+		m.search.pages.loading = true
+		return searchCmd(m.player, m.search.input.Value(), m.search.seq, m.search.pages.next)
+
+	default:
+		return nil
+	}
+}
+
 // previewCover schedules an artwork load for whatever the cursor now rests on,
 // after the debounce.
 func (m *Model) previewCover() tea.Cmd {
@@ -235,8 +275,13 @@ func (m *Model) applySearchResults(res msg.SearchResults) tea.Cmd {
 	if res.Seq != m.search.seq {
 		return nil
 	}
-	m.search.results = res.Tracks
-	m.search.cursor.reset()
+	if res.Offset == 0 {
+		m.search.results = res.Tracks
+		m.search.cursor.reset()
+	} else {
+		m.search.results = append(m.search.results, res.Tracks...)
+	}
+	m.search.pages.took(res.More, res.Next)
 
 	// An empty query clears the pane rather than leaving a stale cover behind.
 	if strings.TrimSpace(res.Query) == "" {

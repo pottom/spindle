@@ -33,13 +33,8 @@ type Player interface {
 	// admit it happened.
 	Queue(ctx context.Context) (Queue, error)
 
-	// Browsing, the first page of it. Search matches tracks; an empty query
-	// yields no results rather than everything.
-	Search(ctx context.Context, query string) ([]Track, error)
-	Playlists(ctx context.Context) ([]Playlist, error)
-	PlaylistTracks(ctx context.Context, playlistID string) ([]Track, error)
-
-	// The same three lists read from anywhere in them. None of the three is
+	// Browsing, read from anywhere in the list. Search matches tracks; an empty
+	// query yields no results rather than everything. None of the three is
 	// short on a real account — a library runs to hundreds of playlists and a
 	// playlist to thousands of tracks — and every backend answers with a page,
 	// so a caller that never asks for the second one is showing a list that has

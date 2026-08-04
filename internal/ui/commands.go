@@ -69,6 +69,12 @@ const (
 	// margin for the ones we do not send.
 	playFloor = 1500 * time.Millisecond
 
+	// pageAhead is how close to the end of what is loaded the cursor has to come
+	// before the next page is sent for. Far enough that the rows are usually
+	// there by the time they are reached, near enough that idly opening a list
+	// does not fetch the whole of it.
+	pageAhead = 10
+
 	// unplayableWindow is how long to keep saying that a track was skipped. It
 	// is news rather than a state: nothing is wrong now, and the line would
 	// otherwise sit there over music that is playing perfectly well.
@@ -203,42 +209,49 @@ func fetchQueueCmd(p player.Player) tea.Cmd {
 	}
 }
 
-func fetchPlaylistsCmd(p player.Player) tea.Cmd {
+func fetchPlaylistsCmd(p player.Player, offset int) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 		defer cancel()
 
-		items, err := p.Playlists(ctx)
+		page, err := p.PlaylistsPage(ctx, offset)
 		if err != nil {
 			return msg.Error{Err: err}
 		}
-		return msg.PlaylistsFetched{Playlists: items}
+		return msg.PlaylistsFetched{
+			Playlists: page.Items, Offset: offset, More: page.More, Next: page.Next,
+		}
 	}
 }
 
-func fetchPlaylistTracksCmd(p player.Player, id string) tea.Cmd {
+func fetchPlaylistTracksCmd(p player.Player, id string, offset int) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 		defer cancel()
 
-		tracks, err := p.PlaylistTracks(ctx, id)
+		page, err := p.PlaylistTracksPage(ctx, id, offset)
 		if err != nil {
 			return msg.Error{Err: err}
 		}
-		return msg.PlaylistTracksFetched{PlaylistID: id, Tracks: tracks}
+		return msg.PlaylistTracksFetched{
+			PlaylistID: id, Tracks: page.Items, Offset: offset, More: page.More, Next: page.Next,
+		}
 	}
 }
 
-func searchCmd(p player.Player, query string, seq int) tea.Cmd {
+func searchCmd(p player.Player, query string, seq, offset int) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 		defer cancel()
 
-		tracks, err := p.Search(ctx, query)
+		page, err := p.SearchPage(ctx, query, offset)
 		if err != nil {
 			return msg.Error{Err: err}
 		}
-		return msg.SearchResults{Seq: seq, Tracks: tracks, Query: query, Matched: true}
+		return msg.SearchResults{
+			Seq: seq, Tracks: page.Items, Query: query, Matched: true,
+			Offset: offset, More: page.More, Next: page.Next,
+		}
 	}
 }
 

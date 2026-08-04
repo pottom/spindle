@@ -11,10 +11,39 @@ import (
 type playlistPane struct {
 	items  []player.Playlist
 	cursor listState
+	pages  paging
 
 	open   *player.Playlist // nil while browsing the top level
 	tracks []player.Track
 	inner  listState
+	within paging
+}
+
+// paging is what a list has read so far and what is left. Lists arrive fifty at
+// a time and are read by scrolling, so the next page is fetched as the cursor
+// approaches the end of what is loaded rather than by asking for it.
+type paging struct {
+	// more says another page exists, next is where to ask for it. Next is the
+	// backend's answer rather than the number of items received: pages arrive
+	// short — a podcast episode or a track unavailable here is dropped — and
+	// counting what survived would re-read the same rows forever.
+	more bool
+	next int
+
+	// loading stops a run of cursor keys from asking for the same page a dozen
+	// times before the first answer lands.
+	loading bool
+}
+
+// wants reports whether the cursor has come near enough to the end of what is
+// loaded to send for the next page.
+func (p paging) wants(cursor, loaded int) bool {
+	return p.more && !p.loading && cursor >= loaded-pageAhead
+}
+
+// took records a page that has arrived.
+func (p *paging) took(more bool, next int) {
+	p.more, p.next, p.loading = more, next, false
 }
 
 // selected returns the playlist under the cursor at the top level.
@@ -57,6 +86,7 @@ type searchPane struct {
 	input   textinput.Model
 	results []player.Track
 	cursor  listState
+	pages   paging
 
 	// seq rises with every query, so a slow search that lands after a newer one
 	// can be thrown away.

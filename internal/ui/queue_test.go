@@ -771,7 +771,8 @@ func TestPlaylistsUseTheSameShapeAsTheQueue(t *testing.T) {
 	m := New(p, nil, defaultTestCell)
 	m.ps = &player.State{TrackID: "t01", Playing: true}
 	m.tab = tabLibrary
-	lists, err := p.Playlists(t.Context())
+	listPage, err := p.PlaylistsPage(t.Context(), 0)
+	lists := listPage.Items
 	if err != nil {
 		t.Fatalf("Playlists: %v", err)
 	}
@@ -807,10 +808,12 @@ func TestOpenPlaylistFollowsTheCursor(t *testing.T) {
 	p := player.NewMock()
 	m := New(p, nil, defaultTestCell)
 	m.tab = tabLibrary
-	lists, _ := p.Playlists(t.Context())
+	listPage, _ := p.PlaylistsPage(t.Context(), 0)
+	lists := listPage.Items
 	open := lists[0]
 	m.playlists.open = &open
-	tracks, err := p.PlaylistTracks(t.Context(), open.ID)
+	trackPage, err := p.PlaylistTracksPage(t.Context(), open.ID, 0)
+	tracks := trackPage.Items
 	if err != nil || len(tracks) < 2 {
 		t.Fatalf("PlaylistTracks: %v (%d tracks)", err, len(tracks))
 	}
@@ -835,10 +838,12 @@ func TestPlayOnlyThisTrack(t *testing.T) {
 	p := player.NewMock()
 	m := New(p, nil, defaultTestCell)
 	m.tab = tabLibrary
-	lists, _ := p.Playlists(t.Context())
+	listPage, _ := p.PlaylistsPage(t.Context(), 0)
+	lists := listPage.Items
 	open := lists[0]
 	m.playlists.open = &open
-	tracks, _ := p.PlaylistTracks(t.Context(), open.ID)
+	trackPage, _ := p.PlaylistTracksPage(t.Context(), open.ID, 0)
+	tracks := trackPage.Items
 	if len(tracks) < 2 {
 		t.Fatalf("the mock playlist has %d tracks, want at least 2", len(tracks))
 	}
@@ -873,10 +878,12 @@ func TestQueuedTracksAreMarkedWhereverTheyAreListed(t *testing.T) {
 	p := player.NewMock()
 	m := New(p, nil, defaultTestCell)
 	m.tab = tabLibrary
-	lists, _ := p.Playlists(t.Context())
+	listPage, _ := p.PlaylistsPage(t.Context(), 0)
+	lists := listPage.Items
 	open := lists[0]
 	m.playlists.open = &open
-	tracks, _ := p.PlaylistTracks(t.Context(), open.ID)
+	trackPage, _ := p.PlaylistTracksPage(t.Context(), open.ID, 0)
+	tracks := trackPage.Items
 	m.playlists.tracks = tracks
 	m.width, m.height = 180, 40
 	m.resize()
@@ -927,10 +934,12 @@ func TestTheLibraryMarksWhatIsPlaying(t *testing.T) {
 	p := player.NewMock()
 	m := New(p, nil, defaultTestCell)
 	m.tab = tabLibrary
-	lists, _ := p.Playlists(t.Context())
+	listPage, _ := p.PlaylistsPage(t.Context(), 0)
+	lists := listPage.Items
 	open := lists[0]
 	m.playlists.open = &open
-	tracks, _ := p.PlaylistTracks(t.Context(), open.ID)
+	trackPage, _ := p.PlaylistTracksPage(t.Context(), open.ID, 0)
+	tracks := trackPage.Items
 	m.playlists.tracks = tracks
 	m.ps = &player.State{TrackID: tracks[3].ID, Playing: true}
 	m.width, m.height = 160, 40
@@ -961,7 +970,8 @@ func TestSearchUsesTheSameShapeAsTheQueue(t *testing.T) {
 	m := New(p, nil, defaultTestCell)
 	m.tab = tabSearch
 	m.search.input.SetValue("queen")
-	res, err := p.Search(t.Context(), "queen")
+	resPage, err := p.SearchPage(t.Context(), "queen", 0)
+	res := resPage.Items
 	if err != nil || len(res) < 2 {
 		t.Fatalf("Search: %v (%d results)", err, len(res))
 	}
@@ -991,5 +1001,64 @@ func TestSearchUsesTheSameShapeAsTheQueue(t *testing.T) {
 	row := plain(block[l.artHeight+3])
 	if at := strings.Index(row, res[0].Artists[0]); at < len(row)/3 {
 		t.Errorf("the artists sit at column %d of %d, want them out with the others", at, len(row))
+	}
+}
+
+// Lists arrive fifty at a time and are read by scrolling, so scrolling is the
+// only signal there is that more is wanted. Nobody should have to know the list
+// was ever cut.
+func TestScrollingSendsForTheNextPage(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.tab = tabSearch
+	m.width, m.height = 120, 36
+	m.resize()
+
+	// A page that says there is more behind it.
+	m.search.input.SetValue("queen")
+	var tm tea.Model = m
+	tm, _ = tm.Update(msg.SearchResults{
+		Seq: m.search.seq, Query: "queen", Matched: true,
+		Tracks: make([]player.Track, 12), More: true, Next: 12,
+	})
+	got := tm.(Model)
+	if !got.search.pages.more || got.search.pages.next != 12 {
+		t.Fatalf("the page's answer was not kept: %+v", got.search.pages)
+	}
+
+	// Near the top, nothing is asked for.
+	if cmd := got.readAhead(); cmd != nil {
+		t.Error("a fetch went out with the cursor at the top of the list")
+	}
+
+	// Near the end, the next page is sent for — once, however many keys follow.
+	got.search.cursor.cursor = 11
+	if cmd := got.readAhead(); cmd == nil {
+		t.Fatal("the cursor reached the end of the list and nothing was fetched")
+	}
+	if cmd := got.readAhead(); cmd != nil {
+		t.Error("a second fetch went out while the first was still in flight")
+	}
+}
+
+// A later page is added to what is already read; only the first replaces it.
+// Reading past fifty must not throw the reader back to the top.
+func TestALaterPageIsAppended(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.tab = tabSearch
+	m.search.results = make([]player.Track, 12)
+	m.search.cursor.cursor = 11
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(msg.SearchResults{
+		Seq: m.search.seq, Query: "queen", Matched: true,
+		Tracks: make([]player.Track, 8), Offset: 12,
+	})
+
+	got := tm.(Model)
+	if len(got.search.results) != 20 {
+		t.Errorf("%d results after the second page, want the twelve plus the eight", len(got.search.results))
+	}
+	if got.search.cursor.cursor != 11 {
+		t.Errorf("the cursor moved to %d when the page arrived, want it left alone", got.search.cursor.cursor)
 	}
 }

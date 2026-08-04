@@ -117,11 +117,6 @@ func (s *Spotify) AddToQueue(ctx context.Context, trackID string) error {
 	return nil
 }
 
-func (s *Spotify) Search(ctx context.Context, query string) ([]Track, error) {
-	page, err := s.SearchPage(ctx, query, 0)
-	return page.Items, err
-}
-
 func (s *Spotify) SearchPage(ctx context.Context, query string, offset int) (Page[Track], error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
@@ -143,11 +138,6 @@ func (s *Spotify) SearchPage(ctx context.Context, query string, offset int) (Pag
 		out = append(out, trackFromFull(&res.Tracks.Tracks[i]))
 	}
 	return Page[Track]{Items: out, More: res.Tracks.Next != "", Next: start + pageLimit}, nil
-}
-
-func (s *Spotify) Playlists(ctx context.Context) ([]Playlist, error) {
-	page, err := s.PlaylistsPage(ctx, 0)
-	return page.Items, err
 }
 
 func (s *Spotify) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist], error) {
@@ -174,11 +164,6 @@ func (s *Spotify) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist]
 		})
 	}
 	return Page[Playlist]{Items: out, More: page.Next != "", Next: start + pageLimit}, nil
-}
-
-func (s *Spotify) PlaylistTracks(ctx context.Context, playlistID string) ([]Track, error) {
-	page, err := s.PlaylistTracksPage(ctx, playlistID, 0)
-	return page.Items, err
 }
 
 func (s *Spotify) PlaylistTracksPage(ctx context.Context, playlistID string, offset int) (Page[Track], error) {

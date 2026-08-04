@@ -201,11 +201,6 @@ type localContext struct {
 // allowed to read a playlist it did not create. The daemon is a player rather
 // than an application and the protocol it speaks has no such rule, so it is
 // asked first and the Web API kept only for when there is no daemon at all.
-func (l *Local) PlaylistTracks(ctx context.Context, playlistID string) ([]Track, error) {
-	page, err := l.PlaylistTracksPage(ctx, playlistID, 0)
-	return page.Items, err
-}
-
 func (l *Local) PlaylistTracksPage(ctx context.Context, playlistID string, offset int) (Page[Track], error) {
 	page, err := l.contextTracks(ctx, "spotify:playlist:"+playlistID, offset)
 	if err == nil {

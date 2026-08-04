@@ -353,11 +353,6 @@ func findMockTrack(id string) (Track, bool) {
 
 // Search matches the query against the title, the artists and the album. An
 // empty query returns nothing rather than the whole catalogue.
-func (m *Mock) Search(ctx context.Context, query string) ([]Track, error) {
-	page, err := m.SearchPage(ctx, query, 0)
-	return page.Items, err
-}
-
 func (m *Mock) SearchPage(ctx context.Context, query string, offset int) (Page[Track], error) {
 	if err := m.delay(ctx); err != nil {
 		return Page[Track]{}, err
@@ -378,11 +373,6 @@ func (m *Mock) SearchPage(ctx context.Context, query string, offset int) (Page[T
 	return mockPage(hits, offset), nil
 }
 
-func (m *Mock) Playlists(ctx context.Context) ([]Playlist, error) {
-	page, err := m.PlaylistsPage(ctx, 0)
-	return page.Items, err
-}
-
 func (m *Mock) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist], error) {
 	if err := m.delay(ctx); err != nil {
 		return Page[Playlist]{}, err
@@ -398,11 +388,6 @@ func (m *Mock) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist], e
 		out = append(out, p)
 	}
 	return mockPage(out, offset), nil
-}
-
-func (m *Mock) PlaylistTracks(ctx context.Context, playlistID string) ([]Track, error) {
-	page, err := m.PlaylistTracksPage(ctx, playlistID, 0)
-	return page.Items, err
 }
 
 func (m *Mock) PlaylistTracksPage(ctx context.Context, playlistID string, offset int) (Page[Track], error) {

@@ -134,9 +134,9 @@ func TestSearchSkipsEmptyQuery(t *testing.T) {
 		t.Error("an empty query must not reach the API")
 	})
 
-	tracks, err := s.Search(context.Background(), "   ")
-	if err != nil || tracks != nil {
-		t.Errorf("Search(blank) = %v, %v; want nil, nil", tracks, err)
+	page, err := s.SearchPage(context.Background(), "   ", 0)
+	if err != nil || page.Items != nil {
+		t.Errorf("Search(blank) = %v, %v; want nothing", page.Items, err)
 	}
 }
 
@@ -153,10 +153,11 @@ func TestPlaylistTracksSkipsWhatIsNotATrack(t *testing.T) {
 		]}`)) //nolint:errcheck // test server
 	})
 
-	tracks, err := s.PlaylistTracks(context.Background(), "p1")
+	page, err := s.PlaylistTracksPage(context.Background(), "p1", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
+	tracks := page.Items
 	if len(tracks) != 1 || tracks[0].Title != "Heroes" {
 		t.Errorf("tracks = %+v, want just Heroes", tracks)
 	}
