@@ -177,15 +177,6 @@ func artworkArea(interior, bodyHeight int, mode layoutMode, cell cover.CellSize)
 	return width, height
 }
 
-// frameLeft is the column every screen starts at. The tabs are not all the same
-// width — a list earns the whole terminal and the player does not — so a frame
-// centred on its own width would slide the artwork sideways every time the tab
-// changed. Anchoring them all where the widest one begins keeps the picture and
-// the text where they were, and lets the lists run on past them to the right.
-func frameLeft(w int) int {
-	return max(w-min(w, maxTableWidth), 0) / 2
-}
-
 // queueScopeMin is the narrowest trace worth drawing beside the queue's detail
 // panel. Below it the bands are wider than they are tall and read as a bar
 // chart of nothing in particular.

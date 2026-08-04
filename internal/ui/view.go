@@ -88,11 +88,7 @@ func (m Model) renderPlayer() string {
 		lines = append(lines, m.pad(row, l))
 	}
 
-	indent := strings.Repeat(" ", frameLeft(m.width))
-	for i, line := range lines {
-		lines[i] = indent + line
-	}
-	return strings.Join(lines, "\n")
+	return lipgloss.PlaceHorizontal(m.width, lipgloss.Center, strings.Join(lines, "\n"))
 }
 
 // pad indents one line to the left margin and squares it off to the content

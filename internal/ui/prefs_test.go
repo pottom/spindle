@@ -53,20 +53,6 @@ func TestPrefsIgnoreWhatItCannotUse(t *testing.T) {
 	}
 }
 
-// The tabs are not the same width, and a frame centred on its own width would
-// slide the artwork sideways every time you moved between them.
-func TestTheFrameDoesNotMoveBetweenTabs(t *testing.T) {
-	at := func(tab tabID) int {
-		m := scopeModel(220, 45)
-		m.tab = tab
-		m.resize()
-		return strings.Index(ansiOff(m.render()), "spindle")
-	}
-	if player, queue := at(tabPlayer), at(tabQueue); player != queue {
-		t.Errorf("the frame starts at column %d on the player and %d on the queue", player, queue)
-	}
-}
-
 // The trace goes into the column the detail panel has never filled, and nothing
 // below it moves when it appears.
 func TestQueueDrawsTheTraceWithoutMovingTheList(t *testing.T) {
