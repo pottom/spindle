@@ -1,5 +1,11 @@
 package ui
 
+import (
+	"strings"
+
+	"charm.land/lipgloss/v2"
+)
+
 const (
 	// barsPeakDecay is what a marker keeps of its height each frame. A marker
 	// falls by a share of where it is rather than by a fixed step: a fixed step
@@ -47,7 +53,13 @@ func (m Model) barsLines(w int) []string {
 
 	dotsY := scopeRows * dotsPerCellY
 	grid := make([]uint8, w*scopeRows)
-	loud := make([]float32, w)
+
+	// The colour of every cell, chosen from where it sits: which part of the
+	// frequency range the column covers, and how high up the bar the row is.
+	paint := make([]int8, w*scopeRows)
+	for i := range paint {
+		paint[i] = -1
+	}
 
 	// Each band gets as even a share of the width as it can, with a blank
 	// column between: a solid block reads as one shape, not as a spectrum.
@@ -59,27 +71,77 @@ func (m Model) barsLines(w int) []string {
 		height := int(float64(m.scope.bands[b]) * float64(dotsY))
 		peak := int(float64(m.scope.peaks[b]) * float64(dotsY))
 
+		levels := len(m.styles.Bars[0])
 		for c := from; c < to && c < w; c++ {
-			loud[c] = m.scope.bands[b]
 			for y := range height {
 				dy := dotsY - 1 - y
-				grid[(dy/dotsPerCellY)*w+c] |= 1 << brailleBit[0][dy%dotsPerCellY]
-				grid[(dy/dotsPerCellY)*w+c] |= 1 << brailleBit[1][dy%dotsPerCellY]
+				cell := (dy/dotsPerCellY)*w + c
+				grid[cell] |= 1 << brailleBit[0][dy%dotsPerCellY]
+				grid[cell] |= 1 << brailleBit[1][dy%dotsPerCellY]
+
+				// How far up its own bar this row is, not how far up the screen:
+				// a short bar still burns brightest at its tip.
+				up := float64(y) / float64(max(height-1, 1))
+				if l := int8(min(int(up*float64(levels)), levels-1)); l > paint[cell] {
+					paint[cell] = l
+				}
 			}
+
 			if peak <= height || m.scope.peaks[b] < barsPeakFloor {
 				continue
 			}
 			// The marker sits one dot thick at the height reached, which is
-			// what separates it from the bar it fell from.
+			// what separates it from the bar it fell from, and always at the
+			// hottest step so it reads as a marker rather than as more bar.
 			dy := min(max(dotsY-peak, 0), dotsY-1)
-			grid[(dy/dotsPerCellY)*w+c] |= 1 << brailleBit[0][dy%dotsPerCellY]
-			grid[(dy/dotsPerCellY)*w+c] |= 1 << brailleBit[1][dy%dotsPerCellY]
-			loud[c] = 1
+			cell := (dy/dotsPerCellY)*w + c
+			grid[cell] |= 1 << brailleBit[0][dy%dotsPerCellY]
+			grid[cell] |= 1 << brailleBit[1][dy%dotsPerCellY]
+			paint[cell] = int8(levels - 1)
 		}
 	}
-	// Drawn without the trail: that belongs to the waveform, and with no samples
-	// arriving it holds a flat centre line that burns straight across the bars.
-	bare := m
-	bare.scope.trail = nil
-	return bare.scopeDraw(w, grid, loud)
+	return m.barsDraw(w, grid, paint, n)
+}
+
+// barsDraw turns the dot grid into rows, colouring each cell from the palette:
+// hue by where the column sits in the frequency range, strength by how high up
+// its bar the row is.
+func (m Model) barsDraw(w int, grid []uint8, paint []int8, bands int) []string {
+	freqs := len(m.styles.Bars)
+
+	lines := make([]string, scopeRows)
+	for r := range scopeRows {
+		var sb strings.Builder
+
+		var run strings.Builder
+		var style lipgloss.Style
+		lit := false
+		flush := func() {
+			if run.Len() > 0 {
+				sb.WriteString(style.Render(run.String()))
+				run.Reset()
+			}
+		}
+
+		for c := range w {
+			at := r*w + c
+			if grid[at] == 0 || paint[at] < 0 {
+				flush()
+				lit = false
+				sb.WriteByte(' ')
+				continue
+			}
+
+			f := min(c*freqs/w, freqs-1)
+			want := m.styles.Bars[f][paint[at]]
+			if !lit || want.GetForeground() != style.GetForeground() {
+				flush()
+				style, lit = want, true
+			}
+			run.WriteRune(rune(brailleBase + int(grid[at])))
+		}
+		flush()
+		lines[r] = fit(sb.String(), w)
+	}
+	return lines
 }

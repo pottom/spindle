@@ -77,6 +77,10 @@ type Styles struct {
 	ScopeCore []lipgloss.Style
 	ScopeEdge []lipgloss.Style
 
+	// Bars is the spectrum's palette: hue across the frequency range, strength
+	// up the height of a bar. Indexed [frequency][level].
+	Bars [][]lipgloss.Style
+
 	// Status line.
 	DeviceOn  lipgloss.Style
 	DeviceOff lipgloss.Style
@@ -127,6 +131,7 @@ func New(isDark bool, accent color.Color) Styles {
 
 		ScopeCore: coreRamp(accent),
 		ScopeEdge: edgeRamp(t),
+		Bars:      barPalette(t, accent),
 
 		Quality: fg(t.Faint),
 
@@ -316,6 +321,55 @@ func lyricFade(t Theme, accent color.Color) []lipgloss.Style {
 		// sung and its immediate neighbour stay bright.
 		f := 1 - math.Cos(math.Pow(t, lyricFadeBias)*math.Pi/2)
 		out[i] = lipgloss.NewStyle().Foreground(blend(near, far, f))
+	}
+	return out
+}
+
+const (
+	// barFreqSteps is how many hues the spectrum sweeps across its width, and
+	// barLevelSteps how many strengths it climbs through.
+	barFreqSteps  = 10
+	barLevelSteps = 6
+
+	// barHueArc is how far the hue travels from one end of the spectrum to the
+	// other, in degrees. Wide enough to see the sweep, narrow enough that the
+	// far end still belongs to the artwork's colour.
+	barHueArc = 46
+)
+
+// barPalette builds the spectrum's colours: hue across the frequency range,
+// strength up the height of a bar.
+//
+// Two dimensions rather than one, because a bar carries two facts. Where the
+// energy sits is the horizontal one — the hue sweeps from a deeper shade at the
+// bass end to a brighter one at the treble, so a mix reads as a colour before
+// it reads as a shape. How loud that band is is the vertical one — a bar rises
+// out of a dim base into a lit tip, which is what makes a meter look like it is
+// burning rather than merely tall.
+func barPalette(t Theme, accent color.Color) [][]lipgloss.Style {
+	base, sat, light := toHSL(accent)
+
+	out := make([][]lipgloss.Style, barFreqSteps)
+	for f := range out {
+		// Centred on the accent, so the middle of the spectrum is the album's
+		// own colour and the ends lean either side of it.
+		offset := (float64(f)/float64(barFreqSteps-1) - 0.5) * barHueArc
+		hue := math.Mod(base+offset+360, 360)
+
+		out[f] = make([]lipgloss.Style, barLevelSteps)
+		for l := range out[f] {
+			v := float64(l) / float64(barLevelSteps-1)
+
+			// The foot of a bar sits close to the ground and the tip lifts well
+			// past the accent, so height reads before colour does.
+			c := fromHSL(hue, min(sat*(0.55+0.5*v), 1), light*(0.42+0.75*v))
+			if v > 0.82 {
+				// The last step goes toward white: a tip that only gets lighter
+				// in its own hue stops registering as hotter.
+				c = blend(c, t.Text, (v-0.82)/0.18*0.55)
+			}
+			out[f][l] = lipgloss.NewStyle().Foreground(c)
+		}
 	}
 	return out
 }
