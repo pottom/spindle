@@ -101,3 +101,33 @@ func TestOvertakenTransmissionIsDropped(t *testing.T) {
 		t.Error("the newest cover never reached the terminal")
 	}
 }
+
+// Every cover goes out under the same image id. Kitty replaces the picture but
+// keeps the placement a previous transmission created, so a cover of a new size
+// has to arrive with the old placement deleted — otherwise the terminal draws
+// into the old rectangle and only the corner that fits is ever seen.
+func TestNewGeometryClearsTheOldPlacement(t *testing.T) {
+	var out bytes.Buffer
+	k := NewKitty(&out, CellSize{Width: 14, Height: 29, Measured: true})
+	img := solid(640, 640, color.RGBA{R: 10, G: 20, B: 30, A: 255})
+
+	if _, err := k.Render(img, 49, 23, 1); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if _, err := k.Render(img, 24, 11, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	sent := out.String()
+	del := strings.Index(sent, "a=d,d=I")
+	place := strings.Index(sent, "r=11")
+	switch {
+	case del < 0:
+		t.Error("the old placement was never deleted")
+	case place < 0:
+		t.Error("the new placement was never sent")
+	case del > place:
+		t.Error("the delete came after the new placement, which undoes it")
+	}
+}

@@ -97,6 +97,13 @@ func (k *Kitty) transmit(data []byte, cols, rows int, seq uint64) error {
 	encoded := base64.StdEncoding.EncodeToString(data)
 
 	var sb strings.Builder
+
+	// Delete the previous image and its placements first. Re-transmitting under
+	// the same id replaces the picture but not the placement it already has, so
+	// without this the terminal keeps drawing into the old rectangle and only
+	// the corner of the new cover that fits inside it is ever seen.
+	fmt.Fprintf(&sb, "\x1b_Ga=d,d=I,i=%d,q=2\x1b\\", imageID)
+
 	first := true
 	for len(encoded) > 0 {
 		chunk := encoded
