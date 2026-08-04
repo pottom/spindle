@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -104,5 +105,63 @@ func TestStoreDeleteIsIdempotent(t *testing.T) {
 	}
 	if tok, _ := s.Load(); tok != nil {
 		t.Error("token survived deletion")
+	}
+}
+
+// A token says nothing about which application asked for it or what it was
+// allowed to do, and both change. Keeping one that no longer matches turns into
+// a refusal somewhere far away from the cause.
+func TestATokenGrantedElsewhereIsNotReused(t *testing.T) {
+	tempConfig(t)
+	store, err := NewStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tok := &oauth2.Token{AccessToken: "a", RefreshToken: "r", Expiry: time.Now().Add(time.Hour)}
+	if err := store.Save(tok); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := store.Load(); err != nil || got == nil {
+		t.Fatalf("Load right after Save = %v, %v — want the token back", got, err)
+	}
+
+	// The same token, now that the application has changed.
+	if err := SaveClientID("1c227ccd43c64c89918ce162bfc38c7b"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := store.Load(); err != nil || got != nil {
+		t.Errorf("Load after the client id changed = %v, want nothing", got)
+	}
+}
+
+// The same when a screen starts needing a permission the last authorisation
+// never asked for.
+func TestATokenMissingAScopeIsNotReused(t *testing.T) {
+	tempConfig(t)
+	store, err := NewStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	id, err := ClientID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	short := grant{
+		Token:    &oauth2.Token{AccessToken: "a", RefreshToken: "r", Expiry: time.Now().Add(time.Hour)},
+		ClientID: id,
+		Scopes:   Scopes[:len(Scopes)-1],
+	}
+	data, err := json.MarshalIndent(short, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(store.Path(), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, err := store.Load(); err != nil || got != nil {
+		t.Errorf("Load of a grant short one scope = %v, want nothing", got)
 	}
 }

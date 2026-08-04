@@ -30,8 +30,21 @@ func NewStore() (*Store, error) {
 // Path is where the token lives, for diagnostics.
 func (s *Store) Path() string { return s.path }
 
-// Load returns the stored token, or nil when there is none. A file that cannot
-// be parsed is treated as absent: the flow will simply run again.
+// grant is the token together with what it was granted for. A token says
+// nothing about which application asked for it or what it was allowed to do,
+// and both change: a client id can be swapped, and a new screen can need a
+// permission the last authorisation never requested. Keeping a token that no
+// longer matches turns into a 403 somewhere far away from the cause.
+type grant struct {
+	*oauth2.Token
+	ClientID string   `json:"granted_to,omitempty"`
+	Scopes   []string `json:"granted_for,omitempty"`
+}
+
+// Load returns the stored token, or nil when there is none, when it was granted
+// to another application, or when it lacks a permission now being asked for. A
+// file that cannot be parsed is treated as absent: the flow will simply run
+// again.
 func (s *Store) Load() (*oauth2.Token, error) {
 	data, err := os.ReadFile(s.path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -41,16 +54,44 @@ func (s *Store) Load() (*oauth2.Token, error) {
 		return nil, fmt.Errorf("read token: %w", err)
 	}
 
-	var tok oauth2.Token
-	if err := json.Unmarshal(data, &tok); err != nil || tok.RefreshToken == "" {
+	var saved grant
+	if err := json.Unmarshal(data, &saved); err != nil || saved.Token == nil || saved.RefreshToken == "" {
 		return nil, nil
 	}
-	return &tok, nil
+
+	id, err := ClientID()
+	if err != nil {
+		return nil, err
+	}
+	if saved.ClientID != id || !covers(saved.Scopes, Scopes) {
+		return nil, nil
+	}
+	return saved.Token, nil
 }
 
-// Save writes the token so only its owner can read it.
+// covers reports whether a grant already carries every scope wanted.
+func covers(granted, wanted []string) bool {
+	have := make(map[string]bool, len(granted))
+	for _, s := range granted {
+		have[s] = true
+	}
+	for _, s := range wanted {
+		if !have[s] {
+			return false
+		}
+	}
+	return true
+}
+
+// Save writes the token so only its owner can read it, along with the
+// application and the permissions it belongs to.
 func (s *Store) Save(tok *oauth2.Token) error {
-	data, err := json.MarshalIndent(tok, "", "  ")
+	id, err := ClientID()
+	if err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(grant{Token: tok, ClientID: id, Scopes: Scopes}, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode token: %w", err)
 	}
