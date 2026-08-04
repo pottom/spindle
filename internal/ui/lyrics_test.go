@@ -289,6 +289,9 @@ func TestWindowIsSymmetric(t *testing.T) {
 func TestLyricsDoNotMoveTheArtwork(t *testing.T) {
 	m := lyricsModel(120, 44)
 	l := m.layout()
+	// The trace steps aside for the words, which is its own rule; this is about
+	// the picture staying put.
+	m.scope.on = false
 
 	m.lyrics.on = false
 	off := strings.Split(plain(m.render()), "\n")
@@ -308,5 +311,26 @@ func TestLyricsDoNotMoveTheArtwork(t *testing.T) {
 			t.Errorf("row %d moved in the artwork column:\n  off: %q\n  on:  %q",
 				i, string(a[:end]), string(b[:end]))
 		}
+	}
+}
+
+// The trace and the words want the same band of the screen, so only one of them
+// can have it. Showing both meant the trace drawing over the lyric.
+func TestWaveformStepsAsideForTheWords(t *testing.T) {
+	m := lyricsModel(120, 44)
+	m.scope.on = true
+
+	m.lyrics.on = false
+	if !m.scopeVisible() {
+		t.Fatal("the trace is not showing to begin with")
+	}
+
+	m.lyrics.on = true
+	if m.scopeVisible() {
+		t.Error("the trace is still drawn over the words")
+	}
+	// And the help stops offering a key that would do nothing visible.
+	if strings.Contains(plain(m.render()), "v waveform") {
+		t.Error("the help still offers the waveform while the words are showing")
 	}
 }
