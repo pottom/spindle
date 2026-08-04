@@ -28,10 +28,15 @@ const (
 	// ordinalCols is the width of the track number column in a list.
 	ordinalCols = 2
 
-	// factLabelCols is the label column of the detail panel, and popularityCells
-	// the width of the little bar beside the rating.
-	factLabelCols   = 12
-	popularityCells = 8
+	// factLabelCols is the label column of the detail panel.
+	factLabelCols = 12
+
+	// The rating: five stars, so each stands for twenty of Spotify's hundred.
+	// Nothing scores zero stars — a track nobody plays is still a track.
+	starFull  = "★"
+	starEmpty = "☆"
+	starCount = 5
+	starStep  = 100 / starCount
 
 	// secondaryCols is the fixed middle column of a list row: the artist, or the
 	// playlist's owner. Fixed so the trailing column always lines up.
@@ -166,11 +171,18 @@ func (m Model) trackDetail(w int) []string {
 		lines = append(lines, m.fact(f.label, f.value, w))
 	}
 	if t.Popularity != nil {
-		lines = append(lines, m.fact("Popularity",
-			meter(float64(*t.Popularity)/100, popularityCells, s.MeterOn, s.MeterOff)+
-				s.Volume.Render(fmt.Sprintf(" %d", *t.Popularity)), w))
+		lines = append(lines, m.fact("Popularity", m.stars(*t.Popularity), w))
 	}
 	return lines
+}
+
+// stars renders a rating as five of them, filled in fifths. Spotify's number is
+// out of a hundred, which reads as a measurement; a row of stars reads as an
+// opinion, which is what it is.
+func (m Model) stars(popularity int) string {
+	filled := min(max((popularity+starStep-1)/starStep, 1), starCount)
+	return m.styles.StarOn.Render(strings.Repeat(starFull, filled)) +
+		m.styles.StarOff.Render(strings.Repeat(starEmpty, starCount-filled))
 }
 
 // fact is one label-and-value row of the detail panel. The label column is

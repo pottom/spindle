@@ -53,6 +53,8 @@ type Styles struct {
 
 	// Detail panel.
 	FactLabel lipgloss.Style
+	StarOn    lipgloss.Style
+	StarOff   lipgloss.Style
 
 	// Scrollbar.
 	ScrollThumb lipgloss.Style
@@ -98,6 +100,8 @@ func New(isDark bool, accent color.Color) Styles {
 		Empty:        fg(t.Faint),
 
 		FactLabel: fg(t.Faint),
+		StarOn:    fg(accent),
+		StarOff:   fg(t.Faint),
 
 		ScrollThumb: fg(accent),
 		ScrollTrack: fg(t.Faint),

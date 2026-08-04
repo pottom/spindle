@@ -404,13 +404,39 @@ func TestPopularityShownEvenAtZero(t *testing.T) {
 
 	m.queue[1].Popularity = &fifty
 	m.queuePane.cursor.cursor = queueRowOf(1)
-	if got := plain(strings.Join(m.trackDetail(40), "\n")); !strings.Contains(got, "50") {
-		t.Errorf("trackDetail() = %q, want the rating", got)
+	if got := plain(strings.Join(m.trackDetail(40), "\n")); !strings.Contains(got, strings.Repeat(starFull, 3)) {
+		t.Errorf("trackDetail() = %q, want three of five stars for a rating of fifty", got)
 	}
 
 	// A backend that does not rate tracks says nothing rather than zero.
 	m.queue[1].Popularity = nil
 	if got := plain(strings.Join(m.trackDetail(40), "\n")); strings.Contains(got, "Popularity") {
 		t.Errorf("trackDetail() = %q, want no rating when the backend does not give one", got)
+	}
+}
+
+// Five stars over Spotify's hundred: each stands for twenty. The boundaries are
+// where a rating looks wrong if they are off by one, so they are pinned here.
+func TestStars(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+
+	cases := []struct {
+		popularity int
+		want       int
+	}{
+		{0, 1}, {1, 1}, {20, 1},
+		{21, 2}, {40, 2},
+		{41, 3}, {49, 3}, {60, 3},
+		{61, 4}, {80, 4},
+		{81, 5}, {100, 5},
+	}
+	for _, c := range cases {
+		got := strings.Count(plain(m.stars(c.popularity)), starFull)
+		if got != c.want {
+			t.Errorf("stars(%d) = %d filled, want %d", c.popularity, got, c.want)
+		}
+		if total := len([]rune(plain(m.stars(c.popularity)))); total != starCount {
+			t.Errorf("stars(%d) = %d stars, want %d", c.popularity, total, starCount)
+		}
 	}
 }
