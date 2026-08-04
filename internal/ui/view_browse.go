@@ -15,8 +15,10 @@ const (
 	nowMark   = "♪"
 	// queuedMark says a track is already waiting. Pressing the key that puts it
 	// there is otherwise an act with no visible result, and a list you have
-	// been picking from is worth being able to read back.
-	queuedMark = "＋"
+	// been picking from is worth being able to read back. A dot rather than a
+	// sign: it marks a state, and the column is read down rather than word by
+	// word.
+	queuedMark = "•"
 
 	// The scrollbar: a lit thumb over a faint track, one cell wide.
 	scrollThumb = "┃"
@@ -312,10 +314,24 @@ func (m Model) withMark(t player.Track, title string) string {
 	if hot(t) {
 		title += " " + hotMark
 	}
-	if m.isQueued(t.ID) {
-		title += " " + m.styles.Queued.Render(queuedMark)
-	}
 	return title
+}
+
+// queuedColumn is the narrow band between the ordinal and the title, carrying
+// the mark for a track already waiting in the queue. A column of its own rather
+// than a flag after the title: what is worth reading here is how much of a list
+// has been picked over, and marks scattered along the titles cannot be counted
+// at a glance the way a column can.
+func (m Model) queuedColumn(t player.Track) string {
+	if m.tab == tabQueue {
+		// Everything here is in the queue by definition; a column saying so
+		// would be a column of dots.
+		return ""
+	}
+	if !m.isQueued(t.ID) {
+		return "  "
+	}
+	return m.styles.Queued.Render(queuedMark) + " "
 }
 
 // isQueued reports whether a track is one of those waiting by hand. Only those:
@@ -586,7 +602,7 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 		primary = m.styles.RowPlaying
 	}
 
-	title := m.withMark(t, primary.Render(t.Title))
+	title := m.queuedColumn(t) + m.withMark(t, primary.Render(t.Title))
 	switch {
 	case m.ps != nil && m.ps.TrackID == t.ID:
 		title = m.leadIn(m.styles.Cursor.Render(nowMark)) + title

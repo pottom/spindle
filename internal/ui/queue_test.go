@@ -892,6 +892,15 @@ func TestQueuedTracksAreMarkedWhereverTheyAreListed(t *testing.T) {
 	m.queue = []player.Track{queued, {ID: tracks[2].ID, Title: tracks[2].Title}}
 
 	after := plain(m.render())
+	// The mark stands in a column of its own, between the ordinal and the
+	// title, so a list can be read down for how much of it has been picked.
+	for _, line := range strings.Split(after, "\n") {
+		if at := strings.Index(line, queuedMark); at >= 0 {
+			if title := strings.Index(line, queued.Title); title < at {
+				t.Errorf("the mark is at %d and the title at %d — want the mark ahead of it", at, title)
+			}
+		}
+	}
 	for _, line := range strings.Split(after, "\n") {
 		if !strings.Contains(line, queuedMark) {
 			continue
