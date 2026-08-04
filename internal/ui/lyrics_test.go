@@ -314,23 +314,34 @@ func TestLyricsDoNotMoveTheArtwork(t *testing.T) {
 	}
 }
 
-// The trace and the words want the same band of the screen, so only one of them
-// can have it. Showing both meant the trace drawing over the lyric.
-func TestWaveformStepsAsideForTheWords(t *testing.T) {
+// The words and the trace both have their place: the information moves to the
+// top of the column and the words take what it leaves, which is above the band
+// the trace runs across. Neither has to give way.
+func TestWordsAndWaveformCoexist(t *testing.T) {
 	m := lyricsModel(120, 44)
 	m.scope.on = true
+	m.setProgress(24 * time.Second)
+	m.scope.frame = []float32{0.8, -0.8, 0.5, -0.5}
+	m.scope.follow(m.scope.frame)
 
-	m.lyrics.on = false
-	if !m.scopeVisible() {
-		t.Fatal("the trace is not showing to begin with")
+	if !m.scopeVisible() || !m.lyricsVisible() {
+		t.Fatalf("scope %v, lyrics %v — want both", m.scopeVisible(), m.lyricsVisible())
 	}
 
-	m.lyrics.on = true
-	if m.scopeVisible() {
-		t.Error("the trace is still drawn over the words")
+	var lastWord, firstTrace = -1, -1
+	for i, row := range strings.Split(plain(m.render()), "\n") {
+		if strings.Contains(row, "xxxxxx") {
+			lastWord = i
+		}
+		if firstTrace < 0 && strings.ContainsRune(row, '⠀'+0x12) {
+			firstTrace = i
+		}
 	}
-	// And the help stops offering a key that would do nothing visible.
-	if strings.Contains(plain(m.render()), "v waveform") {
-		t.Error("the help still offers the waveform while the words are showing")
+	if lastWord < 0 {
+		t.Fatal("no words on screen")
+	}
+	if firstTrace >= 0 && firstTrace <= lastWord {
+		t.Errorf("the trace starts at row %d and the words end at %d, want them clear of each other",
+			firstTrace, lastWord)
 	}
 }

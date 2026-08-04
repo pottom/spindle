@@ -124,12 +124,7 @@ func (m Model) scopeTop(l layout) int {
 }
 
 // scopeVisible reports whether the trace is on screen right now.
-// The words take precedence: they sit in the column beside the picture at the
-// same height the trace runs across, so only one of the two can have that band.
-// Showing both would mean the trace drawing over the lyric.
-func (m Model) scopeVisible() bool {
-	return m.scope.on && m.scopeAvailable() && !m.lyricsVisible()
-}
+func (m Model) scopeVisible() bool { return m.scope.on && m.scopeAvailable() }
 
 // scopeLines renders the trace across w cells.
 //

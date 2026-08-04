@@ -251,7 +251,7 @@ func (m Model) helpKeysWith(scope, lyrics bool) tabKeys {
 
 // helpKeys is the help for what is on screen.
 func (m Model) helpKeys() tabKeys {
-	return m.helpKeysWith(m.scopeAvailable() && !m.lyricsVisible(), m.lyricsAvailable())
+	return m.helpKeysWith(m.scopeAvailable(), m.lyricsAvailable())
 }
 
 // layoutMode is how the current tab divides its body.

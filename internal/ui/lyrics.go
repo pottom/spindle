@@ -61,12 +61,10 @@ func (m Model) lyricsAvailable() bool {
 // lyricsVisible reports whether the words are on screen right now.
 func (m Model) lyricsVisible() bool { return m.lyrics.on && m.lyricsAvailable() }
 
-// lyricsRows is how many blank rows sit under the information block, which is
-// what the words have to fit into.
+// lyricsRows is how many rows are free under the information block once it has
+// been moved to the top of the body.
 func (m Model) lyricsRows(l layout) int {
-	info := len(m.infoBlock(l.infoWidth))
-	top := max((l.bodyHeight-info)/2, 0)
-	return max(l.bodyHeight-top-info-1, 0)
+	return max(l.bodyHeight-len(m.infoBlock(l.infoWidth))-1, 0)
 }
 
 // lyricsBlock is the words, laid out to fill the rows given.
@@ -168,27 +166,29 @@ func (m Model) lyricsNote(w, rows int, text string) []string {
 
 // infoWithLyrics is the player's right-hand column with the words under it.
 //
-// The track information stays exactly where it sits without them — centred
-// against the picture — and the words go into the rows below it, which were
-// already blank. Anchoring the information to the top instead left the picture
-// hanging in the middle of a gap, and moved the very thing that was supposed
-// to stay still.
+// The track information goes to the top of the body and the words take
+// everything below it. The picture does not move — it stays centred, exactly
+// where it sits without the words — so only this column rearranges.
 func (m Model) infoWithLyrics(l layout, rows int) []string {
-	info := m.infoBlock(l.infoWidth)
-	out := stack(info, l.infoWidth, rows)
-
-	// One blank row after the controls, so the words do not read as another
-	// line of the track information.
-	at := max((rows-len(info))/2, 0) + len(info) + 1
-	room := min(rows-at, lyricsMaxRows)
-	if room < lyricsMinRows {
-		return out
+	out := make([]string, 0, rows)
+	for _, line := range m.infoBlock(l.infoWidth) {
+		if len(out) == rows {
+			return out
+		}
+		out = append(out, fit(line, l.infoWidth))
 	}
 
-	for i, line := range m.lyricsBlock(l.infoWidth, room) {
-		out[at+i] = line
+	// A blank row after the controls, so the words do not read as another line
+	// of the track information.
+	if len(out) < rows {
+		out = append(out, strings.Repeat(" ", l.infoWidth))
 	}
-	return out
+	out = append(out, m.lyricsBlock(l.infoWidth, min(rows-len(out), lyricsMaxRows))...)
+
+	for len(out) < rows {
+		out = append(out, strings.Repeat(" ", l.infoWidth))
+	}
+	return out[:rows]
 }
 
 // fetchLyrics asks for the words of the track playing, once. It returns nil
