@@ -290,7 +290,7 @@ const (
 	// lyricFadeBias pulls the fall toward the middle of the window. Below one,
 	// the rows next to the current line start receding at once instead of
 	// holding their strength for two or three rows.
-	lyricFadeBias = 0.6
+	lyricFadeBias = 0.45
 )
 
 // lyricFade builds the fade: the line being sung in the artwork's accent, then
@@ -301,7 +301,7 @@ const (
 // away quickly. Lines of text falling off at the edges like that read as a
 // surface curving away — the same shading that makes a cylinder look round.
 func lyricFade(t Theme, accent color.Color) []lipgloss.Style {
-	near := blend(t.Muted, t.Text, 0.15)
+	near := blend(t.Muted, t.Faint, 0.2)
 	far := shift(t.Faint, 0, 0.85, 0.45)
 
 	out := make([]lipgloss.Style, lyricFadeSteps)
