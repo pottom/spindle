@@ -38,6 +38,9 @@ type keyMap struct {
 	// Queue editing. Only the tracks put there by hand can be moved or dropped,
 	// so these do nothing on the rest of the list.
 	Enqueue key.Binding
+	// PlayOne plays the track under the cursor and nothing else, where enter
+	// would have played the list it belongs to.
+	PlayOne key.Binding
 	// EnqueueTyped is the same action on the search tab, where every printable
 	// key belongs to the query and cannot mean anything else.
 	EnqueueTyped key.Binding
@@ -138,6 +141,10 @@ func newKeyMap() keyMap {
 		Enqueue: key.NewBinding(
 			key.WithKeys("a"),
 			key.WithHelp("a", "add to queue"),
+		),
+		PlayOne: key.NewBinding(
+			key.WithKeys("o"),
+			key.WithHelp("o", "play only this"),
 		),
 		EnqueueTyped: key.NewBinding(
 			key.WithKeys("ctrl+a"),
@@ -290,10 +297,11 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 		short := []key.Binding{
 			hint("↑↓", "select"),
 			hint("enter", "play"),
+			hint("o", "only this"),
 			hint("a", "queue"),
 			hint("esc", "back"),
 		}
-		second := []key.Binding{k.GoTab, k.PlayPause, k.Next, k.Help, k.Quit}
+		second := []key.Binding{k.GoTab, k.PlayOne, k.PlayPause, k.Next, k.Help}
 		if scope {
 			short = append(short, hint("v", "waveform"))
 			second = append(second, k.Scope)

@@ -91,6 +91,23 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			m.awaitTrackChange(),
 		), true
 
+	case key.Matches(k, m.keys.PlayOne):
+		// Enter plays the list from here, which is what the official client
+		// does and what makes the rest of it follow. This is the other reading:
+		// one track, and whatever was playing before it is let go. Nothing
+		// follows it, because nothing was asked to.
+		t := m.cursorTrack()
+		if m.playlists.open == nil || t == nil {
+			return nil, true
+		}
+		id, p := t.ID, m.player
+		return tea.Batch(
+			controlCmd("play track", func(ctx context.Context) error {
+				return p.PlayTrack(ctx, id)
+			}),
+			m.awaitTrackChange(),
+		), true
+
 	case key.Matches(k, m.keys.Enqueue):
 		if m.playlists.open == nil {
 			return nil, true

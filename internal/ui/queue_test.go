@@ -828,3 +828,41 @@ func TestOpenPlaylistFollowsTheCursor(t *testing.T) {
 		t.Errorf("cursorTrack = %v, want the panel to follow the cursor", got)
 	}
 }
+
+// Enter plays the list from the track under the cursor, so the rest of it
+// follows. o is the other reading: that one track and nothing after it.
+func TestPlayOnlyThisTrack(t *testing.T) {
+	p := player.NewMock()
+	m := New(p, nil, defaultTestCell)
+	m.tab = tabPlaylists
+	lists, _ := p.Playlists(t.Context())
+	open := lists[0]
+	m.playlists.open = &open
+	tracks, _ := p.PlaylistTracks(t.Context(), open.ID)
+	if len(tracks) < 2 {
+		t.Fatalf("the mock playlist has %d tracks, want at least 2", len(tracks))
+	}
+	m.playlists.tracks = tracks
+	m.playlists.inner.move(1, len(tracks))
+
+	cmd, handled := m.playlistKey(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	if !handled || cmd == nil {
+		t.Fatal("o did nothing inside a playlist")
+	}
+	runControls(cmd)
+
+	st, err := p.State(t.Context())
+	if err != nil {
+		t.Fatalf("State: %v", err)
+	}
+	if st.TrackID != tracks[1].ID {
+		t.Errorf("playing %q, want the track under the cursor %q", st.TrackID, tracks[1].ID)
+	}
+
+	// At the top level there is no track under the cursor, so the key is a
+	// no-op rather than playing something the cursor is not on.
+	m.playlists.open = nil
+	if cmd, _ := m.playlistKey(tea.KeyPressMsg{Code: 'o', Text: "o"}); cmd != nil {
+		t.Error("o played something from the list of playlists")
+	}
+}

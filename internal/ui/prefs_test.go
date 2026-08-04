@@ -104,6 +104,19 @@ func columnOf(screen, want string) int {
 	return -1
 }
 
+// runControls runs the commands a key returned, without waiting out the timers
+// among them: a batch's message names the commands rather than running them.
+func runControls(cmd tea.Cmd) {
+	if cmd == nil {
+		return
+	}
+	if batch, ok := cmd().(tea.BatchMsg); ok {
+		for _, inner := range batch {
+			runControls(inner)
+		}
+	}
+}
+
 func rowOf(screen, want string) int {
 	for i, line := range strings.Split(screen, "\n") {
 		if strings.Contains(line, want) {
