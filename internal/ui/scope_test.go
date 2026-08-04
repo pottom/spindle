@@ -114,6 +114,7 @@ func TestScopeDrawsAContinuousLine(t *testing.T) {
 
 	// A step from bottom to top inside two dots: every row between has to be lit.
 	m.scope.frame = []float32{-1, -1, 1, 1}
+	m.scope.follow(m.scope.frame)
 	lines := m.scopeLines(4)
 	if len(lines) != scopeRows {
 		t.Fatalf("scopeLines = %d rows, want %d", len(lines), scopeRows)
@@ -126,6 +127,7 @@ func TestScopeDrawsAContinuousLine(t *testing.T) {
 
 	// Silence rests on the centre line, and only there.
 	m.scope.frame = []float32{0, 0, 0, 0}
+	m.scope.follow(m.scope.frame)
 	lit := 0
 	for _, line := range m.scopeLines(4) {
 		if strings.TrimSpace(plain(line)) != "" {
@@ -150,4 +152,40 @@ func TestScopeWithoutASourceRestsFlat(t *testing.T) {
 	}
 }
 
-func msgScopeTick() tea.Msg { return msg.ScopeTick{} }
+func msgScopeTick() tea.Msg { return msg.WaveformReady{} }
+
+// Measured against a live stream, peaks within one track ran from 0.06 to 0.87.
+// At a fixed scale that is a flat line for half the track and a clipped one for
+// the rest, so the trace follows the recent loudness instead.
+func TestScopeFollowsTheLoudness(t *testing.T) {
+	m := scopeModel(100, 40)
+	m.scope.on = true
+	m.resize()
+
+	quiet := []float32{0.06, -0.06, 0.05, -0.05}
+	loud := []float32{0.87, -0.87, 0.8, -0.8}
+
+	// A quiet passage still reaches most of the way up.
+	for range 40 {
+		m.scope.follow(quiet)
+	}
+	m.scope.frame = quiet
+	if got := m.scopeSample(0, 4); got < 0.7 {
+		t.Errorf("quiet passage scaled to %.2f, want most of the deflection", got)
+	}
+
+	// A sudden hit louder than anything before is drawn at the edge, not past it.
+	m.scope.follow(loud)
+	m.scope.frame = loud
+	if got := m.scopeSample(0, 4); got > 1 || got < 0.9 {
+		t.Errorf("loud hit scaled to %.2f, want it pinned at the edge", got)
+	}
+
+	// And the gain does not run away in silence, where only noise is left.
+	for range 500 {
+		m.scope.follow([]float32{0, 0, 0, 0})
+	}
+	if m.scope.envelope < scopeFloor {
+		t.Errorf("envelope fell to %.3f in silence, want it held at %.2f", m.scope.envelope, scopeFloor)
+	}
+}

@@ -154,15 +154,16 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = message.Err
 		return m, nil
 
-	case msg.ScopeTick:
+	case msg.WaveformReady:
 		// The trace stops the moment it leaves the screen: a redraw every 33ms
 		// for something nobody is looking at is the whole cost of the feature.
 		if !m.scopeVisible() {
 			m.scope.running = false
 			return m, nil
 		}
-		m.scope.frame = m.nextScopeFrame()
-		return m, scopeTickCmd()
+		m.scope.frame = message.Samples
+		m.scope.follow(message.Samples)
+		return m, scopeFrameCmd(m.player)
 
 	case spinner.TickMsg:
 		if message.ID == m.device.ID() {
@@ -614,5 +615,5 @@ func (m *Model) startScope() tea.Cmd {
 		return nil
 	}
 	m.scope.running = true
-	return scopeTickCmd()
+	return scopeFrameCmd(m.player)
 }

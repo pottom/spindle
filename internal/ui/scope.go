@@ -3,8 +3,6 @@ package ui
 import (
 	"math"
 	"strings"
-
-	"github.com/pottom/spindle/internal/player"
 )
 
 const (
@@ -51,6 +49,40 @@ type scopeState struct {
 	// frame is the latest waveform, one value per horizontal dot, in -1..1. It
 	// is resampled to whatever width the screen turns out to be.
 	frame []float32
+
+	// envelope follows the recent loudness so the trace can be scaled to it.
+	// Measured against a live stream, peaks ran from 0.06 to 0.87 within one
+	// track: at a fixed scale the quiet passages are a flat line and the loud
+	// ones clip. It rises at once and falls slowly, as a meter does.
+	envelope float32
+}
+
+const (
+	// scopeDeflection is how much of the half-height a passage at the current
+	// envelope fills, leaving room for something louder to still read as louder.
+	scopeDeflection = 0.86
+
+	// scopeRelease is the fraction of the envelope kept each frame while the
+	// music is quieter than it was — about a second and a half to fall by half.
+	scopeRelease = 0.985
+
+	// scopeFloor stops the gain running away in silence, where the only thing
+	// left to amplify is the noise.
+	scopeFloor = 0.05
+)
+
+// follow updates the loudness envelope from a new frame.
+func (s *scopeState) follow(frame []float32) {
+	var peak float32
+	for _, v := range frame {
+		if v < 0 {
+			v = -v
+		}
+		peak = max(peak, v)
+	}
+
+	s.envelope = max(peak, s.envelope*scopeRelease)
+	s.envelope = max(s.envelope, scopeFloor)
 }
 
 // available reports whether the trace can be offered at all. A short terminal
@@ -90,7 +122,7 @@ func (m Model) scopeLines(w int) []string {
 		y := m.scopeSample(x, dotsX)
 		// Map -1..1 onto the rows, leaving a dot of headroom at each edge so a
 		// clipping passage does not look like a flat line against the border.
-		dy := int(math.Round((0.5 - float64(y)*0.46) * float64(dotsY-1)))
+		dy := int(math.Round((0.5 - float64(y)*0.5*scopeDeflection) * float64(dotsY-1)))
 		dy = min(max(dy, 0), dotsY-1)
 
 		from := dy
@@ -140,11 +172,15 @@ func (m Model) scopeLines(w int) []string {
 // daemon sent to however wide the terminal is. With no frame at all the trace
 // rests on the centre line, which is what silence looks like.
 func (m Model) scopeSample(x, dots int) float32 {
-	if len(m.scope.frame) == 0 || dots <= 0 {
+	if len(m.scope.frame) == 0 || dots <= 0 || m.scope.envelope <= 0 {
 		return 0
 	}
 	i := x * len(m.scope.frame) / dots
-	return m.scope.frame[min(i, len(m.scope.frame)-1)]
+	v := m.scope.frame[min(i, len(m.scope.frame)-1)]
+
+	// Scaled to the recent loudness, then clamped: a sudden hit louder than
+	// anything before it is drawn at the edge rather than off it.
+	return min(max(v/m.scope.envelope, -1), 1)
 }
 
 // scopeBlock is the trace with its blank separator, padded to the frame width.
@@ -156,15 +192,4 @@ func (m Model) scopeBlock(l layout) []string {
 		out = append(out, m.pad(line, l))
 	}
 	return out
-}
-
-// nextScopeFrame asks the backend for the latest waveform. A backend with no
-// samples to give leaves the trace resting on the centre line, which is what
-// silence looks like — no error, nothing to explain.
-func (m Model) nextScopeFrame() []float32 {
-	source, ok := m.player.(player.Waveform)
-	if !ok {
-		return nil
-	}
-	return source.Waveform()
 }

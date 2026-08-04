@@ -52,13 +52,20 @@ const (
 	volumeDebounce = 400 * time.Millisecond
 )
 
-// scopeTickCmd drives the waveform. Thirty frames a second is what makes a
-// trace look like sound rather than a slideshow; it runs only while the trace
-// is on screen.
-func scopeTickCmd() tea.Cmd {
-	return tea.Tick(scopeInterval, func(t time.Time) tea.Msg {
-		return msg.ScopeTick{Time: t}
-	})
+// scopeFrameCmd waits out a frame and then asks the backend what is being
+// heard. The wait and the fetch are one command so the trace paces itself: the
+// next frame is only asked for once the last one has arrived, which keeps a
+// slow backend from queueing up requests nobody will draw.
+func scopeFrameCmd(p player.Player) tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(scopeInterval)
+
+		source, ok := p.(player.Waveform)
+		if !ok {
+			return msg.WaveformReady{}
+		}
+		return msg.WaveformReady{Samples: source.Waveform()}
+	}
 }
 
 func tickCmd() tea.Cmd {
