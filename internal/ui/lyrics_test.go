@@ -227,3 +227,54 @@ func TestLitLineIsAccent(t *testing.T) {
 		t.Error("the lit line is not set apart from the fade")
 	}
 }
+
+// The fade falls away as a curve, not a straight line: nearly flat beside the
+// line being sung and steep at the edges, which is the shading that makes a
+// surface look like it is curving away.
+func TestFadeCurvesLikeACylinder(t *testing.T) {
+	m := lyricsModel(120, 44)
+	fade := m.styles.LyricFade
+
+	// One step per row between the centre of the window and its edge, so the
+	// deepest shade is actually reached and none is wasted.
+	if want := lyricsLead + 1; len(fade) != want {
+		t.Fatalf("the fade has %d steps for a window of %d rows, want %d", len(fade), lyricsMaxRows, want)
+	}
+
+	lum := func(i int) float64 {
+		r, g, b, _ := fade[i].GetForeground().RGBA()
+		return (0.2126*float64(r>>8) + 0.7152*float64(g>>8) + 0.0722*float64(b>>8)) / 255
+	}
+
+	// Monotonic from the first fade step to the last.
+	for i := 2; i < len(fade); i++ {
+		if lum(i) >= lum(i-1) {
+			t.Errorf("step %d is no darker than %d", i, i-1)
+		}
+	}
+	// And falling faster at the edge than beside the centre.
+	near := lum(1) - lum(2)
+	edge := lum(len(fade)-2) - lum(len(fade)-1)
+	if edge <= near {
+		t.Errorf("the fade drops %.3f at the centre and %.3f at the edge, want the edge steeper", near, edge)
+	}
+}
+
+// The window is symmetric about the line being sung, or the block reads as a
+// list with a tail rather than as a curve.
+func TestWindowIsSymmetric(t *testing.T) {
+	m := lyricsModel(120, 44)
+	m.setProgress(24 * time.Second)
+
+	rows := m.lyricsBlock(44, lyricsMaxRows)
+	lit := -1
+	for i, r := range rows {
+		if strings.Contains(r, "\x1b[1;") {
+			lit = i
+		}
+	}
+	above, below := lit, len(rows)-1-lit
+	if above != below {
+		t.Errorf("%d rows above the lit line and %d below, want them equal", above, below)
+	}
+}

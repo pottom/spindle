@@ -281,23 +281,27 @@ func blend(a, b color.Color, t float64) color.Color {
 	return color.RGBA{R: mix(ar, br), G: mix(ag, bg), B: mix(ab, bb), A: 0xff}
 }
 
-// lyricFadeSteps is how many strengths a lyric is drawn in. Six carries the
-// eye a long way from the current line without the furthest rows becoming
-// invisible on a light terminal.
+// lyricFadeSteps is how many strengths a lyric is drawn in: one for the line
+// being sung and one for each row between it and the edge of the window. Fewer
+// and the fall shows as bands; more and the deepest are never reached.
 const lyricFadeSteps = 6
 
 // lyricFade builds the fade: the line being sung in the artwork's accent, then
 // a fall away from it that keeps going past the theme's faintest text.
+//
+// The fall follows a cosine rather than a straight line, so the rows either side
+// of the current one stay nearly as strong as it and the outermost ones drop
+// away quickly. Lines of text falling off at the edges like that read as a
+// surface curving away — the same shading that makes a cylinder look round.
 func lyricFade(t Theme, accent color.Color) []lipgloss.Style {
 	near := blend(t.Muted, t.Text, 0.15)
-	far := shift(t.Faint, 0, 0.9, 0.62)
+	far := shift(t.Faint, 0, 0.85, 0.45)
 
 	out := make([]lipgloss.Style, lyricFadeSteps)
 	out[0] = lipgloss.NewStyle().Foreground(accent).Bold(true)
 	for i := 1; i < lyricFadeSteps; i++ {
-		// The first step away is already a clear drop, so the rest of the fall
-		// is spread over what is left.
-		f := float64(i-1) / float64(lyricFadeSteps-2)
+		t := float64(i-1) / float64(lyricFadeSteps-2)
+		f := 1 - math.Cos(t*math.Pi/2)
 		out[i] = lipgloss.NewStyle().Foreground(blend(near, far, f))
 	}
 	return out

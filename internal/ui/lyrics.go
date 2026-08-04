@@ -19,11 +19,12 @@ const (
 	// lyricsMaxRows is the most shown at once. A whole lyric on screen is a
 	// page of text to search through; a handful of lines around the one being
 	// sung is something to follow.
-	lyricsMaxRows = 9
+	lyricsMaxRows = 11
 
-	// lyricsLead is how many of those rows sit above the current line. Less
-	// than half, because what is coming is worth more than what has gone.
-	lyricsLead = 3
+	// lyricsLead is how many of those rows sit above the current line. Exactly
+	// half: the fade falls away evenly on both sides, which is what makes the
+	// block read as a surface curving away rather than as a list with a tail.
+	lyricsLead = lyricsMaxRows / 2
 )
 
 // lyricsState is the words of the track playing, and whether they are on screen.
