@@ -1,8 +1,13 @@
 package ui
 
 import (
+	"fmt"
+	"regexp"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui/cover"
 )
 
@@ -81,3 +86,156 @@ func TestListWindowHandlesNothingToShow(t *testing.T) {
 // defaultTestCell is a measured cell of the shape a modern terminal reports, so
 // layout-dependent tests do not silently exercise the fallback.
 var defaultTestCell = cover.CellSize{Width: 17, Height: 41, Measured: true}
+
+// pagedQueue is a queue tab holding more tracks than any terminal could show,
+// which is the only situation in which paging means anything.
+func pagedQueue(n int) Model {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{TrackID: "now", Title: "playing", Playing: true}
+	m.tab = tabQueue
+	for i := range n {
+		m.queue = append(m.queue, trackAt(fmt.Sprintf("id%02d", i), fmt.Sprintf("track %02d", i)))
+	}
+	m.width, m.height = 100, 40
+	m.resize()
+	return m
+}
+
+// listRowPattern matches a drawn list row by its gutter: the cursor if it is
+// there, then the ordinal or the playing mark, then the title.
+var listRowPattern = regexp.MustCompile(`(?m)^ +(?:▸ +)?(?:♪|\d+) {2}\S`)
+
+func drawnListRows(screen string) int {
+	return len(listRowPattern.FindAllString(screen, -1))
+}
+
+// A page has to be a screenful, or the key lies about where it lands. The view
+// draws the rows and the key handler moves by them without being able to ask
+// the view anything, so this is what keeps the two of them saying one number.
+func TestAPageIsTheRowsOnScreen(t *testing.T) {
+	m := pagedQueue(60)
+
+	page := m.visibleListRows()
+	if drawn := drawnListRows(plain(m.render())); drawn != page {
+		t.Fatalf("the queue drew %d rows but a page moves by %d", drawn, page)
+	}
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
+	if got := tm.(Model).queuePane.cursor.cursor; got != page {
+		t.Errorf("page down landed on row %d, want %d — one screenful", got, page)
+	}
+
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyPgUp})
+	if got := tm.(Model).queuePane.cursor.cursor; got != 0 {
+		t.Errorf("page up landed on row %d, want the screenful back", got)
+	}
+}
+
+// However far a key asks the cursor to go, it stops at the list.
+func TestPagingStopsAtTheEnds(t *testing.T) {
+	m := pagedQueue(60)
+	last := len(m.queueRows()) - 1
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyPgUp})
+	if got := tm.(Model).queuePane.cursor.cursor; got != 0 {
+		t.Errorf("page up from the top left the cursor on %d, want 0", got)
+	}
+
+	for range 20 {
+		tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
+	}
+	if got := tm.(Model).queuePane.cursor.cursor; got != last {
+		t.Errorf("paging past the bottom left the cursor on %d, want the last row %d", got, last)
+	}
+}
+
+// home and end reach the ends of whichever list is under them, and so do g and
+// G — the library has two levels and both are driven by the same keys.
+func TestTheEndsAreOneKeyAway(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.tab = tabLibrary
+	for i := range 30 {
+		m.playlists.items = append(m.playlists.items, player.Playlist{
+			ID: fmt.Sprintf("p%02d", i), Name: fmt.Sprintf("playlist %02d", i),
+		})
+	}
+	m.width, m.height = 100, 40
+	m.resize()
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
+	if got := tm.(Model).playlists.cursor.cursor; got != 29 {
+		t.Errorf("end landed on %d, want the last playlist", got)
+	}
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyHome})
+	if got := tm.(Model).playlists.cursor.cursor; got != 0 {
+		t.Errorf("home landed on %d, want the first playlist", got)
+	}
+
+	// Inside a playlist the same keys drive the tracks.
+	open := tm.(Model)
+	open.playlists.open = &player.Playlist{ID: "p00", Name: "playlist 00"}
+	for i := range 40 {
+		open.playlists.tracks = append(open.playlists.tracks, trackAt(fmt.Sprintf("t%02d", i), "track"))
+	}
+
+	tm = open
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'G', Text: "G", Mod: tea.ModShift})
+	if got := tm.(Model).playlists.inner.cursor; got != 39 {
+		t.Errorf("G landed on track %d, want the last one", got)
+	}
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	if got := tm.(Model).playlists.inner.cursor; got != 0 {
+		t.Errorf("g landed on track %d, want the first one", got)
+	}
+}
+
+// On the search tab every printable key belongs to the query, so g has to type
+// rather than jump. The keys that are not letters still move the results.
+func TestGTypesOnTheSearchTabAndPageUpDoesNot(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.tab = tabSearch
+	for i := range 40 {
+		m.search.results = append(m.search.results, trackAt(fmt.Sprintf("r%02d", i), "result"))
+	}
+	m.search.cursor.cursor = 20
+	m.width, m.height = 100, 40
+	m.resize()
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	got := tm.(Model)
+	if c := got.search.cursor.cursor; c != 20 {
+		t.Errorf("g moved the cursor to %d instead of typing", c)
+	}
+	if q := got.search.input.Value(); q != "g" {
+		t.Errorf("query = %q, want the letter in it", q)
+	}
+
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyPgUp})
+	if c := tm.(Model).search.cursor.cursor; c >= 20 {
+		t.Errorf("page up left the cursor on %d, want it a screenful higher", c)
+	}
+}
+
+// The picker is a list like any other, and the keys that move a list move it.
+func TestThePickerTakesTheSameKeys(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{TrackID: "a", Title: "a", Playing: true}
+	m.devices.open = true
+	m.devices.items = devices("", "laptop", "phone", "speaker")
+	m.width, m.height = 100, 40
+	m.resize()
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
+	if sel := tm.(Model).devices.selected(); sel == nil || sel.ID != "speaker" {
+		t.Errorf("end landed on %v, want the last device", sel)
+	}
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyPgUp})
+	if sel := tm.(Model).devices.selected(); sel == nil || sel.ID != "laptop" {
+		t.Errorf("page up landed on %v, want the first device", sel)
+	}
+}

@@ -11,15 +11,11 @@ import (
 
 // queueKey handles the queue tab.
 func (m *Model) queueKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
-	switch {
-	case key.Matches(k, m.keys.Down), key.Matches(k, m.keys.Up):
-		delta := 1
-		if key.Matches(k, m.keys.Up) {
-			delta = -1
-		}
-		m.queuePane.cursor.move(delta, len(m.queueRows()))
+	if m.listKey(k, &m.queuePane.cursor, len(m.queueRows()), true) {
 		return m.previewCover(), true
+	}
 
+	switch {
 	case key.Matches(k, m.keys.Enter):
 		// The top row is already playing; restarting it is not what "play"
 		// means to anyone pressing enter on the track they are listening to.
