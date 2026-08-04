@@ -328,6 +328,13 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.lyrics.on = !m.lyrics.on
 		return m, m.fetchLyrics()
 
+	case key.Matches(k, m.keys.Peek):
+		if !m.peekAvailable() {
+			return m, nil
+		}
+		m.peek.on = !m.peek.on
+		return m, nil
+
 	case key.Matches(k, m.keys.Help):
 		// Expanding the help shortens the body, which shrinks the artwork, so
 		// the cover has to be rendered again at the new size.

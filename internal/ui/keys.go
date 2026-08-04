@@ -32,6 +32,7 @@ type keyMap struct {
 	Refresh key.Binding
 	Scope   key.Binding
 	Lyrics  key.Binding
+	Peek    key.Binding
 
 	// Queue editing. Only the tracks put there by hand can be moved or dropped,
 	// so these do nothing on the rest of the list.
@@ -124,6 +125,10 @@ func newKeyMap() keyMap {
 			key.WithKeys("l"),
 			key.WithHelp("l", "lyrics"),
 		),
+		Peek: key.NewBinding(
+			key.WithKeys("u"),
+			key.WithHelp("u", "up next"),
+		),
 
 		Enqueue: key.NewBinding(
 			key.WithKeys("a"),
@@ -214,7 +219,7 @@ func (k keyMap) forReadOnlyQueue() tabKeys {
 // forPlayer is the player screen's help. The waveform key is only listed where
 // there is room to draw one: advertising a key that does nothing is worse than
 // a shorter bar.
-func (k keyMap) forPlayer(scope, lyrics bool) tabKeys {
+func (k keyMap) forPlayer(scope, lyrics, peek bool) tabKeys {
 	short := []key.Binding{
 		hint("space", "play/pause"),
 		hint("n/p", "track"),
@@ -236,6 +241,9 @@ func (k keyMap) forPlayer(scope, lyrics bool) tabKeys {
 	}
 	if lyrics {
 		second = append(second, k.Lyrics)
+	}
+	if peek {
+		second = append(second, k.Peek)
 	}
 
 	return tabKeys{

@@ -71,6 +71,9 @@ func (m Model) renderPlayer() string {
 	if m.scopeVisible() {
 		body = m.drawScope(body, l)
 	}
+	if m.peekVisible() {
+		body = m.drawPeek(body, l)
+	}
 	lines = append(lines, body...)
 
 	// A blank row before the bottom block, so the help never reads as one more
@@ -319,7 +322,7 @@ func (m Model) renderTooSmall() string {
 // this number, so it cannot depend on the answer. The bar is the same height
 // either way, which TestHelpHeightDoesNotDependOnTheScope keeps true.
 func (m Model) helpHeight() int {
-	return lipgloss.Height(m.help.View(m.helpKeysWith(false, false)))
+	return lipgloss.Height(m.help.View(m.helpKeysWith(false, false, false)))
 }
 
 // formatDuration renders a position as m:ss, or h:mm:ss past an hour.

@@ -211,8 +211,8 @@ func TestHelpHeightDoesNotDependOnTheScope(t *testing.T) {
 		m := scopeModel(100, 44)
 		m.help.ShowAll = full
 
-		with := lipgloss.Height(m.help.View(m.keys.forPlayer(true, false)))
-		without := lipgloss.Height(m.help.View(m.keys.forPlayer(false, false)))
+		with := lipgloss.Height(m.help.View(m.keys.forPlayer(true, false, false)))
+		without := lipgloss.Height(m.help.View(m.keys.forPlayer(false, false, false)))
 		if with != without {
 			t.Errorf("ShowAll=%v: help is %d rows with the waveform key and %d without", full, with, without)
 		}
