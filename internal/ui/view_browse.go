@@ -218,12 +218,14 @@ func hot(t player.Track) bool {
 // The mark has a column of its own rather than trailing the title, so the marked
 // rows line up with each other and the titles all start in the same place. Held
 // open whether the mark is there or not, for the same reason.
+// The place arrives already styled: a running order is part of the row and is
+// drawn like one, while the mark for the track playing belongs to the cursor.
 func (m Model) leadIn(t player.Track, place string) string {
 	mark := strings.Repeat(" ", hotCols)
 	if hot(t) {
 		mark = hotMark
 	}
-	return m.styles.Cursor.Render(padLeft(place, ordinalCols)) + " " + mark + " "
+	return padLeft(place, ordinalCols) + " " + mark + " "
 }
 
 // fact is one label-and-value row of the detail panel. The label column is
@@ -299,7 +301,7 @@ func (m Model) queueRow(t player.Track, w int, selected bool, number int) string
 		primary = m.styles.RowSelected
 	}
 	return m.rowWithTempo(w, selected,
-		m.leadIn(t, nowMark)+primary.Render(t.Title),
+		m.leadIn(t, m.styles.Cursor.Render(nowMark))+primary.Render(t.Title),
 		m.styles.RowSecondary.Render(strings.Join(t.Artists, ", ")),
 		m.tempoCell(t),
 		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
@@ -425,9 +427,9 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 	title := primary.Render(t.Title)
 	switch {
 	case m.ps != nil && m.ps.TrackID == t.ID:
-		title = m.leadIn(t, nowMark) + title
+		title = m.leadIn(t, m.styles.Cursor.Render(nowMark)) + title
 	case number > 0:
-		title = m.leadIn(t, fmt.Sprintf("%d", number)) + title
+		title = m.leadIn(t, primary.Render(fmt.Sprintf("%d", number))) + title
 	}
 
 	return m.rowWithTempo(w, selected,
