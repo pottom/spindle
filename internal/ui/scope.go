@@ -148,7 +148,7 @@ func (m Model) scopeAvailable() bool {
 // share a composition: the cover and a detail panel across the top, the list
 // itself below.
 func (m Model) listTab() bool {
-	return m.tab == tabQueue || m.tab == tabPlaylists
+	return m.tab == tabQueue || m.tab == tabLibrary
 }
 
 // scopeMode is the visualiser the current tab is set to.

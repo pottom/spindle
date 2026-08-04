@@ -183,9 +183,9 @@ func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 		// screen feel alive, and a feature nobody knows to ask for may as well
 		// not exist. The key is there to put it away.
 		scope: scopeState{modes: [tabCount]scopeMode{
-			tabPlayer:    scopeWave,
-			tabQueue:     scopeWave,
-			tabPlaylists: scopeWave,
+			tabPlayer:  scopeWave,
+			tabQueue:   scopeWave,
+			tabLibrary: scopeWave,
 		}},
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
 		device:  spinner.New(spinner.WithSpinner(deviceSpinner)),
@@ -205,7 +205,7 @@ func (m Model) coverTarget() string {
 			return t.CoverURL
 		}
 		return ""
-	case tabPlaylists:
+	case tabLibrary:
 		return m.playlists.cover()
 	case tabSearch:
 		return m.search.cover()

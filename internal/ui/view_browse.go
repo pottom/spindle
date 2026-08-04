@@ -13,6 +13,10 @@ import (
 const (
 	rowCursor = "▸"
 	nowMark   = "♪"
+	// queuedMark says a track is already waiting. Pressing the key that puts it
+	// there is otherwise an act with no visible result, and a list you have
+	// been picking from is worth being able to read back.
+	queuedMark = "＋"
 
 	// The scrollbar: a lit thumb over a faint track, one cell wide.
 	scrollThumb = "┃"
@@ -306,9 +310,32 @@ func (m Model) leadIn(place string) string {
 // something most rows do not have.
 func (m Model) withMark(t player.Track, title string) string {
 	if hot(t) {
-		return title + " " + hotMark
+		title += " " + hotMark
+	}
+	if m.isQueued(t.ID) {
+		title += " " + m.styles.Queued.Render(queuedMark)
 	}
 	return title
+}
+
+// isQueued reports whether a track is one of those waiting by hand. Only those:
+// everything the album or playlist supplies is in the list as well, and marking
+// all of it would say nothing about what was chosen.
+func (m Model) isQueued(id string) bool {
+	if id == "" {
+		return false
+	}
+	for _, t := range m.queue {
+		if !t.Queued {
+			// The hand-added tracks are the leading run; past them is the
+			// context, which nobody put there.
+			break
+		}
+		if t.ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 // fact is one label-and-value row of the detail panel. The label column is
@@ -407,11 +434,11 @@ func (m Model) playlistPaneView(l layout, rows int) []string {
 	if m.playlists.open == nil {
 		return m.listBlock(l, rows, listScreen{
 			detail:   m.playlistDetail,
-			heading:  func(int) string { return m.styles.Title.Render("Playlists") },
+			heading:  func(int) string { return m.styles.Title.Render("Library") },
 			subtitle: func() string { return m.styles.Album.Render(playlistSubtitle(m.playlists.items)) },
 			count:    len(m.playlists.items),
 			state:    &m.playlists.cursor,
-			empty:    "No playlists.",
+			empty:    "Nothing saved yet.",
 			row: func(i, w int, selected bool) string {
 				return m.playlistRow(m.playlists.items[i], w, selected)
 			},

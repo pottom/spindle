@@ -293,7 +293,7 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 			},
 		}
 
-	case tabPlaylists:
+	case tabLibrary:
 		short := []key.Binding{
 			hint("↑↓", "select"),
 			hint("enter", "play"),

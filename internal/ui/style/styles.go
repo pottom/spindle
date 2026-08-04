@@ -63,8 +63,12 @@ type Styles struct {
 
 	// Detail panel.
 	FactLabel lipgloss.Style
-	StarOn    lipgloss.Style
-	StarOff   lipgloss.Style
+	// Queued marks a track already waiting in the queue, wherever else it is
+	// being listed.
+	Queued lipgloss.Style
+
+	StarOn  lipgloss.Style
+	StarOff lipgloss.Style
 
 	// Scrollbar.
 	ScrollThumb lipgloss.Style
@@ -117,6 +121,7 @@ func New(isDark bool, accent color.Color) Styles {
 		LyricAhead: lipgloss.NewStyle().Foreground(shift(accent, 0, 0.62, 0.6)),
 
 		FactLabel: fg(t.Faint),
+		Queued:    fg(accent),
 		StarOn:    fg(accent),
 		StarOff:   fg(t.Faint),
 

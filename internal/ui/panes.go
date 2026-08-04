@@ -135,7 +135,7 @@ func (m Model) cursorTrack() *player.Track {
 	switch {
 	case m.tab == tabQueue:
 		return m.queuedTrack()
-	case m.tab == tabPlaylists && m.playlists.open != nil:
+	case m.tab == tabLibrary && m.playlists.open != nil:
 		return at(m.playlists.tracks, m.playlists.inner.cursor)
 	case m.tab == tabSearch:
 		return at(m.search.results, m.search.cursor.cursor)

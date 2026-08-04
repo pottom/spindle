@@ -770,7 +770,7 @@ func TestPlaylistsUseTheSameShapeAsTheQueue(t *testing.T) {
 	p := player.NewMock()
 	m := New(p, nil, defaultTestCell)
 	m.ps = &player.State{TrackID: "t01", Playing: true}
-	m.tab = tabPlaylists
+	m.tab = tabLibrary
 	lists, err := p.Playlists(t.Context())
 	if err != nil {
 		t.Fatalf("Playlists: %v", err)
@@ -806,7 +806,7 @@ func TestPlaylistsUseTheSameShapeAsTheQueue(t *testing.T) {
 func TestOpenPlaylistFollowsTheCursor(t *testing.T) {
 	p := player.NewMock()
 	m := New(p, nil, defaultTestCell)
-	m.tab = tabPlaylists
+	m.tab = tabLibrary
 	lists, _ := p.Playlists(t.Context())
 	open := lists[0]
 	m.playlists.open = &open
@@ -834,7 +834,7 @@ func TestOpenPlaylistFollowsTheCursor(t *testing.T) {
 func TestPlayOnlyThisTrack(t *testing.T) {
 	p := player.NewMock()
 	m := New(p, nil, defaultTestCell)
-	m.tab = tabPlaylists
+	m.tab = tabLibrary
 	lists, _ := p.Playlists(t.Context())
 	open := lists[0]
 	m.playlists.open = &open
@@ -864,5 +864,49 @@ func TestPlayOnlyThisTrack(t *testing.T) {
 	m.playlists.open = nil
 	if cmd, _ := m.playlistKey(tea.KeyPressMsg{Code: 'o', Text: "o"}); cmd != nil {
 		t.Error("o played something from the list of playlists")
+	}
+}
+
+// Adding a track to the queue is otherwise an act with no visible result, and a
+// list you have been picking from is worth being able to read back.
+func TestQueuedTracksAreMarkedWhereverTheyAreListed(t *testing.T) {
+	p := player.NewMock()
+	m := New(p, nil, defaultTestCell)
+	m.tab = tabLibrary
+	lists, _ := p.Playlists(t.Context())
+	open := lists[0]
+	m.playlists.open = &open
+	tracks, _ := p.PlaylistTracks(t.Context(), open.ID)
+	m.playlists.tracks = tracks
+	m.width, m.height = 180, 40
+	m.resize()
+
+	before := plain(m.render())
+	if strings.Contains(before, queuedMark) {
+		t.Fatal("something was marked as queued before anything was")
+	}
+
+	// The second track, put there by hand.
+	queued := tracks[1]
+	queued.Queued = true
+	m.queue = []player.Track{queued, {ID: tracks[2].ID, Title: tracks[2].Title}}
+
+	after := plain(m.render())
+	for _, line := range strings.Split(after, "\n") {
+		if !strings.Contains(line, queuedMark) {
+			continue
+		}
+		if !strings.Contains(line, queued.Title) {
+			t.Errorf("row %q is marked, want only the track that was added by hand", strings.TrimSpace(line))
+		}
+	}
+	if !strings.Contains(after, queuedMark) {
+		t.Error("the track added by hand is not marked at all")
+	}
+
+	// What the playlist itself supplies is in the list too, and marking that
+	// would say nothing about what was chosen.
+	if m.isQueued(tracks[2].ID) {
+		t.Error("a track the context supplied is marked as queued by hand")
 	}
 }

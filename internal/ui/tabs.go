@@ -10,14 +10,14 @@ import (
 const headerGap = 2
 
 // tabID identifies a screen. Each one works differently: the player shows what
-// is sounding, the queue what follows, the playlists browse a library, the
-// search hunts for a track.
+// is sounding, the queue what follows, the library browses what has been saved,
+// the search hunts for a track.
 type tabID int
 
 const (
 	tabPlayer tabID = iota
 	tabQueue
-	tabPlaylists
+	tabLibrary
 	tabSearch
 
 	// tabCount sizes the per-tab state: each screen remembers its own
@@ -27,10 +27,10 @@ const (
 )
 
 var tabNames = [...]string{
-	tabPlayer:    "now playing",
-	tabQueue:     "queue",
-	tabPlaylists: "playlists",
-	tabSearch:    "search",
+	tabPlayer:  "now playing",
+	tabQueue:   "queue",
+	tabLibrary: "library",
+	tabSearch:  "search",
 }
 
 func (t tabID) String() string { return tabNames[t] }

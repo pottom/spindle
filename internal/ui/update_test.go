@@ -225,7 +225,7 @@ func TestOnlyOnePlayRequestAtATime(t *testing.T) {
 	sent := make(chan string, 8)
 	m := New(&recordingPlayer{Player: player.NewMock(), played: sent}, nil, defaultTestCell)
 	m.ps = &player.State{TrackID: "a", Title: "a", Playing: true}
-	m.tab = tabPlaylists
+	m.tab = tabLibrary
 
 	ask := func(id string) tea.Cmd {
 		return m.startPlay(playRequest{

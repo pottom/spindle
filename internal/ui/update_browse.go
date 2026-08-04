@@ -28,7 +28,7 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 		cmds = append(cmds, cmd)
 	}
 	switch {
-	case t == tabPlaylists && m.playlists.items == nil:
+	case t == tabLibrary && m.playlists.items == nil:
 		cmds = append(cmds, fetchPlaylistsCmd(m.player))
 	case t == tabQueue:
 		// The queue is kept for the sake of instant skipping, which only needs
@@ -45,7 +45,7 @@ func (m *Model) browseKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	switch m.tab {
 	case tabQueue:
 		return m.queueKey(k)
-	case tabPlaylists:
+	case tabLibrary:
 		return m.playlistKey(k)
 	case tabSearch:
 		return m.searchKey(k)

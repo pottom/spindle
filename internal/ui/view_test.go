@@ -169,7 +169,7 @@ func TestHelpSitsOnTheLastRowWithSpaceAbove(t *testing.T) {
 	}
 
 	for _, size := range [][2]int{{minWidth, minHeight}, {96, 28}, {120, 44}} {
-		for _, tab := range []tabID{tabPlayer, tabQueue, tabPlaylists, tabSearch} {
+		for _, tab := range []tabID{tabPlayer, tabQueue, tabLibrary, tabSearch} {
 			m := New(p, nil, defaultTestCell)
 			m.ps, m.tab, m.queue = st, tab, q.Upcoming
 			// A queue longer than the pane, so the list runs to the last row
@@ -202,7 +202,7 @@ func TestDigitsSwitchTabs(t *testing.T) {
 
 	var tm tea.Model = m
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
-	if got := tm.(Model).tab; got != tabPlaylists {
+	if got := tm.(Model).tab; got != tabLibrary {
 		t.Errorf("tab = %v after 3, want playlists", got)
 	}
 
