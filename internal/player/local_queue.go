@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 )
 
-// localQueue is what the daemon's /player/queue endpoint answers with. It
-// carries no metadata: the daemon knows the order and the origin of each track,
-// the Web API knows what they are called.
+// localQueue is what the daemon's /player/queue endpoint answers with: the
+// upcoming tracks, in order, named.
 type localQueue struct {
 	Tracks []localQueueTrack `json:"tracks"`
 }
@@ -17,66 +18,111 @@ type localQueue struct {
 type localQueueTrack struct {
 	URI    string `json:"uri"`
 	Queued bool   `json:"queued"`
+
+	Name        string   `json:"name"`
+	ArtistNames []string `json:"artist_names"`
+	AlbumName   string   `json:"album_name"`
+	AlbumCover  string   `json:"album_cover_url"`
+	Duration    int64    `json:"duration"`
+	ReleaseDate string   `json:"release_date"`
+	TrackNumber int      `json:"track_number"`
+	DiscNumber  int      `json:"disc_number"`
+	TotalTracks int      `json:"total_tracks"`
+	AlbumType   string   `json:"album_type"`
 }
 
-// Queue is the upcoming tracks, each carrying the id the device knows it by and
-// whether it sits in the part of the list whose order can be set outright.
+func (t localQueueTrack) toTrack() Track {
+	return Track{
+		ID:          trackIDFromURI(t.URI),
+		Title:       t.Name,
+		Artists:     t.ArtistNames,
+		Album:       t.AlbumName,
+		CoverURL:    t.AlbumCover,
+		Duration:    time.Duration(t.Duration) * time.Millisecond,
+		Queued:      t.Queued,
+		Released:    releaseDate(t.ReleaseDate),
+		TrackNumber: t.TrackNumber,
+		DiscNumber:  t.DiscNumber,
+		TotalTracks: t.TotalTracks,
+		AlbumType:   t.AlbumType,
+	}
+}
+
+// Queue is what is playing and what comes next, both as the device holds them.
 //
-// Neither source has both halves. The Web API returns titles, artists and covers
-// but will not say where a track came from; the daemon knows exactly that, and
-// is the only one whose ids the device will answer to — the same recording can
-// carry a different id on each side, and telling the device the Web API's id
-// makes it search its context, fail, and quietly rewind to the first track.
-// Looking the metadata up by the daemon's ids instead would be tidier, but the
-// batch endpoint is closed to applications registered since late 2024.
-//
-// The two lists describe the same sequence, so they are matched by position.
-// That only holds if nothing moved between the two requests, which is what the
-// second reading of the daemon's queue checks.
+// The Web API is deliberately not consulted. It answers with the server's copy
+// of the queue, which lags behind anything edited here — a track removed and
+// then played past would come back — and it identifies the same recordings
+// under ids of its own that the device will not answer to.
 func (l *Local) Queue(ctx context.Context) (Queue, error) {
 	if l.idle() {
 		return l.web.Queue(ctx)
 	}
 
-	before, err := l.queueOrigins(ctx)
+	upcoming, err := l.queueTracks(ctx)
 	if err != nil {
-		return l.web.Queue(ctx)
+		return Queue{}, err
 	}
 
-	q, err := l.web.Queue(ctx)
-	if err != nil || len(q.Upcoming) == 0 {
-		return q, err
+	out := Queue{Upcoming: upcoming}
+	l.mu.RLock()
+	if l.snapshot != nil {
+		out.Current = l.snapshot.asTrack()
 	}
-
-	after, err := l.queueOrigins(ctx)
-	if err != nil || !sameOrigins(before, after) {
-		// The track changed under us. Without the marks the queue is read-only,
-		// which the UI works out for itself, and the next refresh is moments
-		// away — better than acting on a list that has already moved on.
-		return q, nil
-	}
-
-	if len(q.Upcoming) > len(before) {
-		q.Upcoming = q.Upcoming[:len(before)]
-	}
-	for i := range q.Upcoming {
-		q.Upcoming[i].Queued = before[i].Queued
-		q.Upcoming[i].DeviceID = trackIDFromURI(before[i].URI)
-	}
-	return q, nil
+	l.mu.RUnlock()
+	return out, nil
 }
 
-// sameOrigins reports whether two readings of the queue describe the same one.
-func sameOrigins(a, b []localQueueTrack) bool {
-	if len(a) != len(b) {
-		return false
+// queueTracks asks the daemon what is coming.
+func (l *Local) queueTracks(ctx context.Context) ([]Track, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, l.addr+"/player/queue", nil)
+	if err != nil {
+		return nil, fmt.Errorf("build queue request: %w", err)
 	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
+
+	resp, err := l.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch daemon queue: %w", err)
+	}
+	defer resp.Body.Close() //nolint:errcheck // read-only request
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetch daemon queue: unexpected status %s", resp.Status)
+	}
+
+	var q localQueue
+	if err := json.NewDecoder(resp.Body).Decode(&q); err != nil {
+		return nil, fmt.Errorf("decode daemon queue: %w", err)
+	}
+
+	out := make([]Track, 0, len(q.Tracks))
+	for _, t := range q.Tracks {
+		out = append(out, t.toTrack())
+	}
+	return out, nil
+}
+
+// releaseDate turns the daemon's protobuf rendering of a release date —
+// "year:1987 month:11 day:21", with the later fields missing when the label
+// never recorded them — into what the rest of spindle speaks.
+func releaseDate(s string) string {
+	var out string
+	for _, part := range strings.Fields(s) {
+		name, value, ok := strings.Cut(part, ":")
+		if !ok {
+			continue
+		}
+		switch name {
+		case "year":
+			out = value
+		case "month", "day":
+			if out == "" {
+				return ""
+			}
+			out += "-" + value
 		}
 	}
-	return true
+	return out
 }
 
 // SetQueue replaces the hand-queued tracks, leaving the context alone.
@@ -114,30 +160,4 @@ func (l *Local) Drop(ctx context.Context, trackID string) error {
 	// to look again.
 	l.notify()
 	return nil
-}
-
-// queueOrigins asks the daemon which upcoming tracks are its queue rather than
-// its context. The distinction is not shown — to the user there is one list —
-// but only the queue's order can be written back wholesale.
-func (l *Local) queueOrigins(ctx context.Context) ([]localQueueTrack, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, l.addr+"/player/queue", nil)
-	if err != nil {
-		return nil, fmt.Errorf("build queue request: %w", err)
-	}
-
-	resp, err := l.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("fetch daemon queue: %w", err)
-	}
-	defer resp.Body.Close() //nolint:errcheck // read-only request
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetch daemon queue: unexpected status %s", resp.Status)
-	}
-
-	var q localQueue
-	if err := json.NewDecoder(resp.Body).Decode(&q); err != nil {
-		return nil, fmt.Errorf("decode daemon queue: %w", err)
-	}
-	return q.Tracks, nil
 }

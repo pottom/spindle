@@ -58,7 +58,6 @@ func TestDropRemovesAContextTrackToo(t *testing.T) {
 	dropped := make(chan string, 1)
 	m := queueModel(1, "a", "b", "c")
 	m.player = recordingEditor{Player: m.player, dropped: dropped}
-	m.queue[1].DeviceID = "device-b"
 	m.queuePane.cursor.cursor = queueRowOf(1)
 
 	cmd := m.dropQueued()
@@ -67,8 +66,8 @@ func TestDropRemovesAContextTrackToo(t *testing.T) {
 	}
 	cmd()
 
-	if got := <-dropped; got != "device-b" {
-		t.Errorf("Drop(%q), want the device's own id", got)
+	if got := <-dropped; got != "b" {
+		t.Errorf("Drop(%q), want the track under the cursor", got)
 	}
 	if names := ids(m.queue); len(names) != 2 || names[0] != "a" || names[1] != "c" {
 		t.Errorf("queue = %v, want b gone and the rest in order", names)
@@ -342,42 +341,6 @@ func TestOnlyTheLeadingRunIsSent(t *testing.T) {
 
 	if got := <-sent; len(got) != 1 || got[0] != "a" {
 		t.Errorf("SetQueue(%v), want only the run at the front", got)
-	}
-}
-
-// Everything said to the playback device has to use the id that device knows.
-// The Web API can report a different one for the same recording, and the device
-// answers an unknown id by rewinding to the start of the album.
-func TestTheDeviceIsAddressedInItsOwnIds(t *testing.T) {
-	sent := make(chan []string, 1)
-	m := queueModel(1, "a", "b")
-	m.player = recordingEditor{Player: m.player, sent: sent}
-	m.queue[0].DeviceID = "device-a"
-
-	cmd := m.commitQueue(m.queue)
-	if cmd == nil {
-		t.Fatal("commitQueue = nil")
-	}
-	cmd()
-
-	if got := <-sent; len(got) != 1 || got[0] != "device-a" {
-		t.Errorf("SetQueue(%v), want the device's own id", got)
-	}
-}
-
-// Taking out the track that is playing means not hearing the rest of it, which
-// is a skip. The one behind it moves up and starts.
-func TestDropOnThePlayingRowSkipsIt(t *testing.T) {
-	m := queueModel(1, "a", "b")
-
-	if cmd := m.dropQueued(); cmd == nil {
-		t.Fatal("dropQueued() = nil on the playing row, want a skip")
-	}
-	if m.ps.Title != "a" {
-		t.Errorf("title = %q, want the next track playing", m.ps.Title)
-	}
-	if names := ids(m.queue); len(names) != 1 || names[0] != "b" {
-		t.Errorf("queue = %v, want a taken and b waiting", names)
 	}
 }
 

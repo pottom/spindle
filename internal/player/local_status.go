@@ -30,6 +30,28 @@ type localTrack struct {
 	AlbumCover  string   `json:"album_cover_url"`
 	Position    int64    `json:"position"`
 	Duration    int64    `json:"duration"`
+	ReleaseDate string   `json:"release_date"`
+	TrackNumber int      `json:"track_number"`
+	DiscNumber  int      `json:"disc_number"`
+}
+
+// asTrack is the playing track as a list entry, for the queue screen, which
+// shows it at the head of what follows.
+func (s *localStatus) asTrack() *Track {
+	if s.Track == nil {
+		return nil
+	}
+	return &Track{
+		ID:          trackIDFromURI(s.Track.URI),
+		Title:       s.Track.Name,
+		Artists:     s.Track.ArtistNames,
+		Album:       s.Track.AlbumName,
+		CoverURL:    s.Track.AlbumCover,
+		Duration:    time.Duration(s.Track.Duration) * time.Millisecond,
+		Released:    releaseDate(s.Track.ReleaseDate),
+		TrackNumber: s.Track.TrackNumber,
+		DiscNumber:  s.Track.DiscNumber,
+	}
 }
 
 // toState converts a daemon status into the shape the UI works in.

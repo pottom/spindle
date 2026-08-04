@@ -65,7 +65,7 @@ func (m *Model) dropQueued() tea.Cmd {
 		return nil
 	}
 
-	id := deviceID(m.queue[at])
+	id := m.queue[at].ID
 	rest := make([]player.Track, 0, len(m.queue)-1)
 	rest = append(rest, m.queue[:at]...)
 	rest = append(rest, m.queue[at+1:]...)
@@ -113,7 +113,7 @@ func (m *Model) commitQueue(next []player.Track) tea.Cmd {
 			// Only the leading run is the queue; the device keeps no more.
 			break
 		}
-		ids = append(ids, deviceID(t))
+		ids = append(ids, t.ID)
 	}
 
 	m.queue = next
@@ -131,7 +131,7 @@ func (m *Model) commitQueue(next []player.Track) tea.Cmd {
 // are in the list precisely because they are meant to be heard.
 func (m *Model) playRow(at int) tea.Cmd {
 	target := m.queue[at]
-	id, p := deviceID(target), m.player
+	id, p := target.ID, m.player
 	cmd := m.skip("play from queue", func(ctx context.Context) error {
 		return p.PlayFrom(ctx, id)
 	})
@@ -147,15 +147,6 @@ func (m *Model) playRow(at int) tea.Cmd {
 	m.queuePane.cursor.reset()
 
 	return tea.Batch(cmd, m.syncCover())
-}
-
-// deviceID is the id to speak to the playback device with, falling back to the
-// Web API's when there is no device of ours to ask.
-func deviceID(t player.Track) string {
-	if t.DeviceID != "" {
-		return t.DeviceID
-	}
-	return t.ID
 }
 
 // enqueue appends a track and asks for the queue again, so the queue tab shows
