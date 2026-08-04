@@ -502,7 +502,12 @@ func (m Model) playlistPaneView(l layout, rows int) []string {
 // cursor is resting on, laid out like a track's so the two levels of the tab
 // read as one screen.
 func (m Model) playlistDetail(w, rows int) []string {
-	p := m.playlists.selected()
+	return m.playlistDetailOf(m.playlists.selected(), w, rows)
+}
+
+// playlistDetailOf is the same panel for a playlist from anywhere, so a search
+// result reads exactly as the library's own row does.
+func (m Model) playlistDetailOf(p *player.Playlist, w, rows int) []string {
 	if p == nil {
 		return nil
 	}
@@ -557,31 +562,166 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 		empty = "Nothing matched."
 	}
 
+	found := m.search.current()
 	return m.listBlock(l, rows, listScreen{
-		detail: m.trackDetail,
+		detail: m.searchDetail,
 		// The field is the heading: it is what the screen is about, and it has
 		// to be where the eye already goes for a heading rather than in a band
 		// of its own above one.
-		heading:  func(w int) string { return m.searchField(max(w/2, 8)) },
-		subtitle: func() string { return m.styles.Album.Render(searchSubtitle(m.search.results)) },
-		count:    len(m.search.results),
-		state:    &m.search.cursor,
+		heading:  func(w int) string { return m.searchField(max(w/3, 8)) },
+		subtitle: m.searchKinds,
+		count:    found.count(),
+		state:    &found.cursor,
 		empty:    empty,
-		row: func(i, w int, selected bool) string {
-			return m.trackRow(m.search.results[i], w, selected, 0)
-		},
+		row:      m.searchRow,
 	})
 }
 
-// searchSubtitle counts what came back, and says nothing before anything has.
-func searchSubtitle(results []player.Track) string {
-	if len(results) == 0 {
+// searchKinds is what else the query matched, set against the field.
+//
+// It is the whole argument for showing one kind at a time: the counts say that
+// three artists and eighteen albums are there, which is what a screen of mixed
+// sections would otherwise have to spend rows saying.
+func (m Model) searchKinds() string {
+	if m.search.current().count() == 0 && len(m.search.found) == 0 {
 		return ""
 	}
-	if len(results) == 1 {
-		return "1 result"
+
+	var parts []string
+	for _, kind := range player.SearchKinds {
+		found := m.search.of(kind)
+		if found.count() == 0 {
+			continue
+		}
+
+		count := fmt.Sprintf("%d", found.count())
+		if found.pages.more {
+			// What has been read, not what exists: Spotify's totals are not
+			// worth carrying through three layers for a heading.
+			count += "+"
+		}
+
+		style := m.styles.Album
+		if kind == m.search.kind {
+			style = m.styles.Title
+		}
+		parts = append(parts, style.Render(kind.String()+" "+count))
 	}
-	return fmt.Sprintf("%d results", len(results))
+	return strings.Join(parts, m.styles.Album.Render(" · "))
+}
+
+// searchRow draws one hit, whichever kind is on screen.
+func (m Model) searchRow(i, w int, selected bool) string {
+	found := m.search.current()
+	switch m.search.kind {
+	case player.SearchAlbums:
+		return m.albumRow(found.albums[i], w, selected)
+	case player.SearchArtists:
+		return m.artistRow(found.artists[i], w, selected)
+	case player.SearchPlaylists:
+		return m.playlistRow(found.playlists[i], w, selected)
+	default:
+		return m.trackRow(found.tracks[i], w, selected, 0)
+	}
+}
+
+// albumRow is a record: its name, who made it, and how many tracks it holds.
+func (m Model) albumRow(a player.Album, w int, selected bool) string {
+	primary := m.styles.RowPrimary
+	if selected {
+		primary = m.styles.RowSelected
+	}
+
+	year := releaseYear(a.Released)
+	if a.AlbumType != "" && a.AlbumType != "album" {
+		year = strings.TrimSpace(year + " " + a.AlbumType)
+	}
+	return m.row(w, selected,
+		primary.Render(a.Name),
+		m.styles.RowSecondary.Render(strings.Join(a.Artists, ", ")),
+		m.styles.RowTrailing.Render(year),
+	)
+}
+
+// artistRow is a name and how many people follow it, which is the only measure
+// of an artist that arrives with the list.
+func (m Model) artistRow(a player.Artist, w int, selected bool) string {
+	primary := m.styles.RowPrimary
+	if selected {
+		primary = m.styles.RowSelected
+	}
+	return m.row(w, selected,
+		primary.Render(a.Name),
+		m.styles.RowSecondary.Render(strings.Join(a.Genres, ", ")),
+		m.styles.RowTrailing.Render(formatCount(a.Followers)),
+	)
+}
+
+// searchDetail is the panel beside the cover: whichever kind is on screen, it
+// describes the row under the cursor.
+func (m Model) searchDetail(w, rows int) []string {
+	found := m.search.current()
+	switch m.search.kind {
+	case player.SearchAlbums:
+		return m.albumDetail(atAlbum(found.albums, found.cursor.cursor), w)
+	case player.SearchArtists:
+		return m.artistDetail(atArtist(found.artists, found.cursor.cursor), w)
+	case player.SearchPlaylists:
+		return m.playlistDetailOf(atPlaylist(found.playlists, found.cursor.cursor), w, rows)
+	default:
+		return m.trackDetail(w, rows)
+	}
+}
+
+func (m Model) albumDetail(a *player.Album, w int) []string {
+	if a == nil {
+		return nil
+	}
+	lines := []string{
+		m.styles.Title.Render(a.Name),
+		m.styles.Artist.Render(strings.Join(a.Artists, ", ")),
+		"",
+	}
+	if year := releaseYear(a.Released); year != "" {
+		lines = append(lines, m.fact("Released", year, w))
+	}
+	if a.AlbumType != "" {
+		lines = append(lines, m.fact("Kind", a.AlbumType, w))
+	}
+	if a.Tracks > 0 {
+		lines = append(lines, m.fact("Tracks", fmt.Sprintf("%d", a.Tracks), w))
+	}
+	return lines
+}
+
+func (m Model) artistDetail(a *player.Artist, w int) []string {
+	if a == nil {
+		return nil
+	}
+	lines := []string{
+		m.styles.Title.Render(a.Name),
+		"",
+	}
+	if len(a.Genres) > 0 {
+		lines = append(lines, m.fact("Genres", strings.Join(a.Genres, ", "), w))
+	}
+	if a.Followers > 0 {
+		lines = append(lines, m.fact("Followers", formatCount(a.Followers), w))
+	}
+	return lines
+}
+
+// formatCount is a follower count a person can read at a glance rather than
+// count the digits of.
+func formatCount(n int) string {
+	switch {
+	case n >= 1_000_000:
+		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
+	case n >= 1_000:
+		return fmt.Sprintf("%.1fk", float64(n)/1_000)
+	default:
+		return fmt.Sprintf("%d", n)
+	}
 }
 
 func (m Model) playlistRow(p player.Playlist, w int, selected bool) string {

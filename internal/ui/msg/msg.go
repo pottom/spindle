@@ -84,16 +84,18 @@ type PlaylistTracksFetched struct {
 	Next       int
 }
 
-// SearchResults carries one page of hits for a query. Seq identifies the query,
-// so a slow search landing after a newer one can be discarded.
+// SearchResults carries what a query matched. Seq identifies the query, so a
+// slow search landing after a newer one can be discarded.
+//
+// Kind is what was asked for: empty for a fresh query, which fetches every kind
+// at once, and one kind when a list is being read further into.
 type SearchResults struct {
 	Seq     int
-	Tracks  []player.Track
 	Query   string
+	Kind    player.SearchKind
 	Matched bool
 	Offset  int
-	More    bool
-	Next    int
+	Results player.Results
 }
 
 // CoverSettled fires once the browse cursor has stopped moving for long enough

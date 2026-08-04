@@ -137,24 +137,25 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 }
 
 func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
+	found := m.search.current()
+
 	// No g and G on this tab: they are letters, and every letter here is part
 	// of the query.
-	if m.listKey(k, &m.search.cursor, len(m.search.results), false) {
+	if m.listKey(k, &found.cursor, found.count(), false) {
 		return tea.Batch(m.previewCover(), m.readAhead()), true
 	}
 
 	switch {
-	case key.Matches(k, m.keys.Enter):
-		sel := m.search.selected()
-		if sel == nil {
-			return nil, true
+	case key.Matches(k, m.keys.SearchKind), key.Matches(k, m.keys.SearchKindBack):
+		delta := 1
+		if key.Matches(k, m.keys.SearchKindBack) {
+			delta = -1
 		}
-		id := sel.ID
-		return m.startPlay(playRequest{
-			action: "play track",
-			track:  *sel,
-			call:   func(ctx context.Context, p player.Player) error { return p.PlayNow(ctx, id) },
-		}), true
+		m.turnSearchKind(delta)
+		return tea.Batch(m.previewCover(), m.readAhead()), true
+
+	case key.Matches(k, m.keys.Enter):
+		return m.playSearchHit(), true
 
 	case key.Matches(k, m.keys.ActionsTyped):
 		m.openActions()
@@ -171,8 +172,7 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			return m.switchTab(tabPlayer), true
 		}
 		m.search.input.SetValue("")
-		m.search.results = nil
-		m.search.cursor.reset()
+		m.search.found = nil
 		return m.syncCover(), true
 	}
 
@@ -186,9 +186,80 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	if m.search.input.Value() == before {
 		return cmd, true
 	}
+	// A new query starts over in every kind: the counts beside it have to be
+	// about what is on screen now.
 	m.search.seq++
-	m.search.pages = paging{loading: true}
-	return tea.Batch(cmd, searchCmd(m.player, m.search.input.Value(), m.search.seq, 0)), true
+	m.search.found = nil
+	m.search.current().pages.loading = true
+	return tea.Batch(cmd, searchCmd(m.player, m.search.input.Value(), "", m.search.seq, 0)), true
+}
+
+// turnSearchKind moves to the next kind that matched anything, so a query with
+// no albums does not have an empty screen among its four.
+func (m *Model) turnSearchKind(delta int) {
+	at := 0
+	for i, kind := range player.SearchKinds {
+		if kind == m.search.kind {
+			at = i
+		}
+	}
+
+	for range player.SearchKinds {
+		at = (at + delta + len(player.SearchKinds)) % len(player.SearchKinds)
+		if m.search.of(player.SearchKinds[at]).count() > 0 {
+			m.search.kind = player.SearchKinds[at]
+			return
+		}
+	}
+}
+
+// playSearchHit starts whatever the cursor is on. A track plays on its own and
+// keeps the queue; an album, an artist or a playlist is a list, and plays as
+// one.
+func (m *Model) playSearchHit() tea.Cmd {
+	found := m.search.current()
+	switch m.search.kind {
+	case player.SearchAlbums:
+		if a := atAlbum(found.albums, found.cursor.cursor); a != nil {
+			return m.playContext("play album", player.AlbumURI(a.ID), player.Track{
+				Title: a.Name, Artists: a.Artists, CoverURL: a.CoverURL,
+			})
+		}
+	case player.SearchArtists:
+		if a := atArtist(found.artists, found.cursor.cursor); a != nil {
+			return m.playContext("play artist", player.ArtistURI(a.ID), player.Track{
+				Title: a.Name, CoverURL: a.ImageURL,
+			})
+		}
+	case player.SearchPlaylists:
+		if p := atPlaylist(found.playlists, found.cursor.cursor); p != nil {
+			return m.playContext("play playlist", player.PlaylistURI(p.ID), player.Track{
+				Title: p.Name, Artists: []string{p.Owner}, CoverURL: p.CoverURL,
+			})
+		}
+	default:
+		if t := at(found.tracks, found.cursor.cursor); t != nil {
+			id := t.ID
+			return m.startPlay(playRequest{
+				action: "play track",
+				track:  *t,
+				call:   func(ctx context.Context, p player.Player) error { return p.PlayNow(ctx, id) },
+			})
+		}
+	}
+	return nil
+}
+
+// playContext starts a whole album, artist or playlist. The track shown while
+// the device catches up is a stand-in built from what was chosen: the real one
+// arrives with the next state, and a screen that said nothing in between would
+// read as a key that did not work.
+func (m *Model) playContext(action, uri string, showing player.Track) tea.Cmd {
+	return m.startPlay(playRequest{
+		action: action,
+		track:  showing,
+		call:   func(ctx context.Context, p player.Player) error { return p.PlayContext(ctx, uri) },
+	})
 }
 
 // playRequest is an ask for something to start, and the track it will land on.
@@ -260,11 +331,12 @@ func (m *Model) readAhead() tea.Cmd {
 		return fetchPlaylistsCmd(m.player, m.playlists.pages.next)
 
 	case m.tab == tabSearch:
-		if !m.search.pages.wants(m.search.cursor.cursor, len(m.search.results)) {
+		found := m.search.current()
+		if !found.pages.wants(found.cursor.cursor, found.count()) {
 			return nil
 		}
-		m.search.pages.loading = true
-		return searchCmd(m.player, m.search.input.Value(), m.search.seq, m.search.pages.next)
+		found.pages.loading = true
+		return searchCmd(m.player, m.search.input.Value(), m.search.kind, m.search.seq, found.pages.next)
 
 	default:
 		return nil
@@ -279,21 +351,56 @@ func (m *Model) previewCover() tea.Cmd {
 }
 
 // applySearchResults adopts a result set if it is still the newest one.
+//
+// A fresh query answers every kind at once and each is taken; reading further
+// into one kind answers only that one, and only that one is added to.
 func (m *Model) applySearchResults(res msg.SearchResults) tea.Cmd {
 	if res.Seq != m.search.seq {
 		return nil
 	}
-	if res.Offset == 0 {
-		m.search.results = res.Tracks
-		m.search.cursor.reset()
-	} else {
-		m.search.results = append(m.search.results, res.Tracks...)
-	}
-	m.search.pages.took(res.More, res.Next)
 
 	// An empty query clears the pane rather than leaving a stale cover behind.
 	if strings.TrimSpace(res.Query) == "" {
-		m.search.results = nil
+		m.search.found = nil
+		return m.syncCover()
+	}
+
+	if res.Kind == "" || res.Kind == player.SearchTracks {
+		r := m.search.of(player.SearchTracks)
+		r.tracks = adopt(r.tracks, res.Results.Tracks.Items, res.Offset, &r.cursor)
+		r.pages.took(res.Results.Tracks.More, res.Results.Tracks.Next)
+	}
+	if res.Kind == "" || res.Kind == player.SearchAlbums {
+		r := m.search.of(player.SearchAlbums)
+		r.albums = adopt(r.albums, res.Results.Albums.Items, res.Offset, &r.cursor)
+		r.pages.took(res.Results.Albums.More, res.Results.Albums.Next)
+	}
+	if res.Kind == "" || res.Kind == player.SearchArtists {
+		r := m.search.of(player.SearchArtists)
+		r.artists = adopt(r.artists, res.Results.Artists.Items, res.Offset, &r.cursor)
+		r.pages.took(res.Results.Artists.More, res.Results.Artists.Next)
+	}
+	if res.Kind == "" || res.Kind == player.SearchPlaylists {
+		r := m.search.of(player.SearchPlaylists)
+		r.playlists = adopt(r.playlists, res.Results.Playlists.Items, res.Offset, &r.cursor)
+		r.pages.took(res.Results.Playlists.More, res.Results.Playlists.Next)
+	}
+
+	// A query whose tracks came back empty lands on whatever did match, rather
+	// than opening on an empty screen with the answer one key away.
+	if m.search.current().count() == 0 {
+		m.turnSearchKind(1)
 	}
 	return m.syncCover()
+}
+
+// adopt replaces a list with a first page and extends it with a later one. The
+// cursor only goes home for the first, or reading past fifty would throw the
+// reader back to the top.
+func adopt[T any](have, page []T, offset int, cursor *listState) []T {
+	if offset > 0 {
+		return append(have, page...)
+	}
+	cursor.reset()
+	return page
 }

@@ -81,37 +81,102 @@ type queuePane struct {
 	cursor listState
 }
 
-// searchPane is the search tab: a query and its results.
+// searchPane is the search tab: a query and what it matched.
+//
+// One kind is shown at a time, with the counts of the others beside the query,
+// so what else matched is visible without spending rows on it. The four keep
+// their own cursor and their own paging, because moving between kinds and
+// coming back to where you were is the whole point of switching.
 type searchPane struct {
-	input   textinput.Model
-	results []player.Track
-	cursor  listState
-	pages   paging
+	input textinput.Model
+	kind  player.SearchKind
+	found map[player.SearchKind]*searchResults
 
 	// seq rises with every query, so a slow search that lands after a newer one
 	// can be thrown away.
 	seq int
 }
 
+// searchResults is what one kind matched.
+type searchResults struct {
+	tracks    []player.Track
+	albums    []player.Album
+	artists   []player.Artist
+	playlists []player.Playlist
+
+	cursor listState
+	pages  paging
+}
+
+// count is how many rows this kind has.
+func (r *searchResults) count() int {
+	if r == nil {
+		return 0
+	}
+	return len(r.tracks) + len(r.albums) + len(r.artists) + len(r.playlists)
+}
+
+// of returns the results for a kind, making the room for them on first use.
+//
+// The empty kind is tracks: it is the zero value of the field and the kind a
+// query asks for everything under, and two entries for one list would be a
+// screen that quietly showed nothing.
+func (s *searchPane) of(kind player.SearchKind) *searchResults {
+	if kind == "" {
+		kind = player.SearchTracks
+	}
+	if s.found == nil {
+		s.found = map[player.SearchKind]*searchResults{}
+	}
+	if s.found[kind] == nil {
+		s.found[kind] = &searchResults{}
+	}
+	return s.found[kind]
+}
+
+// current is the results of the kind on screen.
+func (s *searchPane) current() *searchResults { return s.of(s.kind) }
+
 func newSearchPane() searchPane {
 	in := textinput.New()
+	// Tracks to begin with, which is what nearly every search is for.
 	in.Prompt = "⌕ "
 	in.Placeholder = "title, artist or album"
 	in.Focus()
-	return searchPane{input: in}
+	return searchPane{input: in, kind: player.SearchTracks}
 }
 
-// selected returns the result under the cursor.
-func (s searchPane) selected() *player.Track {
-	if s.cursor.cursor < 0 || s.cursor.cursor >= len(s.results) {
+// selected returns the track under the cursor, and nothing when the kind on
+// screen is not tracks: the rest have their own accessors because they are not
+// interchangeable.
+func (s *searchPane) selected() *player.Track {
+	r := s.current()
+	if s.kind != player.SearchTracks && s.kind != "" {
 		return nil
 	}
-	return &s.results[s.cursor.cursor]
+	return at(r.tracks, r.cursor.cursor)
 }
 
-func (s searchPane) cover() string {
-	if sel := s.selected(); sel != nil {
-		return sel.CoverURL
+// cover is the artwork of whatever the cursor rests on, whichever kind that is.
+func (s *searchPane) cover() string {
+	r := s.current()
+	switch s.kind {
+	case player.SearchAlbums:
+		if a := atAlbum(r.albums, r.cursor.cursor); a != nil {
+			return a.CoverURL
+		}
+	case player.SearchArtists:
+		if a := atArtist(r.artists, r.cursor.cursor); a != nil {
+			return a.ImageURL
+		}
+	case player.SearchPlaylists:
+		if p := atPlaylist(r.playlists, r.cursor.cursor); p != nil {
+			return p.CoverURL
+		}
+	default:
+		if t := at(r.tracks, r.cursor.cursor); t != nil {
+			return t.CoverURL
+		}
 	}
 	return ""
 }
@@ -168,18 +233,40 @@ func (m Model) cursorTrack() *player.Track {
 	case m.tab == tabLibrary && m.playlists.open != nil:
 		return at(m.playlists.tracks, m.playlists.inner.cursor)
 	case m.tab == tabSearch:
-		return at(m.search.results, m.search.cursor.cursor)
+		return m.search.selected()
 	default:
 		return nil
 	}
 }
 
 // at is the element under an index, or nil when the cursor has outrun the list.
+// One for each kind, because Go has no way to say it once that is worth reading.
 func at(tracks []player.Track, i int) *player.Track {
 	if i < 0 || i >= len(tracks) {
 		return nil
 	}
 	return &tracks[i]
+}
+
+func atAlbum(albums []player.Album, i int) *player.Album {
+	if i < 0 || i >= len(albums) {
+		return nil
+	}
+	return &albums[i]
+}
+
+func atArtist(artists []player.Artist, i int) *player.Artist {
+	if i < 0 || i >= len(artists) {
+		return nil
+	}
+	return &artists[i]
+}
+
+func atPlaylist(playlists []player.Playlist, i int) *player.Playlist {
+	if i < 0 || i >= len(playlists) {
+		return nil
+	}
+	return &playlists[i]
 }
 
 func (m Model) queuedTrack() *player.Track {

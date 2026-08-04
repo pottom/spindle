@@ -494,6 +494,41 @@ func (m *Mock) PlayTrack(ctx context.Context, trackID string) error {
 	})
 }
 
+// PlayContext starts whatever the uri names, from its beginning. The mock knows
+// only playlists and albums; an artist stands in for its albums' tracks, which
+// is close enough to drive a screen against.
+func (m *Mock) PlayContext(ctx context.Context, uri string) error {
+	kind, id, ok := strings.Cut(strings.TrimPrefix(uri, "spotify:"), ":")
+	if !ok {
+		return fmt.Errorf("play: %q is not a spotify uri", uri)
+	}
+
+	switch kind {
+	case "playlist":
+		return m.PlayPlaylist(ctx, id, 0)
+	case "album":
+		page, err := m.AlbumTracks(ctx, id, 0)
+		if err != nil {
+			return err
+		}
+		return m.mutate(ctx, func() error {
+			m.setQueue(page.Items, 0)
+			return nil
+		})
+	case "artist":
+		top, err := m.ArtistTopTracks(ctx, id)
+		if err != nil {
+			return err
+		}
+		return m.mutate(ctx, func() error {
+			m.setQueue(top, 0)
+			return nil
+		})
+	default:
+		return fmt.Errorf("play: cannot play %s", uri)
+	}
+}
+
 func (m *Mock) PlayPlaylist(ctx context.Context, playlistID string, offset int) error {
 	return m.mutate(ctx, func() error {
 		def := playlistByID(playlistID)

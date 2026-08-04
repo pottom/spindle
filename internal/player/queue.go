@@ -38,6 +38,9 @@ type QueueEditor interface {
 	Drop(ctx context.Context, trackID string) error
 }
 
-// trackURI is how Spotify names a track everywhere except the Web API, which
+// The uri is how Spotify names a thing everywhere except the Web API, which
 // prefers the bare id.
-func trackURI(id string) string { return "spotify:track:" + id }
+func trackURI(id string) string    { return "spotify:track:" + id }
+func AlbumURI(id string) string    { return "spotify:album:" + id }
+func ArtistURI(id string) string   { return "spotify:artist:" + id }
+func PlaylistURI(id string) string { return "spotify:playlist:" + id }

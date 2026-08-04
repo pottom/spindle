@@ -326,6 +326,21 @@ func (s *Spotify) PlayFrom(ctx context.Context, trackID string) error {
 
 // PlayPlaylist starts a playlist at the given position, so the rest of it stays
 // queued behind the track that was chosen.
+// PlayContext starts a whole album, artist or playlist. Naming the device
+// matters here as everywhere else: a play call without one is refused with 404
+// whenever Spotify does not already believe a device is active.
+func (s *Spotify) PlayContext(ctx context.Context, uri string) error {
+	return s.PlayContextOn(ctx, uri, "")
+}
+
+func (s *Spotify) PlayContextOn(ctx context.Context, uri, deviceID string) error {
+	context := spotify.URI(uri)
+	return classify("play", s.client.PlayOpt(ctx, &spotify.PlayOptions{
+		DeviceID:        deviceRef(deviceID),
+		PlaybackContext: &context,
+	}))
+}
+
 func (s *Spotify) PlayPlaylist(ctx context.Context, playlistID string, offset int) error {
 	return s.PlayPlaylistOn(ctx, playlistID, offset, "")
 }

@@ -975,7 +975,7 @@ func TestSearchUsesTheSameShapeAsTheQueue(t *testing.T) {
 	if err != nil || len(res) < 2 {
 		t.Fatalf("Search: %v (%d results)", err, len(res))
 	}
-	m.search.results = res
+	m.search.of(player.SearchTracks).tracks = res
 	m.width, m.height = 150, 36
 	m.resize()
 
@@ -991,10 +991,11 @@ func TestSearchUsesTheSameShapeAsTheQueue(t *testing.T) {
 		t.Errorf("the panel = %q, want the result under the cursor described", head)
 	}
 
-	// The field is the heading, with the count set against it.
+	// The field is the heading, and what else the query matched is set against
+	// it — which is the whole argument for showing one kind at a time.
 	heading := plain(block[l.artHeight+1])
-	if !strings.Contains(heading, "queen") || !strings.Contains(heading, "results") {
-		t.Errorf("heading = %q, want the query and the count", heading)
+	if !strings.Contains(heading, "queen") || !strings.Contains(heading, "tracks") {
+		t.Errorf("heading = %q, want the query and the kinds", heading)
 	}
 
 	// And the results run the whole width, artists out where they are elsewhere.
@@ -1018,11 +1019,13 @@ func TestScrollingSendsForTheNextPage(t *testing.T) {
 	var tm tea.Model = m
 	tm, _ = tm.Update(msg.SearchResults{
 		Seq: m.search.seq, Query: "queen", Matched: true,
-		Tracks: make([]player.Track, 12), More: true, Next: 12,
+		Results: player.Results{Tracks: player.Page[player.Track]{
+			Items: make([]player.Track, 12), More: true, Next: 12,
+		}},
 	})
 	got := tm.(Model)
-	if !got.search.pages.more || got.search.pages.next != 12 {
-		t.Fatalf("the page's answer was not kept: %+v", got.search.pages)
+	if !got.search.current().pages.more || got.search.current().pages.next != 12 {
+		t.Fatalf("the page's answer was not kept: %+v", got.search.current().pages)
 	}
 
 	// Near the top, nothing is asked for.
@@ -1031,7 +1034,7 @@ func TestScrollingSendsForTheNextPage(t *testing.T) {
 	}
 
 	// Near the end, the next page is sent for — once, however many keys follow.
-	got.search.cursor.cursor = 11
+	got.search.current().cursor.cursor = 11
 	if cmd := got.readAhead(); cmd == nil {
 		t.Fatal("the cursor reached the end of the list and nothing was fetched")
 	}
@@ -1045,21 +1048,22 @@ func TestScrollingSendsForTheNextPage(t *testing.T) {
 func TestALaterPageIsAppended(t *testing.T) {
 	m := New(player.NewMock(), nil, defaultTestCell)
 	m.tab = tabSearch
-	m.search.results = make([]player.Track, 12)
-	m.search.cursor.cursor = 11
+	m.search.of(player.SearchTracks).tracks = make([]player.Track, 12)
+	m.search.of(player.SearchTracks).cursor.cursor = 11
 
 	var tm tea.Model = m
 	tm, _ = tm.Update(msg.SearchResults{
-		Seq: m.search.seq, Query: "queen", Matched: true,
-		Tracks: make([]player.Track, 8), Offset: 12,
+		Seq: m.search.seq, Query: "queen", Matched: true, Kind: player.SearchTracks,
+		Offset:  12,
+		Results: player.Results{Tracks: player.Page[player.Track]{Items: make([]player.Track, 8)}},
 	})
 
 	got := tm.(Model)
-	if len(got.search.results) != 20 {
-		t.Errorf("%d results after the second page, want the twelve plus the eight", len(got.search.results))
+	if len(got.search.current().tracks) != 20 {
+		t.Errorf("%d results after the second page, want the twelve plus the eight", len(got.search.current().tracks))
 	}
-	if got.search.cursor.cursor != 11 {
-		t.Errorf("the cursor moved to %d when the page arrived, want it left alone", got.search.cursor.cursor)
+	if got.search.current().cursor.cursor != 11 {
+		t.Errorf("the cursor moved to %d when the page arrived, want it left alone", got.search.current().cursor.cursor)
 	}
 }
 
@@ -1126,5 +1130,71 @@ func TestTheMenuHoldsTheKeyboard(t *testing.T) {
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	if tm.(Model).actions.open {
 		t.Error("esc left the menu up")
+	}
+}
+
+// One kind at a time, with the counts of the others beside the query: what else
+// matched is visible without spending rows on it, and the cursor and the paging
+// stay what they are on every other list.
+func TestSearchShowsOneKindAndCountsTheRest(t *testing.T) {
+	p := player.NewMock()
+	m := New(p, nil, defaultTestCell)
+	m.tab = tabSearch
+	m.search.input.SetValue("queen")
+	res, err := p.Search(t.Context(), "queen", "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.applySearchResults(msg.SearchResults{Seq: m.search.seq, Query: "queen", Matched: true, Results: res})
+	m.width, m.height = 150, 34
+	m.resize()
+
+	heading := plain(m.render())
+	for _, want := range []string{"tracks", "albums", "artists", "playlists"} {
+		if !strings.Contains(heading, want) {
+			t.Errorf("the heading does not count %s", want)
+		}
+	}
+
+	// Tracks to begin with, and the rows are tracks.
+	if m.search.kind != player.SearchTracks {
+		t.Fatalf("a query opens on %q, want tracks", m.search.kind)
+	}
+	if !strings.Contains(plain(m.render()), res.Tracks.Items[0].Title) {
+		t.Error("the first track is not listed")
+	}
+
+	// Turning the kind changes the rows and the panel, and each kind keeps its
+	// own place in its own list.
+	m.search.of(player.SearchTracks).cursor.cursor = 3
+	m.turnSearchKind(1)
+	if m.search.kind != player.SearchAlbums {
+		t.Fatalf("the kind turned to %q, want albums", m.search.kind)
+	}
+	shown := plain(m.render())
+	if !strings.Contains(shown, res.Albums.Items[0].Name) {
+		t.Error("the albums are not listed after turning to them")
+	}
+	if m.search.current().cursor.cursor != 0 {
+		t.Error("the albums opened somewhere other than the top")
+	}
+
+	m.turnSearchKind(-1)
+	if m.search.current().cursor.cursor != 3 {
+		t.Error("coming back to the tracks lost the place in them")
+	}
+}
+
+// A kind that matched nothing is skipped rather than shown empty: the counts
+// beside the query already say it matched nothing.
+func TestSearchSkipsEmptyKinds(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.tab = tabSearch
+	m.search.of(player.SearchTracks).tracks = []player.Track{{ID: "t", Title: "t"}}
+	m.search.of(player.SearchPlaylists).playlists = []player.Playlist{{ID: "p", Name: "p"}}
+
+	m.turnSearchKind(1)
+	if m.search.kind != player.SearchPlaylists {
+		t.Errorf("turned to %q, want the next kind that matched anything", m.search.kind)
 	}
 }

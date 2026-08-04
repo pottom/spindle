@@ -197,25 +197,32 @@ func TestTheEndsAreOneKeyAway(t *testing.T) {
 func TestGTypesOnTheSearchTabAndPageUpDoesNot(t *testing.T) {
 	m := New(player.NewMock(), nil, defaultTestCell)
 	m.tab = tabSearch
+	found := m.search.of(player.SearchTracks)
 	for i := range 40 {
-		m.search.results = append(m.search.results, trackAt(fmt.Sprintf("r%02d", i), "result"))
+		found.tracks = append(found.tracks, trackAt(fmt.Sprintf("r%02d", i), "result"))
 	}
-	m.search.cursor.cursor = 20
+	found.cursor.cursor = 20
 	m.width, m.height = 100, 40
 	m.resize()
 
 	var tm tea.Model = m
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	got := tm.(Model)
-	if c := got.search.cursor.cursor; c != 20 {
-		t.Errorf("g moved the cursor to %d instead of typing", c)
-	}
 	if q := got.search.input.Value(); q != "g" {
-		t.Errorf("query = %q, want the letter in it", q)
+		t.Errorf("query = %q, want the letter in it rather than a jump", q)
 	}
 
+	// Typing starts the query over, so put a list back before testing the keys
+	// that are not letters.
+	found = got.search.of(player.SearchTracks)
+	for i := range 40 {
+		found.tracks = append(found.tracks, trackAt(fmt.Sprintf("r%02d", i), "result"))
+	}
+	found.cursor.cursor = 20
+
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyPgUp})
-	if c := tm.(Model).search.cursor.cursor; c >= 20 {
+	paged := tm.(Model)
+	if c := paged.search.current().cursor.cursor; c >= 20 {
 		t.Errorf("page up left the cursor on %d, want it a screenful higher", c)
 	}
 }

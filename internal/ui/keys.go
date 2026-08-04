@@ -53,6 +53,11 @@ type keyMap struct {
 	Actions      key.Binding
 	ActionsTyped key.Binding
 
+	// SearchKind moves between the kinds of thing a query matched. Control keys
+	// because every printable one on that tab is the query.
+	SearchKind     key.Binding
+	SearchKindBack key.Binding
+
 	Enqueue key.Binding
 	// PlayOne plays the track under the cursor and nothing else, where enter
 	// would have played the list it belongs to.
@@ -166,6 +171,11 @@ func newKeyMap() keyMap {
 			key.WithHelp("m", "mute"),
 		),
 
+		SearchKind: key.NewBinding(
+			key.WithKeys("ctrl+right", "ctrl+t"),
+			key.WithHelp("ctrl+t", "kind"),
+		),
+		SearchKindBack: key.NewBinding(key.WithKeys("ctrl+left")),
 		Actions: key.NewBinding(
 			key.WithKeys("."),
 			key.WithHelp(".", "actions"),

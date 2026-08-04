@@ -243,18 +243,20 @@ func fetchPlaylistTracksCmd(p player.Player, id string, offset int) tea.Cmd {
 	}
 }
 
-func searchCmd(p player.Player, query string, seq, offset int) tea.Cmd {
+// searchCmd asks for one kind, or for every kind when the kind is empty — which
+// is what a fresh query does, since Spotify answers them all in one request.
+func searchCmd(p player.Player, query string, kind player.SearchKind, seq, offset int) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 		defer cancel()
 
-		page, err := p.SearchPage(ctx, query, offset)
+		res, err := p.Search(ctx, query, kind, offset)
 		if err != nil {
 			return msg.Error{Err: err}
 		}
 		return msg.SearchResults{
-			Seq: seq, Tracks: page.Items, Query: query, Matched: true,
-			Offset: offset, More: page.More, Next: page.Next,
+			Seq: seq, Query: query, Kind: kind, Matched: true,
+			Offset: offset, Results: res,
 		}
 	}
 }

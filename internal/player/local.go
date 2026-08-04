@@ -270,6 +270,10 @@ func (l *Local) PlayFrom(ctx context.Context, trackID string) error {
 	}{Uri: trackURI(trackID)})
 }
 
+func (l *Local) PlayContext(ctx context.Context, uri string) error {
+	return l.web.PlayContextOn(ctx, uri, l.deviceID())
+}
+
 func (l *Local) PlayPlaylist(ctx context.Context, playlistID string, offset int) error {
 	return l.web.PlayPlaylistOn(ctx, playlistID, offset, l.deviceID())
 }

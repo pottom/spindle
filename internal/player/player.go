@@ -92,4 +92,9 @@ type Player interface {
 	// "play this one".
 	PlayNow(ctx context.Context, trackID string) error
 	PlayPlaylist(ctx context.Context, playlistID string, offset int) error
+
+	// PlayContext starts an album, an artist or a playlist by its uri, from its
+	// beginning. It is what "play this whole thing" means for the rows that are
+	// not tracks.
+	PlayContext(ctx context.Context, uri string) error
 }
