@@ -246,12 +246,20 @@ func (m Model) progressLine(w int) string {
 // One control, one shape — a meter of its own beside it read as a different
 // kind of thing entirely.
 func (m Model) volumeLine(w int) string {
-	bar := max(w-1, 1)
-	filled := min(max(m.ps.Volume*bar/100, 0), bar)
+	// Paused, the whole thing goes grey, exactly as the progress bar does: the
+	// state has to be readable without hunting for an icon, and one control
+	// answering it differently from the other would undo that.
+	filled, marker := m.styles.Elapsed, m.styles.Knob
+	if !m.ps.Playing {
+		filled, marker = m.styles.Time, m.styles.Time
+	}
 
-	return m.styles.Elapsed.Render(strings.Repeat(meterFull, filled)) +
-		m.styles.Knob.Render(knob) +
-		m.styles.Remaining.Render(strings.Repeat(meterEmpty, bar-filled))
+	bar := max(w-1, 1)
+	at := min(max(m.ps.Volume*bar/100, 0), bar)
+
+	return filled.Render(strings.Repeat(meterFull, at)) +
+		marker.Render(knob) +
+		m.styles.Remaining.Render(strings.Repeat(meterEmpty, bar-at))
 }
 
 // transportLine holds the transport icons, the shuffle and repeat state, and the

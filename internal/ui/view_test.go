@@ -283,9 +283,14 @@ func TestVolumeIsShapedLikeTheProgressBar(t *testing.T) {
 		t.Errorf("the marker sits at %d for silence and %d for full, want it to travel", a, b)
 	}
 
-	// And it is the accent that fills it, as the progress bar is.
+	// It answers the paused state the same way the progress bar does: both go
+	// grey, so one control never contradicts the other.
 	m.ps.Volume = 50
-	if !strings.Contains(m.volumeLine(volumeCells), m.styles.Elapsed.Render(meterFull)) {
-		t.Error("the volume is not drawn in the accent")
+	for _, playing := range []bool{true, false} {
+		m.ps.Playing = playing
+		if a, b := colourUsed(m.volumeLine(volumeCells)), colourUsed(m.progressLine(40)); a != b {
+			t.Errorf("playing=%v: the volume is %q and the progress bar %q, want the same",
+				playing, a, b)
+		}
 	}
 }

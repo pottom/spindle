@@ -75,10 +75,25 @@ func (m Model) artTop(l layout, rows int) int {
 	return max((rows-l.artHeight)/2, 0)
 }
 
-// lyricsRows is how many rows are free under the information block once it has
-// been raised to the top of the picture.
+// lyricsFit is how many rows the words may take.
+//
+// Never past the foot of the picture: the two columns are one composition, and
+// text hanging below the sleeve reads as spilling out of it. On a screen with
+// no picture there is nothing to stay level with, so the cap is the window.
+func (m Model) lyricsFit(l layout) int {
+	if !l.hasArt() {
+		return lyricsMaxRows
+	}
+	return min(max(l.artHeight-len(m.infoBlock(l.infoWidth))-1, 0), lyricsMaxRows)
+}
+
+// lyricsRows is how many rows the words have to work with, which is what
+// decides whether they are worth offering at all.
 func (m Model) lyricsRows(l layout) int {
-	return max(l.bodyHeight-m.artTop(l, l.bodyHeight)-len(m.infoBlock(l.infoWidth))-1, 0)
+	if !l.hasArt() {
+		return max(l.bodyHeight-len(m.infoBlock(l.infoWidth))-1, 0)
+	}
+	return m.lyricsFit(l)
 }
 
 // lyricsBlock is the words, laid out to fill the rows given.
@@ -261,7 +276,7 @@ func (m Model) infoWithLyrics(l layout, rows int) []string {
 	if len(out) < rows {
 		out = append(out, strings.Repeat(" ", l.infoWidth))
 	}
-	out = append(out, m.lyricsBlock(l.infoWidth, min(rows-len(out), lyricsMaxRows))...)
+	out = append(out, m.lyricsBlock(l.infoWidth, min(rows-len(out), m.lyricsFit(l)))...)
 
 	for len(out) < rows {
 		out = append(out, strings.Repeat(" ", l.infoWidth))
