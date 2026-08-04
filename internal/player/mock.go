@@ -3,6 +3,7 @@ package player
 import (
 	"context"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"sync"
@@ -450,6 +451,33 @@ func tracksByID(ids []string) []Track {
 		if i := slices.IndexFunc(mockCatalogue, func(t Track) bool { return t.ID == id }); i >= 0 {
 			out = append(out, mockCatalogue[i])
 		}
+	}
+	return out
+}
+
+// Waveform is a stand-in trace, since the mock plays no sound. It exists so the
+// player screen can be worked on without a device: what it draws is the shape
+// of a waveform, not a recording of one.
+func (m *Mock) Waveform() []float32 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.advance()
+
+	if !m.playing {
+		return nil
+	}
+
+	t := m.elapsed.Seconds()
+	beat := math.Exp(-math.Mod(t*2, 1) * 6)
+
+	out := make([]float32, WaveformSamples)
+	for i := range out {
+		x := float64(i) / float64(len(out))
+		out[i] = float32(
+			math.Sin(x*34+t*5.0)*(0.40+beat*0.44) +
+				math.Sin(x*81-t*8.2)*0.19 +
+				math.Sin(x*193+t*17.0)*0.085*(0.4+beat),
+		)
 	}
 	return out
 }

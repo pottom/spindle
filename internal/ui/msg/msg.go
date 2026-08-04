@@ -43,6 +43,12 @@ type DevicesFetched struct {
 	Devices []player.Device
 }
 
+// ScopeTick paces the waveform, far faster than the second-by-second Tick that
+// drives everything else.
+type ScopeTick struct {
+	Time time.Time
+}
+
 // QueueFetched carries the track playing and what is lined up after it.
 type QueueFetched struct {
 	Current []player.Track // at most one, so the zero value carries nothing

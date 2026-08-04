@@ -154,6 +154,16 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = message.Err
 		return m, nil
 
+	case msg.ScopeTick:
+		// The trace stops the moment it leaves the screen: a redraw every 33ms
+		// for something nobody is looking at is the whole cost of the feature.
+		if !m.scopeVisible() {
+			m.scope.running = false
+			return m, nil
+		}
+		m.scope.frame = m.nextScopeFrame()
+		return m, scopeTickCmd()
+
 	case spinner.TickMsg:
 		if message.ID == m.device.ID() {
 			// Silence should cost nothing: a mark that turns while nothing plays
@@ -282,6 +292,16 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(k, m.keys.Quit):
 		return m, tea.Quit
+
+	case key.Matches(k, m.keys.Scope):
+		if !m.scopeAvailable() {
+			return m, nil
+		}
+		// Turning it on shortens the body, which shrinks the artwork, so the
+		// cover has to be rendered again at the new size.
+		m.scope.on = !m.scope.on
+		m.resize()
+		return m, tea.Batch(m.startScope(), m.syncCover())
 
 	case key.Matches(k, m.keys.Help):
 		// Expanding the help shortens the body, which shrinks the artwork, so
@@ -585,4 +605,14 @@ func (m *Model) spinDevice() tea.Cmd {
 	}
 	m.deviceRun = true
 	return m.device.Tick
+}
+
+// startScope begins the waveform's tick loop if it is not already running, and
+// returns nil otherwise: two loops would drive the trace at twice the rate.
+func (m *Model) startScope() tea.Cmd {
+	if m.scope.running || !m.scopeVisible() {
+		return nil
+	}
+	m.scope.running = true
+	return scopeTickCmd()
 }

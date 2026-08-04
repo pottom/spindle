@@ -25,6 +25,10 @@ const (
 	// per row.
 	coverSettleDelay = 250 * time.Millisecond
 
+	// scopeInterval is the waveform's frame time. Thirty a second is the point
+	// where a trace stops looking like a slideshow.
+	scopeInterval = 33 * time.Millisecond
+
 	// A track change does not appear in State() the moment the command returns.
 	// Measured against a live account it took 466, 530, 564 and 678 ms — so the
 	// 400 ms single shot DESIGN.md guessed at would have confirmed the *old*
@@ -47,6 +51,15 @@ const (
 	// may go out. The first press of a run is not delayed by it — see setVolume.
 	volumeDebounce = 400 * time.Millisecond
 )
+
+// scopeTickCmd drives the waveform. Thirty frames a second is what makes a
+// trace look like sound rather than a slideshow; it runs only while the trace
+// is on screen.
+func scopeTickCmd() tea.Cmd {
+	return tea.Tick(scopeInterval, func(t time.Time) tea.Msg {
+		return msg.ScopeTick{Time: t}
+	})
+}
 
 func tickCmd() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg {

@@ -30,6 +30,7 @@ type keyMap struct {
 	Back    key.Binding
 	Devices key.Binding
 	Refresh key.Binding
+	Scope   key.Binding
 
 	// Queue editing. Only the tracks put there by hand can be moved or dropped,
 	// so these do nothing on the rest of the list.
@@ -113,6 +114,10 @@ func newKeyMap() keyMap {
 		Refresh: key.NewBinding(
 			key.WithKeys("r"),
 			key.WithHelp("r", "refresh"),
+		),
+		Scope: key.NewBinding(
+			key.WithKeys("v"),
+			key.WithHelp("v", "waveform"),
 		),
 
 		Enqueue: key.NewBinding(
@@ -253,13 +258,13 @@ func (k keyMap) forTab(t tabID) tabKeys {
 				hint("space", "play/pause"),
 				hint("n/p", "track"),
 				hint("←→", "seek"),
-				hint("d", "devices"),
+				hint("v", "waveform"),
 				hint("?", "help"),
 			},
 			full: [][]key.Binding{
 				{k.PlayPause, k.Next, k.SeekFwd, k.VolUp},
-				{k.Shuffle, k.Repeat, k.Devices, k.NextTab, k.GoTab},
-				{k.Quit, k.QuitAll},
+				{k.Shuffle, k.Repeat, k.Scope, k.Devices},
+				{k.NextTab, k.GoTab, k.Quit, k.QuitAll},
 			},
 		}
 	}

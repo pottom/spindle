@@ -68,6 +68,9 @@ func (m Model) renderPlayer() string {
 	lines = append(lines, m.pad("", l))
 
 	lines = append(lines, m.body(l)...)
+	if m.scopeVisible() {
+		lines = append(lines, m.scopeBlock(l)...)
+	}
 
 	// A blank row before the bottom block, so the help never reads as one more
 	// entry in whatever list ends above it.

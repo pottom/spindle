@@ -60,6 +60,11 @@ type Styles struct {
 	ScrollThumb lipgloss.Style
 	ScrollTrack lipgloss.Style
 
+	// Waveform. Two strengths, so the trace reads as having depth rather than
+	// as a flat band of one colour.
+	ScopeNear lipgloss.Style
+	ScopeFar  lipgloss.Style
+
 	// Status line.
 	DeviceOn  lipgloss.Style
 	DeviceOff lipgloss.Style
@@ -105,6 +110,9 @@ func New(isDark bool, accent color.Color) Styles {
 
 		ScrollThumb: fg(accent),
 		ScrollTrack: fg(t.Faint),
+
+		ScopeNear: fg(accent),
+		ScopeFar:  fg(t.Muted),
 
 		Quality: fg(t.Faint),
 

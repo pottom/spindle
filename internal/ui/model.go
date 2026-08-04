@@ -132,6 +132,9 @@ type Model struct {
 	// machine right now" without needing to be read.
 	device    spinner.Model
 	deviceRun bool
+
+	// scope is the waveform under the artwork, and whether it is being drawn.
+	scope scopeState
 }
 
 // New wires a model around a playback backend and an artwork loader. The palette
@@ -248,7 +251,9 @@ func (m Model) layoutMode() layoutMode {
 // layout resolves the current geometry. It is pure, so View and Update can both
 // ask for it without either of them owning the answer.
 func (m Model) layout() layout {
-	return computeLayout(m.width, m.height, m.helpHeight(), m.hasNotice(), m.layoutMode(), m.cell)
+	l := computeLayout(m.width, m.height, m.helpHeight(), m.hasNotice(), m.layoutMode(), m.cell)
+	l.bodyHeight = max(l.bodyHeight-m.scopeHeight(), 0)
+	return l
 }
 
 func (m Model) Init() tea.Cmd {
