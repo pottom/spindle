@@ -22,8 +22,9 @@ var ErrMalformedClientID = errors.New("that does not look like a Spotify client 
 
 // settings is what spindle remembers between runs.
 type settings struct {
-	ClientID string `json:"client_id"`
-	Quality  string `json:"quality,omitempty"`
+	ClientID  string `json:"client_id"`
+	Quality   string `json:"quality,omitempty"`
+	Crossfade string `json:"crossfade,omitempty"`
 }
 
 // load reads the settings file, treating an unreadable one as empty: spindle
@@ -124,4 +125,23 @@ func SettingsPath() string {
 		return ""
 	}
 	return path
+}
+
+// Crossfade is how long tracks overlap, as configured, or "" when unset.
+func Crossfade() (string, error) {
+	s, err := load()
+	if err != nil {
+		return "", err
+	}
+	return s.Crossfade, nil
+}
+
+// SaveCrossfade records the overlap, keeping everything else.
+func SaveCrossfade(value string) error {
+	s, err := load()
+	if err != nil {
+		return err
+	}
+	s.Crossfade = value
+	return save(s)
 }

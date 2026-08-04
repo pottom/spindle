@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"time"
 
 	"github.com/devgianlu/go-librespot/daemon"
 	"github.com/gofrs/flock"
@@ -41,6 +42,9 @@ type Options struct {
 
 	// Quality is what to ask Spotify for. The empty value means DefaultQuality.
 	Quality Quality
+
+	// Crossfade is how long one track overlaps the next. Zero is gapless.
+	Crossfade time.Duration
 
 	// Log receives the daemon's own logging.
 	Log io.Writer
@@ -101,12 +105,16 @@ func Run(ctx context.Context, opts Options) error {
 		StateStore: newStore(filepath.Join(dir, "daemon.json")),
 		APIServer:  api,
 		Config: &daemon.Config{
-			DeviceName:    deviceName,
-			DeviceType:    "computer",
-			AudioBackend:  audioBackend,
-			Bitrate:       quality.Bitrate(),
-			VolumeSteps:   100,
-			InitialVolume: 50,
+			DeviceName:   deviceName,
+			DeviceType:   "computer",
+			AudioBackend: audioBackend,
+			Bitrate:      quality.Bitrate(),
+			// go-librespot takes it in milliseconds, and applies it to the
+			// transitions it prefetches: a track running into the next one,
+			// not a skip, where an overlap would just delay the answer.
+			CrossfadeDuration: int(opts.Crossfade / time.Millisecond),
+			VolumeSteps:       100,
+			InitialVolume:     50,
 			Credentials: daemon.CredentialsConfig{
 				Type:        "interactive",
 				Interactive: daemon.InteractiveCredentials{CallbackPort: authCallbackPort},

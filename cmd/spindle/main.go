@@ -45,6 +45,11 @@ func main() {
 				reportFatal(err)
 			}
 			return
+		case "crossfade":
+			if err := runCrossfade(os.Args[2:]); err != nil {
+				reportFatal(err)
+			}
+			return
 		case "daemon":
 			if err := runDaemon(os.Args[2:]); err != nil {
 				reportFatal(err)
