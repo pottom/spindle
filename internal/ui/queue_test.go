@@ -214,6 +214,15 @@ func (r recordingEditor) Drop(_ context.Context, id string) error {
 	return nil
 }
 
+// showOpen puts a page on screen as opening the row would, without the request
+// that fills it: the tests that follow are about what the screen does with the
+// contents, not about how they arrive.
+func showOpen(m *Model, pl player.Playlist, tracks []player.Track) {
+	page := openedPlaylist(pl)
+	page.tracks = tracks
+	m.stack = append(m.stack, page)
+}
+
 // plain strips the styling, so a test can assert on what the screen says rather
 // than on how it was coloured.
 func plain(s string) string { return ansiOff(s) }
@@ -811,13 +820,12 @@ func TestOpenPlaylistFollowsTheCursor(t *testing.T) {
 	listPage, _ := p.PlaylistsPage(t.Context(), 0)
 	lists := listPage.Items
 	open := lists[0]
-	m.playlists.open = &open
 	trackPage, err := p.PlaylistTracksPage(t.Context(), open.ID, 0)
 	tracks := trackPage.Items
 	if err != nil || len(tracks) < 2 {
 		t.Fatalf("PlaylistTracks: %v (%d tracks)", err, len(tracks))
 	}
-	m.playlists.tracks = tracks
+	showOpen(&m, open, tracks)
 
 	if got := m.cursorTrack(); got == nil || got.ID != tracks[0].ID {
 		t.Fatalf("cursorTrack = %v, want the first track", got)
@@ -826,7 +834,7 @@ func TestOpenPlaylistFollowsTheCursor(t *testing.T) {
 		t.Errorf("coverTarget = %q, want the track's own cover", got)
 	}
 
-	m.playlists.inner.move(1, len(tracks))
+	m.openMut().cursor.move(1, len(tracks))
 	if got := m.cursorTrack(); got == nil || got.ID != tracks[1].ID {
 		t.Errorf("cursorTrack = %v, want the panel to follow the cursor", got)
 	}
@@ -841,16 +849,15 @@ func TestPlayOnlyThisTrack(t *testing.T) {
 	listPage, _ := p.PlaylistsPage(t.Context(), 0)
 	lists := listPage.Items
 	open := lists[0]
-	m.playlists.open = &open
 	trackPage, _ := p.PlaylistTracksPage(t.Context(), open.ID, 0)
 	tracks := trackPage.Items
 	if len(tracks) < 2 {
 		t.Fatalf("the mock playlist has %d tracks, want at least 2", len(tracks))
 	}
-	m.playlists.tracks = tracks
-	m.playlists.inner.move(1, len(tracks))
+	showOpen(&m, open, tracks)
+	m.openMut().cursor.move(1, len(tracks))
 
-	cmd, handled := m.playlistKey(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	cmd, handled := m.openKey(tea.KeyPressMsg{Code: 'o', Text: "o"})
 	if !handled || cmd == nil {
 		t.Fatal("o did nothing inside a playlist")
 	}
@@ -866,7 +873,7 @@ func TestPlayOnlyThisTrack(t *testing.T) {
 
 	// At the top level there is no track under the cursor, so the key is a
 	// no-op rather than playing something the cursor is not on.
-	m.playlists.open = nil
+	m.closeOpen()
 	if cmd, _ := m.playlistKey(tea.KeyPressMsg{Code: 'o', Text: "o"}); cmd != nil {
 		t.Error("o played something from the list of playlists")
 	}
@@ -881,10 +888,9 @@ func TestQueuedTracksAreMarkedWhereverTheyAreListed(t *testing.T) {
 	listPage, _ := p.PlaylistsPage(t.Context(), 0)
 	lists := listPage.Items
 	open := lists[0]
-	m.playlists.open = &open
 	trackPage, _ := p.PlaylistTracksPage(t.Context(), open.ID, 0)
 	tracks := trackPage.Items
-	m.playlists.tracks = tracks
+	showOpen(&m, open, tracks)
 	m.width, m.height = 180, 40
 	m.resize()
 
@@ -937,10 +943,9 @@ func TestTheLibraryMarksWhatIsPlaying(t *testing.T) {
 	listPage, _ := p.PlaylistsPage(t.Context(), 0)
 	lists := listPage.Items
 	open := lists[0]
-	m.playlists.open = &open
 	trackPage, _ := p.PlaylistTracksPage(t.Context(), open.ID, 0)
 	tracks := trackPage.Items
-	m.playlists.tracks = tracks
+	showOpen(&m, open, tracks)
 	m.ps = &player.State{TrackID: tracks[3].ID, Playing: true}
 	m.width, m.height = 160, 40
 	m.resize()
@@ -1095,9 +1100,7 @@ func TestTheActionsMenuOffersWhatTheScreenAllows(t *testing.T) {
 	// The same track in the library cannot be taken out of a queue it is not in.
 	lib := New(player.NewMock(), nil, defaultTestCell)
 	lib.tab = tabLibrary
-	open := player.Playlist{ID: "p1", Name: "one"}
-	lib.playlists.open = &open
-	lib.playlists.tracks = []player.Track{{ID: "t1", Title: "one"}}
+	showOpen(&lib, player.Playlist{ID: "p1", Name: "one"}, []player.Track{{ID: "t1", Title: "one"}})
 	if !lib.openActions() {
 		t.Fatal("the menu would not open in the library")
 	}

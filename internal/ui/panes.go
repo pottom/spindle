@@ -13,11 +13,6 @@ type playlistPane struct {
 	cursor listState
 	pages  paging
 
-	open   *player.Playlist // nil while browsing the top level
-	tracks []player.Track
-	inner  listState
-	within paging
-
 	// liked is the first page of the saved tracks, read whenever the library
 	// is, so the row at the top of it has a cover before it is opened and opens
 	// without a wait. likedAll says that page was the whole list, which is the
@@ -65,16 +60,6 @@ func (p playlistPane) selected() *player.Playlist {
 // under the cursor. The playing track's cover is deliberately not used here —
 // it already has a whole tab of its own.
 func (p playlistPane) cover() string {
-	if p.open != nil {
-		// Inside a playlist the panel describes the track under the cursor, so
-		// the picture beside it has to be that track's. The playlist's own
-		// cover is a picture of a list, which says nothing about the row being
-		// read.
-		if t := at(p.tracks, p.inner.cursor); t != nil {
-			return t.CoverURL
-		}
-		return p.open.CoverURL
-	}
 	if sel := p.selected(); sel != nil {
 		return sel.CoverURL
 	}
@@ -243,15 +228,43 @@ func (m Model) nowPlayingRow() (player.Track, bool) {
 // not need to know which list it came from.
 func (m Model) cursorTrack() *player.Track {
 	switch {
+	case m.open() != nil:
+		page := m.open()
+		if page.holdsAlbums() {
+			return nil
+		}
+		return at(page.tracks, page.cursor.cursor)
 	case m.tab == tabQueue:
 		return m.queuedTrack()
-	case m.tab == tabLibrary && m.playlists.open != nil:
-		return at(m.playlists.tracks, m.playlists.inner.cursor)
 	case m.tab == tabSearch:
 		return m.search.selected()
 	default:
 		return nil
 	}
+}
+
+// cursorAlbum and cursorArtist are the same for the rows that are not tracks:
+// an artist's records, and what a search matched.
+func (m Model) cursorAlbum() *player.Album {
+	if page := m.open(); page != nil {
+		if page.holdsAlbums() {
+			return atAlbum(page.albums, page.cursor.cursor)
+		}
+		return nil
+	}
+	if m.tab == tabSearch && m.search.kind == player.SearchAlbums {
+		found := m.search.current()
+		return atAlbum(found.albums, found.cursor.cursor)
+	}
+	return nil
+}
+
+func (m Model) cursorArtist() *player.Artist {
+	if m.open() != nil || m.tab != tabSearch || m.search.kind != player.SearchArtists {
+		return nil
+	}
+	found := m.search.current()
+	return atArtist(found.artists, found.cursor.cursor)
 }
 
 // cursorPlaylist is the playlist under the cursor, where the cursor is on a
@@ -260,7 +273,9 @@ func (m Model) cursorTrack() *player.Track {
 // row say so.
 func (m Model) cursorPlaylist() *player.Playlist {
 	switch {
-	case m.tab == tabLibrary && m.playlists.open == nil:
+	case m.open() != nil:
+		return nil
+	case m.tab == tabLibrary:
 		return m.playlists.selected()
 	case m.tab == tabSearch && m.search.kind == player.SearchPlaylists:
 		found := m.search.current()

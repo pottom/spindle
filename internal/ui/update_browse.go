@@ -21,6 +21,11 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 	}
 	m.tab = t
 
+	// What was open belonged to the screen it was opened from. Leaving it open
+	// would put an album on top of the queue, and the way back would lead to a
+	// list the reader is no longer looking at.
+	m.closeOpen()
+
 	cmds := []tea.Cmd{m.syncCover()}
 	// Coming back to the player is the common way the trace becomes visible
 	// again; waiting for the next second would be a visible gap.
@@ -33,7 +38,7 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 		// elsewhere would otherwise never appear until spindle was restarted,
 		// and one page of a library is a cheap answer.
 		m.playlists.pages.loading = true
-		cmds = append(cmds, fetchPlaylistsCmd(m.player, 0), fetchPlaylistTracksCmd(m.player, likedID, 0))
+		cmds = append(cmds, fetchPlaylistsCmd(m.player, 0), fetchOpenCmd(m.player, openPlaylist, likedID, 0))
 	case t == tabQueue:
 		// The queue is kept for the sake of instant skipping, which only needs
 		// the first entry to be right. Looking at the whole list is a different
@@ -46,6 +51,11 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 // browseKey handles the keys belonging to the playlists and search tabs. It
 // returns handled=false for anything the caller should deal with itself.
 func (m *Model) browseKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
+	// Whatever is open is the screen, whichever tab it was opened from.
+	if cmd, done := m.openKey(k); done {
+		return cmd, true
+	}
+
 	switch m.tab {
 	case tabQueue:
 		return m.queueKey(k)
@@ -58,44 +68,37 @@ func (m *Model) browseKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 }
 
-func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
-	// The tab has two levels and the same keys drive both: the playlists
-	// themselves, or the tracks inside whichever one is open.
-	state, count := &m.playlists.cursor, len(m.playlists.items)
-	if m.playlists.open != nil {
-		state, count = &m.playlists.inner, len(m.playlists.tracks)
+// openKey drives whatever page has been opened, whichever tab it was opened
+// from. It answers before the tab does: while a page is open it is the screen,
+// and the list underneath is only what is waiting to be come back to.
+func (m *Model) openKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
+	page := m.openMut()
+	if page == nil {
+		return nil, false
 	}
-	if m.listKey(k, state, count, true) {
+	if m.listKey(k, &page.cursor, page.count(), true) {
 		return tea.Batch(m.previewCover(), m.readAhead()), true
 	}
 
 	switch {
 	case key.Matches(k, m.keys.Enter):
-		if m.playlists.open == nil {
-			sel := m.playlists.selected()
-			if sel == nil {
-				return nil, true
+		// An artist's list is of records, so choosing one opens it rather than
+		// playing it: an artist page is somewhere to go from, not a list to
+		// start.
+		if page.holdsAlbums() {
+			if a := atAlbum(page.albums, page.cursor.cursor); a != nil {
+				return m.push(openedAlbum(*a)), true
 			}
-			open := *sel
-			m.playlists.open = &open
-			// The saved tracks have already been read once for the row's sake,
-			// so the list is on screen before the request goes out.
-			m.playlists.tracks = nil
-			if isLiked(open.ID) {
-				m.playlists.tracks = m.playlists.liked
-			}
-			m.playlists.inner.reset()
-			m.playlists.within = paging{loading: true}
-			return tea.Batch(fetchPlaylistTracksCmd(m.player, open.ID, 0), m.syncCover()), true
+			return nil, true
 		}
 
-		play := m.playOpenList(m.playlists.inner.cursor)
+		play := m.playOpenList(page.cursor.cursor)
 		if t := m.cursorTrack(); t != nil {
 			play.track = *t
 		}
 		return m.startPlay(play), true
 
-	case key.Matches(k, m.keys.Actions):
+	case key.Matches(k, m.keys.Actions), key.Matches(k, m.keys.ActionsTyped):
 		m.openActions()
 		return nil, true
 
@@ -105,7 +108,7 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		// one track, and whatever was playing before it is let go. Nothing
 		// follows it, because nothing was asked to.
 		t := m.cursorTrack()
-		if m.playlists.open == nil || t == nil {
+		if t == nil {
 			return nil, true
 		}
 		id := t.ID
@@ -115,26 +118,45 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			call:   func(ctx context.Context, p player.Player) error { return p.PlayNow(ctx, id) },
 		}), true
 
-	case key.Matches(k, m.keys.Enqueue):
-		if m.playlists.open == nil {
-			// The whole list, since the whole list is what the cursor is on.
-			if sel := m.playlists.selected(); sel != nil {
-				return m.enqueuePlaylist(sel.ID, sel.Name), true
-			}
-			return nil, true
+	case key.Matches(k, m.keys.Enqueue), key.Matches(k, m.keys.EnqueueTyped):
+		if a := m.cursorAlbum(); a != nil {
+			return m.enqueueList(openAlbum, a.ID, a.Name), true
 		}
-		if i := m.playlists.inner.cursor; i >= 0 && i < len(m.playlists.tracks) {
-			return m.enqueue(m.playlists.tracks[i].ID), true
+		if t := m.cursorTrack(); t != nil {
+			return m.enqueue(t.ID), true
 		}
 		return nil, true
 
 	case key.Matches(k, m.keys.Back):
-		if m.playlists.open == nil {
+		m.pop()
+		return m.syncCover(), true
+	}
+	return nil, false
+}
+
+func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
+	if m.listKey(k, &m.playlists.cursor, len(m.playlists.items), true) {
+		return tea.Batch(m.previewCover(), m.readAhead()), true
+	}
+
+	switch {
+	case key.Matches(k, m.keys.Enter):
+		sel := m.playlists.selected()
+		if sel == nil {
 			return nil, true
 		}
-		m.playlists.open = nil
-		m.playlists.tracks = nil
-		return m.syncCover(), true
+		return m.push(openedPlaylist(*sel)), true
+
+	case key.Matches(k, m.keys.Actions):
+		m.openActions()
+		return nil, true
+
+	case key.Matches(k, m.keys.Enqueue):
+		// The whole list, since the whole list is what the cursor is on.
+		if sel := m.playlists.selected(); sel != nil {
+			return m.enqueueList(openPlaylist, sel.ID, sel.Name), true
+		}
+		return nil, true
 	}
 	return nil, false
 }
@@ -163,7 +185,7 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		return tea.Batch(m.previewCover(), m.readAhead()), true
 
 	case key.Matches(k, m.keys.Enter):
-		return m.playSearchHit(), true
+		return m.openSearchHit(), true
 
 	case key.Matches(k, m.keys.Actions), key.Matches(k, m.keys.ActionsTyped):
 		m.openActions()
@@ -171,7 +193,7 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 
 	case key.Matches(k, m.keys.Enqueue), key.Matches(k, m.keys.EnqueueTyped):
 		if pl := m.cursorPlaylist(); pl != nil {
-			return m.enqueuePlaylist(pl.ID, pl.Name), true
+			return m.enqueueList(openPlaylist, pl.ID, pl.Name), true
 		}
 		if sel := m.search.selected(); sel != nil {
 			return m.enqueue(sel.ID), true
@@ -283,29 +305,25 @@ func (m *Model) turnSearchKind(delta int) {
 	}
 }
 
-// playSearchHit starts whatever the cursor is on. A track plays on its own and
-// keeps the queue; an album, an artist or a playlist is a list, and plays as
-// one.
-func (m *Model) playSearchHit() tea.Cmd {
+// openSearchHit acts on whatever the cursor is on. A track plays; an album, an
+// artist or a playlist opens, because a list you have just found is one you
+// want to look inside before you commit the speakers to it. Starting it whole
+// is a key away either way — the menu offers it, and so does the row above the
+// list once it is open.
+func (m *Model) openSearchHit() tea.Cmd {
 	found := m.search.current()
 	switch m.search.kind {
 	case player.SearchAlbums:
 		if a := atAlbum(found.albums, found.cursor.cursor); a != nil {
-			return m.playContext("play album", player.AlbumURI(a.ID), player.Track{
-				Title: a.Name, Artists: a.Artists, CoverURL: a.CoverURL,
-			})
+			return m.push(openedAlbum(*a))
 		}
 	case player.SearchArtists:
 		if a := atArtist(found.artists, found.cursor.cursor); a != nil {
-			return m.playContext("play artist", player.ArtistURI(a.ID), player.Track{
-				Title: a.Name, CoverURL: a.ImageURL,
-			})
+			return m.push(openedArtist(*a))
 		}
 	case player.SearchPlaylists:
 		if p := atPlaylist(found.playlists, found.cursor.cursor); p != nil {
-			return m.playContext("play playlist", player.PlaylistURI(p.ID), player.Track{
-				Title: p.Name, Artists: []string{p.Owner}, CoverURL: p.CoverURL,
-			})
+			return m.push(openedPlaylist(*p))
 		}
 	default:
 		if t := at(found.tracks, found.cursor.cursor); t != nil {
@@ -320,30 +338,42 @@ func (m *Model) playSearchHit() tea.Cmd {
 	return nil
 }
 
-// playOpenList starts the open library row at the given position, so the rest
-// of it follows.
+// playOpenList starts the open page at the given position, so the rest of it
+// follows.
 //
-// A playlist is named and Spotify plays it from there. The saved tracks have no
-// name Spotify will take, so they are handed over as tracks — which is why only
-// what has been read of them plays: the list is walked a page at a time, and
-// what has not been scrolled to has not been asked for.
+// A playlist or an album is named and Spotify plays it from there. The saved
+// tracks have no name Spotify will take, so they are handed over as tracks —
+// which is why only what has been read of them plays: the list is walked a page
+// at a time, and what has not been scrolled to has not been asked for.
 func (m *Model) playOpenList(offset int) playRequest {
-	id := m.playlists.open.ID
-	if !isLiked(id) {
+	page := m.open()
+	switch {
+	case page.kind == openAlbum:
+		uri := player.AlbumURI(page.id)
+		return playRequest{
+			action: "play album",
+			call: func(ctx context.Context, p player.Player) error {
+				return p.PlayContextAt(ctx, uri, offset)
+			},
+		}
+
+	case !isLiked(page.id):
+		id := page.id
 		return playRequest{
 			action: "play playlist",
 			call: func(ctx context.Context, p player.Player) error {
 				return p.PlayPlaylist(ctx, id, offset)
 			},
 		}
-	}
 
-	ids := trackIDs(m.playlists.tracks)
-	return playRequest{
-		action: "play liked songs",
-		call: func(ctx context.Context, p player.Player) error {
-			return p.PlayTracks(ctx, ids, offset)
-		},
+	default:
+		ids := trackIDs(page.tracks)
+		return playRequest{
+			action: "play liked songs",
+			call: func(ctx context.Context, p player.Player) error {
+				return p.PlayTracks(ctx, ids, offset)
+			},
+		}
 	}
 }
 
@@ -422,12 +452,8 @@ func (m *Model) sendPlay(req playRequest) tea.Cmd {
 // key of its own means nobody has to know the list was ever cut.
 func (m *Model) readAhead() tea.Cmd {
 	switch {
-	case m.tab == tabLibrary && m.playlists.open != nil:
-		if !m.playlists.within.wants(m.playlists.inner.cursor, len(m.playlists.tracks)) {
-			return nil
-		}
-		m.playlists.within.loading = true
-		return fetchPlaylistTracksCmd(m.player, m.playlists.open.ID, m.playlists.within.next)
+	case m.open() != nil:
+		return m.openMut().readAhead(m.player)
 
 	case m.tab == tabLibrary:
 		if !m.playlists.pages.wants(m.playlists.cursor.cursor, len(m.playlists.items)) {

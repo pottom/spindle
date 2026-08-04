@@ -45,6 +45,17 @@ func artistNames(artists []spotify.SimpleArtist) []string {
 	return out
 }
 
+// artistIDs is the same for the ids, which is what a screen needs to go to one
+// of them: a name would have to be searched for, and a search finds the wrong
+// artist as often as the right one.
+func artistIDs(artists []spotify.SimpleArtist) []string {
+	out := make([]string, 0, len(artists))
+	for _, a := range artists {
+		out = append(out, a.ID.String())
+	}
+	return out
+}
+
 func trackFromFull(t *spotify.FullTrack) Track {
 	out := Track{
 		ID:       t.ID.String(),
@@ -54,6 +65,8 @@ func trackFromFull(t *spotify.FullTrack) Track {
 		CoverURL: bestImage(t.Album.Images),
 		Duration: time.Duration(t.Duration) * time.Millisecond,
 	}
+	out.AlbumID = t.Album.ID.String()
+	out.ArtistIDs = artistIDs(t.Artists)
 	out.Released = t.Album.ReleaseDate
 	out.AlbumType = t.Album.AlbumType
 	out.TrackNumber = int(t.TrackNumber)
@@ -75,6 +88,8 @@ func trackFromSimple(t *spotify.SimpleTrack) Track {
 		Title:       t.Name,
 		Artists:     artistNames(t.Artists),
 		Album:       t.Album.Name,
+		AlbumID:     t.Album.ID.String(),
+		ArtistIDs:   artistIDs(t.Artists),
 		CoverURL:    bestImage(t.Album.Images),
 		Duration:    time.Duration(t.Duration) * time.Millisecond,
 		Released:    t.Album.ReleaseDate,

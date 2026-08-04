@@ -232,37 +232,53 @@ func fetchPlaylistsCmd(p player.Player, offset int) tea.Cmd {
 	}
 }
 
-func fetchPlaylistTracksCmd(p player.Player, id string, offset int) tea.Cmd {
+// fetchOpenCmd asks for one page of whatever has been opened. Which call that
+// is depends on the kind, and this is the only place that has to know.
+func fetchOpenCmd(p player.Player, kind openKind, id string, offset int) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 		defer cancel()
 
-		page, err := listPage(ctx, p, id, offset)
+		if kind == openArtist {
+			page, err := p.ArtistAlbums(ctx, id, offset)
+			if err != nil {
+				return msg.Error{Err: err}
+			}
+			return msg.OpenedFetched{
+				ID: id, Albums: page.Items, Offset: offset, More: page.More, Next: page.Next,
+			}
+		}
+
+		page, err := trackPage(ctx, p, kind, id, offset)
 		if err != nil {
 			return msg.Error{Err: err}
 		}
-		return msg.PlaylistTracksFetched{
-			PlaylistID: id, Tracks: page.Items, Offset: offset, More: page.More, Next: page.Next,
+		return msg.OpenedFetched{
+			ID: id, Tracks: page.Items, Offset: offset, More: page.More, Next: page.Next,
 		}
 	}
 }
 
-// listPage is one page of whatever a library row holds: a playlist's tracks, or
-// the account's saved ones. Everything above this reads the two the same way,
-// which is the point of carrying liked songs as a playlist at all.
-func listPage(ctx context.Context, p player.Player, id string, offset int) (player.Page[player.Track], error) {
-	if isLiked(id) {
+// trackPage is one page of the tracks a thing holds: an album's, a playlist's,
+// or the account's saved ones. Everything above this reads the three the same
+// way, which is the point of carrying liked songs as a playlist at all.
+func trackPage(ctx context.Context, p player.Player, kind openKind, id string, offset int) (player.Page[player.Track], error) {
+	switch {
+	case kind == openAlbum:
+		return p.AlbumTracks(ctx, id, offset)
+	case isLiked(id):
 		return p.LikedTracks(ctx, offset)
+	default:
+		return p.PlaylistTracksPage(ctx, id, offset)
 	}
-	return p.PlaylistTracksPage(ctx, id, offset)
 }
 
-// playlistTrackIDs reads a playlist through to its end, or to the cap, whichever
-// comes first.
-func playlistTrackIDs(ctx context.Context, p player.Player, id string) ([]string, error) {
+// listTrackIDs reads a playlist or an album through to its end, or to the cap,
+// whichever comes first.
+func listTrackIDs(ctx context.Context, p player.Player, kind openKind, id string) ([]string, error) {
 	var ids []string
 	for offset := 0; len(ids) < enqueueMost; {
-		page, err := listPage(ctx, p, id, offset)
+		page, err := trackPage(ctx, p, kind, id, offset)
 		if err != nil {
 			return nil, err
 		}

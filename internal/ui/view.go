@@ -108,6 +108,9 @@ func (m Model) body(l layout) []string {
 	case m.tab == tabPlayer && m.ps == nil:
 		block = []string{m.styles.Detail.Render("Connecting…")}
 
+	case m.open() != nil && !m.devices.open:
+		block = m.openPageView(l, max(l.bodyHeight, 1))
+
 	case m.tab == tabQueue && !m.devices.open:
 		block = m.queueBlock(l, max(l.bodyHeight, 1))
 

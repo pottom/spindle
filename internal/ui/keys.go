@@ -350,6 +350,36 @@ func (k keyMap) forPlayer(scope, lyrics, peek bool) tabKeys {
 // forTab is the help for the screens that are lists. scope says whether the
 // visualiser has room beside the queue's artwork; it is listed only where it can
 // be drawn, and never changes the bar's height, which the layout depends on.
+// forOpen is the help for an opened playlist, album or artist. An artist's list
+// is of records, so what enter does there is open one rather than play it.
+func (k keyMap) forOpen(albums, scope bool) tabKeys {
+	enter := hint("enter", "play")
+	if albums {
+		enter = hint("enter", "open")
+	}
+
+	short := []key.Binding{
+		selectHint,
+		enter,
+		hint(".", "actions"),
+		hint("a", "queue"),
+		hint("esc", "back"),
+	}
+	second := []key.Binding{k.Actions, k.PlayOne, k.PlayPause, k.Next, k.Help}
+	if scope {
+		short = append(short, hint("v", "waveform"))
+		second = append(second, k.Scope)
+	}
+	return tabKeys{
+		short: append(short, hint("?", "help")),
+		full: [][]key.Binding{
+			{k.Down, k.Enter, k.Enqueue, k.Back, k.NextTab},
+			second,
+			k.moveKeys(true),
+		},
+	}
+}
+
 func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 	switch t {
 	case tabQueue:
@@ -377,10 +407,9 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 	case tabLibrary:
 		short := []key.Binding{
 			selectHint,
-			hint("enter", "play"),
+			hint("enter", "open"),
 			hint(".", "actions"),
 			hint("a", "queue"),
-			hint("esc", "back"),
 		}
 		second := []key.Binding{k.Actions, k.PlayOne, k.PlayPause, k.Next, k.Help}
 		if scope {

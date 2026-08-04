@@ -39,15 +39,15 @@ func TestQueueingAPlaylistSendsOneOrder(t *testing.T) {
 	m.player = recordingEditor{Player: m.player, sent: sent}
 
 	pl := m.playlists.items[0]
-	want, err := playlistTrackIDs(context.Background(), m.player, pl.ID)
+	want, err := listTrackIDs(context.Background(), m.player, openPlaylist, pl.ID)
 	if err != nil {
-		t.Fatalf("playlistTrackIDs: %v", err)
+		t.Fatalf("listTrackIDs: %v", err)
 	}
 	if len(want) < 2 {
 		t.Fatalf("the mock playlist has %d tracks, want a few to queue", len(want))
 	}
 
-	queuePlaylistCmd(m.player, pl.ID, []string{"waiting"})()
+	queueListCmd(m.player, openPlaylist, pl.ID, []string{"waiting"})()
 
 	got := <-sent
 	if len(got) != len(want)+1 || got[0] != "waiting" {
@@ -100,9 +100,9 @@ func TestTheMenuOverAPlaylistActsOnAllOfIt(t *testing.T) {
 // A long playlist is not the whole queue: what is taken is capped, and it is
 // taken from the top rather than from wherever the paging stopped.
 func TestQueueingALongPlaylistStopsAtTheCap(t *testing.T) {
-	ids, err := playlistTrackIDs(context.Background(), endlessPlaylist{}, "p")
+	ids, err := listTrackIDs(context.Background(), endlessPlaylist{}, openPlaylist, "p")
 	if err != nil {
-		t.Fatalf("playlistTrackIDs: %v", err)
+		t.Fatalf("listTrackIDs: %v", err)
 	}
 	if len(ids) != enqueueMost {
 		t.Errorf("took %d tracks, want the cap of %d", len(ids), enqueueMost)

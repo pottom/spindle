@@ -62,6 +62,12 @@ type Model struct {
 	playlists playlistPane
 	search    searchPane
 
+	// stack is what has been opened on top of a tab's own list: a playlist, an
+	// album, an artist, and whatever was opened from those. It belongs to the
+	// model rather than to a pane because the same page can be reached from the
+	// library and from a search, and it must read the same either way.
+	stack []openPage
+
 	// noDevice is the normal entry path, not an error: nothing is playing
 	// anywhere. Only the player tab cares — browsing works regardless.
 	noDevice bool
@@ -206,6 +212,11 @@ func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 // differently: the player shows what is sounding, the browsers show what the
 // cursor is resting on.
 func (m Model) coverTarget() string {
+	// Whatever is open is the screen, so its cursor is what the picture follows.
+	if page := m.open(); page != nil {
+		return page.cover()
+	}
+
 	switch m.tab {
 	case tabQueue:
 		if t := m.queuedTrack(); t != nil {
@@ -277,6 +288,10 @@ func (m Model) helpKeysWith(scope, lyrics, peek bool) tabKeys {
 		return m.keys.forNoDevice()
 	case m.devices.open:
 		return m.keys.forDevices()
+	case m.open() != nil:
+		// What is open is the screen, and its keys are the same wherever it was
+		// opened from — which is the whole reason it is one screen.
+		return m.keys.forOpen(m.open().holdsAlbums(), scope)
 	case m.tab == tabQueue && !m.editable():
 		// Against a device that is not ours the queue can only be read. Listing
 		// keys that do nothing would be worse than a shorter bar.

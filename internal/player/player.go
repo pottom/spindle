@@ -98,6 +98,10 @@ type Player interface {
 	// not tracks.
 	PlayContext(ctx context.Context, uri string) error
 
+	// PlayContextAt is the same, from a chosen place in it, so the rest of the
+	// album or playlist follows the track that was picked.
+	PlayContextAt(ctx context.Context, uri string, offset int) error
+
 	// PlayTracks starts a list of tracks named one by one, from the given
 	// position, and everything after it follows.
 	//

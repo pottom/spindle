@@ -123,22 +123,19 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.playlists.pages.took(message.More, message.Next)
 		return m, m.syncCover()
 
-	case msg.PlaylistTracksFetched:
-		// The saved tracks are read whether or not the row is open: the library
+	case msg.OpenedFetched:
+		// The saved tracks are read whether or not they are open: the library
 		// asks for the first page as it loads, for the cover and the count.
-		if isLiked(message.PlaylistID) && message.Offset == 0 {
+		if isLiked(message.ID) && message.Offset == 0 {
 			m.playlists.liked, m.playlists.likedAll = message.Tracks, !message.More
 			m.refreshLikedRow()
 		}
 
-		if m.playlists.open != nil && m.playlists.open.ID == message.PlaylistID {
-			if message.Offset == 0 {
-				m.playlists.tracks = message.Tracks
-				m.playlists.inner.reset()
-			} else {
-				m.playlists.tracks = append(m.playlists.tracks, message.Tracks...)
-			}
-			m.playlists.within.took(message.More, message.Next)
+		// Anything else that arrives for a page nobody is on is an answer the
+		// reader has already walked away from.
+		if page := m.openMut(); page != nil && page.id == message.ID {
+			page.adopt(message)
+			return m, m.syncCover()
 		}
 		return m, nil
 

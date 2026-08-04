@@ -479,32 +479,82 @@ func queueSubtitle(tracks []player.Track) string {
 }
 
 func (m Model) playlistPaneView(l layout, rows int) []string {
-	if m.playlists.open == nil {
-		return m.listBlock(l, rows, listScreen{
-			detail:   m.playlistDetail,
-			heading:  func(int) string { return m.styles.Title.Render("Library") },
-			subtitle: func() string { return m.styles.Album.Render(playlistSubtitle(m.playlists.items)) },
-			count:    len(m.playlists.items),
-			state:    &m.playlists.cursor,
-			empty:    "Nothing saved yet.",
-			row: func(i, w int, selected bool) string {
-				return m.playlistRow(m.playlists.items[i], w, selected)
-			},
-		})
-	}
-
-	open := *m.playlists.open
 	return m.listBlock(l, rows, listScreen{
-		detail:   m.trackDetail,
-		heading:  func(w int) string { return fit(m.styles.Title.Render(open.Name), max(w/2, 1)) },
-		subtitle: func() string { return m.styles.Album.Render(openPlaylistSubtitle(open, m.playlists.tracks)) },
-		count:    len(m.playlists.tracks),
-		state:    &m.playlists.inner,
-		empty:    "This playlist is empty.",
+		detail:   m.playlistDetail,
+		heading:  func(int) string { return m.styles.Title.Render("Library") },
+		subtitle: func() string { return m.styles.Album.Render(playlistSubtitle(m.playlists.items)) },
+		count:    len(m.playlists.items),
+		state:    &m.playlists.cursor,
+		empty:    "Nothing saved yet.",
 		row: func(i, w int, selected bool) string {
-			return m.trackRow(m.playlists.tracks[i], w, selected, i+1)
+			return m.playlistRow(m.playlists.items[i], w, selected)
 		},
 	})
+}
+
+// openPageView is whatever has been opened: a playlist, an album, or an
+// artist's records. The same composition as every other list, because it is the
+// same act — the heading says what was opened and the panel describes the row
+// under the cursor.
+func (m Model) openPageView(l layout, rows int) []string {
+	page := *m.open()
+
+	screen := listScreen{
+		detail:   m.trackDetail,
+		heading:  func(w int) string { return fit(m.styles.Title.Render(page.name), max(w/2, 1)) },
+		subtitle: func() string { return m.styles.Album.Render(m.openSubtitle(page)) },
+		count:    page.count(),
+		state:    &m.stack[len(m.stack)-1].cursor,
+		empty:    "Nothing here.",
+		row: func(i, w int, selected bool) string {
+			// An album's tracks are numbered by the record; a playlist's by
+			// where they sit in it. The two happen to be written the same way.
+			return m.trackRow(page.tracks[i], w, selected, i+1)
+		},
+	}
+
+	if page.holdsAlbums() {
+		screen.detail = m.openAlbumDetail
+		screen.empty = "No records here."
+		screen.row = func(i, w int, selected bool) string {
+			return m.albumRow(page.albums[i], w, selected)
+		}
+	}
+	return m.listBlock(l, rows, screen)
+}
+
+// openAlbumDetail is the panel on an artist page, describing the record under
+// the cursor.
+func (m Model) openAlbumDetail(w, rows int) []string {
+	return m.albumDetail(m.cursorAlbum(), w)
+}
+
+// openSubtitle is what the page says about itself beside its name: what it is
+// made of, and how much of it there is.
+func (m Model) openSubtitle(page openPage) string {
+	if page.holdsAlbums() {
+		if n := len(page.albums); n > 0 {
+			return fmt.Sprintf("%s · %d releases", page.subtitle, n)
+		}
+		return page.subtitle
+	}
+
+	// The running time is only added up once every track is in: a total that
+	// grew as the reader scrolled would read as a mistake rather than as
+	// progress.
+	out := fmt.Sprintf("%s · %d tracks", page.subtitle, len(page.tracks))
+	if page.subtitle == "" {
+		out = fmt.Sprintf("%d tracks", len(page.tracks))
+	}
+	if page.pages.more || len(page.tracks) == 0 {
+		return out
+	}
+
+	var total time.Duration
+	for _, t := range page.tracks {
+		total += t.Duration
+	}
+	return out + " · " + formatSpan(total)
 }
 
 // playlistDetail is the panel beside the cover at the top level: what the
@@ -540,29 +590,6 @@ func (m Model) playlistDetailOf(p *player.Playlist, w, rows int) []string {
 		lines = append(lines, m.fact("Length", formatSpan(p.Duration), w))
 	}
 	return lines
-}
-
-// openPlaylistSubtitle is what an open playlist says about itself beside its
-// name: whose it is, how much of it there is.
-func openPlaylistSubtitle(p player.Playlist, tracks []player.Track) string {
-	out := p.Owner
-	if p.Tracks > 0 {
-		out += fmt.Sprintf(" · %d tracks", p.Tracks)
-	}
-
-	// Spotify does not report a playlist's length, so it is added up from the
-	// tracks that have arrived — and only once they all have, because a growing
-	// number beside a fixed one reads as a mistake rather than as progress.
-	if len(tracks) == p.Tracks {
-		var total time.Duration
-		for _, t := range tracks {
-			total += t.Duration
-		}
-		if total > 0 {
-			out += " · " + formatSpan(total)
-		}
-	}
-	return out
 }
 
 func (m Model) searchPaneView(l layout, rows int) []string {

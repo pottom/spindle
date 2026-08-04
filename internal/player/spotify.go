@@ -427,6 +427,22 @@ func (s *Spotify) PlayContextOn(ctx context.Context, uri, deviceID string) error
 	}))
 }
 
+func (s *Spotify) PlayContextAt(ctx context.Context, uri string, offset int) error {
+	return s.PlayContextAtOn(ctx, uri, offset, "")
+}
+
+// PlayContextAtOn is PlayContextAt aimed at one device. See PlayTrackOn for why
+// the device has to be named.
+func (s *Spotify) PlayContextAtOn(ctx context.Context, uri string, offset int, deviceID string) error {
+	context := spotify.URI(uri)
+	pos := max(offset, 0)
+	return classify("play", s.client.PlayOpt(ctx, &spotify.PlayOptions{
+		DeviceID:        deviceRef(deviceID),
+		PlaybackContext: &context,
+		PlaybackOffset:  &spotify.PlaybackOffset{Position: &pos},
+	}))
+}
+
 func (s *Spotify) PlayPlaylist(ctx context.Context, playlistID string, offset int) error {
 	return s.PlayPlaylistOn(ctx, playlistID, offset, "")
 }

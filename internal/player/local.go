@@ -278,6 +278,10 @@ func (l *Local) PlayPlaylist(ctx context.Context, playlistID string, offset int)
 	return l.web.PlayPlaylistOn(ctx, playlistID, offset, l.deviceID())
 }
 
+func (l *Local) PlayContextAt(ctx context.Context, uri string, offset int) error {
+	return l.web.PlayContextAtOn(ctx, uri, offset, l.deviceID())
+}
+
 func (l *Local) PlayTracks(ctx context.Context, trackIDs []string, offset int) error {
 	return l.web.PlayTracksOn(ctx, trackIDs, offset, l.deviceID())
 }

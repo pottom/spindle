@@ -175,19 +175,20 @@ func TestTheEndsAreOneKeyAway(t *testing.T) {
 	}
 
 	// Inside a playlist the same keys drive the tracks.
-	open := tm.(Model)
-	open.playlists.open = &player.Playlist{ID: "p00", Name: "playlist 00"}
+	opened := tm.(Model)
+	var tracks []player.Track
 	for i := range 40 {
-		open.playlists.tracks = append(open.playlists.tracks, trackAt(fmt.Sprintf("t%02d", i), "track"))
+		tracks = append(tracks, trackAt(fmt.Sprintf("t%02d", i), "track"))
 	}
+	showOpen(&opened, player.Playlist{ID: "p00", Name: "playlist 00"}, tracks)
 
-	tm = open
+	tm = opened
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'G', Text: "G", Mod: tea.ModShift})
-	if got := tm.(Model).playlists.inner.cursor; got != 39 {
+	if got := tm.(Model).open().cursor.cursor; got != 39 {
 		t.Errorf("G landed on track %d, want the last one", got)
 	}
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
-	if got := tm.(Model).playlists.inner.cursor; got != 0 {
+	if got := tm.(Model).open().cursor.cursor; got != 0 {
 		t.Errorf("g landed on track %d, want the first one", got)
 	}
 }

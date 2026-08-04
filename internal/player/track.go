@@ -26,6 +26,12 @@ type Track struct {
 	TotalTracks int
 	Explicit    bool
 
+	// AlbumID and ArtistIDs are where the track came from, so a screen can go
+	// there. Names alone would mean searching for the record by its title,
+	// which finds the wrong pressing as often as the right one.
+	AlbumID   string
+	ArtistIDs []string
+
 	// Popularity is Spotify's 0–100 rating, or nil when the backend does not
 	// report it. Zero is a value, not an absence: an obscure catalogue track
 	// really does score nothing.

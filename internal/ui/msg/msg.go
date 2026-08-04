@@ -75,13 +75,20 @@ type PlaylistsFetched struct {
 	Next      int
 }
 
-// PlaylistTracksFetched carries one page of a playlist's contents.
-type PlaylistTracksFetched struct {
-	PlaylistID string
-	Tracks     []player.Track
-	Offset     int
-	More       bool
-	Next       int
+// OpenedFetched carries one page of whatever has been opened: a playlist's or
+// an album's tracks, or an artist's records. ID says which, so a page that
+// arrives after the reader has gone somewhere else can be dropped.
+//
+// One message for the three because they are read the same way — a page at a
+// time, appended to what is there, with the backend saying where the next one
+// starts. Only which field is filled differs.
+type OpenedFetched struct {
+	ID     string
+	Tracks []player.Track
+	Albums []player.Album
+	Offset int
+	More   bool
+	Next   int
 }
 
 // SearchResults carries what a query matched. Seq identifies the query, so a

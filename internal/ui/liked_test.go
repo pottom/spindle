@@ -33,8 +33,8 @@ func likedModel(t *testing.T) Model {
 
 	var tm tea.Model = m
 	tm, _ = tm.Update(msg.PlaylistsFetched{Playlists: page.Items, More: page.More, Next: page.Next})
-	tm, _ = tm.Update(msg.PlaylistTracksFetched{
-		PlaylistID: likedID, Tracks: liked.Items, More: liked.More, Next: liked.Next,
+	tm, _ = tm.Update(msg.OpenedFetched{
+		ID: likedID, Tracks: liked.Items, More: liked.More, Next: liked.Next,
 	})
 	return tm.(Model)
 }
@@ -59,8 +59,8 @@ func TestLikedSongsHeadTheLibrary(t *testing.T) {
 	}
 
 	var tm tea.Model = m
-	tm, _ = tm.Update(msg.PlaylistTracksFetched{
-		PlaylistID: likedID, Tracks: m.playlists.liked, More: false,
+	tm, _ = tm.Update(msg.OpenedFetched{
+		ID: likedID, Tracks: m.playlists.liked, More: false,
 	})
 	if got := tm.(Model).playlists.items[0].Tracks; got != len(m.playlists.liked) {
 		t.Errorf("the row says %d tracks once the list is read out, want %d", got, len(m.playlists.liked))
@@ -81,10 +81,10 @@ func TestOpeningLikedSongsShowsThemAtOnce(t *testing.T) {
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	got := tm.(Model)
 
-	if got.playlists.open == nil || !isLiked(got.playlists.open.ID) {
+	if got.open() == nil || !isLiked(got.open().id) {
 		t.Fatal("enter did not open the saved tracks")
 	}
-	if len(got.playlists.tracks) == 0 {
+	if len(got.open().tracks) == 0 {
 		t.Error("the list came up empty, want the page that was already read")
 	}
 }
@@ -93,8 +93,7 @@ func TestOpeningLikedSongsShowsThemAtOnce(t *testing.T) {
 // track by track — and the rest of what has been read follows it.
 func TestPlayingALikedSongCarriesTheRest(t *testing.T) {
 	m := likedModel(t)
-	m.playlists.open = &player.Playlist{ID: likedID, Name: "Liked Songs"}
-	m.playlists.tracks = m.playlists.liked
+	showOpen(&m, player.Playlist{ID: likedID, Name: "Liked Songs"}, m.playlists.liked)
 
 	req := m.playOpenList(1)
 	if err := req.call(context.Background(), m.player); err != nil {

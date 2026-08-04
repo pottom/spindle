@@ -498,6 +498,11 @@ func (m *Mock) PlayTrack(ctx context.Context, trackID string) error {
 // only playlists and albums; an artist stands in for its albums' tracks, which
 // is close enough to drive a screen against.
 func (m *Mock) PlayContext(ctx context.Context, uri string) error {
+	return m.PlayContextAt(ctx, uri, 0)
+}
+
+// PlayContextAt is the same from a chosen place in it.
+func (m *Mock) PlayContextAt(ctx context.Context, uri string, offset int) error {
 	kind, id, ok := strings.Cut(strings.TrimPrefix(uri, "spotify:"), ":")
 	if !ok {
 		return fmt.Errorf("play: %q is not a spotify uri", uri)
@@ -505,14 +510,14 @@ func (m *Mock) PlayContext(ctx context.Context, uri string) error {
 
 	switch kind {
 	case "playlist":
-		return m.PlayPlaylist(ctx, id, 0)
+		return m.PlayPlaylist(ctx, id, offset)
 	case "album":
 		page, err := m.AlbumTracks(ctx, id, 0)
 		if err != nil {
 			return err
 		}
 		return m.mutate(ctx, func() error {
-			m.setQueue(page.Items, 0)
+			m.setQueue(page.Items, offset)
 			return nil
 		})
 	case "artist":
@@ -521,7 +526,7 @@ func (m *Mock) PlayContext(ctx context.Context, uri string) error {
 			return err
 		}
 		return m.mutate(ctx, func() error {
-			m.setQueue(top, 0)
+			m.setQueue(top, offset)
 			return nil
 		})
 	default:
