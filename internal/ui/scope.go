@@ -3,6 +3,8 @@ package ui
 import (
 	"math"
 	"strings"
+
+	"github.com/pottom/spindle/internal/player"
 )
 
 const (
@@ -72,10 +74,14 @@ const (
 	// left to amplify is the noise.
 	scopeFloor = 0.05
 
-	// scopeTrail is how many frames the glow lasts. Three is where it reads as
-	// afterglow rather than as a smear; beyond that a fast passage turns into a
-	// solid band.
-	scopeTrail = 3
+	// scopeTrail is how many frames the glow lasts. One frame behind the beam
+	// reads as afterglow; more than that smears, because a thirtieth of a
+	// second is long enough for the wave to have moved right across the screen.
+	scopeTrail = 2
+
+	// scopeEdgeFalloff is how many steps back from the accent the top and
+	// bottom rows are drawn, so the trace has a lit core.
+	scopeEdgeFalloff = 2
 )
 
 // follow updates the loudness envelope from a new frame.
@@ -197,12 +203,20 @@ func (m Model) scopeDraw(w int, grid []uint8, loud []float32) []string {
 			}
 		}
 
+		// The extremes of the swing are drawn back from the accent and the middle
+		// of the trace sits in it, which gives the line a lit core rather than
+		// one flat colour across its whole height.
+		falloff := 0
+		if r == 0 || r == scopeRows-1 {
+			falloff = scopeEdgeFalloff
+		}
+
 		for c := range w {
 			at := r*w + c
 			bits := grid[at]
 
 			// Whatever the beam is not covering, the glow might be.
-			want := scopeLevel(loud[c], len(m.styles.Scope))
+			want := max(scopeLevel(loud[c], len(m.styles.Scope))-falloff, 0)
 			for age, old := range m.scope.trail {
 				if len(old) != len(grid) || old[at] == 0 {
 					continue
@@ -210,6 +224,7 @@ func (m Model) scopeDraw(w int, grid []uint8, loud []float32) []string {
 				if glow := len(m.scope.trail) - age - 1; bits == 0 {
 					bits = old[at]
 					want = min(glow, len(m.styles.Scope)-1)
+					want = max(want-falloff, 0)
 				} else {
 					bits |= old[at]
 				}
@@ -297,13 +312,13 @@ func (m Model) scopeSample(start, x, dots int) float32 {
 		return 0
 	}
 
-	// One sample per dot while there are enough of them, which is the case for
-	// any terminal the frame is capped to. A wider one gets the frame stretched
-	// rather than a flat tail where the samples ran out.
-	i := start + x
-	if avail := len(m.scope.frame) - start; dots > avail {
-		i = start + x*avail/dots
-	}
+	// A whole window is spread across the width, however wide that is, so the
+	// screen always shows the same slice of time — about a thirtieth of a
+	// second. Reading one sample per dot instead would zoom in on a wide
+	// terminal and out on a narrow one, and the trace would appear to slow down
+	// or speed up with nothing but the window size.
+	window := min(player.WaveformWindow, len(m.scope.frame)-start)
+	i := start + x*window/dots
 
 	v := m.scope.frame[min(i, len(m.scope.frame)-1)]
 

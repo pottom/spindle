@@ -402,3 +402,81 @@ func lit(lines []string) int {
 	}
 	return n
 }
+
+// The screen always shows the same slice of time, whatever width it is. Reading
+// one sample per dot instead zooms in on a wide terminal and out on a narrow
+// one, and the trace appears to speed up or slow down with nothing but the
+// window size — which is how it once quietly lost a third of its pace.
+func TestScopeSpansTheSameTimeAtAnyWidth(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.scope.on = true
+
+	// A tone at a fixed rate: the number of times it crosses zero across the
+	// screen is how much time the screen is showing.
+	f := make([]float32, 2*player.WaveformWindow)
+	for i := range f {
+		f[i] = float32(math.Sin(float64(i) * 0.19))
+	}
+	m.scope.frame = f
+	m.scope.follow(f)
+
+	crossings := func(w int) int {
+		n, prev := 0, float32(0)
+		for x := range w * dotsPerCellX {
+			v := m.scopeSample(0, x, w*dotsPerCellX)
+			if prev < 0 && v >= 0 {
+				n++
+			}
+			prev = v
+		}
+		return n
+	}
+
+	narrow, wide := crossings(40), crossings(95)
+	if narrow != wide {
+		t.Errorf("a 40-cell screen shows %d cycles and a 95-cell one %d, want the same span of time", narrow, wide)
+	}
+}
+
+// The extremes of the swing are drawn back from the accent and the middle sits
+// in it, so the line has a lit core instead of one flat colour top to bottom.
+func TestScopeShadesTowardsItsCore(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.scope.on = true
+
+	// A swing wide enough to reach every row.
+	f := make([]float32, 2*player.WaveformWindow)
+	for i := range f {
+		f[i] = float32(math.Sin(float64(i) * 0.19))
+	}
+	m.scope.frame = f
+	m.scope.follow(f)
+
+	lines := m.scopeLinesFrom(40, 0)
+	if len(lines) != scopeRows {
+		t.Fatalf("scopeLinesFrom = %d rows, want %d", len(lines), scopeRows)
+	}
+
+	// At one amplitude the inner rows have to come out brighter than the edges,
+	// which is visible as a different escape sequence for the same dots.
+	inner, outer := colourUsed(lines[1]), colourUsed(lines[0])
+	if inner == "" || outer == "" {
+		t.Fatalf("rows carry no colour: inner %q outer %q", inner, outer)
+	}
+	if inner == outer {
+		t.Error("the edges and the core are the same colour, so the trace is flat")
+	}
+}
+
+// colourUsed is the first colour escape in a rendered row.
+func colourUsed(line string) string {
+	start := strings.Index(line, "\x1b[")
+	if start < 0 {
+		return ""
+	}
+	end := strings.Index(line[start:], "m")
+	if end < 0 {
+		return ""
+	}
+	return line[start : start+end+1]
+}
