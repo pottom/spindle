@@ -44,9 +44,11 @@ const (
 	hotMark  = "🔥"
 	hotStars = 4
 
-	// secondaryCols is the fixed middle column of a list row: the artist, or the
-	// playlist's owner. Fixed so the trailing column always lines up.
-	secondaryCols = 20
+	// secondaryCols caps the middle column of a list row: the artist, or the
+	// playlist's owner. It takes a third of the row up to this, so a narrow
+	// screen keeps the title readable and a wide one stops cutting names that
+	// would easily fit — a list of collaborations is mostly commas otherwise.
+	secondaryCols = 44
 
 	// trailingCols holds a duration or a count, right aligned.
 	trailingCols = 8
@@ -471,7 +473,7 @@ func (m Model) rowWithTempo(w int, selected bool, primary, secondary, tempo, tra
 		return gutter + fit(primary, max(body, 0))
 	}
 
-	second := min(secondaryCols, body/3)
+	second := min(body/3, secondaryCols)
 
 	// The column is held whether the track has a tempo or not, so the durations
 	// stay in line down the list instead of stepping in and out.

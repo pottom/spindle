@@ -550,3 +550,31 @@ func TestTempoColumnHoldsItsPlace(t *testing.T) {
 		t.Errorf("row = %q, want the tempo in it", withTempo)
 	}
 }
+
+// The artist column grows with the row. Held at a fixed twenty it cut names
+// that would easily have fitted on a wide screen, and a list of collaborations
+// came out as mostly commas.
+func TestArtistColumnGrowsWithTheRow(t *testing.T) {
+	m := queueModel(0, "a")
+	m.queue[0].Artists = []string{"DJ Alex Man", "Dj Diac", "Nomeli"}
+	full := strings.Join(m.queue[0].Artists, ", ")
+
+	wide := m
+	wide.width, wide.height = 200, 45
+	wide.resize()
+	if got := plain(wide.render()); !strings.Contains(got, full) {
+		t.Errorf("a 200-column screen still cut the artists:\n%s", got)
+	}
+
+	// A narrow one still puts the title first: the name is what gives way.
+	narrow := m
+	narrow.width, narrow.height = 80, 45
+	narrow.resize()
+	out := plain(narrow.render())
+	if strings.Contains(out, full) {
+		t.Error("an 80-column screen gave the artists room the title needed")
+	}
+	if !strings.Contains(out, "a") {
+		t.Error("the title did not survive")
+	}
+}
