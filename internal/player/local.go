@@ -278,6 +278,10 @@ func (l *Local) PlayPlaylist(ctx context.Context, playlistID string, offset int)
 	return l.web.PlayPlaylistOn(ctx, playlistID, offset, l.deviceID())
 }
 
+func (l *Local) PlayTracks(ctx context.Context, trackIDs []string, offset int) error {
+	return l.web.PlayTracksOn(ctx, trackIDs, offset, l.deviceID())
+}
+
 // deviceID is the daemon's own Connect device, as it last reported it. Calls
 // that go out through the Web API have to name it: Spotify keeps no record of
 // which device is active until something tells it, and a call that names none

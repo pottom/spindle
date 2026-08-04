@@ -115,7 +115,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		// cursor is only sent home for the first, or reading past fifty would
 		// throw the reader back to the top of the library.
 		if message.Offset == 0 {
-			m.playlists.items = message.Playlists
+			m.playlists.items = append([]player.Playlist{m.likedRow()}, message.Playlists...)
 			m.playlists.cursor.reset()
 		} else {
 			m.playlists.items = append(m.playlists.items, message.Playlists...)
@@ -124,6 +124,13 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.syncCover()
 
 	case msg.PlaylistTracksFetched:
+		// The saved tracks are read whether or not the row is open: the library
+		// asks for the first page as it loads, for the cover and the count.
+		if isLiked(message.PlaylistID) && message.Offset == 0 {
+			m.playlists.liked, m.playlists.likedAll = message.Tracks, !message.More
+			m.refreshLikedRow()
+		}
+
 		if m.playlists.open != nil && m.playlists.open.ID == message.PlaylistID {
 			if message.Offset == 0 {
 				m.playlists.tracks = message.Tracks

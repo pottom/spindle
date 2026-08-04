@@ -28,6 +28,10 @@ const (
 	// blank column, so it does not touch the durations.
 	scrollCols = 2
 
+	// likedMark stands beside the saved tracks in the library, which are a
+	// collection rather than a playlist.
+	likedMark = "♥"
+
 	// explicitMark is the badge Spotify puts on a track with explicit lyrics.
 	explicitMark = "[E]"
 
@@ -746,11 +750,24 @@ func (m Model) playlistRow(p player.Playlist, w int, selected bool) string {
 	if selected {
 		primary = m.styles.RowSelected
 	}
-	return m.row(w, selected,
-		primary.Render(p.Name),
-		m.styles.RowSecondary.Render(p.Owner),
-		m.styles.RowTrailing.Render(fmt.Sprintf("%d tracks", p.Tracks)),
-	)
+
+	// The saved tracks carry a heart where the others carry nothing: the row is
+	// a different kind of thing from the playlists under it, and one glyph says
+	// so without a heading and without a row of its own.
+	name := primary.Render(p.Name)
+	if isLiked(p.ID) {
+		name = m.styles.Cursor.Render(likedMark) + " " + name
+	}
+
+	// A count of nothing is not a count. The saved tracks arrive a page at a
+	// time and their number is not known until the last of them has, so the
+	// column stays empty rather than saying zero.
+	count := ""
+	if p.Tracks > 0 {
+		count = m.styles.RowTrailing.Render(fmt.Sprintf("%d tracks", p.Tracks))
+	}
+
+	return m.row(w, selected, name, m.styles.RowSecondary.Render(p.Owner), count)
 }
 
 // trackRow draws one track. A number of 0 omits the ordinal, which is what the

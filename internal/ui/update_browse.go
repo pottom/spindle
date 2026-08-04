@@ -33,7 +33,7 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 		// elsewhere would otherwise never appear until spindle was restarted,
 		// and one page of a library is a cheap answer.
 		m.playlists.pages.loading = true
-		cmds = append(cmds, fetchPlaylistsCmd(m.player, 0))
+		cmds = append(cmds, fetchPlaylistsCmd(m.player, 0), fetchPlaylistTracksCmd(m.player, likedID, 0))
 	case t == tabQueue:
 		// The queue is kept for the sake of instant skipping, which only needs
 		// the first entry to be right. Looking at the whole list is a different
@@ -78,19 +78,18 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			}
 			open := *sel
 			m.playlists.open = &open
+			// The saved tracks have already been read once for the row's sake,
+			// so the list is on screen before the request goes out.
 			m.playlists.tracks = nil
+			if isLiked(open.ID) {
+				m.playlists.tracks = m.playlists.liked
+			}
 			m.playlists.inner.reset()
 			m.playlists.within = paging{loading: true}
 			return tea.Batch(fetchPlaylistTracksCmd(m.player, open.ID, 0), m.syncCover()), true
 		}
 
-		id, offset := m.playlists.open.ID, m.playlists.inner.cursor
-		play := playRequest{
-			action: "play playlist",
-			call: func(ctx context.Context, p player.Player) error {
-				return p.PlayPlaylist(ctx, id, offset)
-			},
-		}
+		play := m.playOpenList(m.playlists.inner.cursor)
 		if t := m.cursorTrack(); t != nil {
 			play.track = *t
 		}
@@ -319,6 +318,42 @@ func (m *Model) playSearchHit() tea.Cmd {
 		}
 	}
 	return nil
+}
+
+// playOpenList starts the open library row at the given position, so the rest
+// of it follows.
+//
+// A playlist is named and Spotify plays it from there. The saved tracks have no
+// name Spotify will take, so they are handed over as tracks — which is why only
+// what has been read of them plays: the list is walked a page at a time, and
+// what has not been scrolled to has not been asked for.
+func (m *Model) playOpenList(offset int) playRequest {
+	id := m.playlists.open.ID
+	if !isLiked(id) {
+		return playRequest{
+			action: "play playlist",
+			call: func(ctx context.Context, p player.Player) error {
+				return p.PlayPlaylist(ctx, id, offset)
+			},
+		}
+	}
+
+	ids := trackIDs(m.playlists.tracks)
+	return playRequest{
+		action: "play liked songs",
+		call: func(ctx context.Context, p player.Player) error {
+			return p.PlayTracks(ctx, ids, offset)
+		},
+	}
+}
+
+// trackIDs is a list of tracks as the ids the player takes.
+func trackIDs(tracks []player.Track) []string {
+	out := make([]string, 0, len(tracks))
+	for _, t := range tracks {
+		out = append(out, t.ID)
+	}
+	return out
 }
 
 // playContext starts a whole album, artist or playlist. The track shown while

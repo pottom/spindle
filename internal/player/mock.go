@@ -540,6 +540,19 @@ func (m *Mock) PlayPlaylist(ctx context.Context, playlistID string, offset int) 
 	})
 }
 
+// PlayTracks starts a list named track by track, which is how a list Spotify
+// has no uri for is played.
+func (m *Mock) PlayTracks(ctx context.Context, trackIDs []string, offset int) error {
+	return m.mutate(ctx, func() error {
+		tracks := tracksByID(trackIDs)
+		if len(tracks) == 0 {
+			return fmt.Errorf("play tracks: nothing to play")
+		}
+		m.setQueue(tracks, offset)
+		return nil
+	})
+}
+
 // setQueue replaces what is playing. Callers must hold m.mu.
 func (m *Mock) setQueue(tracks []Track, index int) {
 	if len(tracks) == 0 {

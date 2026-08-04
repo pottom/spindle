@@ -88,22 +88,39 @@ func (m Model) actionsFor(t player.Track) []verb {
 // being opened first.
 func (m Model) actionsForPlaylist(pl player.Playlist) []verb {
 	id, name := pl.ID, pl.Name
-	return []verb{{
+	verbs := []verb{{
 		label: "Play it from the top",
 		do: func(m *Model) tea.Cmd {
 			return m.startPlay(playRequest{
-				action: "play playlist",
-				call:   func(ctx context.Context, p player.Player) error { return p.PlayPlaylist(ctx, id, 0) },
+				action: "play " + strings.ToLower(name),
+				call: func(ctx context.Context, p player.Player) error {
+					if !isLiked(id) {
+						return p.PlayPlaylist(ctx, id, 0)
+					}
+					// Nothing to name, so the list is read and handed over.
+					ids, err := playlistTrackIDs(ctx, p, id)
+					if err != nil {
+						return err
+					}
+					return p.PlayTracks(ctx, ids, 0)
+				},
 			})
 		},
 	}, {
 		key:   "a",
 		label: "Add all of it to the queue",
 		do:    func(m *Model) tea.Cmd { return m.enqueuePlaylist(id, name) },
-	}, {
-		label: "Copy the Spotify link",
-		do:    func(m *Model) tea.Cmd { return m.copyLink(playlistLink(id)) },
 	}}
+
+	// The saved tracks are the account's own and have no address anybody else
+	// can open, so there is nothing to copy.
+	if !isLiked(id) {
+		verbs = append(verbs, verb{
+			label: "Copy the Spotify link",
+			do:    func(m *Model) tea.Cmd { return m.copyLink(playlistLink(id)) },
+		})
+	}
+	return verbs
 }
 
 // openActions raises the menu over whatever the cursor is on, and reports

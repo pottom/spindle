@@ -17,6 +17,13 @@ type playlistPane struct {
 	tracks []player.Track
 	inner  listState
 	within paging
+
+	// liked is the first page of the saved tracks, read whenever the library
+	// is, so the row at the top of it has a cover before it is opened and opens
+	// without a wait. likedAll says that page was the whole list, which is the
+	// only time the count on the row can be trusted.
+	liked    []player.Track
+	likedAll bool
 }
 
 // paging is what a list has read so far and what is left. Lists arrive fifty at

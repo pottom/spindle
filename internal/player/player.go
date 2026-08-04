@@ -97,4 +97,13 @@ type Player interface {
 	// beginning. It is what "play this whole thing" means for the rows that are
 	// not tracks.
 	PlayContext(ctx context.Context, uri string) error
+
+	// PlayTracks starts a list of tracks named one by one, from the given
+	// position, and everything after it follows.
+	//
+	// It exists for the lists Spotify has no uri for. Liked songs is the one
+	// that matters: the official clients play it as a context of the account's
+	// own collection, which is not something a third party can name, so the
+	// only honest way to start it is to hand over the tracks themselves.
+	PlayTracks(ctx context.Context, trackIDs []string, offset int) error
 }

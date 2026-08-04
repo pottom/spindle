@@ -237,7 +237,7 @@ func fetchPlaylistTracksCmd(p player.Player, id string, offset int) tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 		defer cancel()
 
-		page, err := p.PlaylistTracksPage(ctx, id, offset)
+		page, err := listPage(ctx, p, id, offset)
 		if err != nil {
 			return msg.Error{Err: err}
 		}
@@ -247,12 +247,22 @@ func fetchPlaylistTracksCmd(p player.Player, id string, offset int) tea.Cmd {
 	}
 }
 
+// listPage is one page of whatever a library row holds: a playlist's tracks, or
+// the account's saved ones. Everything above this reads the two the same way,
+// which is the point of carrying liked songs as a playlist at all.
+func listPage(ctx context.Context, p player.Player, id string, offset int) (player.Page[player.Track], error) {
+	if isLiked(id) {
+		return p.LikedTracks(ctx, offset)
+	}
+	return p.PlaylistTracksPage(ctx, id, offset)
+}
+
 // playlistTrackIDs reads a playlist through to its end, or to the cap, whichever
 // comes first.
 func playlistTrackIDs(ctx context.Context, p player.Player, id string) ([]string, error) {
 	var ids []string
 	for offset := 0; len(ids) < enqueueMost; {
-		page, err := p.PlaylistTracksPage(ctx, id, offset)
+		page, err := listPage(ctx, p, id, offset)
 		if err != nil {
 			return nil, err
 		}

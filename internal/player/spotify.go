@@ -379,6 +379,42 @@ func (s *Spotify) PlayPlaylistOn(ctx context.Context, playlistID string, offset 
 	}))
 }
 
+// playTracksMost is how many tracks may be named in one play call. Spotify
+// takes a few hundred and refuses more; a list longer than this is played from
+// its head and read on from there.
+const playTracksMost = 300
+
+func (s *Spotify) PlayTracks(ctx context.Context, trackIDs []string, offset int) error {
+	return s.PlayTracksOn(ctx, trackIDs, offset, "")
+}
+
+// PlayTracksOn is PlayTracks aimed at one device. See PlayTrackOn for why the
+// device has to be named.
+//
+// The offset is applied by dropping what comes before it rather than by asking
+// Spotify for a position: the list is only as long as the cap allows, and
+// starting it at the chosen track is what makes the rest follow.
+func (s *Spotify) PlayTracksOn(ctx context.Context, trackIDs []string, offset int, deviceID string) error {
+	if from := max(offset, 0); from < len(trackIDs) {
+		trackIDs = trackIDs[from:]
+	}
+	if len(trackIDs) == 0 {
+		return nil
+	}
+	if len(trackIDs) > playTracksMost {
+		trackIDs = trackIDs[:playTracksMost]
+	}
+
+	uris := make([]spotify.URI, 0, len(trackIDs))
+	for _, id := range trackIDs {
+		uris = append(uris, spotify.URI(trackURI(id)))
+	}
+	return classify("play tracks", s.client.PlayOpt(ctx, &spotify.PlayOptions{
+		DeviceID: deviceRef(deviceID),
+		URIs:     uris,
+	}))
+}
+
 // deviceRef is the id in the shape PlayOptions wants, and nil for "wherever
 // Spotify thinks playback is", which is what a spindle without a daemon means.
 func deviceRef(deviceID string) *spotify.ID {
