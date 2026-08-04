@@ -4,6 +4,8 @@ import (
 	"math"
 	"strings"
 
+	"charm.land/lipgloss/v2"
+
 	"github.com/pottom/spindle/internal/player"
 )
 
@@ -167,7 +169,7 @@ func (m Model) scopeLines(w int) []string {
 // scopeLinesFrom draws the frame beginning at a given sample. Where that sample
 // is decided is scopeTrigger's business; this only draws.
 func (m Model) scopeLinesFrom(w, start int) []string {
-	if w <= 0 || len(m.styles.ScopeCore) == 0 {
+	if w <= 0 || len(m.styles.Bars) == 0 {
 		return nil
 	}
 	grid, loud := m.scopeGrid(w, start)
@@ -213,26 +215,22 @@ func (m Model) scopeGrid(w, start int) ([]uint8, []float32) {
 // the afterglow reaches is drawn at the quiet end of the palette, so the glow
 // reads as behind the trace rather than as part of it.
 func (m Model) scopeDraw(w int, grid []uint8, loud []float32) []string {
+	freqs := len(m.styles.Bars)
+	if freqs == 0 {
+		return make([]string, scopeRows)
+	}
+	levels := len(m.styles.Bars[0])
+
 	lines := make([]string, scopeRows)
 	for r := range scopeRows {
 		var sb strings.Builder
 
-		// The extremes of the swing are drawn in the theme's cool grey and the
-		// middle of the trace in the artwork's accent. Two families rather than
-		// two strengths: a pale tip reads as a different colour, which is what
-		// gives the line a lit core instead of a uniform band.
-		ramp := m.styles.ScopeCore
-		if r == 0 || r == scopeRows-1 {
-			ramp = m.styles.ScopeEdge
-		}
-
-		// Runs of one colour are rendered together, so a row costs about as
-		// much output as a line of text rather than one escape per cell.
 		var run strings.Builder
-		level := -1
+		var style lipgloss.Style
+		lit := false
 		flush := func() {
 			if run.Len() > 0 {
-				sb.WriteString(ramp[level].Render(run.String()))
+				sb.WriteString(style.Render(run.String()))
 				run.Reset()
 			}
 		}
@@ -241,15 +239,17 @@ func (m Model) scopeDraw(w int, grid []uint8, loud []float32) []string {
 			at := r*w + c
 			bits := grid[at]
 
-			// Whatever the beam is not covering, the glow might be.
-			want := scopeLevel(loud[c], len(ramp))
+			// How far the trace swings here decides the strength; the glow
+			// behind it is drawn at the bottom of the scale, so it reads as
+			// behind rather than as part of the trace.
+			level := min(int(math.Sqrt(float64(min(loud[c], 1)))*float64(levels)), levels-1)
 			for age, old := range m.scope.trail {
 				if len(old) != len(grid) || old[at] == 0 {
 					continue
 				}
 				if glow := len(m.scope.trail) - age - 1; bits == 0 {
 					bits = old[at]
-					want = min(glow, len(ramp)-1)
+					level = min(glow, levels-1)
 				} else {
 					bits |= old[at]
 				}
@@ -257,13 +257,15 @@ func (m Model) scopeDraw(w int, grid []uint8, loud []float32) []string {
 
 			if bits == 0 {
 				flush()
-				level = -1
+				lit = false
 				sb.WriteByte(' ')
 				continue
 			}
-			if want != level {
+
+			want := m.styles.Bars[min(c*freqs/w, freqs-1)][level]
+			if !lit || want.GetForeground() != style.GetForeground() {
 				flush()
-				level = want
+				style, lit = want, true
 			}
 			run.WriteRune(rune(brailleBase + int(bits)))
 		}
@@ -279,14 +281,6 @@ func (s *scopeState) remember(grid []uint8) {
 	if len(s.trail) > scopeTrail {
 		s.trail = s.trail[len(s.trail)-scopeTrail:]
 	}
-}
-
-// scopeLevel picks a colour for how far a moment swings.
-func scopeLevel(amplitude float32, levels int) int {
-	// The square root spreads the quiet end out: most music sits low, and a
-	// linear scale would leave the whole trace in one or two colours.
-	t := math.Sqrt(float64(min(amplitude, 1)))
-	return min(max(int(t*float64(levels)), 0), levels-1)
 }
 
 // scopeTrigger finds where in the frame to start drawing, so that a held note

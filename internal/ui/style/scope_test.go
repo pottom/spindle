@@ -25,47 +25,6 @@ var accents = map[string]color.RGBA{
 	"green":     {R: 0x1d, G: 0xb9, B: 0x54, A: 0xff},
 }
 
-// The extremes of the waveform are drawn in a different colour, not a dimmer
-// one. A tip that is merely a faded accent disappears into the trace; the point
-// of it is that it reads as another material.
-func TestScopeEdgeIsNotJustADimmerAccent(t *testing.T) {
-	for name, accent := range accents {
-		s := New(true, accent)
-
-		core := s.ScopeCore[len(s.ScopeCore)-2].GetForeground()
-		edge := s.ScopeEdge[len(s.ScopeEdge)-2].GetForeground()
-
-		_, coreSat, _ := toHSL(core)
-		_, edgeSat, _ := toHSL(edge)
-		if edgeSat >= coreSat {
-			t.Errorf("%s: the edge is as saturated as the trace (%.2f vs %.2f), so it will read as the same colour",
-				name, edgeSat, coreSat)
-		}
-	}
-}
-
-// The trace runs through a little of the hue on either side of the accent, so
-// it is not one flat colour — but it never leaves the accent's family, or it
-// would stop belonging to the artwork.
-func TestScopeCoreTravelsWithoutLeavingTheAccent(t *testing.T) {
-	for name, accent := range accents {
-		s := New(true, accent)
-		base := hueOf(t, accent)
-
-		lowest := hueOf(t, s.ScopeCore[0].GetForeground())
-		highest := hueOf(t, s.ScopeCore[len(s.ScopeCore)-1].GetForeground())
-
-		if travel := hueGap(lowest, highest); travel < 15 {
-			t.Errorf("%s: the palette travels %.0f° of hue, want enough to see", name, travel)
-		}
-		for _, h := range []float64{lowest, highest} {
-			if gap := hueGap(h, base); gap > 45 {
-				t.Errorf("%s: a step sits %.0f° from the accent, want it to stay in the family", name, gap)
-			}
-		}
-	}
-}
-
 // Round-tripping a colour through HSL has to give it back, or every derived
 // shade is quietly wrong.
 func TestHSLRoundTrip(t *testing.T) {

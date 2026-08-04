@@ -12,7 +12,10 @@ const (
 	// leaves every marker descending at one rate, and markers that started
 	// together stay together — which drew a straight line clean across the
 	// screen, over bands that were silent.
-	barsPeakDecay = 0.93
+	//
+	// Slow enough to hang where a hit reached for about a second and a half; at
+	// a third of that it was gone before it registered as a marker at all.
+	barsPeakDecay = 0.98
 
 	// barsPeakFloor is the level below which a band has no marker at all.
 	// Nothing is sounding there, so nothing reached anything.
@@ -47,7 +50,7 @@ func (s *scopeState) adoptBands(bands []float32) {
 // The bands arrive spaced by octave and scaled in decibels, so what is drawn is
 // already what the ear hears as even; the drawing only has to place it.
 func (m Model) barsLines(w int) []string {
-	if w <= 0 || len(m.scope.bands) == 0 || len(m.styles.ScopeCore) == 0 {
+	if w <= 0 || len(m.scope.bands) == 0 || len(m.styles.Bars) == 0 {
 		return nil
 	}
 

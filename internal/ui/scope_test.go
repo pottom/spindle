@@ -323,33 +323,6 @@ func TestTriggerSteadiesThePicture(t *testing.T) {
 	}
 }
 
-// The trace is coloured by how loud each moment is, so a hit flares and the
-// space between recedes. One flat colour reads as a ribbon, not as sound.
-func TestScopeColoursByLoudness(t *testing.T) {
-	m := scopeModel(100, 44)
-	m.scope.mode = scopeWave
-
-	// Quiet on the left, loud on the right.
-	f := make([]float32, 2*player.WaveformWindow)
-	for i := range f {
-		amp := 0.05
-		if i > len(f)/2 {
-			amp = 1
-		}
-		f[i] = float32(amp * math.Sin(float64(i)*0.7))
-	}
-	m.scope.frame = f
-	m.scope.follow(f)
-
-	if len(m.styles.ScopeCore) < 2 {
-		t.Fatal("the waveform has no palette to colour with")
-	}
-	n := len(m.styles.ScopeCore)
-	if got := scopeLevel(0.05, n); got >= scopeLevel(1, n) {
-		t.Errorf("a whisper is coloured %d and a hit %d, want the hit brighter", got, scopeLevel(1, n))
-	}
-}
-
 // The glow is what stops the trace looking redrawn thirty times a second. It
 // has to leave more lit than the current frame alone, and it has to be drawn
 // behind the beam rather than as part of it.

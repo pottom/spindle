@@ -67,18 +67,8 @@ type Styles struct {
 	ScrollThumb lipgloss.Style
 	ScrollTrack lipgloss.Style
 
-	// The waveform is drawn in two families: the middle of the trace runs
-	// through the artwork's accent, and its extremes through the theme's cool
-	// grey. The contrast between the two is what gives the line a lit core and
-	// pale tips rather than one flat colour top to bottom.
-	//
-	// Within each family the step is chosen by how loud the moment is, so the
-	// trace also flares on a hit and recedes between them.
-	ScopeCore []lipgloss.Style
-	ScopeEdge []lipgloss.Style
-
-	// Bars is the spectrum's palette: hue across the frequency range, strength
-	// up the height of a bar. Indexed [frequency][level].
+	// Bars is what both visualisers are drawn in: hue across the width,
+	// strength up the height. Indexed [position][level].
 	Bars [][]lipgloss.Style
 
 	// Status line.
@@ -129,9 +119,7 @@ func New(isDark bool, accent color.Color) Styles {
 		ScrollThumb: fg(accent),
 		ScrollTrack: fg(t.Faint),
 
-		ScopeCore: coreRamp(accent),
-		ScopeEdge: edgeRamp(t),
-		Bars:      barPalette(t, accent),
+		Bars: barPalette(t, accent),
 
 		Quality: fg(t.Faint),
 
@@ -165,46 +153,6 @@ func New(isDark bool, accent color.Color) Styles {
 		Error:   fg(t.Error),
 		Warning: fg(t.Warning),
 	}
-}
-
-// scopeLevels is how many strengths each waveform family is drawn in. Four is
-// enough for the trace to flare and recede without breaking a row into so many
-// runs that it stops compressing.
-const scopeLevels = 4
-
-// coreRamp is the middle of the trace: the artwork's accent, swept through a
-// little of the hue on either side of it. A quiet passage sits a touch cooler
-// and darker, a hit lifts warmer and brighter — the colour moves with the music
-// without ever leaving the accent's family.
-func coreRamp(accent color.Color) []lipgloss.Style {
-	quiet := shift(accent, -14, 0.80, 0.86)
-	hot := shift(accent, 13, 1.12, 1.14)
-	return ramp(quiet, accent, hot)
-}
-
-// edgeRamp is the extremes of the swing: the theme's own cool grey, which reads
-// against the accent as a different colour rather than merely a dimmer one.
-func edgeRamp(t Theme) []lipgloss.Style {
-	return ramp(t.Faint, t.Muted, blend(t.Muted, t.Text, 0.35))
-}
-
-// ramp builds the palette between three stops, the middle one two thirds of the
-// way up so most of the trace sits on it and only the peaks lift past.
-func ramp(low, mid, high color.Color) []lipgloss.Style {
-	const knee = 0.66
-
-	out := make([]lipgloss.Style, scopeLevels)
-	for i := range out {
-		f := float64(i) / float64(scopeLevels-1)
-		var c color.Color
-		if f <= knee {
-			c = blend(low, mid, f/knee)
-		} else {
-			c = blend(mid, high, (f-knee)/(1-knee))
-		}
-		out[i] = lipgloss.NewStyle().Foreground(c)
-	}
-	return out
 }
 
 // shift rotates a colour's hue by the given degrees and scales its saturation
