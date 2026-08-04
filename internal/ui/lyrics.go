@@ -96,13 +96,19 @@ func (m Model) lyricsBlock(w, rows int) []string {
 	}
 
 	at := m.lyricsAt()
-	// Not clamped to the end of the lyric: the line being sung keeps its place
-	// on screen all the way through, and the rows below it simply run out. A
-	// window that stops scrolling near the end would slide the lit line down
-	// under the eye that is following it.
-	from := max(at-lyricsLead, 0)
+
+	// Not clamped at either end: the line being sung keeps its place on screen
+	// from the first line to the last, and the rows beyond simply run out. A
+	// window that stopped scrolling near an end would slide the lit line under
+	// the eye that is following it — which is why the opening of a track looked
+	// unlike the rest of it.
+	from := at - lyricsLead
 
 	out := make([]string, 0, rows)
+	for i := from; i < 0 && len(out) < rows; i++ {
+		out = append(out, strings.Repeat(" ", w))
+	}
+	from = max(from, 0)
 	for i := from; i < len(m.lyrics.lines) && len(out) < rows; i++ {
 		words := strings.TrimSpace(m.lyrics.lines[i].Words)
 		if words == "" || words == "♪" {
@@ -143,15 +149,18 @@ func (m Model) lyricStyle(distance int) lipgloss.Style {
 	return fade[min(distance, len(fade)-1)]
 }
 
-// lyricsAt is the line being sung. Unsynced lyrics have no such line, so the
-// first one stands in and the words simply scroll with nothing.
+// lyricsAt is the line being sung, or -1 before the first one. Unsynced lyrics
+// have no such line, so the first one stands in and the words simply scroll
+// with nothing.
 func (m Model) lyricsAt() int {
 	if !m.lyrics.synced {
 		return 0
 	}
 
+	// Songs open with a bar or two of music. Lighting the first line through it
+	// says it is being sung when it is not.
 	pos := m.elapsed().Milliseconds()
-	at := 0
+	at := -1
 	for i, line := range m.lyrics.lines {
 		if line.At > pos {
 			break

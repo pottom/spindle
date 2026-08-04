@@ -186,9 +186,9 @@ func TestLyricsShowAWindow(t *testing.T) {
 	}
 }
 
-// The line being sung keeps its place on screen all the way through, so the eye
-// following it does not have to move. Only at the very start is it higher,
-// because there is nothing above it yet.
+// The line being sung keeps its place on screen from the first line to the
+// last, so the eye following it never has to move — the opening of a track is
+// padded above rather than starting the block at the top.
 func TestLitLineHoldsItsPlace(t *testing.T) {
 	m := lyricsModel(120, 44)
 
@@ -201,11 +201,7 @@ func TestLitLineHoldsItsPlace(t *testing.T) {
 		return -1
 	}
 
-	m.setProgress(0)
-	if got := litRow(); got != 0 {
-		t.Errorf("at the first line the lit row is %d, want 0", got)
-	}
-	for _, at := range []time.Duration{20 * time.Second, 32 * time.Second, 44 * time.Second} {
+	for _, at := range []time.Duration{0, 20 * time.Second, 32 * time.Second, 44 * time.Second} {
 		m.setProgress(at)
 		if got := litRow(); got != lyricsLead {
 			t.Errorf("at %v the lit row is %d, want %d", at, got, lyricsLead)
@@ -365,5 +361,27 @@ func TestInfoRisesNoHigherThanTheArtwork(t *testing.T) {
 	}
 	if first == 0 {
 		t.Error("the information went to the very top of the body")
+	}
+}
+
+// Songs open with a bar or two of music. Lighting the first line through it
+// says it is being sung when it is not.
+func TestNothingIsLitBeforeTheFirstLine(t *testing.T) {
+	m := lyricsModel(120, 44)
+	m.lyrics.lines[0].At = 4000
+
+	m.setProgress(time.Second)
+	if got := m.lyricsAt(); got != -1 {
+		t.Errorf("line %d is lit before the first one is sung", got)
+	}
+	for _, row := range m.lyricsBlock(44, lyricsMaxRows) {
+		if strings.Contains(row, "\x1b[1;") {
+			t.Errorf("a line is lit before the first one is sung: %q", plain(row))
+		}
+	}
+
+	m.setProgress(5 * time.Second)
+	if got := m.lyricsAt(); got < 0 {
+		t.Error("nothing is lit once the first line's time has come")
 	}
 }
