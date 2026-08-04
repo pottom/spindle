@@ -303,7 +303,15 @@ func (m Model) leadIn(place string) string {
 	if m.rowsAreFlush {
 		width = 1
 	}
-	return padLeft(place, width) + "  "
+
+	// One space where a mark column follows, two where the title comes next.
+	// Four columns between the ordinal and the title is a gap you read across
+	// rather than past.
+	gap := "  "
+	if m.tab != tabQueue {
+		gap = " "
+	}
+	return padLeft(place, width) + gap
 }
 
 // withMark is a title with the flag for a track most of Spotify is playing.
