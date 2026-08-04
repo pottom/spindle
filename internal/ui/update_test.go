@@ -381,3 +381,37 @@ func TestSkipKeysShareThePlayFloor(t *testing.T) {
 		t.Error("a skip inside the floor went straight out")
 	}
 }
+
+// A finished list looks exactly like a crashed program: a still progress bar
+// and a silent room. It is worth one line to say which it is.
+func TestARunOutListSaysSo(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{TrackID: "last", Title: "last", Playing: false, Duration: 3 * time.Minute}
+	m.progressAt = time.Now()
+
+	text, _, ok := m.notice()
+	if !ok || !strings.Contains(text, "run out") {
+		t.Errorf("notice = %q, want it to say the list has run out", text)
+	}
+
+	// Not while something still follows.
+	m.queue = []player.Track{{ID: "next", Title: "next"}}
+	if _, _, ok := m.notice(); ok {
+		t.Error("the line is there with a track still waiting")
+	}
+
+	// Nor when the listener paused partway through the last track: they know
+	// what they did.
+	m.queue = nil
+	m.ps.Progress = time.Minute
+	if _, _, ok := m.notice(); ok {
+		t.Error("the line is there for a track paused in the middle")
+	}
+
+	// Nor while it is playing.
+	m.ps.Progress = 0
+	m.ps.Playing = true
+	if _, _, ok := m.notice(); ok {
+		t.Error("the line is there while the music plays")
+	}
+}

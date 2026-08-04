@@ -73,6 +73,10 @@ const (
 	// is news rather than a state: nothing is wrong now, and the line would
 	// otherwise sit there over music that is playing perfectly well.
 	unplayableWindow = 6 * time.Second
+
+	// ranOutSlack is how near the start of a track counts as never having
+	// begun it. The device rewinds when it runs out of list.
+	ranOutSlack = 2 * time.Second
 )
 
 // lyricsCmd fetches the words of a track. A failure is reported as a track

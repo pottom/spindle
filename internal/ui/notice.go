@@ -36,6 +36,10 @@ func (m Model) notice() (string, lipgloss.Style, bool) {
 
 	case m.err != nil:
 		return errorGlyph + " " + m.err.Error(), m.styles.Error, true
+
+	case m.ranOut():
+		return warnGlyph + " The list has run out — nothing follows this track",
+			m.styles.Warning, true
 	}
 	return "", lipgloss.Style{}, false
 }
@@ -44,4 +48,19 @@ func (m Model) notice() (string, lipgloss.Style, bool) {
 func (m Model) hasNotice() bool {
 	_, _, ok := m.notice()
 	return ok
+}
+
+// ranOut reports that the device stopped because it had nothing left to play.
+//
+// Spotify's own clients follow a finished list with a radio station; ours is
+// refused one, so playback simply stops at the top of the last track with an
+// empty queue behind it. On screen that is a still progress bar and a silent
+// room, which reads as a program that has crashed. It has not: it has finished.
+func (m Model) ranOut() bool {
+	if m.ps == nil || m.ps.Playing || m.ps.TrackID == "" || len(m.queue) > 0 {
+		return false
+	}
+	// At the top of a track rather than partway through it: a listener who
+	// paused in the middle of the last track knows perfectly well what they did.
+	return m.elapsed() < ranOutSlack
 }
