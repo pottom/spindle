@@ -20,6 +20,10 @@ type localStatus struct {
 	// Bitrate is the stream actually playing, which is not necessarily the one
 	// configured: the best available format is picked per track.
 	Bitrate int `json:"bitrate"`
+
+	// Tempo is measured from the audio, since the endpoint that would report it
+	// is closed to this application.
+	Tempo float64 `json:"tempo"`
 }
 
 type localTrack struct {
@@ -45,6 +49,7 @@ func (s *localStatus) toState() *State {
 		DeviceID:   s.DeviceID,
 		DeviceName: s.DeviceName,
 		Bitrate:    s.Bitrate,
+		Tempo:      s.Tempo,
 	}
 
 	if s.Track != nil {

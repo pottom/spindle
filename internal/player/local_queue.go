@@ -31,6 +31,7 @@ type localQueueTrack struct {
 	TotalTracks int      `json:"total_tracks"`
 	AlbumType   string   `json:"album_type"`
 	Popularity  int      `json:"popularity"`
+	Tempo       float64  `json:"tempo"`
 }
 
 func (t localQueueTrack) toTrack() Track {
@@ -49,6 +50,7 @@ func (t localQueueTrack) toTrack() Track {
 		TotalTracks: t.TotalTracks,
 		AlbumType:   t.AlbumType,
 		Popularity:  &popularity,
+		Tempo:       t.Tempo,
 	}
 }
 

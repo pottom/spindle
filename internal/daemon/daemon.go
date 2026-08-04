@@ -85,6 +85,12 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	log := newLogger(out)
 
+	cacheDir, err := xdg.CacheDir()
+	if err != nil {
+		// Without somewhere to keep them, tempos last only as long as this run.
+		cacheDir = ""
+	}
+
 	api, err := daemon.NewApiServer(log, DefaultHost, port, "", "", "")
 	if err != nil {
 		return fmt.Errorf("start local api: %w", err)
@@ -105,6 +111,9 @@ func Run(ctx context.Context, opts Options) error {
 				Type:        "interactive",
 				Interactive: daemon.InteractiveCredentials{CallbackPort: authCallbackPort},
 			},
+			// Not for the audio, which is left to stream: this is where the
+			// measured tempos live, and they are only worth measuring once.
+			Cache: daemon.CacheConfig{Dir: cacheDir},
 		},
 	})
 	if err != nil {

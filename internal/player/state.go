@@ -28,4 +28,8 @@ type State struct {
 	// Bitrate is the stream actually playing, in kbps, or 0 when unknown. Only
 	// the local daemon can say: the Web API never reports what a device chose.
 	Bitrate int
+
+	// Tempo is the measured beat rate in bpm, or zero while the analyser is
+	// still listening or the recording has no steady beat.
+	Tempo float64
 }

@@ -101,7 +101,13 @@ func (m Model) nowPlayingRow() (player.Track, bool) {
 		return player.Track{}, false
 	}
 	if m.nowQueued != nil && m.nowQueued.ID == m.ps.TrackID {
-		return *m.nowQueued, true
+		now := *m.nowQueued
+		// The live measurement is fresher than whatever was recorded last time
+		// this track played, and is the only one there is on a first listen.
+		if m.ps.Tempo > 0 {
+			now.Tempo = m.ps.Tempo
+		}
+		return now, true
 	}
 	return player.Track{
 		ID:       m.ps.TrackID,

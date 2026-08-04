@@ -466,3 +466,40 @@ func TestHotMark(t *testing.T) {
 		t.Error("tracks with no rating were marked")
 	}
 }
+
+// A tempo is measured while a track sounds, so it exists for what has been
+// heard and for nothing else. Showing "0 bpm" for the rest would be inventing
+// a fact about them.
+func TestTempoShownOnlyWhenMeasured(t *testing.T) {
+	measured := player.Track{Album: "Hot Space", Duration: 4 * time.Minute, Tempo: 117.6}
+	if got := factLines(trackFacts(measured)); !strings.Contains(got, "118 bpm") {
+		t.Errorf("trackFacts() = %q, want the measured tempo", got)
+	}
+
+	never := player.Track{Album: "Hot Space", Duration: 4 * time.Minute}
+	if got := factLines(trackFacts(never)); strings.Contains(got, "bpm") {
+		t.Errorf("trackFacts() = %q, want no tempo for a track never played", got)
+	}
+}
+
+// The live measurement is fresher than whatever was recorded when the track was
+// last played, and on a first listen it is the only one there is.
+func TestPlayingTrackPrefersTheLiveTempo(t *testing.T) {
+	m := queueModel(0, "a")
+	m.ps.Tempo = 128
+	m.nowQueued = &player.Track{ID: "now", Title: "playing", Tempo: 96}
+
+	got, ok := m.nowPlayingRow()
+	if !ok {
+		t.Fatal("no playing row")
+	}
+	if got.Tempo != 128 {
+		t.Errorf("tempo = %.0f, want the live measurement", got.Tempo)
+	}
+
+	// With nothing measured yet, what was recorded before still stands.
+	m.ps.Tempo = 0
+	if got, _ := m.nowPlayingRow(); got.Tempo != 96 {
+		t.Errorf("tempo = %.0f, want the remembered one while nothing is measured", got.Tempo)
+	}
+}

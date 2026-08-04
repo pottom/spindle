@@ -266,6 +266,11 @@ func (m Model) statusLine() string {
 	if m.ps.Playing && m.ps.Bitrate > 0 {
 		line += m.styles.Quality.Render(fmt.Sprintf("  %d kbps", m.ps.Bitrate))
 	}
+	// The tempo is measured from the audio, so it arrives a few seconds into a
+	// track and is absent from anything without a steady beat.
+	if m.ps.Playing && m.ps.Tempo > 0 {
+		line += m.styles.Quality.Render(fmt.Sprintf("  %.0f bpm", m.ps.Tempo))
+	}
 	return line
 }
 

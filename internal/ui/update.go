@@ -267,6 +267,7 @@ func (m *Model) adopt(st *player.State) {
 	m.ps.DeviceID = st.DeviceID
 	m.ps.DeviceName = st.DeviceName
 	m.ps.Bitrate = st.Bitrate
+	m.ps.Tempo = st.Tempo
 }
 
 func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {

@@ -30,4 +30,10 @@ type Track struct {
 	// report it. Zero is a value, not an absence: an obscure catalogue track
 	// really does score nothing.
 	Popularity *int
+
+	// Tempo is the beat rate in bpm, measured while the track was playing, or
+	// zero if it never has been. Spotify reports one through an endpoint closed
+	// to this application, so the local device measures it instead — which
+	// means only what has been heard has a tempo.
+	Tempo float64
 }

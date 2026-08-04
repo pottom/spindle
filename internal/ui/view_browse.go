@@ -249,6 +249,12 @@ func trackFacts(t player.Track) []trackFact {
 		facts = append(facts, trackFact{"track", "Track", place})
 	}
 	facts = append(facts, trackFact{"length", "Length", formatDuration(t.Duration)})
+
+	// Measured while the track sounded, so it exists for what has been heard
+	// and for nothing else.
+	if t.Tempo > 0 {
+		facts = append(facts, trackFact{"tempo", "Tempo", fmt.Sprintf("%.0f bpm", t.Tempo)})
+	}
 	return facts
 }
 
