@@ -68,14 +68,16 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case msg.QueueFetched:
-		m.queue = message.Tracks
+		// A move waiting to go out is not in the device's answer yet, and
+		// drawing that answer would undo it under the user's hand.
+		if !m.order.live {
+			m.queue = message.Tracks
+			m.clampQueueCursor()
+		}
 		m.nowQueued = nil
 		if len(message.Current) > 0 {
 			m.nowQueued = &message.Current[0]
 		}
-		// Clamp rather than reset: a poll landing while the queue tab is open
-		// should not throw the cursor back to the top under the user's hand.
-		m.clampQueueCursor()
 		if m.tab == tabQueue {
 			return m, m.syncCover()
 		}
@@ -131,6 +133,13 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, fetchStateCmd(m.player)
+
+	case msg.OrderSettled:
+		// Only the last press of the run counts.
+		if message.Seq != m.order.seq {
+			return m, nil
+		}
+		return m, m.sendOrder()
 
 	case msg.VolumeSettled:
 		// Only the newest keystroke counts, and only if the value has moved

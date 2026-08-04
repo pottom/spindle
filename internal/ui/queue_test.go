@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/player"
+	"github.com/pottom/spindle/internal/ui/msg"
 )
 
 // queued builds a queue of hand-added tracks followed by context ones, which is
@@ -99,11 +100,10 @@ func TestMoveCrossesIntoTheContext(t *testing.T) {
 	m.player = recordingEditor{Player: m.player, reordered: reordered}
 	m.queuePane.cursor.cursor = queueRowOf(2) // c, a context track
 
-	cmd := m.moveQueued(-1)
-	if cmd == nil {
+	if cmd := m.moveQueued(-1); cmd == nil {
 		t.Fatal("moveQueued(-1) = nil on a context track")
 	}
-	cmd()
+	settle(t, &m)
 
 	if got := <-reordered; len(got) != 3 || got[0] != "a" || got[1] != "c" || got[2] != "b" {
 		t.Errorf("Reorder(%v), want the whole run down to the edit, in its new order", got)
@@ -130,11 +130,10 @@ func TestMoveSendsOnlyAsFarAsTheEdit(t *testing.T) {
 	m.player = recordingEditor{Player: m.player, reordered: reordered}
 	m.queuePane.cursor.cursor = queueRowOf(1)
 
-	cmd := m.moveQueued(-1)
-	if cmd == nil {
+	if cmd := m.moveQueued(-1); cmd == nil {
 		t.Fatal("moveQueued(-1) = nil")
 	}
-	cmd()
+	settle(t, &m)
 
 	if got := <-reordered; len(got) != 2 || got[0] != "b" || got[1] != "a" {
 		t.Errorf("Reorder(%v), want the two tracks that moved and no more", got)
@@ -152,11 +151,10 @@ func TestOnlyQueuedTracksAreSent(t *testing.T) {
 	m.player = recordingEditor{Player: m.player, sent: sent}
 	m.queuePane.cursor.cursor = queueRowOf(0)
 
-	cmd := m.moveQueued(1)
-	if cmd == nil {
+	if cmd := m.moveQueued(1); cmd == nil {
 		t.Fatal("moveQueued() = nil")
 	}
-	cmd()
+	settle(t, &m)
 
 	got := <-sent
 	if len(got) != 2 || got[0] != "b" || got[1] != "a" {
@@ -184,6 +182,17 @@ type recordingEditor struct {
 	sent      chan []string
 	reordered chan []string
 	dropped   chan string
+}
+
+// settle runs the edit the move keys left waiting, as the debounce would once
+// the list stopped moving.
+func settle(t *testing.T, m *Model) {
+	t.Helper()
+	cmd := m.sendOrder()
+	if cmd == nil {
+		t.Fatal("nothing was waiting to be sent")
+	}
+	cmd()
 }
 
 func (r recordingEditor) Reorder(_ context.Context, ids []string) error {
@@ -623,5 +632,57 @@ func TestArtistColumnGrowsWithTheRow(t *testing.T) {
 	}
 	if !strings.Contains(out, "a") {
 		t.Error("the title did not survive")
+	}
+}
+
+// Holding the key must not send an edit per press. Each one rewrites what the
+// device has coming, and the next would be describing a list it has not agreed
+// to yet — which is what the reorder refusals were.
+func TestMoveSendsOneEditForARunOfPresses(t *testing.T) {
+	reordered := make(chan []string, 4)
+	m := queueModel(0, "a", "b", "c", "d")
+	m.player = recordingEditor{Player: m.player, reordered: reordered}
+	m.queuePane.cursor.cursor = queueRowOf(3)
+
+	for range 3 {
+		m.moveQueued(-1)
+	}
+	if len(reordered) != 0 {
+		t.Fatal("an edit went out while the list was still moving")
+	}
+
+	// The timers the earlier presses left behind have been overtaken.
+	var tm tea.Model = m
+	for seq := 1; seq < m.order.seq; seq++ {
+		if _, cmd := tm.Update(msg.OrderSettled{Seq: seq}); cmd != nil {
+			t.Errorf("the timer from press %d sent an edit of its own", seq)
+		}
+	}
+
+	_, cmd := tm.Update(msg.OrderSettled{Seq: m.order.seq})
+	if cmd == nil {
+		t.Fatal("the last press sent nothing")
+	}
+	cmd()
+
+	if got := <-reordered; len(got) != 4 || got[0] != "d" {
+		t.Errorf("Reorder(%v), want the whole run in the order it ended up", got)
+	}
+	if len(reordered) != 0 {
+		t.Errorf("%d further edits went out, want one for the run", len(reordered))
+	}
+}
+
+// A poll landing mid-edit describes the list as the device still has it, and
+// drawing that would undo the move under the user's hand.
+func TestAPollDoesNotUndoAWaitingMove(t *testing.T) {
+	m := queueModel(0, "a", "b", "c")
+	m.queuePane.cursor.cursor = queueRowOf(1)
+	m.moveQueued(-1)
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(msg.QueueFetched{Tracks: queueOf(0, "a", "b", "c")})
+	if got := ids(tm.(Model).queue); got[0] != "b" || got[1] != "a" {
+		t.Errorf("queue = %v, want the move to have survived the poll", got)
 	}
 }

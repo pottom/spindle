@@ -77,9 +77,28 @@ func (m *Model) dropQueued() tea.Cmd {
 	})
 }
 
+// pendingOrder is a run of move keys waiting to go out. The list on screen is
+// already the one being asked for; only the request waits.
+type pendingOrder struct {
+	// seq counts the presses, so only the last one's timer sends anything.
+	seq int
+
+	// live is whether there is an edit to send, deep how far down the list the
+	// run reached, and lift whether any of it has to be lifted out of the
+	// context rather than merely reordered inside the queue.
+	live bool
+	deep int
+	lift bool
+}
+
 // moveQueued shifts the track under the cursor by one place. Any row can move,
 // not only the hand-queued ones: an album or a playlist has one order of its
 // own, and lifting a track out of it is the only way to hear it in another.
+//
+// The list moves at once; the request waits for the run of presses to end. A
+// reorder is not something the device can be given twice a second — each one
+// rewrites what is coming — and the second press would be describing a list it
+// has not agreed to yet.
 func (m *Model) moveQueued(delta int) tea.Cmd {
 	at := m.queueIndex()
 	if at < 0 {
@@ -94,14 +113,32 @@ func (m *Model) moveQueued(delta int) tea.Cmd {
 	next := make([]player.Track, len(m.queue))
 	copy(next, m.queue)
 	next[at], next[to] = next[to], next[at]
+	m.queue = next
 	m.queuePane.cursor.cursor += delta
 
-	if next[at].Queued && next[to].Queued {
-		// Both are already the queue's to order: a cheaper edit that leaves the
-		// context where it stands.
-		return m.commitQueue(next)
+	m.order.seq++
+	m.order.deep = max(m.order.deep, max(at, to))
+	// A run that touches the context anywhere has to go out as a lift: the
+	// cheaper edit cannot express it.
+	m.order.lift = m.order.lift || !next[at].Queued || !next[to].Queued
+	m.order.live = true
+	return orderSettleCmd(m.order.seq)
+}
+
+// sendOrder dispatches the run of moves that has come to rest.
+func (m *Model) sendOrder() tea.Cmd {
+	order := m.order
+	m.order = pendingOrder{seq: order.seq}
+	if !order.live || len(m.queue) == 0 {
+		return nil
 	}
-	return m.commitOrder(next, max(at, to))
+
+	if !order.lift {
+		// Every track that moved was already the queue's to order, which is a
+		// cheaper edit and leaves the context where it stands.
+		return m.commitQueue(m.queue)
+	}
+	return m.commitOrder(m.queue, min(order.deep, len(m.queue)-1))
 }
 
 // commitOrder shows the new order at once and sends the run that has to travel

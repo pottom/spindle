@@ -50,6 +50,14 @@ const (
 	// volumeDebounce is the quiet period after a volume request before another
 	// may go out. The first press of a run is not delayed by it — see setVolume.
 	volumeDebounce = 400 * time.Millisecond
+
+	// orderDebounce is how long the queue waits after a move key before it
+	// sends the new order. Reordering is not a request the device can be given
+	// twice a second: each one lifts tracks out of the context, and the next
+	// press would be describing a list the device has not agreed to yet. So
+	// unlike the volume there is no leading request — the run goes out once,
+	// when it is clear where the track was meant to end up.
+	orderDebounce = 400 * time.Millisecond
 )
 
 // lyricsCmd fetches the words of a track. A failure is reported as a track
@@ -259,6 +267,13 @@ func watchCmd(w player.Watcher) tea.Cmd {
 // for a moment after a skip, so an immediate poll would confirm the wrong thing.
 func refetchCmd(d time.Duration) tea.Cmd {
 	return tea.Tick(d, func(time.Time) tea.Msg { return msg.Refetch{} })
+}
+
+// orderSettleCmd waits out the queue's move debounce.
+func orderSettleCmd(seq int) tea.Cmd {
+	return tea.Tick(orderDebounce, func(time.Time) tea.Msg {
+		return msg.OrderSettled{Seq: seq}
+	})
 }
 
 // volumeSettleCmd waits out the volume debounce.

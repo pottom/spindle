@@ -111,6 +111,9 @@ type Model struct {
 	queue    []player.Track
 	queueFor string
 
+	// order is the run of move keys waiting to be sent.
+	order pendingOrder
+
 	// nowQueued is the playing track as the queue reported it. The daemon says
 	// what is playing sooner and more often, but only this carries the release
 	// date and the rest of the detail panel's material.

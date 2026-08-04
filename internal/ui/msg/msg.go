@@ -105,6 +105,12 @@ type VolumeSettled struct {
 	Seq int
 }
 
+// OrderSettled fires once the queue's move keys have stopped, so a run of
+// presses is sent as one edit rather than one per press.
+type OrderSettled struct {
+	Seq int
+}
+
 // ControlDone reports that a control call succeeded, which is what clears a
 // standing complaint about the account not being able to control playback.
 type ControlDone struct{}
