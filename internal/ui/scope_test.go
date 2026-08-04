@@ -20,28 +20,26 @@ func scopeModel(w, h int) Model {
 	return m
 }
 
-// The trace is off until asked for, and the key both shows it and starts the
-// loop that moves it.
+// The trace is on to begin with, and the key puts it away and brings it back.
 func TestScopeKeyTogglesTheTrace(t *testing.T) {
 	m := scopeModel(100, 40)
-	if strings.Contains(plain(m.render()), "⠀") {
-		t.Fatal("the trace was drawn before it was asked for")
+	if !m.scopeVisible() {
+		t.Fatal("the trace is not on by default")
 	}
 
 	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
+	if tm.(Model).scopeVisible() {
+		t.Fatal("the key did not put the trace away")
+	}
+
 	tm, cmd := tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
 	if cmd == nil {
 		t.Fatal("v produced no command, so nothing would move the trace")
 	}
-
 	on := tm.(Model)
 	if !on.scopeVisible() || !on.scope.running {
 		t.Fatalf("scope visible=%v running=%v, want both", on.scopeVisible(), on.scope.running)
-	}
-
-	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
-	if tm.(Model).scopeVisible() {
-		t.Error("the second press did not put the trace away")
 	}
 }
 
@@ -50,6 +48,7 @@ func TestScopeKeyTogglesTheTrace(t *testing.T) {
 func TestScopeMovesNothing(t *testing.T) {
 	for _, size := range [][2]int{{100, 44}, {100, 40}, {120, 50}} {
 		off := scopeModel(size[0], size[1])
+		off.scope.on = false
 		if !off.scopeAvailable() {
 			t.Fatalf("%dx%d: no room for the trace, so there is nothing to test", size[0], size[1])
 		}
@@ -544,5 +543,20 @@ func TestWaveformSurvivesAGrowingCover(t *testing.T) {
 			t.Errorf("%dx%d: no room for the waveform (body %d, art %dx%d, room %d)",
 				size[0], size[1], l.bodyHeight, l.artWidth, l.artHeight, m.scopeRoom(l))
 		}
+	}
+}
+
+// The waveform is on when spindle starts. A feature nobody knows to ask for may
+// as well not exist, and this one is most of what makes the screen feel alive.
+func TestWaveformIsOnByDefault(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	if !m.scope.on {
+		t.Error("the waveform is off to begin with")
+	}
+
+	// Nothing has been drawn yet, so it must not claim to be running either —
+	// the tick loop starts when there is something to draw on.
+	if m.scope.running {
+		t.Error("the tick loop is running before anything is on screen")
 	}
 }

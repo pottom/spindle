@@ -141,13 +141,17 @@ type Model struct {
 // starts dark and is corrected once the terminal reports its background colour.
 func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 	m := Model{
-		player:  p,
-		covers:  covers,
-		cell:    cell,
-		isDark:  true,
-		keys:    newKeyMap(),
-		help:    help.New(),
-		search:  newSearchPane(),
+		player: p,
+		covers: covers,
+		cell:   cell,
+		isDark: true,
+		keys:   newKeyMap(),
+		help:   help.New(),
+		search: newSearchPane(),
+		// The waveform is on to begin with: it is the thing that makes the
+		// screen feel alive, and a feature nobody knows to ask for may as well
+		// not exist. The key is there to put it away.
+		scope:   scopeState{on: true},
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
 		device:  spinner.New(spinner.WithSpinner(deviceSpinner)),
 	}
