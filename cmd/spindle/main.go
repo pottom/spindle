@@ -19,14 +19,8 @@ import (
 	"github.com/pottom/spindle/internal/ui/cover"
 )
 
-// reportFatal prints an error and leaves. A missing client id is not really an
-// error so much as an unfinished setup, so it gets the instructions instead of a
-// one-line complaint.
+// reportFatal prints an error and leaves.
 func reportFatal(err error) {
-	if errors.Is(err, auth.ErrNoClientID) {
-		fmt.Fprintln(os.Stderr, auth.SetupHelp())
-		os.Exit(1)
-	}
 	fmt.Fprintln(os.Stderr, "spindle:", err)
 	os.Exit(1)
 }
@@ -36,7 +30,7 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "login":
-			if err := runLogin(context.Background()); err != nil {
+			if err := runLogin(context.Background(), os.Args[2:]); err != nil {
 				reportFatal(err)
 			}
 			return

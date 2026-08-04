@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -15,10 +14,12 @@ import (
 )
 
 // runLogin authorises spindle and reports who it authorised as. It is the one
-// place the browser flow is meant to be triggered by hand, and the one place
-// that asks for the client id.
-func runLogin(ctx context.Context) error {
-	if err := ensureClientID(os.Stdin, os.Stdout); err != nil {
+// place the browser flow is meant to be triggered by hand.
+//
+// An argument names the application to authenticate as, for anyone who would
+// rather use their own registration than the one spindle ships with.
+func runLogin(ctx context.Context, args []string) error {
+	if err := useClientID(args, os.Stdout); err != nil {
 		return err
 	}
 
@@ -48,25 +49,28 @@ func runLogin(ctx context.Context) error {
 	return nil
 }
 
-// ensureClientID asks for the application's client id if there is none saved.
-// It is asked once and remembered; a malformed answer is rejected on the spot
-// rather than turning into a confusing rejection halfway through the browser.
-func ensureClientID(in io.Reader, out io.Writer) error {
-	if _, err := auth.ClientID(); !errors.Is(err, auth.ErrNoClientID) {
-		return err
+// useClientID records the application to authenticate as. "default" goes back
+// to the one spindle ships with; a malformed id is refused here rather than
+// halfway through the browser.
+func useClientID(args []string, out io.Writer) error {
+	if len(args) == 0 {
+		return nil
+	}
+	if len(args) > 1 {
+		return fmt.Errorf("spindle login takes one client id, got %d arguments", len(args))
 	}
 
-	fmt.Fprintln(out, auth.SetupHelp())
-	fmt.Fprint(out, "\nClient id: ")
-
-	scanner := bufio.NewScanner(in)
-	if !scanner.Scan() {
-		return fmt.Errorf("no client id given")
+	id := strings.TrimSpace(args[0])
+	if id == "default" {
+		id = ""
 	}
-	id := strings.TrimSpace(scanner.Text())
-
 	if err := auth.SaveClientID(id); err != nil {
 		return err
+	}
+
+	if id == "" {
+		fmt.Fprint(out, "Using the application spindle ships with.\n\n")
+		return nil
 	}
 	fmt.Fprintf(out, "Saved to %s\n\n", auth.SettingsPath())
 	return nil
