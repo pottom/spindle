@@ -125,3 +125,19 @@ func repeatFromSpotify(mode string) string {
 		return RepeatOff
 	}
 }
+
+// playlistFromSimple is a playlist as every list of them reports it: the
+// library, and a search.
+//
+// Spotify does not report a playlist's total duration, and adding it up would
+// mean fetching every track, so it is left at zero and the UI omits it.
+func playlistFromSimple(p *spotify.SimplePlaylist) Playlist {
+	return Playlist{
+		ID:          p.ID.String(),
+		Name:        p.Name,
+		Owner:       ownerName(p.Owner),
+		CoverURL:    bestImage(p.Images),
+		Tracks:      int(p.Tracks.Total),
+		Description: plainText(p.Description),
+	}
+}

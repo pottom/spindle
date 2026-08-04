@@ -299,6 +299,9 @@ func (l *Local) AddToQueue(ctx context.Context, trackID string) error {
 func (l *Local) SearchPage(ctx context.Context, q string, offset int) (Page[Track], error) {
 	return l.web.SearchPage(ctx, q, offset)
 }
+func (l *Local) Search(ctx context.Context, q string, kind SearchKind, offset int) (Results, error) {
+	return l.web.Search(ctx, q, kind, offset)
+}
 func (l *Local) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist], error) {
 	return l.web.PlaylistsPage(ctx, offset)
 }

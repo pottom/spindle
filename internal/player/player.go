@@ -44,6 +44,11 @@ type Player interface {
 	// business — it is whatever its source hands over in one request. A caller
 	// starts at zero, follows Page.Next while Page.More, and stops there.
 	SearchPage(ctx context.Context, query string, offset int) (Page[Track], error)
+
+	// Search is the same query against one kind of thing, or against all of
+	// them when the kind is empty. Tracks alone are what SearchPage answers;
+	// this is what a screen offering albums, artists and playlists needs.
+	Search(ctx context.Context, query string, kind SearchKind, offset int) (Results, error)
 	PlaylistsPage(ctx context.Context, offset int) (Page[Playlist], error)
 	PlaylistTracksPage(ctx context.Context, playlistID string, offset int) (Page[Track], error)
 

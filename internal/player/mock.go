@@ -373,6 +373,53 @@ func (m *Mock) SearchPage(ctx context.Context, query string, offset int) (Page[T
 	return mockPage(hits, offset), nil
 }
 
+// Search matches the query against every kind the mock has, so the search
+// screen can be driven offline exactly as it is against Spotify.
+func (m *Mock) Search(ctx context.Context, query string, kind SearchKind, offset int) (Results, error) {
+	tracks, err := m.SearchPage(ctx, query, offset)
+	if err != nil {
+		return Results{}, err
+	}
+
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return Results{}, nil
+	}
+
+	out := Results{}
+	if kind == "" || kind == SearchTracks {
+		out.Tracks = tracks
+	}
+	if kind == "" || kind == SearchAlbums {
+		var hits []Album
+		for _, a := range mockAlbumList {
+			if strings.Contains(strings.ToLower(a.Name+" "+strings.Join(a.Artists, " ")), q) {
+				hits = append(hits, a)
+			}
+		}
+		out.Albums = mockPage(hits, offset)
+	}
+	if kind == "" || kind == SearchArtists {
+		var hits []Artist
+		for _, a := range mockArtists {
+			if strings.Contains(strings.ToLower(a.Name), q) {
+				hits = append(hits, a)
+			}
+		}
+		out.Artists = mockPage(hits, offset)
+	}
+	if kind == "" || kind == SearchPlaylists {
+		var hits []Playlist
+		for _, def := range mockPlaylists {
+			if strings.Contains(strings.ToLower(def.Name+" "+def.Owner), q) {
+				hits = append(hits, def.Playlist)
+			}
+		}
+		out.Playlists = mockPage(hits, offset)
+	}
+	return out, nil
+}
+
 func (m *Mock) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist], error) {
 	if err := m.delay(ctx); err != nil {
 		return Page[Playlist]{}, err

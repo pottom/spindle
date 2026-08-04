@@ -125,26 +125,83 @@ func (s *Spotify) AddToQueue(ctx context.Context, trackID string) error {
 }
 
 func (s *Spotify) SearchPage(ctx context.Context, query string, offset int) (Page[Track], error) {
+	res, err := s.Search(ctx, query, SearchTracks, offset)
+	return res.Tracks, err
+}
+
+// Search matches a query against one kind, or against all of them when the kind
+// is empty. Spotify answers every kind asked for in a single request, so a
+// fresh query learns what else matched for the price of the tracks alone.
+func (s *Spotify) Search(ctx context.Context, query string, kind SearchKind, offset int) (Results, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
-		return Page[Track]{}, nil
+		return Results{}, nil
+	}
+
+	var want spotify.SearchType
+	for _, k := range searchTypes(kind) {
+		want |= k
 	}
 
 	start := max(offset, 0)
-	res, err := s.client.Search(ctx, query, spotify.SearchTypeTrack,
-		spotify.Limit(pageLimit), spotify.Offset(start))
+	res, err := s.client.Search(ctx, query, want, spotify.Limit(pageLimit), spotify.Offset(start))
 	if err != nil {
-		return Page[Track]{}, fmt.Errorf("search: %w", err)
+		return Results{}, fmt.Errorf("search: %w", err)
 	}
-	if res == nil || res.Tracks == nil {
-		return Page[Track]{}, nil
+	if res == nil {
+		return Results{}, nil
 	}
 
-	out := make([]Track, 0, len(res.Tracks.Tracks))
-	for i := range res.Tracks.Tracks {
-		out = append(out, trackFromFull(&res.Tracks.Tracks[i]))
+	out := Results{}
+	if res.Tracks != nil {
+		items := make([]Track, 0, len(res.Tracks.Tracks))
+		for i := range res.Tracks.Tracks {
+			items = append(items, trackFromFull(&res.Tracks.Tracks[i]))
+		}
+		out.Tracks = Page[Track]{Items: items, More: res.Tracks.Next != "", Next: start + pageLimit}
 	}
-	return Page[Track]{Items: out, More: res.Tracks.Next != "", Next: start + pageLimit}, nil
+	if res.Albums != nil {
+		items := make([]Album, 0, len(res.Albums.Albums))
+		for i := range res.Albums.Albums {
+			items = append(items, albumFromSimple(&res.Albums.Albums[i]))
+		}
+		out.Albums = Page[Album]{Items: items, More: res.Albums.Next != "", Next: start + pageLimit}
+	}
+	if res.Artists != nil {
+		items := make([]Artist, 0, len(res.Artists.Artists))
+		for i := range res.Artists.Artists {
+			items = append(items, artistFromFull(&res.Artists.Artists[i]))
+		}
+		out.Artists = Page[Artist]{Items: items, More: res.Artists.Next != "", Next: start + pageLimit}
+	}
+	if res.Playlists != nil {
+		items := make([]Playlist, 0, len(res.Playlists.Playlists))
+		for i := range res.Playlists.Playlists {
+			items = append(items, playlistFromSimple(&res.Playlists.Playlists[i]))
+		}
+		out.Playlists = Page[Playlist]{Items: items, More: res.Playlists.Next != "", Next: start + pageLimit}
+	}
+	return out, nil
+}
+
+// searchTypes is what to ask Spotify for. An empty kind asks for everything,
+// which is one request rather than four.
+func searchTypes(kind SearchKind) []spotify.SearchType {
+	switch kind {
+	case SearchAlbums:
+		return []spotify.SearchType{spotify.SearchTypeAlbum}
+	case SearchArtists:
+		return []spotify.SearchType{spotify.SearchTypeArtist}
+	case SearchPlaylists:
+		return []spotify.SearchType{spotify.SearchTypePlaylist}
+	case SearchTracks:
+		return []spotify.SearchType{spotify.SearchTypeTrack}
+	default:
+		return []spotify.SearchType{
+			spotify.SearchTypeTrack, spotify.SearchTypeAlbum,
+			spotify.SearchTypeArtist, spotify.SearchTypePlaylist,
+		}
+	}
 }
 
 func (s *Spotify) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist], error) {
@@ -158,17 +215,8 @@ func (s *Spotify) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist]
 	}
 
 	out := make([]Playlist, 0, len(page.Playlists))
-	for _, p := range page.Playlists {
-		out = append(out, Playlist{
-			ID:          p.ID.String(),
-			Name:        p.Name,
-			Owner:       ownerName(p.Owner),
-			CoverURL:    bestImage(p.Images),
-			Tracks:      int(p.Tracks.Total),
-			Description: plainText(p.Description),
-			// Spotify does not report a playlist's total duration, and adding it
-			// up would mean fetching every track. The UI omits what is zero.
-		})
+	for i := range page.Playlists {
+		out = append(out, playlistFromSimple(&page.Playlists[i]))
 	}
 	return Page[Playlist]{Items: out, More: page.Next != "", Next: start + pageLimit}, nil
 }
