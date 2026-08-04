@@ -10,9 +10,21 @@ import (
 	"github.com/pottom/spindle/internal/ui/msg"
 )
 
-// lyricsMinRows is the least the words are worth showing in. Fewer than this and
-// the current line has no context around it, which is most of the point.
-const lyricsMinRows = 6
+const (
+	// lyricsMinRows is the least the words are worth showing in. Fewer than
+	// this and the line being sung has no context around it, which is most of
+	// the point.
+	lyricsMinRows = 6
+
+	// lyricsMaxRows is the most shown at once. A whole lyric on screen is a
+	// page of text to search through; a handful of lines around the one being
+	// sung is something to follow.
+	lyricsMaxRows = 9
+
+	// lyricsLead is how many of those rows sit above the current line. Less
+	// than half, because what is coming is worth more than what has gone.
+	lyricsLead = 3
+)
 
 // lyricsState is the words of the track playing, and whether they are on screen.
 type lyricsState struct {
@@ -74,8 +86,11 @@ func (m Model) lyricsBlock(w, rows int) []string {
 	}
 
 	at := m.lyricsAt()
-	above := rows / 3
-	from := min(max(at-above, 0), max(len(m.lyrics.lines)-rows, 0))
+	// Not clamped to the end of the lyric: the line being sung keeps its place
+	// on screen all the way through, and the rows below it simply run out. A
+	// window that stops scrolling near the end would slide the lit line down
+	// under the eye that is following it.
+	from := max(at-lyricsLead, 0)
 
 	out := make([]string, 0, rows)
 	for i := from; i < len(m.lyrics.lines) && len(out) < rows; i++ {
@@ -165,7 +180,7 @@ func (m Model) infoWithLyrics(l layout, rows int) []string {
 	if len(out) < rows {
 		out = append(out, strings.Repeat(" ", l.infoWidth))
 	}
-	out = append(out, m.lyricsBlock(l.infoWidth, rows-len(out))...)
+	out = append(out, m.lyricsBlock(l.infoWidth, min(rows-len(out), lyricsMaxRows))...)
 
 	for len(out) < rows {
 		out = append(out, strings.Repeat(" ", l.infoWidth))

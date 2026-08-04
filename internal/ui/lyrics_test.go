@@ -165,3 +165,65 @@ func TestLyricsKey(t *testing.T) {
 		t.Error("l did not put them away again")
 	}
 }
+
+// A handful of lines around the one being sung is something to follow; the
+// whole lyric at once is a page of text to search through.
+func TestLyricsShowAWindow(t *testing.T) {
+	m := lyricsModel(120, 44)
+	l := m.layout()
+
+	drawn := 0
+	for _, row := range m.infoWithLyrics(l, l.bodyHeight) {
+		if strings.Contains(plain(row), "xxxxxx") {
+			drawn++
+		}
+	}
+	if drawn > lyricsMaxRows {
+		t.Errorf("%d lines on screen, want no more than %d", drawn, lyricsMaxRows)
+	}
+	if drawn < 3 {
+		t.Errorf("%d lines on screen, want enough for context", drawn)
+	}
+}
+
+// The line being sung keeps its place on screen all the way through, so the eye
+// following it does not have to move. Only at the very start is it higher,
+// because there is nothing above it yet.
+func TestLitLineHoldsItsPlace(t *testing.T) {
+	m := lyricsModel(120, 44)
+
+	litRow := func() int {
+		for i, row := range m.lyricsBlock(44, lyricsMaxRows) {
+			if strings.Contains(row, "\x1b[1;") {
+				return i
+			}
+		}
+		return -1
+	}
+
+	m.setProgress(0)
+	if got := litRow(); got != 0 {
+		t.Errorf("at the first line the lit row is %d, want 0", got)
+	}
+	for _, at := range []time.Duration{20 * time.Second, 32 * time.Second, 44 * time.Second} {
+		m.setProgress(at)
+		if got := litRow(); got != lyricsLead {
+			t.Errorf("at %v the lit row is %d, want %d", at, got, lyricsLead)
+		}
+	}
+}
+
+// The line being sung is in the artwork's accent, like everything else on the
+// screen that matters.
+func TestLitLineIsAccent(t *testing.T) {
+	m := lyricsModel(120, 44)
+	m.setProgress(20 * time.Second)
+
+	want := m.styles.Accent
+	if got := m.styles.LyricFade[0].GetForeground(); got != want {
+		t.Errorf("the lit line is %v, want the accent %v", got, want)
+	}
+	if !m.styles.LyricFade[0].GetBold() {
+		t.Error("the lit line is not set apart from the fade")
+	}
+}
