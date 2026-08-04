@@ -18,3 +18,12 @@ type Waveform interface {
 // more than this: the surplus is slack for the drawer to find a consistent
 // starting point in the wave, without which the picture shimmers.
 const WaveformWindow = 256
+
+// Spectrum is implemented by backends that can say how the energy of what is
+// playing is spread across the frequency range. Like the waveform, only a local
+// device can: it has to hear the sound to measure it.
+type Spectrum interface {
+	// Bands is the current spectrum, lowest frequency first, each 0..1, or nil
+	// when nothing has played yet.
+	Bands() []float32
+}

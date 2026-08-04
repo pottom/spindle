@@ -74,15 +74,25 @@ func lyricsCmd(source player.LyricSource, trackID string) tea.Cmd {
 // heard. The wait and the fetch are one command so the trace paces itself: the
 // next frame is only asked for once the last one has arrived, which keeps a
 // slow backend from queueing up requests nobody will draw.
-func scopeFrameCmd(p player.Player) tea.Cmd {
+func scopeFrameCmd(p player.Player, mode scopeMode) tea.Cmd {
 	return func() tea.Msg {
 		time.Sleep(scopeInterval)
 
-		source, ok := p.(player.Waveform)
-		if !ok {
-			return msg.WaveformReady{}
+		// Only what is being drawn is asked for: the two measurements are
+		// independent, and fetching both would double the work for a frame
+		// that shows one.
+		var out msg.WaveformReady
+		if mode.wave() {
+			if source, ok := p.(player.Waveform); ok {
+				out.Samples = source.Waveform()
+			}
 		}
-		return msg.WaveformReady{Samples: source.Waveform()}
+		if mode.bars() {
+			if source, ok := p.(player.Spectrum); ok {
+				out.Bands = source.Bands()
+			}
+		}
+		return out
 	}
 }
 

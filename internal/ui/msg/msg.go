@@ -56,6 +56,7 @@ type LyricsFetched struct {
 // the next frame is asked for when this one lands.
 type WaveformReady struct {
 	Samples []float32
+	Bands   []float32
 }
 
 // QueueFetched carries the track playing and what is lined up after it.

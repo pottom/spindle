@@ -27,19 +27,19 @@ func TestScopeKeyTogglesTheTrace(t *testing.T) {
 		t.Fatal("the trace is not on by default")
 	}
 
+	// The key cycles: waveform, bars, bars with peak markers, off, and round.
+	want := []scopeMode{scopeBars, scopeBarsPeak, scopeOff, scopeWave}
 	var tm tea.Model = m
-	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
-	if tm.(Model).scopeVisible() {
-		t.Fatal("the key did not put the trace away")
-	}
-
-	tm, cmd := tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
-	if cmd == nil {
-		t.Fatal("v produced no command, so nothing would move the trace")
-	}
-	on := tm.(Model)
-	if !on.scopeVisible() || !on.scope.running {
-		t.Fatalf("scope visible=%v running=%v, want both", on.scopeVisible(), on.scope.running)
+	for i, mode := range want {
+		var cmd tea.Cmd
+		tm, cmd = tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
+		got := tm.(Model)
+		if got.scope.mode != mode {
+			t.Fatalf("press %d put it in mode %d, want %d", i+1, got.scope.mode, mode)
+		}
+		if mode != scopeOff && cmd == nil && !got.scope.running {
+			t.Errorf("press %d left nothing to draw the frames", i+1)
+		}
 	}
 }
 
@@ -48,14 +48,14 @@ func TestScopeKeyTogglesTheTrace(t *testing.T) {
 func TestScopeMovesNothing(t *testing.T) {
 	for _, size := range [][2]int{{100, 44}, {100, 40}, {120, 50}} {
 		off := scopeModel(size[0], size[1])
-		off.scope.on = false
+		off.scope.mode = scopeOff
 		if !off.scopeAvailable() {
 			t.Fatalf("%dx%d: no room for the trace, so there is nothing to test", size[0], size[1])
 		}
 		before := plain(off.render())
 
 		on := off
-		on.scope.on = true
+		on.scope.mode = scopeWave
 		after := plain(on.render())
 
 		b := strings.Split(before, "\n")
@@ -100,7 +100,7 @@ func TestScopeIsNotOfferedWithoutRoom(t *testing.T) {
 // the moment the trace leaves the screen.
 func TestScopeStopsWhenItLeavesTheScreen(t *testing.T) {
 	m := scopeModel(100, 40)
-	m.scope.on, m.scope.running = true, true
+	m.scope.mode, m.scope.running = scopeWave, true
 
 	var tm tea.Model = m
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: '2', Text: "2"}) // to the queue tab
@@ -122,7 +122,7 @@ func TestScopeStopsWhenItLeavesTheScreen(t *testing.T) {
 // slope stays continuous instead of breaking into separate dots.
 func TestScopeDrawsAContinuousLine(t *testing.T) {
 	m := scopeModel(100, 40)
-	m.scope.on = true
+	m.scope.mode = scopeWave
 	m.resize()
 
 	// A step from bottom to top inside two dots: every row between has to be lit.
@@ -156,7 +156,7 @@ func TestScopeDrawsAContinuousLine(t *testing.T) {
 // nothing to explain to anyone.
 func TestScopeWithoutASourceRestsFlat(t *testing.T) {
 	m := scopeModel(100, 40)
-	m.scope.on = true
+	m.scope.mode = scopeWave
 	m.resize()
 	m.scope.frame = nil
 
@@ -172,7 +172,7 @@ func msgScopeTick() tea.Msg { return msg.WaveformReady{} }
 // the rest, so the trace follows the recent loudness instead.
 func TestScopeFollowsTheLoudness(t *testing.T) {
 	m := scopeModel(100, 40)
-	m.scope.on = true
+	m.scope.mode = scopeWave
 	m.resize()
 
 	quiet := []float32{0.06, -0.06, 0.05, -0.05}
@@ -224,7 +224,7 @@ func TestHelpHeightDoesNotDependOnTheScope(t *testing.T) {
 // switched off and on by hand.
 func TestScopeResumesOnItsOwn(t *testing.T) {
 	m := scopeModel(100, 44)
-	m.scope.on = true
+	m.scope.mode = scopeWave
 
 	var tm tea.Model = m
 	tm, _ = tm.Update(msg.WaveformReady{Samples: []float32{0.5, -0.5}})
@@ -250,7 +250,7 @@ func TestScopeResumesOnItsOwn(t *testing.T) {
 // The one-second tick is the safety net for everything the tab switch misses.
 func TestScopeResumesOnTheTick(t *testing.T) {
 	m := scopeModel(100, 44)
-	m.scope.on = true
+	m.scope.mode = scopeWave
 	m.noDevice = true
 
 	var tm tea.Model = m
@@ -276,7 +276,7 @@ func TestScopeResumesOnTheTick(t *testing.T) {
 // against 23% triggered.
 func TestTriggerSteadiesThePicture(t *testing.T) {
 	m := scopeModel(100, 44)
-	m.scope.on = true
+	m.scope.mode = scopeWave
 	w := m.layout().interior - leftMargin - rightMargin
 
 	// A steady tone sampled at a phase that drifts frame to frame, which is
@@ -327,7 +327,7 @@ func TestTriggerSteadiesThePicture(t *testing.T) {
 // space between recedes. One flat colour reads as a ribbon, not as sound.
 func TestScopeColoursByLoudness(t *testing.T) {
 	m := scopeModel(100, 44)
-	m.scope.on = true
+	m.scope.mode = scopeWave
 
 	// Quiet on the left, loud on the right.
 	f := make([]float32, 2*player.WaveformWindow)
@@ -355,7 +355,7 @@ func TestScopeColoursByLoudness(t *testing.T) {
 // behind the beam rather than as part of it.
 func TestGlowTrailsTheBeam(t *testing.T) {
 	m := scopeModel(100, 44)
-	m.scope.on = true
+	m.scope.mode = scopeWave
 	w := 40
 
 	wave := func(phase float64) []float32 {
@@ -408,7 +408,7 @@ func lit(lines []string) int {
 // window size — which is how it once quietly lost a third of its pace.
 func TestScopeSpansTheSameTimeAtAnyWidth(t *testing.T) {
 	m := scopeModel(100, 44)
-	m.scope.on = true
+	m.scope.mode = scopeWave
 
 	// A tone at a fixed rate: the number of times it crosses zero across the
 	// screen is how much time the screen is showing.
@@ -441,7 +441,7 @@ func TestScopeSpansTheSameTimeAtAnyWidth(t *testing.T) {
 // in it, so the line has a lit core instead of one flat colour top to bottom.
 func TestScopeShadesTowardsItsCore(t *testing.T) {
 	m := scopeModel(100, 44)
-	m.scope.on = true
+	m.scope.mode = scopeWave
 
 	// A swing wide enough to reach every row.
 	f := make([]float32, 2*player.WaveformWindow)
@@ -550,13 +550,62 @@ func TestWaveformSurvivesAGrowingCover(t *testing.T) {
 // as well not exist, and this one is most of what makes the screen feel alive.
 func TestWaveformIsOnByDefault(t *testing.T) {
 	m := New(player.NewMock(), nil, defaultTestCell)
-	if !m.scope.on {
-		t.Error("the waveform is off to begin with")
+	if m.scope.mode != scopeWave {
+		t.Errorf("the visualiser starts in mode %d, want the waveform", m.scope.mode)
 	}
 
 	// Nothing has been drawn yet, so it must not claim to be running either —
 	// the tick loop starts when there is something to draw on.
 	if m.scope.running {
 		t.Error("the tick loop is running before anything is on screen")
+	}
+}
+
+// Bass on the left, treble on the right, as every analyser reads.
+func TestBarsPutBassOnTheLeft(t *testing.T) {
+	m := scopeModel(120, 44)
+	w := m.layout().interior - leftMargin - rightMargin
+
+	bands := make([]float32, 28)
+	bands[1] = 1 // a low band, loud
+	m.scope.adoptBands(bands)
+
+	lines := m.barsLines(w, false)
+	if len(lines) != scopeRows {
+		t.Fatalf("barsLines = %d rows, want %d", len(lines), scopeRows)
+	}
+
+	// The lit columns have to sit in the left tenth of the row.
+	at := strings.IndexFunc(plain(lines[0]), func(r rune) bool { return r != ' ' })
+	if at < 0 {
+		t.Fatal("nothing was drawn for a loud low band")
+	}
+	if at > w/10 {
+		t.Errorf("the lowest band was drawn at column %d of %d, want it on the left", at, w)
+	}
+}
+
+// The marker hangs where a hit reached and falls back slowly, which is what
+// gives a meter its character. It never sits below the bar it fell from.
+func TestPeakMarkersFallBack(t *testing.T) {
+	m := scopeModel(120, 44)
+
+	loud := make([]float32, 28)
+	for i := range loud {
+		loud[i] = 0.9
+	}
+	m.scope.adoptBands(loud)
+
+	quiet := make([]float32, 28)
+	m.scope.adoptBands(quiet)
+	if m.scope.peaks[0] < 0.5 {
+		t.Errorf("the marker fell to %.2f in one frame, want it to hang", m.scope.peaks[0])
+	}
+
+	for range 200 {
+		m.scope.adoptBands(quiet)
+	}
+	if m.scope.peaks[0] > 0.05 {
+		t.Errorf("the marker is still at %.2f after two hundred frames", m.scope.peaks[0])
 	}
 }

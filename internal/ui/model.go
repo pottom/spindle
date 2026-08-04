@@ -161,7 +161,7 @@ func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 		// The waveform is on to begin with: it is the thing that makes the
 		// screen feel alive, and a feature nobody knows to ask for may as well
 		// not exist. The key is there to put it away.
-		scope:   scopeState{on: true},
+		scope:   scopeState{mode: scopeWave},
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
 		device:  spinner.New(spinner.WithSpinner(deviceSpinner)),
 	}

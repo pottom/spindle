@@ -33,12 +33,30 @@ var brailleBit = [dotsPerCellX][dotsPerCellY]uint8{
 	{3, 4, 5, 7},
 }
 
-// scopeState is the waveform the player screen is drawing, and whether it is
-// drawing one at all.
+// scopeMode is what the visualiser is showing. The key cycles through them.
+type scopeMode int
+
+const (
+	scopeOff scopeMode = iota
+	scopeWave
+	scopeBars
+	scopeBarsPeak
+	scopeModes // how many there are, for the cycle
+)
+
+// next is the mode the key moves to.
+func (s scopeMode) next() scopeMode { return (s + 1) % scopeModes }
+
+// wants reports whether a mode needs the waveform rather than the bands.
+func (s scopeMode) wave() bool { return s == scopeWave }
+func (s scopeMode) bars() bool { return s == scopeBars || s == scopeBarsPeak }
+
+// scopeState is the visualiser the player screen is drawing, and what it is
+// drawing.
 type scopeState struct {
-	// on is what the key toggles. The trace is off until asked for: it costs a
-	// redraw every 33ms, which is not something to spend without being asked.
-	on bool
+	// mode is what the key cycles. Each costs a redraw every 33ms, which is not
+	// something to spend without being asked.
+	mode scopeMode
 
 	// running guards the tick loop, so two callers cannot start it twice and
 	// make the trace move at double speed.
@@ -47,6 +65,12 @@ type scopeState struct {
 	// frame is the latest waveform, one value per horizontal dot, in -1..1. It
 	// is resampled to whatever width the screen turns out to be.
 	frame []float32
+
+	// bands is the latest spectrum, lowest first, each 0..1, and peaks the
+	// highest each has reached lately — the marker that falls back slowly is
+	// what gives a meter its hi-fi character.
+	bands []float32
+	peaks []float32
 
 	// trail is what the last few frames drew, newest last. A cathode ray tube
 	// leaves a glow behind the beam; without it a terminal trace looks redrawn
@@ -124,7 +148,7 @@ func (m Model) scopeTop(l layout) int {
 }
 
 // scopeVisible reports whether the trace is on screen right now.
-func (m Model) scopeVisible() bool { return m.scope.on && m.scopeAvailable() }
+func (m Model) scopeVisible() bool { return m.scope.mode != scopeOff && m.scopeAvailable() }
 
 // scopeLines renders the trace across w cells.
 //
@@ -339,7 +363,12 @@ func (m Model) drawScope(body []string, l layout) []string {
 	}
 
 	w := l.interior - leftMargin - rightMargin
-	for i, line := range m.scopeLines(w) {
+
+	lines := m.scopeLines(w)
+	if m.scope.mode.bars() {
+		lines = m.barsLines(w, m.scope.mode == scopeBarsPeak)
+	}
+	for i, line := range lines {
 		body[at+i] = m.pad(line, l)
 	}
 	return body

@@ -167,8 +167,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.scope.frame = message.Samples
 		m.scope.follow(message.Samples)
+		m.scope.adoptBands(message.Bands)
 		m.rememberScope()
-		return m, scopeFrameCmd(m.player)
+		return m, scopeFrameCmd(m.player, m.scope.mode)
 
 	case spinner.TickMsg:
 		if message.ID == m.device.ID() {
@@ -318,7 +319,7 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		// Nothing about the geometry changes, so the cover is left alone: the
 		// trace only fills rows that were already blank.
-		m.scope.on = !m.scope.on
+		m.scope.mode = m.scope.mode.next()
 		return m, m.startScope()
 
 	case key.Matches(k, m.keys.Lyrics):
@@ -646,5 +647,5 @@ func (m *Model) startScope() tea.Cmd {
 		return nil
 	}
 	m.scope.running = true
-	return scopeFrameCmd(m.player)
+	return scopeFrameCmd(m.player, m.scope.mode)
 }

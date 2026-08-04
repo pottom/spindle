@@ -291,7 +291,7 @@ func TestLyricsDoNotMoveTheArtwork(t *testing.T) {
 	l := m.layout()
 	// The trace steps aside for the words, which is its own rule; this is about
 	// the picture staying put.
-	m.scope.on = false
+	m.scope.mode = scopeOff
 
 	m.lyrics.on = false
 	off := strings.Split(plain(m.render()), "\n")
@@ -319,7 +319,7 @@ func TestLyricsDoNotMoveTheArtwork(t *testing.T) {
 // the trace runs across. Neither has to give way.
 func TestWordsAndWaveformCoexist(t *testing.T) {
 	m := lyricsModel(120, 44)
-	m.scope.on = true
+	m.scope.mode = scopeWave
 	m.setProgress(24 * time.Second)
 	m.scope.frame = []float32{0.8, -0.8, 0.5, -0.5}
 	m.scope.follow(m.scope.frame)
