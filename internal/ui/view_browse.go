@@ -83,7 +83,18 @@ func (m Model) queueBlock(l layout, rows int) []string {
 	w := queueBlockWidth(l)
 
 	top := min(l.artHeight, rows)
-	art := alignTop(strings.Split(m.artworkCells(), "\n"), l.artWidth, top)
+	cells := strings.Split(m.artworkCells(), "\n")
+	art := alignTop(cells, l.artWidth, top)
+
+	// The picture decides how far the panel beside it may reach. The layout
+	// gives the artwork a box; what goes in it keeps the cover's own shape, so
+	// it can come out a row or two shorter — and a fact hanging below the
+	// picture's foot reads as a mistake, which is what it is. Until a cover has
+	// arrived there is no foot to measure, and the box is all there is to go on.
+	foot := top
+	if m.cover.art != "" {
+		foot = min(len(cells), top)
+	}
 
 	// The trace hangs from the same column the artists below start at, so the
 	// screen reads as two halves. Nothing under it moves when it appears: the
@@ -94,7 +105,10 @@ func (m Model) queueBlock(l layout, rows int) []string {
 		detailWidth = queueDetailWidth(l)
 		trace = stack(m.scopeRender(queueScopeWidth(l)), queueScopeWidth(l), top)
 	}
-	detail := stack(m.trackDetail(detailWidth, top), detailWidth, top)
+	detail := stack(m.trackDetail(detailWidth, foot), detailWidth, foot)
+	for len(detail) < top {
+		detail = append(detail, strings.Repeat(" ", detailWidth))
+	}
 
 	out := make([]string, 0, rows)
 	gap := strings.Repeat(" ", columnGap)

@@ -713,3 +713,35 @@ func TestQueueDetailShowsThePlayhead(t *testing.T) {
 			len(other), len(strings.Split(playing, "\n")))
 	}
 }
+
+// The picture keeps its own shape inside the box the layout gives it, so it can
+// come out shorter. Nothing beside it may reach past its foot.
+func TestQueueDetailStaysAboveTheArtworksFoot(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.ps = &player.State{TrackID: "a", Playing: true, Duration: 2 * time.Minute}
+	m.width, m.height = 200, 45
+	m.resize()
+
+	l := m.layout()
+	if l.artHeight < 4 {
+		t.Fatalf("artHeight = %d, want a picture to measure against", l.artHeight)
+	}
+
+	// A cover two rows shorter than the box it was given.
+	short := l.artHeight - 2
+	m.cover.art = strings.TrimRight(strings.Repeat(strings.Repeat("#", l.artWidth)+"\n", short), "\n")
+
+	block := m.queueBlock(l, l.bodyHeight)
+	var above bool
+	for i := range short {
+		above = above || strings.Contains(plain(block[i]), "Length")
+	}
+	if !above {
+		t.Fatal("the panel is empty above the foot, so there is nothing to have overflowed")
+	}
+	for i := short; i < min(l.artHeight, len(block)); i++ {
+		if strings.TrimSpace(plain(block[i])) != "" {
+			t.Errorf("row %d is below the picture's foot at %d but carries %q", i, short, plain(block[i]))
+		}
+	}
+}
