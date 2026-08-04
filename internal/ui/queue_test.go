@@ -699,6 +699,9 @@ func TestQueueDetailShowsThePlayhead(t *testing.T) {
 	if !strings.Contains(playing, knob) {
 		t.Errorf("detail = %q, want the playhead on the track sounding", playing)
 	}
+	if !strings.Contains(playing, "2:00") {
+		t.Errorf("detail = %q, want the clock beside the playhead", playing)
+	}
 
 	m.queuePane.cursor.cursor = queueRowOf(1)
 	other := m.trackDetail(40, 20)

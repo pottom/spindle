@@ -195,18 +195,24 @@ func (m Model) trackDetail(w, rows int) []string {
 		"",
 	}
 
-	// The playhead, for the one track it can belong to. Its row is kept whether
-	// this is that track or not: without that the panel would shift by a row
-	// every time the cursor passed the track playing, and a bar is not worth
-	// making the facts beside it move. It goes in only where there is room for
-	// it at all, because those facts are the point of the panel.
+	// The playhead and the clock either side of it, for the one track they can
+	// belong to. Their rows are kept whether this is that track or not: without
+	// that the panel would shift every time the cursor passed the track
+	// playing, and a bar is not worth making the facts beside it move. They go
+	// in only where there is room for them at all, because those facts are the
+	// point of the panel.
 	facts := trackFacts(*t)
-	if rows >= len(facts)+6 {
-		bar := ""
+	if rows >= len(facts)+7 {
+		bar, times := "", ""
 		if m.ps != nil && m.ps.TrackID == t.ID {
 			bar = m.progressLine(w)
+			times = spread(
+				s.Time.Render(formatDuration(m.elapsed())),
+				s.Time.Render(formatDuration(m.ps.Duration)),
+				w,
+			)
 		}
-		lines = append(lines, bar, "")
+		lines = append(lines, bar, times, "")
 	}
 
 	for _, f := range facts {
