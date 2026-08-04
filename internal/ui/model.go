@@ -93,6 +93,11 @@ type Model struct {
 	// can read playback but never change it.
 	noPremium bool
 
+	// play is the request to start something that is in flight, and the newest
+	// one waiting behind it.
+	playInFlight bool
+	playPending  *playRequest
+
 	// awaitingTrack is the track a skip is trying to move away from, and
 	// confirmUntil is when to stop asking whether it has. expecting is the one
 	// it is trying to move to, where the caller knew which that would be.

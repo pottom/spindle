@@ -233,6 +233,14 @@ func coverSettleCmd(seq int) tea.Cmd {
 // controlCmd runs a playback control call off the update loop. The result is
 // classified here so the UI can tell "Spotify is throttling us" and "this account
 // cannot do that" apart from an ordinary failure.
+// playCmd is controlCmd for a request to start something. It reports when the
+// call has been answered, so the next request can go out after it rather than
+// alongside it.
+func playCmd(action string, call func(context.Context) error) tea.Cmd {
+	inner := controlCmd(action, call)
+	return func() tea.Msg { return msg.PlayDone{Result: inner()} }
+}
+
 func controlCmd(action string, call func(context.Context) error) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)

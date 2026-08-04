@@ -7,6 +7,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui/msg"
 )
 
@@ -80,22 +81,16 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 
 		id, offset := m.playlists.open.ID, m.playlists.inner.cursor
-		p := m.player
-		cmd := tea.Batch(
-			controlCmd("play playlist", func(ctx context.Context) error {
+		play := playRequest{
+			action: "play playlist",
+			call: func(ctx context.Context, p player.Player) error {
 				return p.PlayPlaylist(ctx, id, offset)
-			}),
-			// Without this the player tab shows the previous track until the
-			// next five-second poll, and pressing enter looks like it did
-			// nothing at all.
-			m.awaitTrackChange(),
-		)
-		if t := m.cursorTrack(); t != nil {
-			target := *t
-			m.showTrack(&target)
-			return tea.Batch(cmd, m.syncCover()), true
+			},
 		}
-		return cmd, true
+		if t := m.cursorTrack(); t != nil {
+			play.track = *t
+		}
+		return m.startPlay(play), true
 
 	case key.Matches(k, m.keys.PlayOne):
 		// Enter plays the list from here, which is what the official client
@@ -106,19 +101,12 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		if m.playlists.open == nil || t == nil {
 			return nil, true
 		}
-		id, p := t.ID, m.player
-		target := *t
-		cmd := tea.Batch(
-			controlCmd("play track", func(ctx context.Context) error {
-				return p.PlayTrack(ctx, id)
-			}),
-			m.awaitTrackChange(),
-		)
-		// The mark moves now rather than a round trip from now: pressing this
-		// twice in a row would otherwise leave it on the track asked for last
-		// time, which reads as the wrong one being played.
-		m.showTrack(&target)
-		return tea.Batch(cmd, m.syncCover()), true
+		id := t.ID
+		return m.startPlay(playRequest{
+			action: "play track",
+			track:  *t,
+			call:   func(ctx context.Context, p player.Player) error { return p.PlayTrack(ctx, id) },
+		}), true
 
 	case key.Matches(k, m.keys.Enqueue):
 		if m.playlists.open == nil {
@@ -155,13 +143,12 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		if sel == nil {
 			return nil, true
 		}
-		id, p := sel.ID, m.player
-		return tea.Batch(
-			controlCmd("play track", func(ctx context.Context) error {
-				return p.PlayTrack(ctx, id)
-			}),
-			m.awaitTrackChange(),
-		), true
+		id := sel.ID
+		return m.startPlay(playRequest{
+			action: "play track",
+			track:  *sel,
+			call:   func(ctx context.Context, p player.Player) error { return p.PlayTrack(ctx, id) },
+		}), true
 
 	case key.Matches(k, m.keys.EnqueueTyped):
 		if sel := m.search.selected(); sel != nil {
@@ -191,6 +178,41 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 	m.search.seq++
 	return tea.Batch(cmd, searchCmd(m.player, m.search.input.Value(), m.search.seq)), true
+}
+
+// playRequest is an ask for something to start, and the track it will land on.
+type playRequest struct {
+	action string
+	track  player.Track
+	call   func(ctx context.Context, p player.Player) error
+}
+
+// startPlay shows the track at once and asks for it, one request at a time.
+//
+// The requests are absolute — "play this" — so two of them overlapping can be
+// applied in either order, and the device ends up playing whichever was asked
+// for first. Holding the newest back until the last is answered makes the last
+// press win, and collapses a run of them into two requests rather than one each.
+func (m *Model) startPlay(req playRequest) tea.Cmd {
+	track := req.track
+	m.showTrack(&track)
+
+	if m.playInFlight {
+		m.playPending = &req
+		return m.syncCover()
+	}
+	m.playInFlight = true
+	return tea.Batch(m.sendPlay(req), m.syncCover())
+}
+
+func (m *Model) sendPlay(req playRequest) tea.Cmd {
+	p, call := m.player, req.call
+	return tea.Batch(
+		playCmd(req.action, func(ctx context.Context) error { return call(ctx, p) }),
+		// Without this the player tab shows the previous track until the next
+		// resting poll, and the key looks like it did nothing at all.
+		m.awaitTrackChange(),
+	)
 }
 
 // previewCover schedules an artwork load for whatever the cursor now rests on,

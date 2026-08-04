@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -213,4 +214,87 @@ func TestTheQueueIsNotBorrowedFromMidChange(t *testing.T) {
 	if m.ps.TrackID == "a" {
 		t.Error("the track being left was borrowed back from the queue")
 	}
+}
+
+// Two requests to play cannot be in flight at once. They are absolute — "play
+// this" — so overlapping ones can be applied in either order, and the device
+// ends up on whichever was asked for first. A run of presses collapses to two
+// requests, and the last press is the one that sounds.
+func TestOnlyOnePlayRequestAtATime(t *testing.T) {
+	sent := make(chan string, 8)
+	m := New(&recordingPlayer{Player: player.NewMock(), played: sent}, nil, defaultTestCell)
+	m.ps = &player.State{TrackID: "a", Title: "a", Playing: true}
+	m.tab = tabPlaylists
+
+	ask := func(id string) tea.Cmd {
+		return m.startPlay(playRequest{
+			action: "play track",
+			track:  player.Track{ID: id, Title: id},
+			call:   func(ctx context.Context, p player.Player) error { return p.PlayTrack(ctx, id) },
+		})
+	}
+
+	first := ask("b")
+	ask("c")
+	ask("d") // c is overtaken before it ever goes out
+
+	if got := m.ps.TrackID; got != "d" {
+		t.Errorf("the mark is on %q, want the track asked for last", got)
+	}
+	if len(sent) != 0 {
+		t.Fatal("a request went out before the model ran the command")
+	}
+
+	// The first goes out on its own; the answer releases the last.
+	done := runPlay(t, first)
+	if got := <-sent; got != "b" {
+		t.Errorf("first request was for %q, want b", got)
+	}
+
+	var tm tea.Model = m
+	_, cmd := tm.Update(done)
+	if cmd == nil {
+		t.Fatal("the answer released nothing, so the last press never went out")
+	}
+	runPlay(t, cmd)
+	if got := <-sent; got != "d" {
+		t.Errorf("second request was for %q, want the last press", got)
+	}
+	if len(sent) != 0 {
+		t.Errorf("%d further requests went out, want the overtaken one dropped", len(sent))
+	}
+}
+
+// runPlay runs the commands a play request returned and hands back its answer.
+func runPlay(t *testing.T, cmd tea.Cmd) tea.Msg {
+	t.Helper()
+	var out tea.Msg
+	var run func(tea.Cmd)
+	run = func(c tea.Cmd) {
+		if c == nil {
+			return
+		}
+		switch result := c().(type) {
+		case tea.BatchMsg:
+			for _, inner := range result {
+				run(inner)
+			}
+		case msg.PlayDone:
+			out = result
+		}
+	}
+	run(cmd)
+	return out
+}
+
+// recordingPlayer notes which track was asked for, in the order the requests
+// actually went out.
+type recordingPlayer struct {
+	player.Player
+	played chan string
+}
+
+func (r *recordingPlayer) PlayTrack(ctx context.Context, trackID string) error {
+	r.played <- trackID
+	return nil
 }

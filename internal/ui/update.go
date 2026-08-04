@@ -155,6 +155,22 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.sendVolume()
 
+	case msg.PlayDone:
+		// The answer releases the next request, and is then handled as any
+		// other control's would be: it may be an error worth showing.
+		m.playInFlight = false
+		var next tea.Cmd
+		if pending := m.playPending; pending != nil {
+			m.playPending = nil
+			m.playInFlight = true
+			next = m.sendPlay(*pending)
+		}
+		if message.Result == nil {
+			return m, next
+		}
+		model, cmd := m.Update(message.Result)
+		return model, tea.Batch(next, cmd)
+
 	case msg.ControlDone:
 		// Whatever was standing in the way is evidently no longer standing.
 		m.noPremium, m.err = false, nil

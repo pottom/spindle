@@ -111,6 +111,17 @@ type OrderSettled struct {
 	Seq int
 }
 
+// PlayDone reports that a request to start something has been answered, one way
+// or the other. It is what lets the next one go: two overlapping requests to
+// play can be applied in either order, and the device would end up on the one
+// asked for first.
+//
+// Result carries whatever the call itself produced — a success, an error, a
+// rate limit — for the model to handle as it would any other control.
+type PlayDone struct {
+	Result any
+}
+
 // ControlDone reports that a control call succeeded, which is what clears a
 // standing complaint about the account not being able to control playback.
 type ControlDone struct{}
