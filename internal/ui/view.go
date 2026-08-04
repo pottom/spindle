@@ -161,10 +161,17 @@ func (m Model) artworkCells() string {
 func (m Model) infoBlock(w int) []string {
 	s, ps := m.styles, m.ps
 
-	return []string{
+	lines := []string{
 		s.Title.Render(ps.Title),
 		s.Artist.Render(strings.Join(ps.Artists, ", ")),
-		s.Album.Render(ps.Album),
+	}
+	if t, ok := m.nowPlayingRow(); ok {
+		lines = append(lines, m.trackCaption(t, w)...)
+	} else {
+		lines = append(lines, s.Album.Render(ps.Album))
+	}
+
+	return append(lines,
 		"",
 		"",
 		m.progressLine(w),
@@ -176,7 +183,7 @@ func (m Model) infoBlock(w int) []string {
 		"",
 		"",
 		m.transportLine(w),
-	}
+	)
 }
 
 // progressLine is a thin rule with the playhead riding on it. Paused, the whole

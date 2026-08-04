@@ -12,7 +12,8 @@ import (
 // localQueue is what the daemon's /player/queue endpoint answers with: the
 // upcoming tracks, in order, named.
 type localQueue struct {
-	Tracks []localQueueTrack `json:"tracks"`
+	Current *localQueueTrack  `json:"current"`
+	Tracks  []localQueueTrack `json:"tracks"`
 }
 
 type localQueueTrack struct {
@@ -62,45 +63,38 @@ func (l *Local) Queue(ctx context.Context) (Queue, error) {
 		return l.web.Queue(ctx)
 	}
 
-	upcoming, err := l.queueTracks(ctx)
-	if err != nil {
-		return Queue{}, err
-	}
-
-	out := Queue{Upcoming: upcoming}
-	l.mu.RLock()
-	if l.snapshot != nil {
-		out.Current = l.snapshot.asTrack()
-	}
-	l.mu.RUnlock()
-	return out, nil
+	return l.queueTracks(ctx)
 }
 
-// queueTracks asks the daemon what is coming.
-func (l *Local) queueTracks(ctx context.Context) ([]Track, error) {
+// queueTracks asks the daemon what is playing and what is coming.
+func (l *Local) queueTracks(ctx context.Context) (Queue, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, l.addr+"/player/queue", nil)
 	if err != nil {
-		return nil, fmt.Errorf("build queue request: %w", err)
+		return Queue{}, fmt.Errorf("build queue request: %w", err)
 	}
 
 	resp, err := l.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("fetch daemon queue: %w", err)
+		return Queue{}, fmt.Errorf("fetch daemon queue: %w", err)
 	}
 	defer resp.Body.Close() //nolint:errcheck // read-only request
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetch daemon queue: unexpected status %s", resp.Status)
+		return Queue{}, fmt.Errorf("fetch daemon queue: unexpected status %s", resp.Status)
 	}
 
 	var q localQueue
 	if err := json.NewDecoder(resp.Body).Decode(&q); err != nil {
-		return nil, fmt.Errorf("decode daemon queue: %w", err)
+		return Queue{}, fmt.Errorf("decode daemon queue: %w", err)
 	}
 
-	out := make([]Track, 0, len(q.Tracks))
+	out := Queue{Upcoming: make([]Track, 0, len(q.Tracks))}
+	if q.Current != nil {
+		current := q.Current.toTrack()
+		out.Current = &current
+	}
 	for _, t := range q.Tracks {
-		out = append(out, t.toTrack())
+		out.Upcoming = append(out.Upcoming, t.toTrack())
 	}
 	return out, nil
 }

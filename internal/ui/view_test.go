@@ -222,3 +222,36 @@ func TestDigitsSwitchTabs(t *testing.T) {
 		t.Errorf("query = %q, want the digit typed", q)
 	}
 }
+
+// Both screens draw the same facts from the same place. The queue names them
+// because it is read as a table; the player leaves the names off because they
+// sit under the title as one caption — and a bare number there has to say what
+// it is.
+func TestBothScreensDrawTheSameFacts(t *testing.T) {
+	pop := 50
+	track := player.Track{
+		Title: "Holiday", Artists: []string{"Madonna"},
+		Album: "The Immaculate Collection", Duration: 4*time.Minute + 2*time.Second,
+		Released: "1990-11-09", AlbumType: "compilation", TrackNumber: 1, Popularity: &pop,
+	}
+
+	m := New(player.NewMock(), nil, defaultTestCell)
+	caption := ansiOff(strings.Join(m.trackCaption(track, 60), "\n"))
+
+	for _, want := range []string{"The Immaculate Collection", "1990", "compilation", "track 1", starFull} {
+		if !strings.Contains(caption, want) {
+			t.Errorf("trackCaption() = %q, want %q in it", caption, want)
+		}
+	}
+	// The names belong to the queue's table, not here.
+	for _, unwanted := range []string{"Album", "Released", "Track", "Popularity"} {
+		if strings.Contains(caption, unwanted) {
+			t.Errorf("trackCaption() = %q, want no label %q", caption, unwanted)
+		}
+	}
+	// And the length is under the progress bar, where it is read against the
+	// elapsed time; repeating it here would be furniture.
+	if strings.Contains(caption, "4:02") {
+		t.Errorf("trackCaption() = %q, want no duration", caption)
+	}
+}

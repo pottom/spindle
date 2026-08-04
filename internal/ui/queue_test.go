@@ -226,7 +226,7 @@ func TestFactsSkipWhatSpotifyDidNotSay(t *testing.T) {
 		Album: "Hot Space", Released: "1982-05-21",
 		TrackNumber: 3, TotalTracks: 11, DiscNumber: 2, Duration: 4 * time.Minute,
 	}
-	got := factLines(trackFacts(full, false))
+	got := factLines(trackFacts(full))
 	for _, want := range []string{"Album", "Released", "Track", "Length"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("trackFacts() = %q, want a %s row", got, want)
@@ -240,17 +240,10 @@ func TestFactsSkipWhatSpotifyDidNotSay(t *testing.T) {
 	}
 
 	bare := player.Track{Album: "Unknown", Duration: time.Minute}
-	if got := factLines(trackFacts(bare, false)); strings.Contains(got, "Released") || strings.Contains(got, "Track ") {
+	if got := factLines(trackFacts(bare)); strings.Contains(got, "Released") || strings.Contains(got, "Track ") {
 		t.Errorf("trackFacts() = %q, want no empty rows", got)
 	}
 
-	// Only the track sounding now says so; the rest need no label for waiting.
-	if got := factLines(trackFacts(full, true)); !strings.Contains(got, "playing now") {
-		t.Errorf("trackFacts() = %q, want the playing track to say so", got)
-	}
-	if got := factLines(trackFacts(full, false)); strings.Contains(got, "Status") {
-		t.Errorf("trackFacts() = %q, want no status on a waiting track", got)
-	}
 }
 
 func factLines(facts []trackFact) string {
@@ -438,5 +431,38 @@ func TestStars(t *testing.T) {
 		if total := len([]rune(plain(m.stars(c.popularity)))); total != starCount {
 			t.Errorf("stars(%d) = %d stars, want %d", c.popularity, total, starCount)
 		}
+	}
+}
+
+// The rating is on the detail panel for one track at a time. The mark is what
+// carries it to every row at once, so it has to appear exactly where the stars
+// reach four and nowhere else.
+func TestHotMark(t *testing.T) {
+	m := queueModel(0, "a", "b", "c")
+	m.width, m.height = 96, 30
+	m.resize()
+
+	three, four, five := 60, 61, 100
+	m.queue[0].Popularity = &three
+	m.queue[1].Popularity = &four
+	m.queue[2].Popularity = &five
+
+	out := plain(m.render())
+	for _, line := range strings.Split(out, "\n") {
+		marked := strings.Contains(line, hotMark)
+		switch {
+		case strings.Contains(line, " a ") && marked:
+			t.Errorf("three stars was marked: %q", line)
+		case strings.Contains(line, " b ") && !marked:
+			t.Errorf("four stars was not marked: %q", line)
+		case strings.Contains(line, " c ") && !marked:
+			t.Errorf("five stars was not marked: %q", line)
+		}
+	}
+
+	// A backend that does not rate tracks marks nothing.
+	m.queue[1].Popularity, m.queue[2].Popularity = nil, nil
+	if strings.Contains(plain(m.render()), hotMark) {
+		t.Error("tracks with no rating were marked")
 	}
 }

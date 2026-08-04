@@ -38,6 +38,11 @@ const (
 	starCount = 5
 	starStep  = 100 / starCount
 
+	// hotMark flags a track most of Spotify is playing right now. hotStars is
+	// where "most" begins.
+	hotMark  = "🔥"
+	hotStars = 4
+
 	// secondaryCols is the fixed middle column of a list row: the artist, or the
 	// playlist's owner. Fixed so the trailing column always lines up.
 	secondaryCols = 20
@@ -166,8 +171,7 @@ func (m Model) trackDetail(w int) []string {
 		s.Artist.Render(strings.Join(t.Artists, ", ")),
 		"",
 	}
-	_, hasNow := m.nowPlayingRow()
-	for _, f := range trackFacts(*t, hasNow && m.queuePane.cursor.cursor == 0) {
+	for _, f := range trackFacts(*t) {
 		lines = append(lines, m.fact(f.label, f.value, w))
 	}
 	if t.Popularity != nil {
@@ -176,13 +180,34 @@ func (m Model) trackDetail(w int) []string {
 	return lines
 }
 
+// starsFor is how many of the five a rating earns. Nothing scores none: a track
+// nobody plays is still a track.
+func starsFor(popularity int) int {
+	return min(max((popularity+starStep-1)/starStep, 1), starCount)
+}
+
 // stars renders a rating as five of them, filled in fifths. Spotify's number is
 // out of a hundred, which reads as a measurement; a row of stars reads as an
 // opinion, which is what it is.
 func (m Model) stars(popularity int) string {
-	filled := min(max((popularity+starStep-1)/starStep, 1), starCount)
+	filled := starsFor(popularity)
 	return m.styles.StarOn.Render(strings.Repeat(starFull, filled)) +
 		m.styles.StarOff.Render(strings.Repeat(starEmpty, starCount-filled))
+}
+
+// hot reports whether a track is worth flagging in a list. The rating is on the
+// detail panel for whatever the cursor rests on; the mark is what carries it to
+// every other row at once.
+func hot(t player.Track) bool {
+	return t.Popularity != nil && starsFor(*t.Popularity) >= hotStars
+}
+
+// withMarks is a title with whatever the list wants to say about it beside it.
+func (m Model) withMarks(t player.Track, title string) string {
+	if hot(t) {
+		return title + " " + hotMark
+	}
+	return title
 }
 
 // fact is one label-and-value row of the detail panel. The label column is
@@ -191,12 +216,19 @@ func (m Model) fact(label, value string, w int) string {
 	return fit(m.styles.FactLabel.Render(padRight(label, factLabelCols))+value, w)
 }
 
-type trackFact struct{ label, value string }
+// trackFact is one thing known about a track: what it is called, and what it
+// says. Both screens draw the same facts — the queue names them, the player
+// does not — so they are gathered once and rendered twice.
+type trackFact struct {
+	key   string
+	label string
+	value string
+}
 
 // trackFacts is what is worth saying about a track, in the order it is worth
 // saying it. Anything Spotify left blank is left out rather than shown empty.
-func trackFacts(t player.Track, playing bool) []trackFact {
-	facts := []trackFact{{"Album", t.Album}}
+func trackFacts(t player.Track) []trackFact {
+	facts := []trackFact{{"album", "Album", t.Album}}
 
 	if year := releaseYear(t.Released); year != "" {
 		// A single or a compilation is worth knowing and costs no room of its
@@ -204,7 +236,7 @@ func trackFacts(t player.Track, playing bool) []trackFact {
 		if t.AlbumType != "" && t.AlbumType != "album" {
 			year += " · " + t.AlbumType
 		}
-		facts = append(facts, trackFact{"Released", year})
+		facts = append(facts, trackFact{"released", "Released", year})
 	}
 	if t.TrackNumber > 0 {
 		place := fmt.Sprintf("%d", t.TrackNumber)
@@ -214,12 +246,9 @@ func trackFacts(t player.Track, playing bool) []trackFact {
 		if t.DiscNumber > 1 {
 			place += fmt.Sprintf(", disc %d", t.DiscNumber)
 		}
-		facts = append(facts, trackFact{"Track", place})
+		facts = append(facts, trackFact{"track", "Track", place})
 	}
-	facts = append(facts, trackFact{"Length", formatDuration(t.Duration)})
-	if playing {
-		facts = append(facts, trackFact{"Status", "playing now"})
-	}
+	facts = append(facts, trackFact{"length", "Length", formatDuration(t.Duration)})
 	return facts
 }
 
@@ -247,7 +276,7 @@ func (m Model) queueRow(t player.Track, w int, selected bool, number int) string
 	// The mark stands in the same columns the track number would, or the titles
 	// beside it would sit one indent out.
 	return m.row(w, selected,
-		m.styles.Cursor.Render(padLeft(nowMark, ordinalCols))+"  "+primary.Render(t.Title),
+		m.styles.Cursor.Render(padLeft(nowMark, ordinalCols))+"  "+primary.Render(m.withMarks(t, t.Title)),
 		m.styles.RowSecondary.Render(strings.Join(t.Artists, ", ")),
 		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
 	)
@@ -369,9 +398,9 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 		primary = m.styles.RowPlaying
 	}
 
-	title := t.Title
+	title := m.withMarks(t, t.Title)
 	if number > 0 {
-		title = padLeft(fmt.Sprintf("%d", number), ordinalCols) + "  " + t.Title
+		title = padLeft(fmt.Sprintf("%d", number), ordinalCols) + "  " + title
 	}
 	if m.ps != nil && m.ps.TrackID == t.ID {
 		title = nowMark + " " + title
@@ -437,4 +466,37 @@ func formatSpan(d time.Duration) string {
 		return fmt.Sprintf("%dh %02dm", h, total%60)
 	}
 	return fmt.Sprintf("%dm", total)
+}
+
+// trackCaption is the same facts without their names, for the player screen.
+//
+// There the values sit right under the title and read as one caption: the album
+// on its own line, then the rest on another. Naming them would turn a caption
+// into a table, and the player screen is the one place with room to be quiet.
+func (m Model) trackCaption(t player.Track, w int) []string {
+	s := m.styles
+	lines := []string{s.Album.Render(fit(t.Album, w))}
+
+	var rest []string
+	for _, f := range trackFacts(t) {
+		switch f.key {
+		case "album", "length":
+			// The album has a line of its own; the length is already under the
+			// progress bar, where it is read against the elapsed time.
+			continue
+		case "track":
+			// A bare number in a run of facts could be anything. The queue has
+			// a column to name it; here the value has to name itself.
+			rest = append(rest, "track "+f.value)
+			continue
+		}
+		rest = append(rest, f.value)
+	}
+	if len(rest) > 0 {
+		lines = append(lines, s.Detail.Render(fit(strings.Join(rest, " · "), w)))
+	}
+	if t.Popularity != nil {
+		lines = append(lines, m.stars(*t.Popularity))
+	}
+	return lines
 }
