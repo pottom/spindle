@@ -259,7 +259,8 @@ func TestPageReportsWhatFollows(t *testing.T) {
 
 // A page thinned out by podcast episodes is still a full page as far as the
 // list is concerned. Counting the tracks that survived would end the scroll on
-// whichever page happened to hold one.
+// whichever page happened to hold one, and would make the next request overlap
+// this one for as long as the list lasted.
 func TestShortPageStillHasMore(t *testing.T) {
 	s, _ := newQueryStub(t, `{"next":"https://api.spotify.com/v1/playlists/p1/tracks?offset=50","items":[
 	  {"track":{"type":"track","id":"t1","name":"Heroes","artists":[],"album":{"images":[]}}},
@@ -275,6 +276,9 @@ func TestShortPageStillHasMore(t *testing.T) {
 	}
 	if !page.More {
 		t.Error("More = false on a page that was only short because an item was dropped")
+	}
+	if page.Next != pageLimit {
+		t.Errorf("Next = %d, want %d — what was asked for, not what survived", page.Next, pageLimit)
 	}
 }
 

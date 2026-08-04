@@ -87,6 +87,9 @@ func TestContextInfersWhatFollowsFromAFullPage(t *testing.T) {
 			if page.More != c.want {
 				t.Errorf("More = %v, want %v", page.More, c.want)
 			}
+			if page.More && page.Next != pageLimit {
+				t.Errorf("Next = %d, want %d", page.Next, pageLimit)
+			}
 		})
 	}
 }

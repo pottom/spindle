@@ -429,7 +429,7 @@ const mockPageLimit = 5
 func mockPage[T any](items []T, offset int) Page[T] {
 	start := min(max(offset, 0), len(items))
 	end := min(start+mockPageLimit, len(items))
-	return Page[T]{Items: items[start:end], More: end < len(items)}
+	return Page[T]{Items: items[start:end], More: end < len(items), Next: end}
 }
 
 // PlayTrack queues the whole catalogue from the chosen track, so next and

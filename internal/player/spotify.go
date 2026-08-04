@@ -128,8 +128,9 @@ func (s *Spotify) SearchPage(ctx context.Context, query string, offset int) (Pag
 		return Page[Track]{}, nil
 	}
 
+	start := max(offset, 0)
 	res, err := s.client.Search(ctx, query, spotify.SearchTypeTrack,
-		spotify.Limit(pageLimit), spotify.Offset(max(offset, 0)))
+		spotify.Limit(pageLimit), spotify.Offset(start))
 	if err != nil {
 		return Page[Track]{}, fmt.Errorf("search: %w", err)
 	}
@@ -141,7 +142,7 @@ func (s *Spotify) SearchPage(ctx context.Context, query string, offset int) (Pag
 	for i := range res.Tracks.Tracks {
 		out = append(out, trackFromFull(&res.Tracks.Tracks[i]))
 	}
-	return Page[Track]{Items: out, More: res.Tracks.Next != ""}, nil
+	return Page[Track]{Items: out, More: res.Tracks.Next != "", Next: start + pageLimit}, nil
 }
 
 func (s *Spotify) Playlists(ctx context.Context) ([]Playlist, error) {
@@ -150,7 +151,8 @@ func (s *Spotify) Playlists(ctx context.Context) ([]Playlist, error) {
 }
 
 func (s *Spotify) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist], error) {
-	page, err := s.client.CurrentUsersPlaylists(ctx, spotify.Limit(pageLimit), spotify.Offset(max(offset, 0)))
+	start := max(offset, 0)
+	page, err := s.client.CurrentUsersPlaylists(ctx, spotify.Limit(pageLimit), spotify.Offset(start))
 	if err != nil {
 		return Page[Playlist]{}, fmt.Errorf("fetch playlists: %w", err)
 	}
@@ -171,7 +173,7 @@ func (s *Spotify) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist]
 			// up would mean fetching every track. The UI omits what is zero.
 		})
 	}
-	return Page[Playlist]{Items: out, More: page.Next != ""}, nil
+	return Page[Playlist]{Items: out, More: page.Next != "", Next: start + pageLimit}, nil
 }
 
 func (s *Spotify) PlaylistTracks(ctx context.Context, playlistID string) ([]Track, error) {
@@ -180,8 +182,9 @@ func (s *Spotify) PlaylistTracks(ctx context.Context, playlistID string) ([]Trac
 }
 
 func (s *Spotify) PlaylistTracksPage(ctx context.Context, playlistID string, offset int) (Page[Track], error) {
+	start := max(offset, 0)
 	page, err := s.client.GetPlaylistItems(ctx, spotify.ID(playlistID),
-		spotify.Limit(pageLimit), spotify.Offset(max(offset, 0)))
+		spotify.Limit(pageLimit), spotify.Offset(start))
 	if err != nil {
 		return Page[Track]{}, fmt.Errorf("fetch playlist tracks: %w", err)
 	}
@@ -200,8 +203,9 @@ func (s *Spotify) PlaylistTracksPage(ctx context.Context, playlistID string, off
 
 	// What follows is taken from Spotify's own link to the next page rather than
 	// from the length of this one: the items dropped just above would otherwise
-	// make a full page look like the last one.
-	return Page[Track]{Items: out, More: page.Next != ""}, nil
+	// make a full page look like the last one, and they are why the next offset
+	// counts what was asked for instead of what survived.
+	return Page[Track]{Items: out, More: page.Next != "", Next: start + pageLimit}, nil
 }
 
 func (s *Spotify) Play(ctx context.Context) error {

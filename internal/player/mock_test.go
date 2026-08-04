@@ -229,7 +229,7 @@ func TestMockSearchPagesCoverEveryMatch(t *testing.T) {
 		if !page.More {
 			break
 		}
-		offset += len(page.Items)
+		offset = page.Next
 	}
 
 	var want []string

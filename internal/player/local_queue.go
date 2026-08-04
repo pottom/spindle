@@ -219,9 +219,10 @@ func (l *Local) contextTracks(ctx context.Context, uri string, offset int) (Page
 	if err != nil {
 		return Page[Track]{}, fmt.Errorf("build context request: %w", err)
 	}
+	start := max(offset, 0)
 	q := req.URL.Query()
 	q.Set("uri", uri)
-	q.Set("offset", strconv.Itoa(max(offset, 0)))
+	q.Set("offset", strconv.Itoa(start))
 	q.Set("limit", strconv.Itoa(pageLimit))
 	req.URL.RawQuery = q.Encode()
 
@@ -253,5 +254,5 @@ func (l *Local) contextTracks(ctx context.Context, uri string, offset int) (Page
 	// full answer is therefore the only sign that more exist, and the price is
 	// one empty request at the end of a list whose length divides by the page
 	// size.
-	return Page[Track]{Items: out, More: len(out) == pageLimit}, nil
+	return Page[Track]{Items: out, More: len(out) == pageLimit, Next: start + pageLimit}, nil
 }

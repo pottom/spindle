@@ -18,4 +18,14 @@ type Page[T any] struct {
 	// can be true for a page that came back short: a backend that drops what it
 	// cannot play still has whatever follows.
 	More bool
+
+	// Next is the offset to ask for to get that further page, and is meaningless
+	// when More is false.
+	//
+	// It is here because the caller cannot work it out. Advancing by the number
+	// of items received is right until a page arrives with a podcast episode or
+	// a track unavailable in this market in it — both come back as blanks and
+	// are dropped — and from there on every request would overlap the one
+	// before, re-reading the same tracks and never reaching the end.
+	Next int
 }

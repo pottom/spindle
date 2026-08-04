@@ -45,10 +45,9 @@ type Player interface {
 	// so a caller that never asks for the second one is showing a list that has
 	// been cut without saying so.
 	//
-	// The offset counts items, not pages, and each call decides the page size
-	// itself: it is what its source will hand over in one request, which is not
-	// the same number for the Web API and the daemon. The caller advances by
-	// what it was given and stops when More is false.
+	// The offset counts items, not pages, and the page size is the backend's own
+	// business — it is whatever its source hands over in one request. A caller
+	// starts at zero, follows Page.Next while Page.More, and stops there.
 	SearchPage(ctx context.Context, query string, offset int) (Page[Track], error)
 	PlaylistsPage(ctx context.Context, offset int) (Page[Playlist], error)
 	PlaylistTracksPage(ctx context.Context, playlistID string, offset int) (Page[Track], error)
