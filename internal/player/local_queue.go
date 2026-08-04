@@ -183,3 +183,61 @@ func (l *Local) Drop(ctx context.Context, trackID string) error {
 	l.notify()
 	return nil
 }
+
+// localContext is what the daemon's /player/context endpoint answers with: what
+// a playlist, album or artist holds, named the same way the queue's tracks are.
+type localContext struct {
+	URI    string            `json:"uri"`
+	Offset int               `json:"offset"`
+	Tracks []localQueueTrack `json:"tracks"`
+}
+
+// PlaylistTracks asks the daemon what a playlist holds.
+//
+// The Web API cannot answer this. Measured against a live account, it refuses
+// /playlists/{id}/tracks outright and /playlists/{id}/items for anything the
+// user does not own — a client id registered after Spotify's clampdown is not
+// allowed to read a playlist it did not create. The daemon is a player rather
+// than an application and the protocol it speaks has no such rule, so it is
+// asked first and the Web API kept only for when there is no daemon at all.
+func (l *Local) PlaylistTracks(ctx context.Context, playlistID string) ([]Track, error) {
+	tracks, err := l.contextTracks(ctx, "spotify:playlist:"+playlistID)
+	if err == nil {
+		return tracks, nil
+	}
+	return l.web.PlaylistTracks(ctx, playlistID)
+}
+
+func (l *Local) contextTracks(ctx context.Context, uri string) ([]Track, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, l.addr+"/player/context", nil)
+	if err != nil {
+		return nil, fmt.Errorf("build context request: %w", err)
+	}
+	q := req.URL.Query()
+	q.Set("uri", uri)
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := l.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch %s: %w", uri, err)
+	}
+	defer resp.Body.Close() //nolint:errcheck // read-only request
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetch %s: unexpected status %s", uri, resp.Status)
+	}
+
+	var page localContext
+	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+		return nil, fmt.Errorf("decode %s: %w", uri, err)
+	}
+
+	out := make([]Track, 0, len(page.Tracks))
+	for _, t := range page.Tracks {
+		// A context lists what it holds, not what was asked for by hand.
+		track := t.toTrack()
+		track.Queued = false
+		out = append(out, track)
+	}
+	return out, nil
+}

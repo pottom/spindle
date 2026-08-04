@@ -286,9 +286,6 @@ func (l *Local) Search(ctx context.Context, q string) ([]Track, error) {
 	return l.web.Search(ctx, q)
 }
 func (l *Local) Playlists(ctx context.Context) ([]Playlist, error) { return l.web.Playlists(ctx) }
-func (l *Local) PlaylistTracks(ctx context.Context, id string) ([]Track, error) {
-	return l.web.PlaylistTracks(ctx, id)
-}
 
 // idle reports whether the daemon has nothing playing, in which case commands
 // belong to whatever device does.
