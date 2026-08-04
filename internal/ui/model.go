@@ -94,8 +94,10 @@ type Model struct {
 	noPremium bool
 
 	// awaitingTrack is the track a skip is trying to move away from, and
-	// confirmUntil is when to stop asking whether it has.
+	// confirmUntil is when to stop asking whether it has. expecting is the one
+	// it is trying to move to, where the caller knew which that would be.
 	awaitingTrack string
+	expecting     string
 	confirmUntil  time.Time
 
 	// nextPollAt is when the resting poll is next due, followUntil is how long

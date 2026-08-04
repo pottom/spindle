@@ -81,7 +81,7 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 
 		id, offset := m.playlists.open.ID, m.playlists.inner.cursor
 		p := m.player
-		return tea.Batch(
+		cmd := tea.Batch(
 			controlCmd("play playlist", func(ctx context.Context) error {
 				return p.PlayPlaylist(ctx, id, offset)
 			}),
@@ -89,7 +89,13 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			// next five-second poll, and pressing enter looks like it did
 			// nothing at all.
 			m.awaitTrackChange(),
-		), true
+		)
+		if t := m.cursorTrack(); t != nil {
+			target := *t
+			m.showTrack(&target)
+			return tea.Batch(cmd, m.syncCover()), true
+		}
+		return cmd, true
 
 	case key.Matches(k, m.keys.PlayOne):
 		// Enter plays the list from here, which is what the official client
@@ -101,12 +107,18 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			return nil, true
 		}
 		id, p := t.ID, m.player
-		return tea.Batch(
+		target := *t
+		cmd := tea.Batch(
 			controlCmd("play track", func(ctx context.Context) error {
 				return p.PlayTrack(ctx, id)
 			}),
 			m.awaitTrackChange(),
-		), true
+		)
+		// The mark moves now rather than a round trip from now: pressing this
+		// twice in a row would otherwise leave it on the track asked for last
+		// time, which reads as the wrong one being played.
+		m.showTrack(&target)
+		return tea.Batch(cmd, m.syncCover()), true
 
 	case key.Matches(k, m.keys.Enqueue):
 		if m.playlists.open == nil {

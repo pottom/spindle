@@ -165,3 +165,52 @@ func TestTheQueueDoesNotOverwriteWhatTheDeviceSaid(t *testing.T) {
 		t.Errorf("title = %q, want the device's", got)
 	}
 }
+
+// Playing one track and then another before the first has been confirmed must
+// leave the mark on the second. The answer to the overtaken request arrives
+// afterwards and names a track nobody is waiting for any more.
+func TestAnOvertakenRequestDoesNotMoveTheMark(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{TrackID: "a", Title: "a", Playing: true}
+
+	// Asked for b, then for c before b was confirmed.
+	m.awaitTrackChange()
+	m.showTrack(&player.Track{ID: "b", Title: "b"})
+	m.awaitTrackChange()
+	m.showTrack(&player.Track{ID: "c", Title: "c"})
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(msg.StateFetched{State: &player.State{TrackID: "b", Title: "b", Playing: true}})
+	if got := tm.(Model).ps.TrackID; got != "c" {
+		t.Errorf("the mark moved to %q, want the track asked for last", got)
+	}
+
+	tm, _ = tm.Update(msg.StateFetched{State: &player.State{TrackID: "c", Title: "c", Playing: true}})
+	if got := tm.(Model).ps.TrackID; got != "c" {
+		t.Errorf("the mark is on %q once the device agrees, want c", got)
+	}
+
+	// Once it has agreed, the device is in charge again: the next track starts
+	// on its own and has to be adopted.
+	tm, _ = tm.Update(msg.StateFetched{State: &player.State{TrackID: "d", Title: "d", Playing: true}})
+	if got := tm.(Model).ps.TrackID; got != "d" {
+		t.Errorf("the mark is on %q, want the device's own next track", got)
+	}
+}
+
+// Mid-change the queue still names the track being left, so it must not be
+// borrowed from: that is what put the mark on the wrong row.
+func TestTheQueueIsNotBorrowedFromMidChange(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{TrackID: "a", Title: "a", Playing: true}
+	m.awaitTrackChange()
+
+	// The device has gone quiet about what it is playing while it loads.
+	m.ps = &player.State{Playing: true}
+	m.nowQueued = &player.Track{ID: "a", Title: "a"}
+	m.fillFromQueue()
+
+	if m.ps.TrackID == "a" {
+		t.Error("the track being left was borrowed back from the queue")
+	}
+}

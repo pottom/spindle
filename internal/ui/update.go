@@ -283,6 +283,18 @@ func (m *Model) adopt(st *player.State) {
 	if m.awaitingTrack != "" && st.TrackID == m.awaitingTrack {
 		return
 	}
+
+	// Where the track asked for is known, anything else arriving inside the
+	// window is a snapshot from before the request — including the answer to a
+	// request that has already been overtaken, which is what pressing play on
+	// one track after another produces. Adopting those marks a row that is not
+	// the one about to sound.
+	if m.expecting != "" && time.Now().Before(m.confirmUntil) {
+		if st.TrackID != m.expecting {
+			return
+		}
+	}
+	m.expecting = ""
 	if m.ps == nil || !time.Now().Before(m.optimisticUntil) {
 		m.ps = st
 		m.progressAt = time.Now()
@@ -308,6 +320,12 @@ func (m *Model) adopt(st *player.State) {
 // playing is worse than one that is a moment behind.
 func (m *Model) fillFromQueue() {
 	if m.ps == nil || m.ps.Title != "" || m.nowQueued == nil {
+		return
+	}
+	// Mid-change the queue is stale by definition: it still names the track
+	// being left, and borrowing that would put the mark on the wrong row until
+	// the device caught up.
+	if m.awaitingTrack != "" {
 		return
 	}
 	if m.ps.TrackID != "" && m.ps.TrackID != m.nowQueued.ID {
@@ -600,6 +618,7 @@ func (m *Model) showTrack(t *player.Track) {
 	m.ps.Album = t.Album
 	m.ps.CoverURL = t.CoverURL
 	m.ps.Duration = t.Duration
+	m.expecting = t.ID
 	m.setProgress(0)
 }
 
