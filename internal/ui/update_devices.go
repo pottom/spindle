@@ -44,9 +44,11 @@ func (m *Model) deviceKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		return m.syncCover(), true
 	}
 
-	// Keep the transport keys away from a screen where they have nothing to act
-	// on, but let quit and tab switching through.
-	return nil, m.noDevice
+	// Anything else belongs to whoever handles it next. The transport keys stop
+	// at their own guard, which already refuses to act with no device; claiming
+	// them here swallowed quit and help as well, and left the no-device screen
+	// with no way out of it at all.
+	return nil, false
 }
 
 // transfer moves playback and closes the picker at once. The confirming fetch is

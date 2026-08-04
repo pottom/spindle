@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -97,5 +98,47 @@ func TestNoDeviceScreenCannotBeClosed(t *testing.T) {
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if sel := tm.(Model).devices.selected(); sel == nil || sel.ID != "phone" {
 		t.Errorf("cursor on %v, want phone", sel)
+	}
+}
+
+// The no-device screen offers q in its help bar, and has nothing behind it to
+// go back to: swallowing the key left no way out of the program at all.
+func TestQuitWorksOnTheNoDeviceScreen(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.noDevice = true
+	m.width, m.height = 100, 30
+	m.resize()
+
+	for _, k := range []tea.KeyPressMsg{
+		{Code: 'q', Text: "q"},
+		{Code: 'c', Mod: tea.ModCtrl},
+	} {
+		if _, cmd := m.deviceKey(k); cmd {
+			t.Errorf("%v was swallowed by the device screen", k)
+		}
+	}
+
+	// And it reaches the quit case for real.
+	var tm tea.Model = m
+	if _, cmd := tm.Update(tea.KeyPressMsg{Code: 'q', Text: "q"}); cmd == nil {
+		t.Error("q on the no-device screen quits nothing")
+	}
+}
+
+// The picker and the queue cannot both have the keyboard: the help bar and the
+// arrow keys drive the device list, so the device list is what must be drawn.
+func TestTheDevicePickerIsDrawnOverEveryTab(t *testing.T) {
+	for _, tab := range []tabID{tabPlayer, tabQueue, tabLibrary} {
+		m := New(player.NewMock(), nil, defaultTestCell)
+		m.ps = &player.State{TrackID: "a", Title: "a", Playing: true}
+		m.tab = tab
+		m.devices.open = true
+		m.devices.items = []player.Device{{ID: "d1", Name: "kitchen speaker"}}
+		m.width, m.height = 120, 36
+		m.resize()
+
+		if got := plain(m.render()); !strings.Contains(got, "kitchen speaker") {
+			t.Errorf("tab %d: the picker has the keyboard but is not on screen:\n%s", tab, got)
+		}
 	}
 }
