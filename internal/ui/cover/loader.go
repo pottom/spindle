@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 
 	_ "image/jpeg"
 	_ "image/png"
@@ -37,6 +38,11 @@ type Loader struct {
 
 	mu      sync.Mutex
 	decoded *imageLRU
+
+	// seq numbers the loads, so a renderer can tell an overtaken one from the
+	// newest. Requests are started from tea.Cmd goroutines and finish in any
+	// order.
+	seq atomic.Uint64
 }
 
 // NewLoader prepares the pipeline. A cache directory that cannot be created is
@@ -79,11 +85,15 @@ func (l *Loader) Load(ctx context.Context, url string, wCells, hCells int) (Art,
 		return Art{}, fmt.Errorf("load cover: no artwork url")
 	}
 
+	// Claimed before the download, not after: the order requests were made in is
+	// what says which answer is the current one.
+	seq := l.seq.Add(1)
+
 	img, err := l.image(ctx, url)
 	if err != nil {
 		return Art{}, err
 	}
-	cells, err := l.renderer.Render(img, wCells, hCells)
+	cells, err := l.renderer.Render(img, wCells, hCells, seq)
 	if err != nil {
 		return Art{}, fmt.Errorf("load cover: %w", err)
 	}

@@ -6,7 +6,12 @@ import "image"
 type Renderer interface {
 	// Render fits img into a wCells × hCells area and returns a string
 	// embeddable in View().
-	Render(img image.Image, wCells, hCells int) (string, error)
+	//
+	// seq rises with every request. A renderer that writes to the terminal
+	// itself needs it: two loads can be in flight at once, and if the older one
+	// finishes last the terminal is left holding a picture of a size the screen
+	// is no longer drawing.
+	Render(img image.Image, wCells, hCells int, seq uint64) (string, error)
 	Name() string
 }
 

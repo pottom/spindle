@@ -24,7 +24,7 @@ func NewHalfblock(cell CellSize) *Halfblock {
 
 func (h *Halfblock) Name() string { return "halfblock" }
 
-func (h *Halfblock) Render(img image.Image, wCells, hCells int) (string, error) {
+func (h *Halfblock) Render(img image.Image, wCells, hCells int, _ uint64) (string, error) {
 	cols, rows, _, _ := fitCells(img, wCells, hCells, h.Cell)
 	if cols == 0 || rows == 0 {
 		return "", fmt.Errorf("render halfblock: image does not fit %dx%d cells", wCells, hCells)

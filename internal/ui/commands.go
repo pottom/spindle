@@ -96,6 +96,11 @@ func coverCmd(loader *cover.Loader, url string, wCells, hCells int) tea.Cmd {
 		defer cancel()
 
 		art, err := loader.Load(ctx, url, wCells, hCells)
+		if cover.IsStale(err) {
+			// A newer cover is already on screen. Reporting this one would only
+			// give the model something to discard.
+			return nil
+		}
 		if err != nil {
 			return msg.CoverFailed{URL: url, Width: wCells, Height: hCells}
 		}

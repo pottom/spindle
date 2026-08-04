@@ -1,6 +1,8 @@
 package cover
 
 import (
+	"bytes"
+	"image/color"
 	"strings"
 	"testing"
 
@@ -67,4 +69,35 @@ func splitPlaceholders(line string) [][]rune {
 		}
 	}
 	return cells
+}
+
+// Two covers can be in flight at once — moving the cursor down a list starts one
+// per row that settles. They share an image id, so an overtaken load must not
+// reach the terminal after the one that replaced it: the picture would be the
+// old size while the screen draws the new one, and only a corner of it shows.
+func TestOvertakenTransmissionIsDropped(t *testing.T) {
+	var out bytes.Buffer
+	k := NewKitty(&out, CellSize{Width: 9, Height: 18, Measured: true})
+	img := solid(640, 640, color.RGBA{R: 10, G: 20, B: 30, A: 255})
+
+	if _, err := k.Render(img, 14, 7, 2); err != nil {
+		t.Fatalf("Render(seq 2): %v", err)
+	}
+	newest := out.Len()
+
+	// The older load finishes last and must be refused.
+	if _, err := k.Render(img, 40, 20, 1); !IsStale(err) {
+		t.Errorf("Render(seq 1) = %v, want it reported as overtaken", err)
+	}
+	if out.Len() != newest {
+		t.Error("an overtaken cover was written to the terminal")
+	}
+
+	// A newer one still gets through.
+	if _, err := k.Render(img, 20, 10, 3); err != nil {
+		t.Fatalf("Render(seq 3): %v", err)
+	}
+	if out.Len() == newest {
+		t.Error("the newest cover never reached the terminal")
+	}
 }

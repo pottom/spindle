@@ -52,7 +52,7 @@ func TestFitCellsPreservesAspect(t *testing.T) {
 func TestHalfblockRenderDimensions(t *testing.T) {
 	h := NewHalfblock(CellSize{Width: 10, Height: 20})
 
-	art, err := h.Render(solid(640, 640, color.RGBA{R: 10, G: 200, B: 90, A: 255}), 20, 10)
+	art, err := h.Render(solid(640, 640, color.RGBA{R: 10, G: 200, B: 90, A: 255}), 20, 10, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestHalfblockRenderDimensions(t *testing.T) {
 
 func TestHalfblockRejectsEmptyArea(t *testing.T) {
 	h := NewHalfblock(CellSize{Width: 10, Height: 20})
-	if _, err := h.Render(solid(640, 640, color.White), 0, 0); err == nil {
+	if _, err := h.Render(solid(640, 640, color.White), 0, 0, 1); err == nil {
 		t.Error("expected an error for a zero-sized area")
 	}
 }

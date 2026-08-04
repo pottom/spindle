@@ -3,6 +3,7 @@ package cover
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -40,6 +41,12 @@ type Kitty struct {
 
 	mu  sync.Mutex
 	out io.Writer // the tty; written to from the pipeline, never from View
+
+	// sent is the newest load that reached the terminal. Every cover goes out
+	// under the same image id, so a load that was overtaken must not be written
+	// after the one that replaced it: the terminal would keep a picture of a
+	// size the screen has stopped drawing, and show a corner of it.
+	sent uint64
 }
 
 func NewKitty(out io.Writer, cell CellSize) *Kitty {
@@ -48,7 +55,15 @@ func NewKitty(out io.Writer, cell CellSize) *Kitty {
 
 func (k *Kitty) Name() string { return "kitty" }
 
-func (k *Kitty) Render(img image.Image, wCells, hCells int) (string, error) {
+// errStale reports a cover that finished after the one that replaced it. It is
+// not a failure — there is simply nothing left to do with it.
+var errStale = errors.New("cover load overtaken by a newer one")
+
+// IsStale reports whether an error is that of an overtaken load, which the UI
+// should drop rather than complain about.
+func IsStale(err error) bool { return errors.Is(err, errStale) }
+
+func (k *Kitty) Render(img image.Image, wCells, hCells int, seq uint64) (string, error) {
 	cols, rows, pxW, pxH := fitCells(img, wCells, hCells, k.Cell)
 	if cols == 0 || rows == 0 {
 		return "", fmt.Errorf("render kitty: image does not fit %dx%d cells", wCells, hCells)
@@ -69,7 +84,7 @@ func (k *Kitty) Render(img image.Image, wCells, hCells int) (string, error) {
 	if err := png.Encode(&buf, scaled); err != nil {
 		return "", fmt.Errorf("encode cover as png: %w", err)
 	}
-	if err := k.transmit(buf.Bytes(), cols, rows); err != nil {
+	if err := k.transmit(buf.Bytes(), cols, rows, seq); err != nil {
 		return "", err
 	}
 	return placeholderGrid(cols, rows), nil
@@ -78,7 +93,7 @@ func (k *Kitty) Render(img image.Image, wCells, hCells int) (string, error) {
 // transmit uploads the image and creates a virtual placement under imageID.
 // Responses are suppressed with q=2: anything the terminal echoed back would be
 // read by Bubble Tea as keyboard input.
-func (k *Kitty) transmit(data []byte, cols, rows int) error {
+func (k *Kitty) transmit(data []byte, cols, rows int, seq uint64) error {
 	encoded := base64.StdEncoding.EncodeToString(data)
 
 	var sb strings.Builder
@@ -106,9 +121,15 @@ func (k *Kitty) transmit(data []byte, cols, rows int) error {
 
 	k.mu.Lock()
 	defer k.mu.Unlock()
+	if seq < k.sent {
+		// Overtaken while it was being prepared. The screen is already drawing
+		// the newer cover, and this one has nowhere to go.
+		return errStale
+	}
 	if _, err := io.WriteString(k.out, sb.String()); err != nil {
 		return fmt.Errorf("transmit cover: %w", err)
 	}
+	k.sent = seq
 	return nil
 }
 
