@@ -442,10 +442,16 @@ func TestSweepCarriesAcrossWrappedRows(t *testing.T) {
 		t.Errorf("a quarter of the way in %d of %d is swept, want about a quarter", at, length)
 	}
 
-	rowWidth := 24
-	if rows := wrapWords(m.lyrics.lines[1].Words, rowWidth); len(rows) < 2 {
+	// Later in the line it has to reach past the first wrapped row, which only
+	// works if the sweep is measured against the line rather than the row.
+	m.setProgress(10 * time.Second)
+	at = m.lyricsSweep(1, length)
+
+	rows := wrapWords(m.lyrics.lines[1].Words, 24)
+	if len(rows) < 2 {
 		t.Fatal("the line did not wrap, so there is nothing to carry across")
-	} else if at <= len(rows[0]) {
+	}
+	if at <= len(rows[0]) {
 		t.Errorf("the sweep reached %d, still inside the first row of %d", at, len(rows[0]))
 	}
 }

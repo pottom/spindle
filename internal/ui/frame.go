@@ -94,14 +94,3 @@ func place(lines []string, w, h, top int) []string {
 	}
 	return out
 }
-
-// meter draws a filled bar of w cells, using the two styles for the played and
-// the remaining part.
-func meter(fraction float64, w int, on, off lipgloss.Style) string {
-	if w <= 0 {
-		return ""
-	}
-	filled := min(max(int(fraction*float64(w)+0.5), 0), w)
-	return on.Render(strings.Repeat(meterFull, filled)) +
-		off.Render(strings.Repeat(meterEmpty, w-filled))
-}

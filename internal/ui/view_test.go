@@ -255,3 +255,37 @@ func TestBothScreensDrawTheSameFacts(t *testing.T) {
 		t.Errorf("trackCaption() = %q, want no duration", caption)
 	}
 }
+
+// The volume is drawn like the progress bar: what is set in the accent, the
+// rest of the way faint, and the marker on the join. One control, one shape —
+// a meter of its own beside it read as a different kind of thing entirely.
+func TestVolumeIsShapedLikeTheProgressBar(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{Volume: 50, Duration: time.Minute, Progress: 30 * time.Second, Playing: true}
+
+	volume := ansiOff(m.volumeLine(volumeCells))
+	if got := len([]rune(volume)); got != volumeCells {
+		t.Errorf("the volume bar is %d cells, want %d", got, volumeCells)
+	}
+	if !strings.Contains(volume, knob) {
+		t.Error("the volume bar has no marker")
+	}
+	if !strings.Contains(volume, meterFull) || !strings.Contains(volume, meterEmpty) {
+		t.Errorf("the volume bar = %q, want it filled up to the marker and faint after", volume)
+	}
+
+	// The marker moves with the setting, and the accent runs up to it.
+	at := func(v int) int {
+		m.ps.Volume = v
+		return strings.Index(ansiOff(m.volumeLine(volumeCells)), knob)
+	}
+	if a, b := at(0), at(100); a >= b {
+		t.Errorf("the marker sits at %d for silence and %d for full, want it to travel", a, b)
+	}
+
+	// And it is the accent that fills it, as the progress bar is.
+	m.ps.Volume = 50
+	if !strings.Contains(m.volumeLine(volumeCells), m.styles.Elapsed.Render(meterFull)) {
+		t.Error("the volume is not drawn in the accent")
+	}
+}

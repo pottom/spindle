@@ -30,8 +30,9 @@ const (
 	// noCoverGlyph stands in for artwork that could not be loaded.
 	noCoverGlyph = "♪"
 
-	// volumeCells is the width of the little bar beside the volume reading.
-	volumeCells = 8
+	// volumeCells is the width of the bar beside the volume reading. Long
+	// enough that a step of five is a step you can see.
+	volumeCells = 16
 )
 
 func (m Model) View() tea.View {
@@ -240,6 +241,19 @@ func (m Model) progressLine(w int) string {
 		m.styles.Remaining.Render(strings.Repeat(meterEmpty, bar-filled))
 }
 
+// volumeLine is the volume drawn like the progress bar: what is set in the
+// artwork's accent, the rest of the way faint, and the playhead on the join.
+// One control, one shape — a meter of its own beside it read as a different
+// kind of thing entirely.
+func (m Model) volumeLine(w int) string {
+	bar := max(w-1, 1)
+	filled := min(max(m.ps.Volume*bar/100, 0), bar)
+
+	return m.styles.Elapsed.Render(strings.Repeat(meterFull, filled)) +
+		m.styles.Knob.Render(knob) +
+		m.styles.Remaining.Render(strings.Repeat(meterEmpty, bar-filled))
+}
+
 // transportLine holds the transport icons, the shuffle and repeat state, and the
 // volume, all on one row.
 func (m Model) transportLine(w int) string {
@@ -265,8 +279,7 @@ func (m Model) transportLine(w int) string {
 		repeat = s.ToggleOn.Render(iconRep + "1")
 	}
 
-	volume := meter(float64(m.ps.Volume)/100, volumeCells, s.MeterOn, s.MeterOff) +
-		s.Volume.Render(fmt.Sprintf(" %d", m.ps.Volume))
+	volume := m.volumeLine(volumeCells) + s.Volume.Render(fmt.Sprintf(" %d", m.ps.Volume))
 
 	return spread(transport+"    "+shuffle+"  "+repeat, volume, w)
 }

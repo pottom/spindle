@@ -48,8 +48,6 @@ type Styles struct {
 	Controls  lipgloss.Style
 	ToggleOn  lipgloss.Style
 	ToggleOff lipgloss.Style
-	MeterOn   lipgloss.Style
-	MeterOff  lipgloss.Style
 	Volume    lipgloss.Style
 
 	// Lyrics, indexed by how far a line is from the one being sung. Only that
@@ -145,8 +143,6 @@ func New(isDark bool, accent color.Color) Styles {
 		Controls:  fg(t.Text),
 		ToggleOn:  fg(accent),
 		ToggleOff: fg(t.Faint),
-		MeterOn:   fg(t.Muted),
-		MeterOff:  fg(t.Border),
 		Volume:    fg(t.Muted),
 
 		DeviceOn:  fg(accent),
