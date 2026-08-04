@@ -25,4 +25,9 @@ type Track struct {
 	DiscNumber  int
 	TotalTracks int
 	Explicit    bool
+
+	// Popularity is Spotify's 0–100 rating, or nil when the backend does not
+	// report it. Zero is a value, not an absence: an obscure catalogue track
+	// really does score nothing.
+	Popularity *int
 }

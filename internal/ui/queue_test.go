@@ -386,3 +386,31 @@ func TestScrollbarOnlyWhenItCanScroll(t *testing.T) {
 		t.Errorf("render() drew no scrollbar for a list that overflows:\n%s", out)
 	}
 }
+
+// A rating of zero is a rating: an obscure catalogue track really does score
+// nothing, and hiding the row for it would read as the backend having gone
+// quiet. Only a backend that does not rate tracks at all leaves it out.
+func TestPopularityShownEvenAtZero(t *testing.T) {
+	zero, fifty := 0, 50
+	m := queueModel(0, "a", "b")
+	m.width, m.height = 100, 44
+	m.resize()
+
+	m.queue[0].Popularity = &zero
+	m.queuePane.cursor.cursor = queueRowOf(0)
+	if got := plain(strings.Join(m.trackDetail(40), "\n")); !strings.Contains(got, "Popularity") {
+		t.Errorf("trackDetail() = %q, want a rating of zero shown", got)
+	}
+
+	m.queue[1].Popularity = &fifty
+	m.queuePane.cursor.cursor = queueRowOf(1)
+	if got := plain(strings.Join(m.trackDetail(40), "\n")); !strings.Contains(got, "50") {
+		t.Errorf("trackDetail() = %q, want the rating", got)
+	}
+
+	// A backend that does not rate tracks says nothing rather than zero.
+	m.queue[1].Popularity = nil
+	if got := plain(strings.Join(m.trackDetail(40), "\n")); strings.Contains(got, "Popularity") {
+		t.Errorf("trackDetail() = %q, want no rating when the backend does not give one", got)
+	}
+}

@@ -29,9 +29,11 @@ type localQueueTrack struct {
 	DiscNumber  int      `json:"disc_number"`
 	TotalTracks int      `json:"total_tracks"`
 	AlbumType   string   `json:"album_type"`
+	Popularity  int      `json:"popularity"`
 }
 
 func (t localQueueTrack) toTrack() Track {
+	popularity := t.Popularity
 	return Track{
 		ID:          trackIDFromURI(t.URI),
 		Title:       t.Name,
@@ -45,6 +47,7 @@ func (t localQueueTrack) toTrack() Track {
 		DiscNumber:  t.DiscNumber,
 		TotalTracks: t.TotalTracks,
 		AlbumType:   t.AlbumType,
+		Popularity:  &popularity,
 	}
 }
 

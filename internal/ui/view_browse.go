@@ -28,8 +28,10 @@ const (
 	// ordinalCols is the width of the track number column in a list.
 	ordinalCols = 2
 
-	// factLabelCols is the label column of the detail panel.
-	factLabelCols = 12
+	// factLabelCols is the label column of the detail panel, and popularityCells
+	// the width of the little bar beside the rating.
+	factLabelCols   = 12
+	popularityCells = 8
 
 	// secondaryCols is the fixed middle column of a list row: the artist, or the
 	// playlist's owner. Fixed so the trailing column always lines up.
@@ -162,6 +164,11 @@ func (m Model) trackDetail(w int) []string {
 	_, hasNow := m.nowPlayingRow()
 	for _, f := range trackFacts(*t, hasNow && m.queuePane.cursor.cursor == 0) {
 		lines = append(lines, m.fact(f.label, f.value, w))
+	}
+	if t.Popularity != nil {
+		lines = append(lines, m.fact("Popularity",
+			meter(float64(*t.Popularity)/100, popularityCells, s.MeterOn, s.MeterOff)+
+				s.Volume.Render(fmt.Sprintf(" %d", *t.Popularity)), w))
 	}
 	return lines
 }
