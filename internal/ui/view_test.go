@@ -353,12 +353,24 @@ func TestVolumeBarDoesNotMoveWithTheReading(t *testing.T) {
 	m := New(player.NewMock(), nil, defaultTestCell)
 	m.ps = &player.State{Volume: 100, Playing: true, Duration: time.Minute}
 
+	// Where the bar begins is what must not move; the marker inside it travels
+	// with the setting by design.
 	at := func(v int) int {
 		m.ps.Volume = v
-		return strings.Index(ansiOff(m.transportLine(70)), meterEmpty+" ")
+		row := ansiOff(m.transportLine(70))
+		return min(indexOr(row, meterFull), indexOr(row, knob))
 	}
 	full, two, one := at(100), at(90), at(5)
 	if full != two || two != one {
-		t.Errorf("the bar ends at %d, %d and %d for 100, 90 and 5, want it still", full, two, one)
+		t.Errorf("the bar starts at %d, %d and %d for 100, 90 and 5, want it still", full, two, one)
 	}
+}
+
+// indexOr is strings.Index with a large sentinel for "not there", so a missing
+// piece never wins a min().
+func indexOr(s, sub string) int {
+	if at := strings.Index(s, sub); at >= 0 {
+		return at
+	}
+	return 1 << 20
 }
