@@ -13,6 +13,12 @@ import (
 func tempStore(t *testing.T) *Store {
 	t.Helper()
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv(clientIDEnv, "")
+
+	// A grant belongs to an application, so there has to be one.
+	if err := SaveClientID("0123456789abcdef0123456789abcdef"); err != nil {
+		t.Fatal(err)
+	}
 
 	s, err := NewStore()
 	if err != nil {
@@ -112,11 +118,7 @@ func TestStoreDeleteIsIdempotent(t *testing.T) {
 // allowed to do, and both change. Keeping one that no longer matches turns into
 // a refusal somewhere far away from the cause.
 func TestATokenGrantedElsewhereIsNotReused(t *testing.T) {
-	tempConfig(t)
-	store, err := NewStore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	store := tempStore(t)
 
 	tok := &oauth2.Token{AccessToken: "a", RefreshToken: "r", Expiry: time.Now().Add(time.Hour)}
 	if err := store.Save(tok); err != nil {
@@ -138,11 +140,7 @@ func TestATokenGrantedElsewhereIsNotReused(t *testing.T) {
 // The same when a screen starts needing a permission the last authorisation
 // never asked for.
 func TestATokenMissingAScopeIsNotReused(t *testing.T) {
-	tempConfig(t)
-	store, err := NewStore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	store := tempStore(t)
 
 	id, err := ClientID()
 	if err != nil {
