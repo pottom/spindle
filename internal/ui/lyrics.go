@@ -17,12 +17,16 @@ const (
 	// the point.
 	lyricsMinRows = 6
 
+	// lyricsAhead is how far in front of the playhead the words are read. See
+	// lyricsClock. Raised from 300ms after listening: a line lit at the moment
+	// its first syllable sounds has already been passed by the time it is read,
+	// so the words want to arrive slightly before the voice, the way a singer
+	// reads ahead of themselves.
+	lyricsAhead = 450 * time.Millisecond
+
 	// lyricsMaxRows is the most shown at once. A whole lyric on screen is a
 	// page of text to search through; a handful of lines around the one being
 	// sung is something to follow.
-	// lyricsAhead is how far in front of the playhead the words are read. See
-	// lyricsClock.
-	lyricsAhead = 300 * time.Millisecond
 
 	lyricsMaxRows = 11
 
