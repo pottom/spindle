@@ -107,21 +107,38 @@ func (m Model) body(l layout) []string {
 		block = m.queueBlock(l, max(l.bodyHeight, 1))
 
 	default:
-		// The player centres its text against the cover; the browsing tabs give
-		// their list every row going, with the cover centred beside it.
+		// The player centres its text against the cover. The browsing tabs, and
+		// the player once the words are showing, give the right-hand column
+		// every row there is instead.
 		rows := l.artHeight
-		art := center(strings.Split(m.artworkCells(), "\n"), l.artWidth, rows)
-		if m.tab != tabPlayer {
-			rows = max(l.bodyHeight-1, l.artHeight)
-			art = alignTop(strings.Split(m.artworkCells(), "\n"), l.artWidth, rows)
+		full := m.tab != tabPlayer || !l.hasArt() || m.lyricsVisible()
+		if full {
+			rows = max(l.bodyHeight, l.artHeight)
 		}
 
 		right := m.browsePane(l, rows)
 		switch {
 		case m.devices.open:
 			right = m.devicePicker(l.infoWidth, rows)
+		case right == nil && m.lyricsVisible():
+			// The words need room, so the information goes to the top of the
+			// body rather than sitting in the middle of it, and they take
+			// everything under it.
+			right = m.infoWithLyrics(l, rows)
 		case right == nil:
 			right = stack(m.infoBlock(l.infoWidth), l.infoWidth, rows)
+		}
+
+		// Without a picture the text and the list take the whole width, which
+		// is the point of dropping it.
+		if !l.hasArt() {
+			block = right
+			break
+		}
+
+		art := center(strings.Split(m.artworkCells(), "\n"), l.artWidth, rows)
+		if full {
+			art = alignTop(strings.Split(m.artworkCells(), "\n"), l.artWidth, rows)
 		}
 		gap := strings.Repeat(" ", columnGap)
 
@@ -293,7 +310,7 @@ func (m Model) renderTooSmall() string {
 // this number, so it cannot depend on the answer. The bar is the same height
 // either way, which TestHelpHeightDoesNotDependOnTheScope keeps true.
 func (m Model) helpHeight() int {
-	return lipgloss.Height(m.help.View(m.helpKeysWith(false)))
+	return lipgloss.Height(m.help.View(m.helpKeysWith(false, false)))
 }
 
 // formatDuration renders a position as m:ss, or h:mm:ss past an hour.

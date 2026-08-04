@@ -52,6 +52,24 @@ const (
 	volumeDebounce = 400 * time.Millisecond
 )
 
+// lyricsCmd fetches the words of a track. A failure is reported as a track
+// without lyrics: nothing can be done about it, and most tracks that come back
+// empty genuinely have none.
+func lyricsCmd(source player.LyricSource, trackID string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+		defer cancel()
+
+		out := msg.LyricsFetched{TrackID: trackID}
+		lyrics, err := source.Lyrics(ctx, trackID)
+		if err != nil || lyrics == nil {
+			return out
+		}
+		out.Synced, out.Lines = lyrics.Synced, lyrics.Lines
+		return out
+	}
+}
+
 // scopeFrameCmd waits out a frame and then asks the backend what is being
 // heard. The wait and the fetch are one command so the trace paces itself: the
 // next frame is only asked for once the last one has arrived, which keeps a

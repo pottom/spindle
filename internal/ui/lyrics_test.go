@@ -1,0 +1,167 @@
+package ui
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/pottom/spindle/internal/player"
+	"github.com/pottom/spindle/internal/ui/msg"
+)
+
+func msgLyrics(id string) msg.LyricsFetched {
+	return msg.LyricsFetched{TrackID: id, Synced: true,
+		Lines: []player.Lyric{{At: 0, Words: "aaa"}, {At: 4000, Words: "bbb"}}}
+}
+
+func lyricsModel(w, h int) Model {
+	m := scopeModel(w, h)
+	m.ps.Duration = 3 * time.Minute
+	m.lyrics.on = true
+	m.lyrics.forTrack, m.lyrics.synced = m.ps.TrackID, true
+	for i := range 12 {
+		m.lyrics.lines = append(m.lyrics.lines, player.Lyric{
+			At: int64(i) * 4000, Words: strings.Repeat("x", 6) + " " + string(rune('a'+i)),
+		})
+	}
+	return m
+}
+
+// Turning the words off has to give back exactly the screen that was there
+// before, the same promise the waveform makes.
+func TestLyricsOffRestoresThePlayer(t *testing.T) {
+	m := lyricsModel(120, 40)
+	m.lyrics.on = false
+	plainScreen := plain(m.render())
+
+	m.lyrics.on = true
+	withWords := plain(m.render())
+	if withWords == plainScreen {
+		t.Fatal("the words changed nothing")
+	}
+
+	m.lyrics.on = false
+	if got := plain(m.render()); got != plainScreen {
+		t.Error("the screen did not come back as it was")
+	}
+}
+
+// A line too long for the column is wrapped, never cut: a line of a song that
+// stops before its last word is not worth showing.
+func TestLongLyricLinesWrap(t *testing.T) {
+	m := lyricsModel(120, 40)
+	l := m.layout()
+
+	// Six words that cannot share one row.
+	word := strings.Repeat("y", l.infoWidth/3)
+	m.lyrics.lines[3].Words = strings.Join([]string{word, word, word, word, word, word}, " ")
+	m.setProgress(12 * time.Second)
+
+	rows := 0
+	for _, row := range strings.Split(plain(m.render()), "\n") {
+		if strings.Contains(row, word) {
+			rows++
+		}
+		if len([]rune(row)) > m.width {
+			t.Fatalf("a row ran past the frame: %q", row)
+		}
+	}
+	if rows < 2 {
+		t.Errorf("the long line took %d rows, want it wrapped over several", rows)
+	}
+	if strings.Contains(plain(m.render()), "…") {
+		t.Error("the line was cut rather than wrapped")
+	}
+}
+
+// Words are broken on spaces, and only mid-word when one word is longer than
+// the whole row.
+func TestWrapWords(t *testing.T) {
+	got := wrapWords("one two three four", 9)
+	if len(got) < 2 {
+		t.Fatalf("wrapWords = %q, want it broken up", got)
+	}
+	for _, row := range got {
+		if len(row) > 9 {
+			t.Errorf("row %q is wider than 9", row)
+		}
+	}
+	if strings.Join(got, " ") != "one two three four" {
+		t.Errorf("wrapWords = %q, want every word kept", got)
+	}
+}
+
+// Only the line being sung is at full strength; everything else recedes with
+// distance, above and below alike.
+func TestLyricsFadeBothWays(t *testing.T) {
+	m := lyricsModel(120, 40)
+	if len(m.styles.LyricFade) < 3 {
+		t.Fatal("no fade to test")
+	}
+
+	if a, b := m.lyricStyle(-2), m.lyricStyle(2); a.GetForeground() != b.GetForeground() {
+		t.Error("a line two ahead is not drawn like one two behind")
+	}
+	if now, near := m.lyricStyle(0), m.lyricStyle(1); now.GetForeground() == near.GetForeground() {
+		t.Error("the line being sung is drawn like its neighbour")
+	}
+	// And the fade keeps going rather than flattening after one step.
+	if near, far := m.lyricStyle(1), m.lyricStyle(4); near.GetForeground() == far.GetForeground() {
+		t.Error("the fade stops after the first step")
+	}
+}
+
+// The words follow the clock: the lit line is the one whose time has come.
+func TestLyricsFollowTheClock(t *testing.T) {
+	m := lyricsModel(120, 40)
+
+	m.setProgress(0)
+	if got := m.lyricsAt(); got != 0 {
+		t.Errorf("at 0s the line is %d, want 0", got)
+	}
+	m.setProgress(9 * time.Second)
+	if got := m.lyricsAt(); got != 2 {
+		t.Errorf("at 9s the line is %d, want 2", got)
+	}
+	m.setProgress(2 * time.Minute)
+	if got := m.lyricsAt(); got != len(m.lyrics.lines)-1 {
+		t.Errorf("past the end the line is %d, want the last", got)
+	}
+}
+
+// An answer that lands after a skip belongs to the wrong song, and captioning a
+// track with another one's words is the only thing worse than none.
+func TestLateLyricsAreDropped(t *testing.T) {
+	m := lyricsModel(120, 40)
+	m.lyrics.lines = nil
+	m.lyrics.forTrack = ""
+
+	m.adoptLyrics(msgLyrics("someone-else"))
+	if m.lyrics.forTrack != "" {
+		t.Error("the words of another track were adopted")
+	}
+
+	m.adoptLyrics(msgLyrics(m.ps.TrackID))
+	if m.lyrics.forTrack != m.ps.TrackID {
+		t.Error("the words of this track were not adopted")
+	}
+}
+
+// The key is offered only where the words fit, and toggling it is what shows
+// and hides them.
+func TestLyricsKey(t *testing.T) {
+	m := lyricsModel(120, 40)
+	m.lyrics.on = false
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	if !tm.(Model).lyricsVisible() {
+		t.Fatal("l did not show the words")
+	}
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	if tm.(Model).lyricsVisible() {
+		t.Error("l did not put them away again")
+	}
+}

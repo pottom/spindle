@@ -31,6 +31,7 @@ type keyMap struct {
 	Devices key.Binding
 	Refresh key.Binding
 	Scope   key.Binding
+	Lyrics  key.Binding
 
 	// Queue editing. Only the tracks put there by hand can be moved or dropped,
 	// so these do nothing on the rest of the list.
@@ -118,6 +119,10 @@ func newKeyMap() keyMap {
 		Scope: key.NewBinding(
 			key.WithKeys("v"),
 			key.WithHelp("v", "waveform"),
+		),
+		Lyrics: key.NewBinding(
+			key.WithKeys("l"),
+			key.WithHelp("l", "lyrics"),
 		),
 
 		Enqueue: key.NewBinding(
@@ -209,15 +214,18 @@ func (k keyMap) forReadOnlyQueue() tabKeys {
 // forPlayer is the player screen's help. The waveform key is only listed where
 // there is room to draw one: advertising a key that does nothing is worse than
 // a shorter bar.
-func (k keyMap) forPlayer(scope bool) tabKeys {
+func (k keyMap) forPlayer(scope, lyrics bool) tabKeys {
 	short := []key.Binding{
 		hint("space", "play/pause"),
 		hint("n/p", "track"),
 		hint("←→", "seek"),
 	}
-	if scope {
+	switch {
+	case lyrics:
+		short = append(short, hint("l", "lyrics"))
+	case scope:
 		short = append(short, hint("v", "waveform"))
-	} else {
+	default:
 		short = append(short, hint("d", "devices"))
 	}
 	short = append(short, hint("?", "help"))
@@ -225,6 +233,9 @@ func (k keyMap) forPlayer(scope bool) tabKeys {
 	second := []key.Binding{k.Shuffle, k.Repeat, k.Devices}
 	if scope {
 		second = append(second, k.Scope)
+	}
+	if lyrics {
+		second = append(second, k.Lyrics)
 	}
 
 	return tabKeys{

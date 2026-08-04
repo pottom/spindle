@@ -52,6 +52,12 @@ type Styles struct {
 	MeterOff  lipgloss.Style
 	Volume    lipgloss.Style
 
+	// Lyrics, indexed by how far a line is from the one being sung. Only that
+	// line is at full strength; everything else recedes with distance, above
+	// and below alike, so the eye is drawn to the words actually sounding
+	// rather than to a wall of even text.
+	LyricFade []lipgloss.Style
+
 	// Detail panel.
 	FactLabel lipgloss.Style
 	StarOn    lipgloss.Style
@@ -109,6 +115,8 @@ func New(isDark bool, accent color.Color) Styles {
 		RowSelected:  fg(t.Text).Bold(true),
 		RowPlaying:   fg(accent),
 		Empty:        fg(t.Faint),
+
+		LyricFade: lyricFade(t, accent),
 
 		FactLabel: fg(t.Faint),
 		StarOn:    fg(accent),
@@ -271,4 +279,26 @@ func blend(a, b color.Color, t float64) color.Color {
 		return uint8((float64(x>>8)*(1-t) + float64(y>>8)*t))
 	}
 	return color.RGBA{R: mix(ar, br), G: mix(ag, bg), B: mix(ab, bb), A: 0xff}
+}
+
+// lyricFadeSteps is how many strengths a lyric is drawn in. Six carries the
+// eye a long way from the current line without the furthest rows becoming
+// invisible on a light terminal.
+const lyricFadeSteps = 6
+
+// lyricFade builds the fade: the line being sung in the artwork's accent, then
+// a fall away from it that keeps going past the theme's faintest text.
+func lyricFade(t Theme, accent color.Color) []lipgloss.Style {
+	near := blend(t.Muted, t.Text, 0.15)
+	far := shift(t.Faint, 0, 0.9, 0.62)
+
+	out := make([]lipgloss.Style, lyricFadeSteps)
+	out[0] = lipgloss.NewStyle().Foreground(accent).Bold(true)
+	for i := 1; i < lyricFadeSteps; i++ {
+		// The first step away is already a clear drop, so the rest of the fall
+		// is spread over what is left.
+		f := float64(i-1) / float64(lyricFadeSteps-2)
+		out[i] = lipgloss.NewStyle().Foreground(blend(near, far, f))
+	}
+	return out
 }

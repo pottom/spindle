@@ -154,6 +154,10 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = message.Err
 		return m, nil
 
+	case msg.LyricsFetched:
+		m.adoptLyrics(message)
+		return m, nil
+
 	case msg.WaveformReady:
 		// The trace stops the moment it leaves the screen: a redraw every 33ms
 		// for something nobody is looking at is the whole cost of the feature.
@@ -212,6 +216,11 @@ func (m Model) handleTick() (tea.Model, tea.Cmd) {
 	// here means it resumes on its own rather than waiting to be switched off
 	// and on.
 	if cmd := m.startScope(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	// The words belong to whatever is playing, so a track change is what sends
+	// for them. The tick is where that is noticed.
+	if cmd := m.fetchLyrics(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
 	// A banner appearing or clearing changes the height of the body, and with
@@ -311,6 +320,13 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		// trace only fills rows that were already blank.
 		m.scope.on = !m.scope.on
 		return m, m.startScope()
+
+	case key.Matches(k, m.keys.Lyrics):
+		if !m.lyricsAvailable() {
+			return m, nil
+		}
+		m.lyrics.on = !m.lyrics.on
+		return m, m.fetchLyrics()
 
 	case key.Matches(k, m.keys.Help):
 		// Expanding the help shortens the body, which shrinks the artwork, so

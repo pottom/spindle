@@ -135,6 +135,9 @@ type Model struct {
 
 	// scope is the waveform under the artwork, and whether it is being drawn.
 	scope scopeState
+
+	// lyrics is the words of the track playing, and whether they are on screen.
+	lyrics lyricsState
 }
 
 // New wires a model around a playback backend and an artwork loader. The palette
@@ -229,7 +232,7 @@ func (m Model) elapsed() time.Duration {
 // layout is what decides that, and the layout needs the help's height, so the
 // two cannot ask each other — helpHeight passes false and relies on the help
 // coming out the same height either way.
-func (m Model) helpKeysWith(scope bool) tabKeys {
+func (m Model) helpKeysWith(scope, lyrics bool) tabKeys {
 	switch {
 	case m.tab == tabPlayer && m.noDevice:
 		return m.keys.forNoDevice()
@@ -240,14 +243,16 @@ func (m Model) helpKeysWith(scope bool) tabKeys {
 		// keys that do nothing would be worse than a shorter bar.
 		return m.keys.forReadOnlyQueue()
 	case m.tab == tabPlayer:
-		return m.keys.forPlayer(scope)
+		return m.keys.forPlayer(scope, lyrics)
 	default:
 		return m.keys.forTab(m.tab)
 	}
 }
 
 // helpKeys is the help for what is on screen.
-func (m Model) helpKeys() tabKeys { return m.helpKeysWith(m.scopeAvailable()) }
+func (m Model) helpKeys() tabKeys {
+	return m.helpKeysWith(m.scopeAvailable(), m.lyricsAvailable())
+}
 
 // layoutMode is how the current tab divides its body.
 func (m Model) layoutMode() layoutMode {
