@@ -46,5 +46,12 @@ type Player interface {
 	// PlayFrom jumps to a track already coming up, keeping the album or
 	// playlist it belongs to. PlayTrack would drop everything behind it.
 	PlayFrom(ctx context.Context, trackID string) error
+
+	// PlayNow starts a track that is not in the list at all, and leaves the
+	// list alone: what was queued still follows it. PlayTrack is the other
+	// reading — one track and nothing else — and it throws the queue away,
+	// which is not what someone who has spent a minute filling it means by
+	// "play this one".
+	PlayNow(ctx context.Context, trackID string) error
 	PlayPlaylist(ctx context.Context, playlistID string, offset int) error
 }

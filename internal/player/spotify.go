@@ -215,6 +215,12 @@ func (s *Spotify) SetRepeat(ctx context.Context, mode string) error {
 }
 
 // PlayTrack starts one track on its own, with no surrounding context.
+// PlayNow is PlayTrack against the Web API: it has no way to start a track
+// without replacing what was playing, queue and all. The local daemon does.
+func (s *Spotify) PlayNow(ctx context.Context, trackID string) error {
+	return s.PlayTrack(ctx, trackID)
+}
+
 func (s *Spotify) PlayTrack(ctx context.Context, trackID string) error {
 	return s.PlayTrackOn(ctx, trackID, "")
 }

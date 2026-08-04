@@ -237,6 +237,20 @@ func (l *Local) SetRepeat(ctx context.Context, mode string) error {
 // playing: it is the one that knows which device to aim at, and the daemon's
 // own play endpoint cannot start something on another device.
 
+// PlayNow puts a track at the head of the queue and starts it, so everything
+// already queued still follows. Two calls rather than one: the daemon knows how
+// to bring a waiting track forward, and this makes the track waiting first.
+func (l *Local) PlayNow(ctx context.Context, trackID string) error {
+	if l.idle() {
+		// Nothing is playing here, so there is no queue to keep.
+		return l.PlayTrack(ctx, trackID)
+	}
+	if err := l.AddToQueue(ctx, trackID); err != nil {
+		return err
+	}
+	return l.PlayFrom(ctx, trackID)
+}
+
 func (l *Local) PlayTrack(ctx context.Context, trackID string) error {
 	return l.web.PlayTrackOn(ctx, trackID, l.deviceID())
 }

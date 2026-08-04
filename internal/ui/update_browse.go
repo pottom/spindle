@@ -106,7 +106,7 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		return m.startPlay(playRequest{
 			action: "play track",
 			track:  *t,
-			call:   func(ctx context.Context, p player.Player) error { return p.PlayTrack(ctx, id) },
+			call:   func(ctx context.Context, p player.Player) error { return p.PlayNow(ctx, id) },
 		}), true
 
 	case key.Matches(k, m.keys.Enqueue):
@@ -148,7 +148,7 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		return m.startPlay(playRequest{
 			action: "play track",
 			track:  *sel,
-			call:   func(ctx context.Context, p player.Player) error { return p.PlayTrack(ctx, id) },
+			call:   func(ctx context.Context, p player.Player) error { return p.PlayNow(ctx, id) },
 		}), true
 
 	case key.Matches(k, m.keys.EnqueueTyped):

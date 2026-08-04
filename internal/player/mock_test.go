@@ -167,3 +167,50 @@ func TestMockReorderDropsTheSecondCopy(t *testing.T) {
 		t.Errorf("%s is waiting %d times after the reorder, want once", twice, seen)
 	}
 }
+
+// Playing one track is not a reason to throw away a queue somebody spent a
+// minute filling: what was waiting still follows it.
+func TestPlayNowKeepsTheQueue(t *testing.T) {
+	m, _ := newTestMock()
+	ctx := t.Context()
+
+	before, err := m.Queue(ctx)
+	if err != nil {
+		t.Fatalf("Queue: %v", err)
+	}
+	wanted := before.Upcoming[len(before.Upcoming)-1].ID
+	if err := m.AddToQueue(ctx, wanted); err != nil {
+		t.Fatalf("AddToQueue: %v", err)
+	}
+
+	// Something else entirely, played now.
+	other := mockCatalogue[0].ID
+	if other == wanted {
+		other = mockCatalogue[1].ID
+	}
+	if err := m.PlayNow(ctx, other); err != nil {
+		t.Fatalf("PlayNow: %v", err)
+	}
+
+	st, err := m.State(ctx)
+	if err != nil {
+		t.Fatalf("State: %v", err)
+	}
+	if st.TrackID != other {
+		t.Errorf("playing %q, want the track asked for", st.TrackID)
+	}
+
+	after, err := m.Queue(ctx)
+	if err != nil {
+		t.Fatalf("Queue: %v", err)
+	}
+	var kept bool
+	for _, track := range after.Upcoming {
+		if track.ID == wanted && track.Queued {
+			kept = true
+		}
+	}
+	if !kept {
+		t.Error("the hand-added track was thrown away by playing something else")
+	}
+}

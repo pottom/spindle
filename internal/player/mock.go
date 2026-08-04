@@ -404,6 +404,23 @@ func (m *Mock) PlaylistTracks(ctx context.Context, playlistID string) ([]Track, 
 
 // PlayTrack queues the whole catalogue from the chosen track, so next and
 // previous still lead somewhere.
+// PlayNow starts a track without disturbing what is queued behind it.
+func (m *Mock) PlayNow(ctx context.Context, trackID string) error {
+	return m.mutate(ctx, func() error {
+		t, ok := findMockTrack(trackID)
+		if !ok {
+			return fmt.Errorf("play now: unknown track %q", trackID)
+		}
+		// Into the rotation right where it is playing, so the queue behind it
+		// is untouched.
+		m.queue = slices.Insert(m.queue, m.index+1, t)
+		m.index++
+		m.elapsed, m.startedAt = 0, m.now()
+		m.playing = true
+		return nil
+	})
+}
+
 func (m *Mock) PlayTrack(ctx context.Context, trackID string) error {
 	return m.mutate(ctx, func() error {
 		i := slices.IndexFunc(mockCatalogue, func(t Track) bool { return t.ID == trackID })
