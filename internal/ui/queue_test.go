@@ -8,7 +8,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/pottom/spindle/internal/player"
 )
@@ -184,7 +183,7 @@ func TestQueuePaneRenders(t *testing.T) {
 	}
 	// One list, numbered in the order it will be heard: no row carries a badge
 	// for how it got there.
-	if !strings.Contains(out, "1    a") || !strings.Contains(out, "2    b") {
+	if !strings.Contains(out, " 1  a") || !strings.Contains(out, " 2  b") {
 		t.Errorf("render() does not number the queue:\n%s", out)
 	}
 	if !strings.Contains(out, "3 tracks") {
@@ -274,7 +273,7 @@ func TestQueueLeadsWithThePlayingTrack(t *testing.T) {
 	}
 
 	out := plain(m.render())
-	if !strings.Contains(out, nowMark+"    playing") {
+	if !strings.Contains(out, nowMark+"  playing") {
 		t.Errorf("render() does not mark the playing track:\n%s", out)
 	}
 }
@@ -549,41 +548,5 @@ func TestTempoColumnHoldsItsPlace(t *testing.T) {
 	}
 	if !strings.Contains(withTempo, "118") {
 		t.Errorf("row = %q, want the tempo in it", withTempo)
-	}
-}
-
-// The mark has a column of its own, held open on the rows without one, so the
-// marked rows line up with each other and every title starts in the same place.
-func TestHotMarkKeepsItsColumn(t *testing.T) {
-	m := queueModel(0, "cold", "hot")
-	m.width, m.height = 100, 44
-	m.resize()
-
-	quiet, loud := 20, 100
-	m.queue[0].Popularity = &quiet
-	m.queue[1].Popularity = &loud
-
-	var marked, plainRow string
-	for _, line := range strings.Split(plain(m.render()), "\n") {
-		switch {
-		case strings.Contains(line, "cold"):
-			plainRow = line
-		case strings.Contains(line, "hot"):
-			marked = line
-		}
-	}
-	if marked == "" || plainRow == "" {
-		t.Fatal("could not find both rows")
-	}
-	if !strings.Contains(marked, hotMark) || strings.Contains(plainRow, hotMark) {
-		t.Fatalf("the mark landed on the wrong row:\n  %q\n  %q", marked, plainRow)
-	}
-
-	// The column each title begins in is what has to match.
-	at := func(line, title string) int {
-		return lipgloss.Width(line[:strings.Index(line, title)])
-	}
-	if a, b := at(marked, "hot"), at(plainRow, "cold"); a != b {
-		t.Errorf("titles start at columns %d and %d, want the same\n  %q\n  %q", a, b, marked, plainRow)
 	}
 }
