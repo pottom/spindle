@@ -303,7 +303,8 @@ func TestTransportIsAccent(t *testing.T) {
 	if got, want := m.styles.Controls.GetForeground(), m.styles.Accent; got != want {
 		t.Errorf("the transport is %v, want the accent %v", got, want)
 	}
-	if !strings.Contains(m.transportLine(60), m.styles.Controls.Render(iconPrev)) {
+	// The icons are rendered as one run, so the row carries that colour.
+	if !strings.Contains(m.transportLine(60), colourUsed(m.styles.Controls.Render("x"))) {
 		t.Error("the transport row is not drawn in that colour")
 	}
 }
