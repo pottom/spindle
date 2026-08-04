@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 	"time"
+	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -165,7 +166,7 @@ func (m Model) lyricsBlock(w, rows int) []string {
 		// The line being sung is swept through as it goes. The words are not
 		// timed individually — only lines are — so this claims no more than the
 		// progress bar does about a track: not which word, but how far in.
-		cut := m.lyricsSweep(i, len([]rune(words)))
+		cut := m.lyricsSweep(i, words)
 		seen := 0
 		for _, part := range parts {
 			if len(out) == rows {
@@ -221,13 +222,17 @@ func (m Model) lyricsAt() int {
 	return at
 }
 
-// lyricsSweep is how many characters of the current line have been reached,
-// spread evenly over the time the line is given.
+// lyricsSweep is how much of the current line has been reached, spread evenly
+// over the time the line is given, and rounded to a whole word.
 //
-// Evenly is a guess — nobody sings at a constant rate — so this is deliberately
-// not drawn as though it knew which word was being sung. It is the same claim a
-// progress bar makes about a track.
-func (m Model) lyricsSweep(i, length int) int {
+// Evenly is a guess — nobody sings at a constant rate — and the guess is why it
+// moves a word at a time rather than a letter at a time. A letter-by-letter
+// sweep claims to know which syllable is in the air, and is visibly wrong for
+// most of every word; a word lights as its turn comes and stays lit, which is
+// the same claim a progress bar makes about a track and is what the eye follows
+// anyway.
+func (m Model) lyricsSweep(i int, line string) int {
+	length := len([]rune(line))
 	if !m.lyrics.synced || i < 0 || i >= len(m.lyrics.lines) {
 		return length
 	}
@@ -242,7 +247,24 @@ func (m Model) lyricsSweep(i, length int) int {
 	}
 
 	frac := float64(m.lyricsClock()-start) / float64(end-start)
-	return min(max(int(frac*float64(length)+0.5), 0), length)
+	at := min(max(int(frac*float64(length)+0.5), 0), length)
+	return wordEnd(line, at)
+}
+
+// wordEnd rounds a position in a line out to the end of the word it lands in,
+// so a word is lit whole or not at all. A position inside the space between two
+// words has already left the one behind it and not reached the next.
+func wordEnd(line string, at int) int {
+	runes := []rune(line)
+	if at >= len(runes) {
+		return len(runes)
+	}
+	for i := at; i < len(runes); i++ {
+		if unicode.IsSpace(runes[i]) {
+			return i
+		}
+	}
+	return len(runes)
 }
 
 // lyricsClock is the playhead the words are read against, run a little ahead of

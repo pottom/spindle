@@ -396,30 +396,41 @@ func TestLyricSweep(t *testing.T) {
 		{At: 4000, Words: "and here is the second one"},
 		{At: 8000, Words: "then a third"},
 	}
-	const length = 26
+	const line = "and here is the second one"
+	length := len([]rune(line))
 
-	// The words are read against a clock that runs a little ahead of the
-	// playhead, so the line has just begun to sweep as its timestamp arrives.
+	// The sweep moves a word at a time, so as the line's timestamp arrives its
+	// first word is lit whole — that word is what is being sung — and nothing
+	// beyond it. The clock runs a little ahead of the playhead, hence the lead.
 	m.setProgress(4*time.Second - lyricsAhead)
-	if got := m.lyricsSweep(1, length); got != 0 {
-		t.Errorf("at the line's start %d characters are swept, want none", got)
+	if got, want := m.lyricsSweep(1, line), len("and"); got != want {
+		t.Errorf("at the line's start %d characters are swept, want the first word's %d", got, want)
+	}
+
+	// And it always lands on a word's end, never inside one.
+	for at := 4 * time.Second; at < 8*time.Second; at += 200 * time.Millisecond {
+		m.setProgress(at - lyricsAhead)
+		cut := m.lyricsSweep(1, line)
+		if cut < length && line[cut] != ' ' {
+			t.Errorf("at %v the sweep stops mid-word, at %q", at, line[:cut])
+		}
 	}
 
 	m.setProgress(6*time.Second - lyricsAhead)
-	if got := m.lyricsSweep(1, length); got < length/2-2 || got > length/2+2 {
+	if got := m.lyricsSweep(1, line); got < length/2-2 || got > length/2+2 {
 		t.Errorf("halfway through the line %d of %d are swept, want about half", got, length)
 	}
 
 	// It never runs past the line, whatever the clock says.
 	m.setProgress(30 * time.Second)
-	if got := m.lyricsSweep(1, length); got != length {
+	if got := m.lyricsSweep(1, line); got != length {
 		t.Errorf("past the line %d of %d are swept, want all of it", got, length)
 	}
 
 	// And an unsynced lyric has nothing to sweep against, so the line stands
 	// whole rather than creeping at a made-up rate.
 	m.lyrics.synced = false
-	if got := m.lyricsSweep(1, length); got != length {
+	if got := m.lyricsSweep(1, line); got != length {
 		t.Errorf("an unsynced line swept to %d, want it drawn whole", got)
 	}
 }
@@ -434,12 +445,13 @@ func TestSweepCarriesAcrossWrappedRows(t *testing.T) {
 		{At: 4000, Words: strings.Join(words, " ")},
 		{At: 12000, Words: "after"},
 	}
-	length := len(strings.Join(words, " "))
+	line := strings.Join(words, " ")
+	length := len([]rune(line))
 
 	// A quarter of the way in, the sweep is a quarter through the whole line —
 	// which is well past the end of the first wrapped row.
 	m.setProgress(6 * time.Second)
-	at := m.lyricsSweep(1, length)
+	at := m.lyricsSweep(1, line)
 	if at < length/5 || at > length/3 {
 		t.Errorf("a quarter of the way in %d of %d is swept, want about a quarter", at, length)
 	}
@@ -447,7 +459,7 @@ func TestSweepCarriesAcrossWrappedRows(t *testing.T) {
 	// Later in the line it has to reach past the first wrapped row, which only
 	// works if the sweep is measured against the line rather than the row.
 	m.setProgress(10 * time.Second)
-	at = m.lyricsSweep(1, length)
+	at = m.lyricsSweep(1, line)
 
 	rows := wrapWords(m.lyrics.lines[1].Words, 24)
 	if len(rows) < 2 {
