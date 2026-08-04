@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"math"
 	"strings"
 	"testing"
 
@@ -183,14 +184,14 @@ func TestScopeFollowsTheLoudness(t *testing.T) {
 		m.scope.follow(quiet)
 	}
 	m.scope.frame = quiet
-	if got := m.scopeSample(0, 4); got < 0.7 {
+	if got := m.scopeSample(0, 0, 4); got < 0.7 {
 		t.Errorf("quiet passage scaled to %.2f, want most of the deflection", got)
 	}
 
 	// A sudden hit louder than anything before is drawn at the edge, not past it.
 	m.scope.follow(loud)
 	m.scope.frame = loud
-	if got := m.scopeSample(0, 4); got > 1 || got < 0.9 {
+	if got := m.scopeSample(0, 0, 4); got > 1 || got < 0.9 {
 		t.Errorf("loud hit scaled to %.2f, want it pinned at the edge", got)
 	}
 
@@ -268,4 +269,136 @@ func TestScopeResumesOnTheTick(t *testing.T) {
 	if !tm.(Model).scope.running {
 		t.Error("the tick did not pick the trace back up")
 	}
+}
+
+// A held note has to stand still. Without a trigger each frame is cut at an
+// arbitrary point in the wave and the picture shimmers; with one it barely
+// moves. Measured on a steady tone: 83% of cells changed per frame free-running
+// against 23% triggered.
+func TestTriggerSteadiesThePicture(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.scope.on = true
+	w := m.layout().interior - leftMargin - rightMargin
+
+	// A steady tone sampled at a phase that drifts frame to frame, which is
+	// what an unaligned circular buffer hands over.
+	frameAt := func(phase float64) []float32 {
+		f := make([]float32, 2*player.WaveformWindow)
+		for i := range f {
+			f[i] = float32(0.7 * math.Sin(float64(i)*0.19+phase))
+		}
+		return f
+	}
+
+	churn := func(triggered bool) float64 {
+		var prev []string
+		var changed, total float64
+		for k := range 40 {
+			m.scope.frame = frameAt(float64(k) * 1.7)
+			m.scope.follow(m.scope.frame)
+
+			lines := m.scopeLinesFrom(w, 0)
+			if triggered {
+				lines = m.scopeLines(w)
+			}
+			if prev != nil {
+				for i := range lines {
+					a, b := plain(lines[i]), plain(prev[i])
+					for c := 0; c < len(a) && c < len(b); c++ {
+						if a[c] != b[c] {
+							changed++
+						}
+					}
+					total += float64(len(a))
+				}
+			}
+			prev = lines
+		}
+		return changed / total
+	}
+
+	steady, free := churn(true), churn(false)
+	if steady >= free*0.6 {
+		t.Errorf("trigger changed %.0f%% of cells a frame against %.0f%% free-running, want it far steadier",
+			steady*100, free*100)
+	}
+}
+
+// The trace is coloured by how loud each moment is, so a hit flares and the
+// space between recedes. One flat colour reads as a ribbon, not as sound.
+func TestScopeColoursByLoudness(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.scope.on = true
+
+	// Quiet on the left, loud on the right.
+	f := make([]float32, 2*player.WaveformWindow)
+	for i := range f {
+		amp := 0.05
+		if i > len(f)/2 {
+			amp = 1
+		}
+		f[i] = float32(amp * math.Sin(float64(i)*0.7))
+	}
+	m.scope.frame = f
+	m.scope.follow(f)
+
+	if len(m.styles.Scope) < 2 {
+		t.Fatal("the waveform has no palette to colour with")
+	}
+	if got := scopeLevel(0.05, len(m.styles.Scope)); got >= scopeLevel(1, len(m.styles.Scope)) {
+		t.Errorf("a whisper is coloured %d and a hit %d, want the hit brighter",
+			got, scopeLevel(1, len(m.styles.Scope)))
+	}
+}
+
+// The glow is what stops the trace looking redrawn thirty times a second. It
+// has to leave more lit than the current frame alone, and it has to be drawn
+// behind the beam rather than as part of it.
+func TestGlowTrailsTheBeam(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.scope.on = true
+	w := 40
+
+	wave := func(phase float64) []float32 {
+		f := make([]float32, 2*player.WaveformWindow)
+		for i := range f {
+			f[i] = float32(0.8 * math.Sin(float64(i)*0.19+phase))
+		}
+		return f
+	}
+
+	m.scope.frame = wave(0)
+	m.scope.follow(m.scope.frame)
+	bare := lit(m.scopeLinesFrom(w, 0))
+
+	// A few frames at shifting phases, each remembered.
+	for k := range scopeTrail {
+		m.scope.frame = wave(float64(k) * 0.6)
+		m.scope.follow(m.scope.frame)
+		grid, _ := m.scopeGrid(w, 0)
+		m.scope.remember(grid)
+	}
+	withGlow := lit(m.scopeLinesFrom(w, 0))
+
+	if withGlow <= bare {
+		t.Errorf("glow lit %d cells against %d without it, want more", withGlow, bare)
+	}
+
+	// A resize leaves grids of the wrong size behind; they have to be ignored
+	// rather than drawn at the wrong offset.
+	if got := m.scopeLinesFrom(w+7, 0); len(got) != scopeRows {
+		t.Errorf("scopeLinesFrom at a new width = %d rows, want %d", len(got), scopeRows)
+	}
+}
+
+func lit(lines []string) int {
+	n := 0
+	for _, line := range lines {
+		for _, r := range plain(line) {
+			if r != ' ' {
+				n++
+			}
+		}
+	}
+	return n
 }

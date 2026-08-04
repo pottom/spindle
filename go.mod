@@ -54,4 +54,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/devgianlu/go-librespot => github.com/pottom/go-librespot v0.8.1-0.20260804080228-72e2121336b3
+replace github.com/devgianlu/go-librespot => github.com/pottom/go-librespot v0.8.1-0.20260804085453-2e3e54e88699

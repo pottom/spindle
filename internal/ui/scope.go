@@ -46,6 +46,12 @@ type scopeState struct {
 	// is resampled to whatever width the screen turns out to be.
 	frame []float32
 
+	// trail is what the last few frames drew, newest last. A cathode ray tube
+	// leaves a glow behind the beam; without it a terminal trace looks redrawn
+	// thirty times a second, because it is. The trigger is what makes this work
+	// rather than smear: the older frames sit almost on top of the newest.
+	trail [][]uint8
+
 	// envelope follows the recent loudness so the trace can be scaled to it.
 	// Measured against a live stream, peaks ran from 0.06 to 0.87 within one
 	// track: at a fixed scale the quiet passages are a flat line and the loud
@@ -65,6 +71,11 @@ const (
 	// scopeFloor stops the gain running away in silence, where the only thing
 	// left to amplify is the noise.
 	scopeFloor = 0.05
+
+	// scopeTrail is how many frames the glow lasts. Three is where it reads as
+	// afterglow rather than as a smear; beyond that a fast passage turns into a
+	// solid band.
+	scopeTrail = 3
 )
 
 // follow updates the loudness envelope from a new frame.
@@ -115,17 +126,37 @@ func (m Model) scopeVisible() bool {
 // The waveform is drawn as a line rather than a scatter of points: consecutive
 // samples are joined vertically, so a steep slope stays continuous instead of
 // breaking into dots. Without that a loud passage looks like static.
+//
+// Each cell is coloured by how loud that moment is, not by where it sits, so
+// the trace flares on a hit and recedes between them.
 func (m Model) scopeLines(w int) []string {
-	if w <= 0 {
+	return m.scopeLinesFrom(w, m.scopeTrigger(w*dotsPerCellX))
+}
+
+// scopeLinesFrom draws the frame beginning at a given sample. Where that sample
+// is decided is scopeTrigger's business; this only draws.
+func (m Model) scopeLinesFrom(w, start int) []string {
+	if w <= 0 || len(m.styles.Scope) == 0 {
 		return nil
 	}
+	grid, loud := m.scopeGrid(w, start)
+	return m.scopeDraw(w, grid, loud)
+}
 
+// scopeGrid plots the frame: which braille dots the trace lights, and how far
+// the wave swings under each cell.
+func (m Model) scopeGrid(w, start int) ([]uint8, []float32) {
 	dotsX, dotsY := w*dotsPerCellX, scopeRows*dotsPerCellY
 	grid := make([]uint8, w*scopeRows)
+	loud := make([]float32, w)
 
 	prev := -1
 	for x := range dotsX {
-		y := m.scopeSample(x, dotsX)
+		y := m.scopeSample(start, x, dotsX)
+		if a := abs32(y); a > loud[x/dotsPerCellX] {
+			loud[x/dotsPerCellX] = a
+		}
+
 		// Map -1..1 onto the rows, leaving a dot of headroom at each edge so a
 		// clipping passage does not look like a flat line against the border.
 		dy := int(math.Round((0.5 - float64(y)*0.5*scopeDeflection) * float64(dotsY-1)))
@@ -142,29 +173,57 @@ func (m Model) scopeLines(w int) []string {
 		prev = dy
 	}
 
+	return grid, loud
+}
+
+// scopeDraw turns a dot grid into rows, with the older frames glowing behind it.
+//
+// A cell the beam is on now is coloured by how loud that moment is; a cell only
+// the afterglow reaches is drawn at the quiet end of the palette, so the glow
+// reads as behind the trace rather than as part of it.
+func (m Model) scopeDraw(w int, grid []uint8, loud []float32) []string {
 	lines := make([]string, scopeRows)
 	for r := range scopeRows {
 		var sb strings.Builder
-		// A run of blank cells carries no style, so the rows compress to about
-		// as much output as a line of text.
-		style := m.styles.ScopeNear
-		if r == 0 || r == scopeRows-1 {
-			style = m.styles.ScopeFar
-		}
 
+		// Runs of one colour are rendered together, so a row costs about as
+		// much output as a line of text rather than one escape per cell.
 		var run strings.Builder
+		level := -1
 		flush := func() {
 			if run.Len() > 0 {
-				sb.WriteString(style.Render(run.String()))
+				sb.WriteString(m.styles.Scope[level].Render(run.String()))
 				run.Reset()
 			}
 		}
+
 		for c := range w {
-			bits := grid[r*w+c]
+			at := r*w + c
+			bits := grid[at]
+
+			// Whatever the beam is not covering, the glow might be.
+			want := scopeLevel(loud[c], len(m.styles.Scope))
+			for age, old := range m.scope.trail {
+				if len(old) != len(grid) || old[at] == 0 {
+					continue
+				}
+				if glow := len(m.scope.trail) - age - 1; bits == 0 {
+					bits = old[at]
+					want = min(glow, len(m.styles.Scope)-1)
+				} else {
+					bits |= old[at]
+				}
+			}
+
 			if bits == 0 {
 				flush()
+				level = -1
 				sb.WriteByte(' ')
 				continue
+			}
+			if want != level {
+				flush()
+				level = want
 			}
 			run.WriteRune(rune(brailleBase + int(bits)))
 		}
@@ -174,14 +233,78 @@ func (m Model) scopeLines(w int) []string {
 	return lines
 }
 
-// scopeSample reads the waveform at one horizontal dot, resampling whatever the
-// daemon sent to however wide the terminal is. With no frame at all the trace
-// rests on the centre line, which is what silence looks like.
-func (m Model) scopeSample(x, dots int) float32 {
+// remember keeps a frame's dots so the next few can glow behind the beam.
+func (s *scopeState) remember(grid []uint8) {
+	s.trail = append(s.trail, grid)
+	if len(s.trail) > scopeTrail {
+		s.trail = s.trail[len(s.trail)-scopeTrail:]
+	}
+}
+
+// scopeLevel picks a colour for how far a moment swings.
+func scopeLevel(amplitude float32, levels int) int {
+	// The square root spreads the quiet end out: most music sits low, and a
+	// linear scale would leave the whole trace in one or two colours.
+	t := math.Sqrt(float64(min(amplitude, 1)))
+	return min(max(int(t*float64(levels)), 0), levels-1)
+}
+
+// scopeTrigger finds where in the frame to start drawing, so that a held note
+// stands still on screen instead of shimmering.
+//
+// It looks for a rising zero crossing, the way an oscilloscope does, and
+// requires the wave to have dipped below a small negative threshold first so
+// that noise around zero cannot trigger it. Failing to find one is not a
+// failure: the trace free-runs from the start of the frame, which is what a
+// scope does with no trigger.
+func (m Model) scopeTrigger(dots int) int {
+	frame := m.scope.frame
+	slack := len(frame) - dots
+	if slack <= 0 || m.scope.envelope <= 0 {
+		return 0
+	}
+
+	// A tenth of the recent loudness: high enough to ignore the noise floor,
+	// low enough that a quiet passage still triggers.
+	threshold := m.scope.envelope * 0.1
+
+	armed := false
+	for i := range slack {
+		v := frame[i]
+		if v < -threshold {
+			armed = true
+			continue
+		}
+		if armed && v >= 0 {
+			return i
+		}
+	}
+	return 0
+}
+
+func abs32(v float32) float32 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+// scopeSample reads one sample of the frame, scaled to the recent loudness.
+// With no frame at all the trace rests on the centre line, which is what
+// silence looks like.
+func (m Model) scopeSample(start, x, dots int) float32 {
 	if len(m.scope.frame) == 0 || dots <= 0 || m.scope.envelope <= 0 {
 		return 0
 	}
-	i := x * len(m.scope.frame) / dots
+
+	// One sample per dot while there are enough of them, which is the case for
+	// any terminal the frame is capped to. A wider one gets the frame stretched
+	// rather than a flat tail where the samples ran out.
+	i := start + x
+	if avail := len(m.scope.frame) - start; dots > avail {
+		i = start + x*avail/dots
+	}
+
 	v := m.scope.frame[min(i, len(m.scope.frame)-1)]
 
 	// Scaled to the recent loudness, then clamped: a sudden hit louder than
@@ -205,4 +328,17 @@ func (m Model) drawScope(body []string, l layout) []string {
 		body[at+i] = m.pad(line, l)
 	}
 	return body
+}
+
+// rememberScope keeps this frame's dots so the next few draw a glow behind the
+// beam. It is done here rather than while rendering because View has to stay a
+// pure function of the model, and a trail is state.
+func (m *Model) rememberScope() {
+	l := m.layout()
+	w := l.interior - leftMargin - rightMargin
+	if w <= 0 {
+		return
+	}
+	grid, _ := m.scopeGrid(w, m.scopeTrigger(w*dotsPerCellX))
+	m.scope.remember(grid)
 }

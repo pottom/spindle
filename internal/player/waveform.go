@@ -14,7 +14,7 @@ type Waveform interface {
 	Waveform() []float32
 }
 
-// WaveformSamples is how many points a frame carries. It is comfortably more
-// than the horizontal dots of a wide terminal, so the trace never has to be
-// stretched — only reduced.
-const WaveformSamples = 256
+// WaveformWindow is how much of a frame is meant to be drawn. A frame carries
+// more than this: the surplus is slack for the drawer to find a consistent
+// starting point in the wave, without which the picture shimmers.
+const WaveformWindow = 256

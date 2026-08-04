@@ -470,7 +470,8 @@ func (m *Mock) Waveform() []float32 {
 	t := m.elapsed.Seconds()
 	beat := math.Exp(-math.Mod(t*2, 1) * 6)
 
-	out := make([]float32, WaveformSamples)
+	// Twice the window, as a real device sends: the surplus is trigger slack.
+	out := make([]float32, 2*WaveformWindow)
 	for i := range out {
 		x := float64(i) / float64(len(out))
 		out[i] = float32(

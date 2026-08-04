@@ -163,6 +163,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.scope.frame = message.Samples
 		m.scope.follow(message.Samples)
+		m.rememberScope()
 		return m, scopeFrameCmd(m.player)
 
 	case spinner.TickMsg:
