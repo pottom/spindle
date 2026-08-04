@@ -714,18 +714,16 @@ func TestBarsFillTheWidth(t *testing.T) {
 	}
 }
 
-// Whatever the width, the bars are equal and there are as many as will fit —
-// never more than there are bands, because a column nothing was measured for
-// would have to be invented.
-func TestBarsFitLeavesLittleOver(t *testing.T) {
+// Whatever the width, there is a bar for every band — the spectrum is not
+// thinned to make it fit — down to the point where there are fewer cells than
+// bands and two of them have to share a column.
+func TestBarsKeepEveryBand(t *testing.T) {
 	const bands = 28
 	for w := 8; w <= 400; w++ {
-		pitch, count := barsFit(w, bands)
-		if count < 1 || count > bands {
-			t.Fatalf("w = %d: %d bars, want between 1 and %d", w, count, bands)
-		}
-		if over := w - pitch*count; over < 0 || over >= pitch {
-			t.Errorf("w = %d: %d bars of %d cells leave %d over", w, count, pitch, over)
+		count := min(bands, w)
+		bar := max(w/count-barsGap, 1)
+		if last := barsAt(count-1, count, w, bar); count > 1 && last+bar != w {
+			t.Errorf("w = %d: %d bars of %d cells end at %d, want the right edge", w, count, bar, last+bar)
 		}
 	}
 }
