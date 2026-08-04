@@ -298,11 +298,10 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if !m.scopeAvailable() {
 			return m, nil
 		}
-		// Turning it on shortens the body, which shrinks the artwork, so the
-		// cover has to be rendered again at the new size.
+		// Nothing about the geometry changes, so the cover is left alone: the
+		// trace only fills rows that were already blank.
 		m.scope.on = !m.scope.on
-		m.resize()
-		return m, tea.Batch(m.startScope(), m.syncCover())
+		return m, m.startScope()
 
 	case key.Matches(k, m.keys.Help):
 		// Expanding the help shortens the body, which shrinks the artwork, so

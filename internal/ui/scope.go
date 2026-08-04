@@ -15,10 +15,6 @@ const (
 	// against the artwork.
 	scopeChrome = 1
 
-	// scopeMinHeight is the terminal height below which the trace is not
-	// offered at all: the player itself needs the rows more.
-	scopeMinHeight = 28
-
 	// brailleBase is U+2800, where the eight-dot cells begin.
 	brailleBase = 0x2800
 
@@ -85,23 +81,33 @@ func (s *scopeState) follow(frame []float32) {
 	s.envelope = max(s.envelope, scopeFloor)
 }
 
-// available reports whether the trace can be offered at all. A short terminal
-// has better uses for five rows.
+// scopeAvailable reports whether the trace can be drawn without moving anything.
+//
+// It goes into the blank rows the player screen already has below the artwork,
+// never into rows taken from it: shrinking the body would move the cover and
+// the text every time the key was pressed, and a visualiser is not worth making
+// the rest of the screen jump.
 func (m Model) scopeAvailable() bool {
-	return m.tab == tabPlayer && !m.noDevice && m.height >= scopeMinHeight
+	if m.tab != tabPlayer || m.noDevice || m.ps == nil {
+		return false
+	}
+	return m.scopeRoom(m.layout()) >= scopeRows+scopeChrome
+}
+
+// scopeRoom is how many blank rows sit below the artwork, which is what the
+// trace has to fit into. scopeTop is the first of them.
+func (m Model) scopeRoom(l layout) int {
+	return max(l.bodyHeight-m.scopeTop(l), 0)
+}
+
+func (m Model) scopeTop(l layout) int {
+	block := l.artHeight
+	return max((l.bodyHeight-block)/2, 0) + block
 }
 
 // scopeVisible reports whether the trace is on screen right now.
 func (m Model) scopeVisible() bool {
 	return m.scope.on && m.scopeAvailable()
-}
-
-// scopeHeight is the rows the trace occupies, blank separator included.
-func (m Model) scopeHeight() int {
-	if !m.scopeVisible() {
-		return 0
-	}
-	return scopeRows + scopeChrome
 }
 
 // scopeLines renders the trace across w cells.
@@ -183,13 +189,20 @@ func (m Model) scopeSample(x, dots int) float32 {
 	return min(max(v/m.scope.envelope, -1), 1)
 }
 
-// scopeBlock is the trace with its blank separator, padded to the frame width.
-func (m Model) scopeBlock(l layout) []string {
-	w := l.interior - leftMargin - rightMargin
-	out := make([]string, 0, scopeRows+scopeChrome)
-	out = append(out, m.pad("", l))
-	for _, line := range m.scopeLines(w) {
-		out = append(out, m.pad(line, l))
+// drawScope writes the trace into the blank rows directly under the artwork,
+// leaving everything above exactly where it was.
+//
+// It hugs the cover rather than sitting at the foot of the screen: the trace
+// belongs to the record being played, and a band of empty rows between the two
+// would read as an unrelated meter.
+func (m Model) drawScope(body []string, l layout) []string {
+	at := m.scopeTop(l) + scopeChrome
+	if at+scopeRows > len(body) {
+		return body
 	}
-	return out
+	w := l.interior - leftMargin - rightMargin
+	for i, line := range m.scopeLines(w) {
+		body[at+i] = m.pad(line, l)
+	}
+	return body
 }

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui/msg"
@@ -43,35 +44,47 @@ func TestScopeKeyTogglesTheTrace(t *testing.T) {
 	}
 }
 
-// The rows come out of the body, and the screen stays exactly as tall as the
-// terminal — a visualiser that pushes the help bar off the bottom is worse than
-// no visualiser.
-func TestScopeTakesItsRowsFromTheBody(t *testing.T) {
-	for _, size := range [][2]int{{100, 40}, {80, 30}, {64, 28}} {
+// Turning the trace on must not move anything: it goes into rows that were
+// already blank. A visualiser is not worth making the cover jump.
+func TestScopeMovesNothing(t *testing.T) {
+	for _, size := range [][2]int{{100, 44}, {100, 40}, {120, 50}} {
 		off := scopeModel(size[0], size[1])
-		before := off.layout().bodyHeight
+		if !off.scopeAvailable() {
+			t.Fatalf("%dx%d: no room for the trace, so there is nothing to test", size[0], size[1])
+		}
+		before := plain(off.render())
 
-		on := scopeModel(size[0], size[1])
+		on := off
 		on.scope.on = true
-		on.resize()
+		after := plain(on.render())
 
-		if got := on.layout().bodyHeight; got != before-scopeRows-scopeChrome {
-			t.Errorf("%dx%d: body = %d with the trace, want %d", size[0], size[1], got, before-scopeRows-scopeChrome)
+		b := strings.Split(before, "\n")
+		a := strings.Split(after, "\n")
+		if len(a) != len(b) {
+			t.Fatalf("%dx%d: %d rows with the trace, %d without", size[0], size[1], len(a), len(b))
 		}
-		rows := strings.Split(plain(on.render()), "\n")
-		if len(rows) != size[1] {
-			t.Errorf("%dx%d: render() = %d rows, want %d", size[0], size[1], len(rows), size[1])
+		// Exactly the trace's own rows may differ; everything else has to be
+		// character for character what it was.
+		first := tabBarHeight + off.scopeTop(off.layout()) + scopeChrome
+		for i := range b {
+			if i >= first && i < first+scopeRows {
+				continue
+			}
+			if a[i] != b[i] {
+				t.Errorf("%dx%d: row %d moved\n  off: %q\n  on:  %q", size[0], size[1], i, b[i], a[i])
+			}
 		}
-		if strings.TrimSpace(rows[len(rows)-1]) == "" {
-			t.Errorf("%dx%d: the help bar was pushed off the bottom", size[0], size[1])
+		// And the artwork keeps its size, or the cover would be re-rendered.
+		if on.layout().artHeight != off.layout().artHeight {
+			t.Errorf("%dx%d: the artwork changed size", size[0], size[1])
 		}
 	}
 }
 
-// A short terminal has better uses for five rows, and the key says so by doing
-// nothing rather than by rearranging the screen.
-func TestScopeIsNotOfferedOnAShortTerminal(t *testing.T) {
-	m := scopeModel(80, scopeMinHeight-1)
+// Where there are not enough blank rows the trace is not offered, and the key
+// says so by doing nothing rather than by rearranging the screen.
+func TestScopeIsNotOfferedWithoutRoom(t *testing.T) {
+	m := scopeModel(80, minHeight+2)
 
 	var tm tea.Model = m
 	tm, cmd := tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
@@ -187,5 +200,21 @@ func TestScopeFollowsTheLoudness(t *testing.T) {
 	}
 	if m.scope.envelope < scopeFloor {
 		t.Errorf("envelope fell to %.3f in silence, want it held at %.2f", m.scope.envelope, scopeFloor)
+	}
+}
+
+// helpHeight has to ask for the help without knowing whether the waveform key
+// is offered, because the layout decides that and the layout needs the height.
+// That is only safe while the bar is the same height either way.
+func TestHelpHeightDoesNotDependOnTheScope(t *testing.T) {
+	for _, full := range []bool{false, true} {
+		m := scopeModel(100, 44)
+		m.help.ShowAll = full
+
+		with := lipgloss.Height(m.help.View(m.keys.forPlayer(true)))
+		without := lipgloss.Height(m.help.View(m.keys.forPlayer(false)))
+		if with != without {
+			t.Errorf("ShowAll=%v: help is %d rows with the waveform key and %d without", full, with, without)
+		}
 	}
 }

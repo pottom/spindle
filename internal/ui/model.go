@@ -221,7 +221,11 @@ func (m Model) elapsed() time.Duration {
 }
 
 // helpKeys is the key set the help bar should advertise right now.
-func (m Model) helpKeys() tabKeys {
+// helpKeysWith is helpKeys with the waveform key's availability passed in. The
+// layout is what decides that, and the layout needs the help's height, so the
+// two cannot ask each other — helpHeight passes false and relies on the help
+// coming out the same height either way.
+func (m Model) helpKeysWith(scope bool) tabKeys {
 	switch {
 	case m.tab == tabPlayer && m.noDevice:
 		return m.keys.forNoDevice()
@@ -231,10 +235,15 @@ func (m Model) helpKeys() tabKeys {
 		// Against a device that is not ours the queue can only be read. Listing
 		// keys that do nothing would be worse than a shorter bar.
 		return m.keys.forReadOnlyQueue()
+	case m.tab == tabPlayer:
+		return m.keys.forPlayer(scope)
 	default:
 		return m.keys.forTab(m.tab)
 	}
 }
+
+// helpKeys is the help for what is on screen.
+func (m Model) helpKeys() tabKeys { return m.helpKeysWith(m.scopeAvailable()) }
 
 // layoutMode is how the current tab divides its body.
 func (m Model) layoutMode() layoutMode {
@@ -251,9 +260,7 @@ func (m Model) layoutMode() layoutMode {
 // layout resolves the current geometry. It is pure, so View and Update can both
 // ask for it without either of them owning the answer.
 func (m Model) layout() layout {
-	l := computeLayout(m.width, m.height, m.helpHeight(), m.hasNotice(), m.layoutMode(), m.cell)
-	l.bodyHeight = max(l.bodyHeight-m.scopeHeight(), 0)
-	return l
+	return computeLayout(m.width, m.height, m.helpHeight(), m.hasNotice(), m.layoutMode(), m.cell)
 }
 
 func (m Model) Init() tea.Cmd {

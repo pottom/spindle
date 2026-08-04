@@ -67,10 +67,11 @@ func (m Model) renderPlayer() string {
 	}
 	lines = append(lines, m.pad("", l))
 
-	lines = append(lines, m.body(l)...)
+	body := m.body(l)
 	if m.scopeVisible() {
-		lines = append(lines, m.scopeBlock(l)...)
+		body = m.drawScope(body, l)
 	}
+	lines = append(lines, body...)
 
 	// A blank row before the bottom block, so the help never reads as one more
 	// entry in whatever list ends above it.
@@ -282,8 +283,12 @@ func (m Model) renderTooSmall() string {
 }
 
 // helpHeight is how many lines the help bar currently occupies.
+// helpHeight is how many rows the help bar takes. It asks without the waveform
+// key: the layout decides whether that key is offered, and the layout needs
+// this number, so it cannot depend on the answer. The bar is the same height
+// either way, which TestHelpHeightDoesNotDependOnTheScope keeps true.
 func (m Model) helpHeight() int {
-	return lipgloss.Height(m.help.View(m.helpKeys()))
+	return lipgloss.Height(m.help.View(m.helpKeysWith(false)))
 }
 
 // formatDuration renders a position as m:ss, or h:mm:ss past an hour.

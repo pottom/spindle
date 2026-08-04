@@ -206,6 +206,37 @@ func (k keyMap) forReadOnlyQueue() tabKeys {
 	}
 }
 
+// forPlayer is the player screen's help. The waveform key is only listed where
+// there is room to draw one: advertising a key that does nothing is worse than
+// a shorter bar.
+func (k keyMap) forPlayer(scope bool) tabKeys {
+	short := []key.Binding{
+		hint("space", "play/pause"),
+		hint("n/p", "track"),
+		hint("←→", "seek"),
+	}
+	if scope {
+		short = append(short, hint("v", "waveform"))
+	} else {
+		short = append(short, hint("d", "devices"))
+	}
+	short = append(short, hint("?", "help"))
+
+	second := []key.Binding{k.Shuffle, k.Repeat, k.Devices}
+	if scope {
+		second = append(second, k.Scope)
+	}
+
+	return tabKeys{
+		short: short,
+		full: [][]key.Binding{
+			{k.PlayPause, k.Next, k.SeekFwd, k.VolUp},
+			second,
+			{k.NextTab, k.GoTab, k.Quit, k.QuitAll},
+		},
+	}
+}
+
 func (k keyMap) forTab(t tabID) tabKeys {
 	switch t {
 	case tabQueue:
@@ -253,19 +284,6 @@ func (k keyMap) forTab(t tabID) tabKeys {
 		}
 
 	default:
-		return tabKeys{
-			short: []key.Binding{
-				hint("space", "play/pause"),
-				hint("n/p", "track"),
-				hint("←→", "seek"),
-				hint("v", "waveform"),
-				hint("?", "help"),
-			},
-			full: [][]key.Binding{
-				{k.PlayPause, k.Next, k.SeekFwd, k.VolUp},
-				{k.Shuffle, k.Repeat, k.Scope, k.Devices},
-				{k.NextTab, k.GoTab, k.Quit, k.QuitAll},
-			},
-		}
+		return tabKeys{}
 	}
 }
