@@ -69,7 +69,8 @@ func (m Model) renderPlayer() string {
 	lines = append(lines, m.pad("", l))
 
 	body := m.body(l)
-	if m.scopeVisible() {
+	// The queue draws its trace inside its own top block, beside the detail.
+	if m.tab == tabPlayer && m.scopeVisible() {
 		body = m.drawScope(body, l)
 	}
 	if m.peekVisible() {
@@ -87,7 +88,11 @@ func (m Model) renderPlayer() string {
 		lines = append(lines, m.pad(row, l))
 	}
 
-	return lipgloss.PlaceHorizontal(m.width, lipgloss.Center, strings.Join(lines, "\n"))
+	indent := strings.Repeat(" ", frameLeft(m.width))
+	for i, line := range lines {
+		lines[i] = indent + line
+	}
+	return strings.Join(lines, "\n")
 }
 
 // pad indents one line to the left margin and squares it off to the content

@@ -177,6 +177,39 @@ func artworkArea(interior, bodyHeight int, mode layoutMode, cell cover.CellSize)
 	return width, height
 }
 
+// frameLeft is the column every screen starts at. The tabs are not all the same
+// width — a list earns the whole terminal and the player does not — so a frame
+// centred on its own width would slide the artwork sideways every time the tab
+// changed. Anchoring them all where the widest one begins keeps the picture and
+// the text where they were, and lets the lists run on past them to the right.
+func frameLeft(w int) int {
+	return max(w-min(w, maxTableWidth), 0) / 2
+}
+
+// queueScopeMin is the narrowest trace worth drawing beside the queue's detail
+// panel. Below it the bands are wider than they are tall and read as a bar
+// chart of nothing in particular.
+const queueScopeMin = 28
+
+// queueScopeWidth is the trace's share of the column beside the queue's
+// artwork, and zero when the detail panel needs all of it. The detail keeps the
+// left half; what the words do not use is empty on that screen anyway.
+func queueScopeWidth(l layout) int {
+	if !l.hasArt() {
+		return 0
+	}
+	w := l.infoWidth - columnGap - queueDetailWidth(l)
+	if w < queueScopeMin {
+		return 0
+	}
+	return w
+}
+
+// queueDetailWidth is what the detail panel keeps once the trace has its share.
+func queueDetailWidth(l layout) int {
+	return max(minInfoCols, l.infoWidth/2)
+}
+
 // fitsMinimum reports whether the player screen can be drawn at all.
 func fitsMinimum(w, h int) bool {
 	return w >= minWidth && h >= minHeight

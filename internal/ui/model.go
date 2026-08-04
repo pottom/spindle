@@ -166,7 +166,7 @@ func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 		// The waveform is on to begin with: it is the thing that makes the
 		// screen feel alive, and a feature nobody knows to ask for may as well
 		// not exist. The key is there to put it away.
-		scope:   scopeState{mode: scopeWave},
+		scope:   scopeState{modes: [tabCount]scopeMode{tabPlayer: scopeWave, tabQueue: scopeWave}},
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
 		device:  spinner.New(spinner.WithSpinner(deviceSpinner)),
 	}
@@ -257,7 +257,7 @@ func (m Model) helpKeysWith(scope, lyrics, peek bool) tabKeys {
 	case m.tab == tabPlayer:
 		return m.keys.forPlayer(scope, lyrics, peek)
 	default:
-		return m.keys.forTab(m.tab)
+		return m.keys.forTab(m.tab, scope)
 	}
 }
 
@@ -289,6 +289,7 @@ func (m Model) Init() tea.Cmd {
 		tea.RequestBackgroundColor,
 		tickCmd(),
 		fetchStateCmd(m.player),
+		loadPrefsCmd(),
 	}
 	// A backend that reports its own changes is followed rather than polled.
 	if w, ok := m.player.(player.Watcher); ok {

@@ -261,20 +261,28 @@ func (k keyMap) forPlayer(scope, lyrics, peek bool) tabKeys {
 	}
 }
 
-func (k keyMap) forTab(t tabID) tabKeys {
+// forTab is the help for the screens that are lists. scope says whether the
+// visualiser has room beside the queue's artwork; it is listed only where it can
+// be drawn, and never changes the bar's height, which the layout depends on.
+func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 	switch t {
 	case tabQueue:
+		short := []key.Binding{
+			hint("↑↓", "select"),
+			hint("enter", "play"),
+			hint("x", "remove"),
+			hint("J/K", "move"),
+		}
+		second := []key.Binding{k.PlayPause, k.Next, k.NextTab, k.GoTab, k.Help}
+		if scope {
+			short = append(short, hint("v", "waveform"))
+			second = append(second, k.Scope)
+		}
 		return tabKeys{
-			short: []key.Binding{
-				hint("↑↓", "select"),
-				hint("enter", "play"),
-				hint("x", "remove"),
-				hint("J/K", "move"),
-				hint("?", "help"),
-			},
+			short: append(short, hint("?", "help")),
 			full: [][]key.Binding{
 				{k.Down, k.Enter, k.Drop, k.MoveDn},
-				{k.PlayPause, k.Next, k.NextTab, k.GoTab, k.Help},
+				second,
 			},
 		}
 

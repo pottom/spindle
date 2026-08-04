@@ -28,6 +28,10 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		return m.handleKey(message)
 
+	case prefsMsg:
+		m.applyPrefs(prefs(message))
+		return m, tea.Batch(m.startScope(), m.fetchLyrics())
+
 	case msg.Tick:
 		return m.handleTick()
 
@@ -168,10 +172,10 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.scope.frame = message.Samples
 		m.scope.follow(message.Samples)
 		m.scope.adoptBands(message.Bands)
-		if m.scope.mode.wave() {
+		if m.scopeMode().wave() {
 			m.rememberScope()
 		}
-		return m, scopeFrameCmd(m.player, m.scope.mode)
+		return m, scopeFrameCmd(m.player, m.scopeMode())
 
 	case spinner.TickMsg:
 		if message.ID == m.device.ID() {
@@ -321,22 +325,22 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		// Nothing about the geometry changes, so the cover is left alone: the
 		// trace only fills rows that were already blank.
-		m.scope.mode = m.scope.mode.next()
-		return m, m.startScope()
+		m.scope.modes[m.tab] = m.scopeMode().next()
+		return m, tea.Batch(m.startScope(), m.savePrefs())
 
 	case key.Matches(k, m.keys.Lyrics):
 		if !m.lyricsAvailable() {
 			return m, nil
 		}
 		m.lyrics.on = !m.lyrics.on
-		return m, m.fetchLyrics()
+		return m, tea.Batch(m.fetchLyrics(), m.savePrefs())
 
 	case key.Matches(k, m.keys.Peek):
 		if !m.peekAvailable() {
 			return m, nil
 		}
 		m.peek.on = !m.peek.on
-		return m, nil
+		return m, m.savePrefs()
 
 	case key.Matches(k, m.keys.Help):
 		// Expanding the help shortens the body, which shrinks the artwork, so
@@ -674,5 +678,5 @@ func (m *Model) startScope() tea.Cmd {
 		return nil
 	}
 	m.scope.running = true
-	return scopeFrameCmd(m.player, m.scope.mode)
+	return scopeFrameCmd(m.player, m.scopeMode())
 }

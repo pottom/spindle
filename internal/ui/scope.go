@@ -58,9 +58,11 @@ func (s scopeMode) bars() bool { return s == scopeBars }
 // scopeState is the visualiser the player screen is drawing, and what it is
 // drawing.
 type scopeState struct {
-	// mode is what the key cycles. Each costs a redraw every 33ms, which is not
-	// something to spend without being asked.
-	mode scopeMode
+	// modes is what the key cycles, one per tab. Each screen keeps its own: the
+	// player is watched and the queue is read, and someone who wants the trace
+	// on one of them does not necessarily want it on the other. Each costs a
+	// redraw every 33ms, which is not something to spend without being asked.
+	modes [tabCount]scopeMode
 
 	// running guards the tick loop, so two callers cannot start it twice and
 	// make the trace move at double speed.
@@ -129,10 +131,40 @@ func (s *scopeState) follow(frame []float32) {
 // the text every time the key was pressed, and a visualiser is not worth making
 // the rest of the screen jump.
 func (m Model) scopeAvailable() bool {
-	if m.tab != tabPlayer || m.noDevice || m.ps == nil {
+	if m.noDevice || m.ps == nil {
 		return false
 	}
-	return m.scopeRoom(m.layout()) >= scopeRows+scopeChrome
+	l := m.layout()
+	switch m.tab {
+	case tabPlayer:
+		return m.scopeRoom(l) >= scopeRows+scopeChrome
+	case tabQueue:
+		// On the queue the room is beside the artwork rather than beneath it:
+		// the detail panel has never filled that column, and the list below is
+		// not moved by anything put there.
+		return queueScopeWidth(l) > 0 && l.artHeight >= scopeRows
+	default:
+		return false
+	}
+}
+
+// scopeMode is the visualiser the current tab is set to.
+func (m Model) scopeMode() scopeMode { return m.scope.modes[m.tab] }
+
+// scopeWidth is how many cells the trace has on the current tab.
+func (m Model) scopeWidth(l layout) int {
+	if m.tab == tabQueue {
+		return queueScopeWidth(l)
+	}
+	return l.interior - leftMargin - rightMargin
+}
+
+// scopeRender draws whichever visualiser is on, across w cells.
+func (m Model) scopeRender(w int) []string {
+	if m.scopeMode().wave() {
+		return m.scopeLines(w)
+	}
+	return m.barsLines(w)
 }
 
 // scopeRoom is how many blank rows sit below the artwork, which is what the
@@ -152,7 +184,7 @@ func (m Model) scopeTop(l layout) int {
 }
 
 // scopeVisible reports whether the trace is on screen right now.
-func (m Model) scopeVisible() bool { return m.scope.mode != scopeOff && m.scopeAvailable() }
+func (m Model) scopeVisible() bool { return m.scopeMode() != scopeOff && m.scopeAvailable() }
 
 // scopeLines renders the trace across w cells.
 //
@@ -358,12 +390,7 @@ func (m Model) drawScope(body []string, l layout) []string {
 		return body
 	}
 
-	w := l.interior - leftMargin - rightMargin
-
-	lines := m.barsLines(w)
-	if m.scope.mode.wave() {
-		lines = m.scopeLines(w)
-	}
+	lines := m.scopeRender(m.scopeWidth(l))
 	for i, line := range lines {
 		body[at+i] = m.pad(line, l)
 	}
@@ -374,8 +401,7 @@ func (m Model) drawScope(body []string, l layout) []string {
 // beam. It is done here rather than while rendering because View has to stay a
 // pure function of the model, and a trail is state.
 func (m *Model) rememberScope() {
-	l := m.layout()
-	w := l.interior - leftMargin - rightMargin
+	w := m.scopeWidth(m.layout())
 	if w <= 0 {
 		return
 	}

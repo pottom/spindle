@@ -84,12 +84,26 @@ func (m Model) queueBlock(l layout, rows int) []string {
 
 	top := min(l.artHeight, rows)
 	art := alignTop(strings.Split(m.artworkCells(), "\n"), l.artWidth, top)
-	detail := stack(m.trackDetail(l.infoWidth), l.infoWidth, top)
+
+	// The trace takes the far side of the detail panel's column, which the
+	// words have never reached. Nothing below it moves: the list starts where
+	// the artwork ends either way.
+	detailWidth := l.infoWidth
+	var trace []string
+	if m.scopeVisible() {
+		detailWidth = queueDetailWidth(l)
+		trace = stack(m.scopeRender(queueScopeWidth(l)), queueScopeWidth(l), top)
+	}
+	detail := stack(m.trackDetail(detailWidth), detailWidth, top)
 
 	out := make([]string, 0, rows)
 	gap := strings.Repeat(" ", columnGap)
 	for i := range art {
-		out = append(out, art[i]+gap+detail[i])
+		row := art[i] + gap + detail[i]
+		if trace != nil {
+			row += gap + trace[i]
+		}
+		out = append(out, row)
 	}
 	if len(out) < rows {
 		out = append(out, strings.Repeat(" ", w))

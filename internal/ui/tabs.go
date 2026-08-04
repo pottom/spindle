@@ -19,6 +19,11 @@ const (
 	tabQueue
 	tabPlaylists
 	tabSearch
+
+	// tabCount sizes the per-tab state: each screen remembers its own
+	// visualiser, and an array indexed by the tab keeps that beside the tab
+	// rather than in a parallel structure that can fall out of step.
+	tabCount = iota
 )
 
 var tabNames = [...]string{
