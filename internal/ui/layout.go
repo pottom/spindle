@@ -88,6 +88,7 @@ type layout struct {
 	interior   int // content width, capped so an ultrawide terminal stays readable
 	artWidth   int // artwork area in cells, or zero when there is no room for one
 	artHeight  int
+	artRows    int // rows the picture will really fill, which can be fewer
 	infoWidth  int // the column beside the artwork, or the whole width without one
 	bodyHeight int // rows above the help bar
 }
@@ -118,10 +119,11 @@ func computeLayout(w, h, helpHeight int, hasBanner bool, mode layoutMode, cell c
 	}
 	bodyHeight := max(h-chrome, 0)
 
-	var artWidth, artHeight int
+	var artWidth, artHeight, artRows int
 	infoWidth := interior - leftMargin - rightMargin
 	if tier != tierCompact {
 		artWidth, artHeight = artworkArea(interior, bodyHeight, mode, cell)
+		artRows = artworkRows(artWidth, artHeight, cell)
 		infoWidth -= artWidth + columnGap
 	}
 
@@ -129,6 +131,7 @@ func computeLayout(w, h, helpHeight int, hasBanner bool, mode layoutMode, cell c
 		interior:   interior,
 		artWidth:   artWidth,
 		artHeight:  artHeight,
+		artRows:    artRows,
 		infoWidth:  infoWidth,
 		bodyHeight: bodyHeight,
 	}
@@ -210,6 +213,24 @@ func queueScopeWidth(l layout) int {
 // queueDetailWidth is what the detail panel keeps once the trace has its share.
 func queueDetailWidth(l layout) int {
 	return queueSplit(l) - l.artWidth - 2*columnGap
+}
+
+// artworkRows is how many rows the picture will actually fill inside the box it
+// has been given. A cover is square and cells are not, and no whole number of
+// cells is exactly square, so one of the two dimensions always has slack: the
+// box is as wide as it was asked to be and comes out a row or two short.
+//
+// Anything laid out beside the artwork has to know this. The box is where the
+// picture may go; this is where it ends, and a line below that reads as a
+// mistake. It is derived rather than measured so that it holds before a cover
+// has arrived as well as after — a budget that changed when the picture loaded
+// would show a row and then take it away again.
+func artworkRows(artWidth, artHeight int, cell cover.CellSize) int {
+	if artWidth <= 0 || artHeight <= 0 || cell.Width <= 0 || cell.Height <= 0 {
+		return artHeight
+	}
+	side := min(artWidth*cell.Width, artHeight*cell.Height)
+	return min(max(side/cell.Height, 1), artHeight)
 }
 
 // fitsMinimum reports whether the player screen can be drawn at all.

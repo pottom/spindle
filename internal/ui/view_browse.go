@@ -83,18 +83,12 @@ func (m Model) queueBlock(l layout, rows int) []string {
 	w := queueBlockWidth(l)
 
 	top := min(l.artHeight, rows)
-	cells := strings.Split(m.artworkCells(), "\n")
-	art := alignTop(cells, l.artWidth, top)
+	art := alignTop(strings.Split(m.artworkCells(), "\n"), l.artWidth, top)
 
-	// The picture decides how far the panel beside it may reach. The layout
-	// gives the artwork a box; what goes in it keeps the cover's own shape, so
-	// it can come out a row or two shorter — and a fact hanging below the
-	// picture's foot reads as a mistake, which is what it is. Until a cover has
-	// arrived there is no foot to measure, and the box is all there is to go on.
-	foot := top
-	if m.cover.art != "" {
-		foot = min(len(cells), top)
-	}
+	// The picture decides how far the panel beside it may reach: the box the
+	// layout gives the artwork is a row or two taller than the cover drawn in
+	// it, and a fact hanging below the picture's foot reads as a mistake.
+	foot := min(l.artRows, top)
 
 	// The trace hangs from the same column the artists below start at, so the
 	// screen reads as two halves. Nothing under it moves when it appears: the
@@ -216,7 +210,7 @@ func (m Model) trackDetail(w, rows int) []string {
 	// in only where there is room for them at all, because those facts are the
 	// point of the panel.
 	facts := trackFacts(*t)
-	if rows >= len(facts)+7 {
+	if rows >= len(facts)+6 {
 		bar, times := "", ""
 		if m.ps != nil && m.ps.TrackID == t.ID {
 			bar = m.progressLine(w)
@@ -226,7 +220,12 @@ func (m Model) trackDetail(w, rows int) []string {
 				w,
 			)
 		}
-		lines = append(lines, bar, times, "")
+		lines = append(lines, bar, times)
+		if rows >= len(facts)+7 {
+			// The air under the clock is the first thing to go: better a
+			// tighter panel than no playhead at all.
+			lines = append(lines, "")
+		}
 	}
 
 	for _, f := range facts {

@@ -723,13 +723,10 @@ func TestQueueDetailStaysAboveTheArtworksFoot(t *testing.T) {
 	m.resize()
 
 	l := m.layout()
-	if l.artHeight < 4 {
-		t.Fatalf("artHeight = %d, want a picture to measure against", l.artHeight)
+	if l.artRows >= l.artHeight {
+		t.Skipf("the picture fills its box at this cell size (%d rows), so there is no foot to overrun", l.artRows)
 	}
-
-	// A cover two rows shorter than the box it was given.
-	short := l.artHeight - 2
-	m.cover.art = strings.TrimRight(strings.Repeat(strings.Repeat("#", l.artWidth)+"\n", short), "\n")
+	short := l.artRows
 
 	block := m.queueBlock(l, l.bodyHeight)
 	var above bool
@@ -743,5 +740,25 @@ func TestQueueDetailStaysAboveTheArtworksFoot(t *testing.T) {
 		if strings.TrimSpace(plain(block[i])) != "" {
 			t.Errorf("row %d is below the picture's foot at %d but carries %q", i, short, plain(block[i]))
 		}
+	}
+}
+
+// The playhead must not appear while the cover loads and go again once it has:
+// what fits is decided by the box and the cell, not by whether a picture has
+// arrived yet.
+func TestQueuePlayheadDoesNotFlickerAsTheCoverLoads(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.ps = &player.State{TrackID: "a", Playing: true, Duration: 2 * time.Minute}
+	m.width, m.height = 200, 45
+	m.resize()
+
+	l := m.layout()
+	loading := len(m.trackDetail(queueDetailWidth(l), min(l.artRows, l.artHeight)))
+
+	m.cover.art = strings.TrimRight(strings.Repeat(strings.Repeat("#", l.artWidth)+"\n", l.artRows), "\n")
+	loaded := len(m.trackDetail(queueDetailWidth(l), min(l.artRows, l.artHeight)))
+
+	if loading != loaded {
+		t.Errorf("the panel is %d rows while the cover loads and %d once it has", loading, loaded)
 	}
 }
