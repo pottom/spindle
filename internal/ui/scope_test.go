@@ -706,24 +706,37 @@ func TestBarsFillTheWidth(t *testing.T) {
 			t.Fatalf("w = %d: nothing was drawn for a full spectrum", w)
 		}
 
-		// One cell of slack at each end: the bars carry a blank column between
-		// them, and the last one keeps its own.
-		if first > 1 || last < w-1-barsGap-1 {
+		// A little slack at each end: the bars carry a blank column between
+		// them, the last one keeps its own, and a margin under barsSlack is
+		// left rather than drawing fewer bars for it.
+		if first > barsSlack || last < w-barsSlack {
 			t.Errorf("w = %d: the bars run from %d to %d, want them to reach both ends", w, first, last)
 		}
 	}
 }
 
-// Whatever the width, there is a bar for every band — the spectrum is not
-// thinned to make it fit — down to the point where there are fewer cells than
-// bands and two of them have to share a column.
-func TestBarsKeepEveryBand(t *testing.T) {
-	const bands = 28
-	for w := 8; w <= 400; w++ {
-		count := min(bands, w)
-		bar := max(w/count-barsGap, 1)
-		if last := barsAt(count-1, count, w, bar); count > 1 && last+bar != w {
-			t.Errorf("w = %d: %d bars of %d cells end at %d, want the right edge", w, count, bar, last+bar)
+// Whatever the width, the bars fill it: either there is one for every band and
+// what is left over is a cell or two, or there are fewer and wider ones and
+// there is nothing left over at all.
+func TestBarsFitLeavesLittleOver(t *testing.T) {
+	for _, bands := range []int{16, 28, 64} {
+		for w := 8; w <= 400; w++ {
+			pitch, count := barsFit(w, bands)
+			if count < 1 || count > bands {
+				t.Fatalf("w = %d: %d bars, want between 1 and %d", w, count, bands)
+			}
+			if over := w - pitch*count; over < 0 || over > barsSlack {
+				t.Errorf("w = %d over %d bands: %d bars of %d cells leave %d over", w, bands, count, pitch, over)
+			}
 		}
+	}
+}
+
+// A spectrum drawn in a narrow panel keeps its bands: they are what it is, and
+// a couple of unused cells at the edge is not worth half of them.
+func TestNarrowBarsKeepTheirBands(t *testing.T) {
+	const bands = 64
+	if _, count := barsFit(68, bands); count != bands {
+		t.Errorf("at 68 cells the spectrum came out in %d bars, want one for each of the %d bands", count, bands)
 	}
 }

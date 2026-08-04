@@ -24,6 +24,11 @@ const (
 	// barsGap is the blank column between bars, so they read as separate bands
 	// rather than as one filled shape.
 	barsGap = 1
+
+	// barsSlack is how many cells a whole number of equal bars may leave over
+	// before it is worth drawing fewer, wider ones. A cell or two at each end
+	// is not a margin anybody sees; a hand's width is.
+	barsSlack = 4
 )
 
 // adoptBands takes a spectrum frame and carries the peak markers with it.
@@ -68,14 +73,15 @@ func (m Model) barsLines(w int) []string {
 	// reads as one shape, not as a spectrum, and a meter whose columns are not
 	// the same size reads as a meter that is wrong.
 	//
-	// One bar per band, unless there are more bands than cells to draw them in.
+	// The gaps are the same width as well, so what will not divide is left as a
+	// margin, split between the two ends.
 	n := len(m.scope.bands)
-	count := min(n, w)
-	bar := max(w/count-barsGap, 1)
+	pitch, count := barsFit(w, n)
+	left := max((w-pitch*count)/2, 0)
 
 	for b := range count {
-		from := barsAt(b, count, w, bar)
-		to := from + bar
+		from := left + b*pitch
+		to := max(from+pitch-barsGap, from+1)
 
 		band, top := m.bandsAt(b, count)
 		height := int(float64(band) * float64(dotsY))
@@ -113,21 +119,44 @@ func (m Model) barsLines(w int) []string {
 	return m.barsDraw(w, grid, paint)
 }
 
-// barsAt is the first column of one bar: the first bar against the left edge,
-// the last against the right, the rest spread evenly between them.
+// barsFit chooses how the bars tile the width: how many cells one takes, and
+// how many there are.
 //
-// Spread rather than stepped by a fixed pitch, because a whole number of equal
-// bars rarely fills a width exactly, and the cells left over have to go
-// somewhere. Stepping leaves them as a margin, which on a wide screen was a
-// hand's width of nothing at each end, in the one place that is meant to be
-// full. Here they go into the gaps instead, so a gap here and there is a cell
-// wider than its neighbours — which in a row of bars nobody sees, while every
-// bar is still exactly as wide as every other, which everybody does.
-func barsAt(b, count, w, bar int) int {
-	if count < 2 {
-		return 0
+// A bar for every band, if that fills the width near enough. It usually does
+// not divide, and where the cells left over amount to something — at sixty-odd
+// bands on a wide screen it was a hand's width of nothing at each end, in the
+// one place that is meant to be full — fewer and wider bars are drawn instead,
+// at whatever pitch wastes least. Folding two bands into one column costs a
+// little detail nobody was reading; an empty margin costs the picture its
+// width, and uneven gaps between the bars cost it its regularity, which is what
+// makes a meter read as a meter.
+//
+// Never more bars than bands: a column nothing was measured for would have to be
+// drawn from a neighbour, and an invented band is worse than a missing one.
+func barsFit(w, n int) (pitch, count int) {
+	pitch, count = max(w/n, 1), min(n, w)
+	waste := w - pitch*count
+	if waste <= barsSlack {
+		return pitch, count
 	}
-	return b * (w - bar) / (count - 1)
+
+	// The first pitch that fits well enough wins, and it is the one with the
+	// most bars: a wider bar is always a shorter list of them, so chasing the
+	// last cell of the width would keep costing bands after it had stopped
+	// buying anything.
+	for p := pitch + 1; p <= w; p++ {
+		k := min(n, w/p)
+		if k < 1 {
+			break
+		}
+		if over := w - p*k; over < waste {
+			pitch, count, waste = p, k, over
+		}
+		if waste <= barsSlack {
+			break
+		}
+	}
+	return pitch, count
 }
 
 // bandsAt is the level and the peak marker for one bar. It covers one band and
