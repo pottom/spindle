@@ -39,9 +39,11 @@ const (
 	starStep  = 100 / starCount
 
 	// hotMark flags a track most of Spotify is playing right now. hotStars is
-	// where "most" begins.
+	// where "most" begins, and hotCols is what the mark occupies: an emoji is
+	// two cells wide, and the column is held open on the rows without one.
 	hotMark  = "🔥"
 	hotStars = 4
+	hotCols  = 2
 
 	// secondaryCols is the fixed middle column of a list row: the artist, or the
 	// playlist's owner. Fixed so the trailing column always lines up.
@@ -210,12 +212,18 @@ func hot(t player.Track) bool {
 	return t.Popularity != nil && starsFor(*t.Popularity) >= hotStars
 }
 
-// withMarks is a title with whatever the list wants to say about it beside it.
-func (m Model) withMarks(t player.Track, title string) string {
+// leadIn is what stands to the left of a title: the track's place in the list,
+// then the mark for one most of Spotify is playing.
+//
+// The mark has a column of its own rather than trailing the title, so the marked
+// rows line up with each other and the titles all start in the same place. Held
+// open whether the mark is there or not, for the same reason.
+func (m Model) leadIn(t player.Track, place string) string {
+	mark := strings.Repeat(" ", hotCols)
 	if hot(t) {
-		return title + " " + hotMark
+		mark = hotMark
 	}
-	return title
+	return m.styles.Cursor.Render(padLeft(place, ordinalCols)) + " " + mark + " "
 }
 
 // fact is one label-and-value row of the detail panel. The label column is
@@ -290,10 +298,8 @@ func (m Model) queueRow(t player.Track, w int, selected bool, number int) string
 	if selected {
 		primary = m.styles.RowSelected
 	}
-	// The mark stands in the same columns the track number would, or the titles
-	// beside it would sit one indent out.
 	return m.rowWithTempo(w, selected,
-		m.styles.Cursor.Render(padLeft(nowMark, ordinalCols))+"  "+primary.Render(m.withMarks(t, t.Title)),
+		m.leadIn(t, nowMark)+primary.Render(t.Title),
 		m.styles.RowSecondary.Render(strings.Join(t.Artists, ", ")),
 		m.tempoCell(t),
 		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
@@ -416,16 +422,16 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 		primary = m.styles.RowPlaying
 	}
 
-	title := m.withMarks(t, t.Title)
-	if number > 0 {
-		title = padLeft(fmt.Sprintf("%d", number), ordinalCols) + "  " + title
-	}
-	if m.ps != nil && m.ps.TrackID == t.ID {
-		title = nowMark + " " + title
+	title := primary.Render(t.Title)
+	switch {
+	case m.ps != nil && m.ps.TrackID == t.ID:
+		title = m.leadIn(t, nowMark) + title
+	case number > 0:
+		title = m.leadIn(t, fmt.Sprintf("%d", number)) + title
 	}
 
 	return m.rowWithTempo(w, selected,
-		primary.Render(title),
+		title,
 		m.styles.RowSecondary.Render(strings.Join(t.Artists, ", ")),
 		m.tempoCell(t),
 		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
