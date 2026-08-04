@@ -30,7 +30,12 @@ const (
 
 	// likedMark stands beside the saved tracks in the library, which are a
 	// collection rather than a playlist.
-	likedMark = "♥"
+	//
+	// The variation selector asks for the text form of the heart. Without it a
+	// terminal is free to draw the emoji instead, which is two cells wide where
+	// one was measured, and the name beside it lands a column out of line with
+	// every other name in the list.
+	likedMark = "♥\ufe0e"
 
 	// explicitMark is the badge Spotify puts on a track with explicit lyrics.
 	explicitMark = "[E]"
@@ -753,11 +758,10 @@ func (m Model) playlistRow(p player.Playlist, w int, selected bool) string {
 
 	// The saved tracks carry a heart where the others carry nothing: the row is
 	// a different kind of thing from the playlists under it, and one glyph says
-	// so without a heading and without a row of its own.
-	name := primary.Render(p.Name)
-	if isLiked(p.ID) {
-		name = m.styles.Cursor.Render(likedMark) + " " + name
-	}
+	// so without a heading and without a row of its own. The column is held
+	// open on the rows without one, the way the queue holds its marks, so every
+	// name in the list starts in the same place.
+	name := m.libraryMark(p) + primary.Render(p.Name)
 
 	// A count of nothing is not a count. The saved tracks arrive a page at a
 	// time and their number is not known until the last of them has, so the
@@ -768,6 +772,16 @@ func (m Model) playlistRow(p player.Playlist, w int, selected bool) string {
 	}
 
 	return m.row(w, selected, name, m.styles.RowSecondary.Render(p.Owner), count)
+}
+
+// libraryMark is the column in front of a library row, which says what kind of
+// thing the row is. Only the saved tracks have anything to say there; the rest
+// keep the column blank rather than closing it, so the names stay in line.
+func (m Model) libraryMark(p player.Playlist) string {
+	if isLiked(p.ID) {
+		return m.styles.Cursor.Render(likedMark) + " "
+	}
+	return "  "
 }
 
 // trackRow draws one track. A number of 0 omits the ordinal, which is what the
@@ -919,14 +933,25 @@ func (m Model) searchField(w int) string {
 }
 
 func playlistSubtitle(items []player.Playlist) string {
-	if len(items) == 0 {
-		return ""
-	}
-	var total int
+	// The saved tracks sit in this list and are not a playlist, so they are not
+	// counted as one. Their own number is not known until they have all been
+	// read, and a total that grew as the reader scrolled would be worse than no
+	// total at all.
+	var lists, total int
 	for _, p := range items {
+		if isLiked(p.ID) {
+			continue
+		}
+		lists++
 		total += p.Tracks
 	}
-	return fmt.Sprintf("%d playlists · %d tracks", len(items), total)
+	if lists == 0 {
+		return ""
+	}
+	if total == 0 {
+		return fmt.Sprintf("%d playlists", lists)
+	}
+	return fmt.Sprintf("%d playlists · %d tracks", lists, total)
 }
 
 // formatSpan renders a long duration as hours and minutes, for playlist lengths

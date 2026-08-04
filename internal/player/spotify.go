@@ -1,7 +1,9 @@
 package player
 
 import (
+	"cmp"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -40,6 +42,13 @@ const (
 type Spotify struct {
 	client *spotify.Client
 
+	// http is the same authenticated client the library is built on, and base
+	// is where the API lives, kept for the few answers the library cannot read.
+	// See PlaylistsPage. A field rather than a constant so a test can point it
+	// at a stub, which is what the library's own option does for the rest.
+	http *http.Client
+	base string
+
 	// followed remembers which cursor reaches which offset of the followed
 	// artists, the one list the Web API refuses to page by offset. See
 	// FollowedArtists. Browsing runs in tea.Cmd goroutines, hence the lock.
@@ -53,7 +62,11 @@ type Spotify struct {
 func NewSpotify(httpClient *http.Client, opts ...spotify.ClientOption) *Spotify {
 	wrapped := *httpClient
 	wrapped.Transport = &rateLimiter{base: httpClient.Transport}
-	return &Spotify{client: spotify.New(&wrapped, opts...)}
+	return &Spotify{
+		client: spotify.New(&wrapped, opts...),
+		http:   &wrapped,
+		base:   "https://api.spotify.com/v1/",
+	}
 }
 
 // State reports what the active device is doing. Spotify answers 204 when
@@ -226,21 +239,72 @@ func searchTypes(kind SearchKind) []spotify.SearchType {
 	}
 }
 
+// PlaylistsPage lists the account's playlists.
+//
+// Read from the answer directly rather than through the client library, for one
+// field: how many tracks each playlist holds. Spotify used to report that as
+// "tracks" and now reports it as "items", the same rename that moved a
+// playlist's contents from /tracks to /items, and every library still looking
+// for the old name reads every playlist as empty. Both names are accepted here,
+// so the count survives whichever one arrives.
 func (s *Spotify) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist], error) {
 	start := max(offset, 0)
-	page, err := s.client.CurrentUsersPlaylists(ctx, spotify.Limit(pageLimit), spotify.Offset(start))
-	if err != nil {
+
+	var page struct {
+		Next  string `json:"next"`
+		Items []struct {
+			ID          string          `json:"id"`
+			Name        string          `json:"name"`
+			Description string          `json:"description"`
+			Images      []spotify.Image `json:"images"`
+			Owner       struct {
+				DisplayName string `json:"display_name"`
+				ID          string `json:"id"`
+			} `json:"owner"`
+			Tracks struct {
+				Total int `json:"total"`
+			} `json:"tracks"`
+			Contents struct {
+				Total int `json:"total"`
+			} `json:"items"`
+		} `json:"items"`
+	}
+	url := fmt.Sprintf("%sme/playlists?limit=%d&offset=%d", s.base, pageLimit, start)
+	if err := s.read(ctx, url, &page); err != nil {
 		return Page[Playlist]{}, fmt.Errorf("fetch playlists: %w", err)
 	}
-	if page == nil {
-		return Page[Playlist]{}, nil
-	}
 
-	out := make([]Playlist, 0, len(page.Playlists))
-	for i := range page.Playlists {
-		out = append(out, playlistFromSimple(&page.Playlists[i]))
+	out := make([]Playlist, 0, len(page.Items))
+	for _, item := range page.Items {
+		out = append(out, Playlist{
+			ID:          item.ID,
+			Name:        item.Name,
+			Owner:       cmp.Or(item.Owner.DisplayName, item.Owner.ID),
+			CoverURL:    bestImage(item.Images),
+			Tracks:      max(item.Tracks.Total, item.Contents.Total),
+			Description: plainText(item.Description),
+		})
 	}
 	return Page[Playlist]{Items: out, More: page.Next != "", Next: start + pageLimit}, nil
+}
+
+// read fetches one answer from the Web API into out. It is for the few places
+// the client library cannot be asked; everything else goes through it.
+func (s *Spotify) read(ctx context.Context, url string, out any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return classify("read", err)
+	}
+	defer resp.Body.Close() //nolint:errcheck // read-only request
+
+	if resp.StatusCode != http.StatusOK {
+		return classify("read", fmt.Errorf("unexpected status %s", resp.Status))
+	}
+	return json.NewDecoder(resp.Body).Decode(out)
 }
 
 func (s *Spotify) PlaylistTracksPage(ctx context.Context, playlistID string, offset int) (Page[Track], error) {

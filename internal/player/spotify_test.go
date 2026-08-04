@@ -18,7 +18,11 @@ func newStub(t *testing.T, handler http.HandlerFunc) *Spotify {
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
-	return NewSpotify(srv.Client(), spotify.WithBaseURL(srv.URL+"/"))
+	s := NewSpotify(srv.Client(), spotify.WithBaseURL(srv.URL+"/"))
+	// The few calls that read the answer directly have to reach the stub as
+	// well, and they do not go through the client library's option.
+	s.base = srv.URL + "/"
+	return s
 }
 
 // Spotify answers "nothing is playing" with 204 and an empty body, which the
@@ -316,5 +320,31 @@ func TestTransferKeepsPlaying(t *testing.T) {
 	ids, ok := got.body["device_ids"].([]any)
 	if !ok || len(ids) != 1 || ids[0] != "dev2" {
 		t.Errorf("device_ids = %v, want [dev2]", got.body["device_ids"])
+	}
+}
+
+// Spotify renamed a playlist's track count from "tracks" to "items", the same
+// rename that moved its contents from /tracks to /items. A library still
+// reading the old name reads every playlist as empty, so both are accepted.
+func TestPlaylistCountUnderEitherName(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"the old name", `{"items":[{"id":"p1","name":"Humor","tracks":{"total":3}}]}`},
+		{"the new name", `{"items":[{"id":"p1","name":"Humor","items":{"total":3}}]}`},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s, _ := newQueryStub(t, c.body)
+			page, err := s.PlaylistsPage(context.Background(), 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(page.Items) != 1 || page.Items[0].Tracks != 3 {
+				t.Errorf("playlists = %+v, want one of three tracks", page.Items)
+			}
+		})
 	}
 }

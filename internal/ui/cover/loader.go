@@ -114,6 +114,16 @@ func (l *Loader) image(ctx context.Context, url string) (image.Image, error) {
 		return img, nil
 	}
 
+	// Some artwork is drawn rather than downloaded. It goes into the same cache
+	// as the rest: the drawing is cheap but it is not free, and a cursor resting
+	// on the row would redraw it on every load.
+	if img, ok := generated(url); ok {
+		l.mu.Lock()
+		l.decoded.put(key, img)
+		l.mu.Unlock()
+		return img, nil
+	}
+
 	data, err := l.bytes(ctx, url, key)
 	if err != nil {
 		return nil, err
