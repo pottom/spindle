@@ -34,6 +34,13 @@ func reportFatal(err error) {
 func main() {
 	// Subcommands come before flags so "spindle login" reads the way it looks.
 	if len(os.Args) > 1 {
+		// The daemon-driving commands leave through os.Exit rather than
+		// reportFatal: they answer with an exit code of their own, so a script
+		// can tell a missing daemon from a silent one.
+		if controlCommands[os.Args[1]] {
+			os.Exit(runControl(context.Background(), os.Args[1], os.Args[2:]))
+		}
+
 		switch os.Args[1] {
 		case "login":
 			if err := runLogin(context.Background(), os.Args[2:]); err != nil {
