@@ -23,15 +23,33 @@ const (
 	tokenURL = "https://accounts.spotify.com/api/token"
 )
 
-// Scopes are the permissions spindle asks for. Reading playback state and
-// controlling it cover the player; the playlist scopes cover the library tab.
-// Search needs no scope of its own.
+// Scopes are the permissions spindle asks for. Search needs none of its own.
+//
+// Asking for more than is used would be rude, and asking for less means a
+// second trip through the browser later: every scope here is one a screen or a
+// key already depends on, or is about to. They cost nothing that is refused —
+// what a new application is refused is endpoints, not permissions.
 var Scopes = []string{
+	// The player.
 	"user-read-playback-state",
 	"user-modify-playback-state",
 	"user-read-currently-playing",
+
+	// The library tab, and editing what is in it.
 	"playlist-read-private",
 	"playlist-read-collaborative",
+	"playlist-modify-private",
+	"playlist-modify-public",
+
+	// Liked songs, and the like key.
+	"user-library-read",
+	"user-library-modify",
+
+	// Following an artist, and the pages built from listening history.
+	"user-follow-read",
+	"user-follow-modify",
+	"user-top-read",
+	"user-read-recently-played",
 }
 
 // ErrNoClientID reports that the application is not configured yet. Callers are
