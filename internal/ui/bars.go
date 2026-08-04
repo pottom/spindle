@@ -64,21 +64,20 @@ func (m Model) barsLines(w int) []string {
 		paint[i] = -1
 	}
 
-	// Every band is the same width, with a blank column between: a solid block
-	// reads as one shape, not as a spectrum. Sharing the width out by division
-	// gave some bands a cell more than others, and a meter whose columns are
-	// not the same size reads as a meter that is wrong. What will not divide is
-	// left as a margin, split between the two ends.
+	// Every bar is the same width, with a blank column between: a solid block
+	// reads as one shape, not as a spectrum, and a meter whose columns are not
+	// the same size reads as a meter that is wrong.
 	n := len(m.scope.bands)
-	pitch := max(w/n, 1)
-	left := max((w-pitch*n)/2, 0)
+	pitch, count := barsFit(w, n)
+	left := max((w-pitch*count)/2, 0)
 
-	for b := range n {
+	for b := range count {
 		from := left + b*pitch
 		to := max(from+pitch-barsGap, from+1)
 
-		height := int(float64(m.scope.bands[b]) * float64(dotsY))
-		peak := int(float64(m.scope.peaks[b]) * float64(dotsY))
+		band, top := m.bandsAt(b, count)
+		height := int(float64(band) * float64(dotsY))
+		peak := int(float64(top) * float64(dotsY))
 
 		levels := len(m.styles.Bars[0])
 		for c := from; c < to && c < w; c++ {
@@ -96,7 +95,7 @@ func (m Model) barsLines(w int) []string {
 				}
 			}
 
-			if peak <= height || m.scope.peaks[b] < barsPeakFloor {
+			if peak <= height || top < barsPeakFloor {
 				continue
 			}
 			// The marker sits one dot thick at the height reached, which is
@@ -109,13 +108,61 @@ func (m Model) barsLines(w int) []string {
 			paint[cell] = int8(levels - 1)
 		}
 	}
-	return m.barsDraw(w, grid, paint, n)
+	return m.barsDraw(w, grid, paint)
+}
+
+// barsFit chooses how the bars tile the width: how many cells one takes, and
+// how many there are.
+//
+// The count follows the width rather than the number of bands, because the
+// bands do not divide it. Whatever a whole number of equal bars leaves over is
+// a margin, and at sixty-odd bands on a wide screen that margin was a hand's
+// width of nothing at each end, in the one place on the screen that is meant to
+// be full. So the pitch that wastes the fewest cells wins, and the number of
+// bars is whatever fits at it — folding two bands into one column costs a
+// little detail, an empty margin costs the picture its width.
+//
+// Never more bars than bands: a column nothing was measured for would be drawn
+// from a neighbour, and an invented band is worse than a missing one.
+func barsFit(w, n int) (pitch, count int) {
+	pitch, count = 1, min(n, w)
+	waste := w - count
+
+	// Ties keep the smaller pitch, which is the one with more bars: at equal
+	// waste, more of the spectrum is being shown.
+	for p := 2; p <= w && waste > 0; p++ {
+		k := min(n, w/p)
+		if k < 1 {
+			break
+		}
+		if left := w - p*k; left < waste {
+			pitch, count, waste = p, k, left
+		}
+	}
+	return pitch, count
+}
+
+// bandsAt is the level and the peak marker for one bar, which may cover more
+// than one band. The loudest of them wins rather than their average: a meter
+// answers what reached this far, and averaging a hit with its quiet neighbour
+// flattens exactly the moment worth seeing.
+func (m Model) bandsAt(bar, count int) (band, peak float32) {
+	n := len(m.scope.bands)
+	from, to := bar*n/count, max((bar+1)*n/count, bar*n/count+1)
+
+	for i := from; i < to && i < n; i++ {
+		band = max(band, m.scope.bands[i])
+		if i < len(m.scope.peaks) {
+			peak = max(peak, m.scope.peaks[i])
+		}
+	}
+	return band, peak
 }
 
 // barsDraw turns the dot grid into rows, colouring each cell from the palette:
 // hue by where the column sits in the frequency range, strength by how high up
 // its bar the row is.
-func (m Model) barsDraw(w int, grid []uint8, paint []int8, bands int) []string {
+func (m Model) barsDraw(w int, grid []uint8, paint []int8) []string {
 	freqs := len(m.styles.Bars)
 
 	lines := make([]string, scopeRows)

@@ -685,3 +685,47 @@ func TestBarsAreAllTheSameWidth(t *testing.T) {
 		}
 	}
 }
+
+// The spectrum is the full width of the screen it is given. It used to leave
+// whatever a whole number of equal bars would not divide as a margin, which at
+// a wide terminal was a hand's width of nothing at each end.
+func TestBarsFillTheWidth(t *testing.T) {
+	for _, w := range []int{40, 77, 100, 133, 160, 199, 240} {
+		bands := make([]float32, 28)
+		for i := range bands {
+			bands[i] = 1
+		}
+
+		m := scopeModel(w+leftMargin+rightMargin+2, 44)
+		m.scope.adoptBands(bands)
+
+		row := plain(m.barsLines(w)[0])
+		first := strings.IndexFunc(row, func(r rune) bool { return r != ' ' })
+		last := strings.LastIndexFunc(row, func(r rune) bool { return r != ' ' })
+		if first < 0 {
+			t.Fatalf("w = %d: nothing was drawn for a full spectrum", w)
+		}
+
+		// One cell of slack at each end: the bars carry a blank column between
+		// them, and the last one keeps its own.
+		if first > 1 || last < w-1-barsGap-1 {
+			t.Errorf("w = %d: the bars run from %d to %d, want them to reach both ends", w, first, last)
+		}
+	}
+}
+
+// Whatever the width, the bars are equal and there are as many as will fit —
+// never more than there are bands, because a column nothing was measured for
+// would have to be invented.
+func TestBarsFitLeavesLittleOver(t *testing.T) {
+	const bands = 28
+	for w := 8; w <= 400; w++ {
+		pitch, count := barsFit(w, bands)
+		if count < 1 || count > bands {
+			t.Fatalf("w = %d: %d bars, want between 1 and %d", w, count, bands)
+		}
+		if over := w - pitch*count; over < 0 || over >= pitch {
+			t.Errorf("w = %d: %d bars of %d cells leave %d over", w, count, pitch, over)
+		}
+	}
+}
