@@ -21,15 +21,11 @@ func (m *Model) deviceKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		return nil, false
 	}
 
-	switch {
-	case key.Matches(k, m.keys.Down), key.Matches(k, m.keys.Up):
-		delta := 1
-		if key.Matches(k, m.keys.Up) {
-			delta = -1
-		}
-		m.devices.cursor.move(delta, len(m.devices.items))
+	if m.listKey(k, &m.devices.cursor, len(m.devices.items), true) {
 		return nil, true
+	}
 
+	switch {
 	case key.Matches(k, m.keys.Enter):
 		return m.transfer(), true
 

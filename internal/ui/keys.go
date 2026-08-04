@@ -23,17 +23,28 @@ type keyMap struct {
 	NextTab key.Binding
 	PrevTab key.Binding
 	// GoTab is the digits: one per screen, in the order they are drawn.
-	GoTab   key.Binding
-	Up      key.Binding
-	Down    key.Binding
-	Enter   key.Binding
-	Back    key.Binding
-	Devices key.Binding
-	Refresh key.Binding
-	Scope   key.Binding
-	Lyrics  key.Binding
-	Peek    key.Binding
-	Mute    key.Binding
+	GoTab key.Binding
+	Up    key.Binding
+	Down  key.Binding
+	// PageDown and PageUp move by whatever the list is showing, so a page is a
+	// screenful rather than a number somebody picked.
+	PageDown key.Binding
+	PageUp   key.Binding
+	// First and Last go to the ends. The letters that mean the same are separate
+	// bindings rather than more keys on these two, because the search tab reads
+	// every printable key as part of the query and must not act on them there.
+	First    key.Binding
+	Last     key.Binding
+	FirstVim key.Binding
+	LastVim  key.Binding
+	Enter    key.Binding
+	Back     key.Binding
+	Devices  key.Binding
+	Refresh  key.Binding
+	Scope    key.Binding
+	Lyrics   key.Binding
+	Peek     key.Binding
+	Mute     key.Binding
 
 	// Queue editing. Only the tracks put there by hand can be moved or dropped,
 	// so these do nothing on the rest of the list.
@@ -105,6 +116,18 @@ func newKeyMap() keyMap {
 			key.WithKeys("down", "ctrl+n"),
 			key.WithHelp("↑↓", "select"),
 		),
+		PageDown: key.NewBinding(
+			key.WithKeys("pgdown", "ctrl+f"),
+			key.WithHelp("pgdn / pgup", "page down / up"),
+		),
+		PageUp: key.NewBinding(key.WithKeys("pgup", "ctrl+b")),
+		First: key.NewBinding(
+			key.WithKeys("home"),
+			key.WithHelp("home / end", "first / last"),
+		),
+		Last:     key.NewBinding(key.WithKeys("end")),
+		FirstVim: key.NewBinding(key.WithKeys("g")),
+		LastVim:  key.NewBinding(key.WithKeys("G")),
 		Enter: key.NewBinding(
 			key.WithKeys("enter"),
 			key.WithHelp("enter", "play"),
@@ -180,6 +203,28 @@ func hint(keys, desc string) key.Binding {
 	return key.NewBinding(key.WithKeys(keys), key.WithHelp(keys, desc))
 }
 
+// selectHint is the movement entry every list's short bar opens with. The page
+// keys ride along with the arrows rather than taking a slot of their own: the
+// bar is one line and already full at the narrowest terminal, and an entry
+// added to the end of it costs whatever was last — which is the help key.
+var selectHint = hint("↑↓ ⇞⇟", "select")
+
+// moveKeys is the movement block of the expanded help. It is a column of its
+// own rather than rows added to an existing one so that offering it cannot make
+// the bar taller: the layout is measured from the help's height before the bar
+// is drawn, and a bar that grew afterwards would push the last row of every
+// list off the bottom of the screen.
+//
+// vim says whether g and G are read on this screen. They are not offered where
+// they do nothing.
+func (k keyMap) moveKeys(vim bool) []key.Binding {
+	out := []key.Binding{k.PageDown, k.First}
+	if vim {
+		out = append(out, hint("g / G", "first / last"))
+	}
+	return out
+}
+
 // forNoDevice is the help while nothing is playing: the transport keys have
 // nothing to act on, so offering them would be a lie.
 func (k keyMap) forNoDevice() tabKeys {
@@ -193,6 +238,7 @@ func (k keyMap) forNoDevice() tabKeys {
 		full: [][]key.Binding{
 			{k.Down, k.Enter, k.Refresh},
 			{k.NextTab, k.Quit},
+			k.moveKeys(true),
 		},
 	}
 }
@@ -208,6 +254,7 @@ func (k keyMap) forDevices() tabKeys {
 		},
 		full: [][]key.Binding{
 			{k.Down, k.Enter, k.Refresh, k.Back},
+			k.moveKeys(true),
 		},
 	}
 }
@@ -216,7 +263,7 @@ func (k keyMap) forDevices() tabKeys {
 func (k keyMap) forReadOnlyQueue() tabKeys {
 	return tabKeys{
 		short: []key.Binding{
-			hint("↑↓", "select"),
+			selectHint,
 			hint("enter", "play"),
 			hint("tab", "switch"),
 			hint("?", "help"),
@@ -224,6 +271,7 @@ func (k keyMap) forReadOnlyQueue() tabKeys {
 		full: [][]key.Binding{
 			{k.Down, k.Enter, k.NextTab, k.GoTab},
 			{k.PlayPause, k.Next, k.Help, k.Quit},
+			k.moveKeys(true),
 		},
 	}
 }
@@ -275,7 +323,7 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 	switch t {
 	case tabQueue:
 		short := []key.Binding{
-			hint("↑↓", "select"),
+			selectHint,
 			hint("enter", "play"),
 			hint("x", "remove"),
 			hint("j/k", "move"),
@@ -290,12 +338,13 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 			full: [][]key.Binding{
 				{k.Down, k.Enter, k.Drop, k.MoveDn},
 				second,
+				k.moveKeys(true),
 			},
 		}
 
 	case tabLibrary:
 		short := []key.Binding{
-			hint("↑↓", "select"),
+			selectHint,
 			hint("enter", "play"),
 			hint("o", "only this"),
 			hint("a", "queue"),
@@ -311,6 +360,7 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 			full: [][]key.Binding{
 				{k.Down, k.Enter, k.Enqueue, k.Back, k.NextTab},
 				second,
+				k.moveKeys(true),
 			},
 		}
 
@@ -318,13 +368,15 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 		return tabKeys{
 			short: []key.Binding{
 				hint("type", "to search"),
-				hint("↑↓", "select"),
+				selectHint,
 				hint("enter", "play"),
 				hint("ctrl+a", "queue"),
 			},
 			full: [][]key.Binding{
 				{k.Down, k.Enter, k.EnqueueTyped, k.Back, k.NextTab},
 				{hint("ctrl+c", "quit"), k.Help},
+				// No g and G here: the query has them.
+				k.moveKeys(false),
 			},
 		}
 

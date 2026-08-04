@@ -55,19 +55,17 @@ func (m *Model) browseKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 }
 
 func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
-	switch {
-	case key.Matches(k, m.keys.Down), key.Matches(k, m.keys.Up):
-		delta := 1
-		if key.Matches(k, m.keys.Up) {
-			delta = -1
-		}
-		if m.playlists.open != nil {
-			m.playlists.inner.move(delta, len(m.playlists.tracks))
-			return m.previewCover(), true
-		}
-		m.playlists.cursor.move(delta, len(m.playlists.items))
+	// The tab has two levels and the same keys drive both: the playlists
+	// themselves, or the tracks inside whichever one is open.
+	state, count := &m.playlists.cursor, len(m.playlists.items)
+	if m.playlists.open != nil {
+		state, count = &m.playlists.inner, len(m.playlists.tracks)
+	}
+	if m.listKey(k, state, count, true) {
 		return m.previewCover(), true
+	}
 
+	switch {
 	case key.Matches(k, m.keys.Enter):
 		if m.playlists.open == nil {
 			sel := m.playlists.selected()
@@ -130,15 +128,13 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 }
 
 func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
-	switch {
-	case key.Matches(k, m.keys.Down), key.Matches(k, m.keys.Up):
-		delta := 1
-		if key.Matches(k, m.keys.Up) {
-			delta = -1
-		}
-		m.search.cursor.move(delta, len(m.search.results))
+	// No g and G on this tab: they are letters, and every letter here is part
+	// of the query.
+	if m.listKey(k, &m.search.cursor, len(m.search.results), false) {
 		return m.previewCover(), true
+	}
 
+	switch {
 	case key.Matches(k, m.keys.Enter):
 		sel := m.search.selected()
 		if sel == nil {

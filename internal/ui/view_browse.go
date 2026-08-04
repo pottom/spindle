@@ -124,7 +124,10 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 		out = append(out, strings.Repeat(" ", w))
 	}
 
-	body := max(rows-len(out), 0)
+	// What is left is the list. It is asked for rather than counted off what has
+	// been drawn, because the page keys have to move by the same number and
+	// cannot see this function.
+	body := listBodyRows(rows, l.artHeight)
 	if opts.count == 0 && body > 0 {
 		out = append(out, fit(m.styles.Empty.Render(opts.empty), w))
 	}
