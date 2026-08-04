@@ -116,4 +116,17 @@ func TestPeekRowsAreFlushWithTheHeading(t *testing.T) {
 	if heading != first {
 		t.Errorf("the heading starts at column %d and the first row at %d, want them flush", heading, first)
 	}
+
+	// And the block sits a column in from the frame's margin, so it does not
+	// run hard against the same edge as the artwork and the device name.
+	var device int
+	for _, row := range strings.Split(plain(m.render()), "\n") {
+		if i := strings.Index(row, "◐"); i >= 0 {
+			device = i
+			break
+		}
+	}
+	if heading != device+1 {
+		t.Errorf("the glance starts at column %d and the device name at %d, want one column in", heading, device)
+	}
 }

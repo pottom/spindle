@@ -39,9 +39,14 @@ func (m Model) drawPeek(body []string, l layout) []string {
 	if len(body) < peekRows+peekChrome {
 		return body
 	}
-	w := l.interior - leftMargin - rightMargin
+	// A column in from the frame's own margin. Flush with the artwork and the
+	// device name, the glance reads as part of the chrome rather than as
+	// something laid on top of the screen.
+	const inset = 1
+	w := l.interior - leftMargin - rightMargin - inset
+	indent := strings.Repeat(" ", inset)
 
-	body[0] = m.pad(spread(
+	body[0] = m.pad(indent+spread(
 		m.styles.Title.Render("Up next"),
 		m.styles.Album.Render(peekSubtitle(len(m.queue))),
 		w,
@@ -54,7 +59,7 @@ func (m Model) drawPeek(body []string, l layout) []string {
 		if i < len(m.queue) {
 			row = flush.trackRow(m.queue[i], w, false, i+1)
 		}
-		body[i+1] = m.pad(row, l)
+		body[i+1] = m.pad(indent+row, l)
 	}
 	return body
 }
