@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zmb3/spotify/v2"
@@ -25,6 +26,12 @@ const (
 // Spotify drives playback through the Spotify Web API.
 type Spotify struct {
 	client *spotify.Client
+
+	// followed remembers which cursor reaches which offset of the followed
+	// artists, the one list the Web API refuses to page by offset. See
+	// FollowedArtists. Browsing runs in tea.Cmd goroutines, hence the lock.
+	mu       sync.Mutex
+	followed map[int]string
 }
 
 // NewSpotify builds the backend around an authenticated HTTP client. The

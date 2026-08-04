@@ -24,27 +24,53 @@ const (
 	albumBudapest = "Hungarian Rhapsody: Queen Live in Budapest"
 )
 
-// Release dates and lengths, so the detail panel has something real to show
-// offline. The mock is where the layout is judged; blank fields would flatter it.
-var mockAlbums = map[string]struct {
-	released  string
-	tracks    int
-	albumType string
-}{
-	albumOpera:    {"1975-11-21", 12, "album"},
-	albumHotSpace: {"1982-05-21", 11, "album"},
-	albumBowie:    {"2002-10-14", 20, "compilation"},
-	albumBudapest: {"2012-11-05", 22, "album"},
+// The four albums the catalogue is drawn from, with real release dates and
+// lengths so the detail panel has something to show offline. The mock is where
+// the layout is judged; blank fields would flatter it.
+//
+// This is also what the saved-albums screen lists and what an artist's records
+// are picked from, so the same four records answer every way in to them.
+var mockAlbumList = []Album{
+	{ID: "al1", Name: albumOpera, Artists: []string{"Queen"}, CoverURL: coverOpera, Released: "1975-11-21", Tracks: 12, AlbumType: "album"},
+	{ID: "al2", Name: albumHotSpace, Artists: []string{"Queen"}, CoverURL: coverHotSpace, Released: "1982-05-21", Tracks: 11, AlbumType: "album"},
+	{ID: "al3", Name: albumBowie, Artists: []string{"David Bowie"}, CoverURL: coverBowie, Released: "2002-10-14", Tracks: 20, AlbumType: "compilation"},
+	{ID: "al4", Name: albumBudapest, Artists: []string{"Queen"}, CoverURL: coverBudapest, Released: "2012-11-05", Tracks: 22, AlbumType: "album"},
 }
+
+// The two artists behind the catalogue. Their pictures are their own album
+// covers: artist photographs live at URLs the mock has no honest way to know,
+// and a broken image would say less about the layout than a real cover does.
+var mockArtists = []Artist{
+	{ID: "ar1", Name: "Queen", ImageURL: coverOpera, Genres: []string{"glam rock", "classic rock"}, Followers: 45_000_000},
+	{ID: "ar2", Name: "David Bowie", ImageURL: coverBowie, Genres: []string{"art rock", "glam rock"}, Followers: 12_000_000},
+}
+
+// mockLikedIDs is what the saved-songs screen lists — enough of the catalogue,
+// spread across the albums, to run past one page.
+var mockLikedIDs = []string{"t01", "t03", "t05", "t08", "t11", "t12", "t14", "t16", "t18"}
+
+// mockRecentIDs is the listening history, most recent first. One track is in it
+// twice on purpose: a real history repeats, and a screen built on the assumption
+// that it does not breaks the first time somebody plays a song again.
+var mockRecentIDs = []string{"t03", "t01", "t12", "t01", "t16", "t05", "t09"}
 
 // detail fills in what the Web API would have supplied along with the track.
 func detail(t Track, number int) Track {
-	if a, ok := mockAlbums[t.Album]; ok {
-		t.Released, t.TotalTracks, t.AlbumType = a.released, a.tracks, a.albumType
+	if a := mockAlbumByName(t.Album); a != nil {
+		t.Released, t.TotalTracks, t.AlbumType = a.Released, a.Tracks, a.AlbumType
 	}
 	t.TrackNumber = number
 	t.DiscNumber = 1
 	return t
+}
+
+func mockAlbumByName(name string) *Album {
+	for i := range mockAlbumList {
+		if mockAlbumList[i].Name == name {
+			return &mockAlbumList[i]
+		}
+	}
+	return nil
 }
 
 func secs(m, s int) time.Duration {

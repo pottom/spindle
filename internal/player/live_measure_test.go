@@ -200,6 +200,64 @@ func TestLivePollingCadence(t *testing.T) {
 	}
 }
 
+// TestLiveLibraryReads reads one page of every library list against the real
+// account. The stubs above prove what goes onto the wire; only this proves that
+// what comes back has anything in it — a field Spotify leaves empty for this
+// client id looks exactly like a mapping that reads the wrong one.
+func TestLiveLibraryReads(t *testing.T) {
+	s := liveBackend(t)
+	ctx := context.Background()
+
+	liked, err := s.LikedTracks(ctx, 0)
+	if err != nil {
+		t.Fatalf("liked tracks: %v", err)
+	}
+	t.Logf("liked: %d tracks, more %v, first %q", len(liked.Items), liked.More, firstTitle(liked.Items))
+
+	saved, err := s.SavedAlbums(ctx, 0)
+	if err != nil {
+		t.Fatalf("saved albums: %v", err)
+	}
+	t.Logf("saved albums: %d, more %v", len(saved.Items), saved.More)
+
+	followed, err := s.FollowedArtists(ctx, 0)
+	if err != nil {
+		t.Fatalf("followed artists: %v", err)
+	}
+	t.Logf("followed artists: %d, more %v", len(followed.Items), followed.More)
+
+	recent, err := s.RecentlyPlayed(ctx, 20)
+	if err != nil {
+		t.Fatalf("recently played: %v", err)
+	}
+	t.Logf("recently played: %d, first %q", len(recent), firstTitle(recent))
+
+	// The album and artist screens, read from whatever the account actually has.
+	if len(saved.Items) > 0 {
+		album := saved.Items[0]
+		tracks, err := s.AlbumTracks(ctx, album.ID, 0)
+		if err != nil {
+			t.Fatalf("album tracks: %v", err)
+		}
+		t.Logf("%q: %d of %d tracks, more %v", album.Name, len(tracks.Items), album.Tracks, tracks.More)
+	}
+	if len(followed.Items) > 0 {
+		artist := followed.Items[0]
+		albums, err := s.ArtistAlbums(ctx, artist.ID, 0)
+		if err != nil {
+			t.Fatalf("artist albums: %v", err)
+		}
+		t.Logf("%q: %d albums, more %v", artist.Name, len(albums.Items), albums.More)
+	}
+}
+
+func firstTitle(tracks []Track) string {
+	if len(tracks) == 0 {
+		return ""
+	}
+	return tracks[0].Title
+}
+
 // TestLiveRemoteSkip issues a single skip and returns. Run it while spindle is
 // open to see how long an outside change takes to reach the screen.
 func TestLiveRemoteSkip(t *testing.T) {
