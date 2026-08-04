@@ -17,6 +17,10 @@ const (
 	// callTimeout bounds every backend call so a hung request cannot wedge the loop.
 	callTimeout = 10 * time.Second
 
+	// bulkTimeout covers a control that has to read a list before it can act:
+	// queueing a whole playlist is a page of it per request.
+	bulkTimeout = 60 * time.Second
+
 	// coverTimeout is more generous: it covers a download as well as the resize.
 	coverTimeout = 20 * time.Second
 
@@ -243,6 +247,29 @@ func fetchPlaylistTracksCmd(p player.Player, id string, offset int) tea.Cmd {
 	}
 }
 
+// playlistTrackIDs reads a playlist through to its end, or to the cap, whichever
+// comes first.
+func playlistTrackIDs(ctx context.Context, p player.Player, id string) ([]string, error) {
+	var ids []string
+	for offset := 0; len(ids) < enqueueMost; {
+		page, err := p.PlaylistTracksPage(ctx, id, offset)
+		if err != nil {
+			return nil, err
+		}
+		for _, t := range page.Items {
+			if len(ids) == enqueueMost {
+				break
+			}
+			ids = append(ids, t.ID)
+		}
+		if !page.More || page.Next <= offset {
+			break
+		}
+		offset = page.Next
+	}
+	return ids, nil
+}
+
 // searchCmd asks for one kind, or for every kind when the kind is empty — which
 // is what a fresh query does, since Spotify answers them all in one request.
 func searchCmd(p player.Player, query string, kind player.SearchKind, seq, offset int) tea.Cmd {
@@ -280,8 +307,15 @@ func playCmd(action string, call func(context.Context) error) tea.Cmd {
 }
 
 func controlCmd(action string, call func(context.Context) error) tea.Cmd {
+	return controlWithin(action, callTimeout, call)
+}
+
+// controlWithin is the same for the few controls that are not one request: a
+// whole playlist has to be read a page at a time before it can be queued, and
+// the timeout that suits a play or a pause would cut that off halfway.
+func controlWithin(action string, within time.Duration, call func(context.Context) error) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), within)
 		defer cancel()
 
 		err := call(ctx)

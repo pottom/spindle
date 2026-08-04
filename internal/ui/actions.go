@@ -25,11 +25,12 @@ type actionsPane struct {
 	verbs []verb
 	state listState
 
-	// on is what the menu was opened over. Held rather than looked up again:
-	// the list underneath can be replaced by a poll while the menu is up, and a
-	// verb must act on what was chosen, not on whatever has since slid under
-	// the cursor.
-	on player.Track
+	// title and subtitle are what the menu was opened over, as it is named at
+	// the head of the menu. Held rather than looked up again: the list
+	// underneath can be replaced by a poll while the menu is up, and a menu
+	// must go on describing what was chosen, not whatever has since slid under
+	// the cursor. The verbs hold their own subject for the same reason.
+	title, subtitle string
 }
 
 // verb is one line of the menu.
@@ -78,15 +79,48 @@ func (m Model) actionsFor(t player.Track) []verb {
 	})
 }
 
+// actionsForPlaylist is the menu for a whole playlist, which is what the cursor
+// is on at the library's top level and among the search's playlists.
+//
+// A playlist has no verb in common with a track: what can be done to it is done
+// to all of it at once, and that is exactly why it wants a menu — nothing else
+// on the screen says that the list under the cursor can be started without
+// being opened first.
+func (m Model) actionsForPlaylist(pl player.Playlist) []verb {
+	id, name := pl.ID, pl.Name
+	return []verb{{
+		label: "Play it from the top",
+		do: func(m *Model) tea.Cmd {
+			return m.startPlay(playRequest{
+				action: "play playlist",
+				call:   func(ctx context.Context, p player.Player) error { return p.PlayPlaylist(ctx, id, 0) },
+			})
+		},
+	}, {
+		key:   "a",
+		label: "Add all of it to the queue",
+		do:    func(m *Model) tea.Cmd { return m.enqueuePlaylist(id, name) },
+	}, {
+		label: "Copy the Spotify link",
+		do:    func(m *Model) tea.Cmd { return m.copyLink(playlistLink(id)) },
+	}}
+}
+
 // openActions raises the menu over whatever the cursor is on, and reports
 // whether there was anything to raise it over.
 func (m *Model) openActions() bool {
+	if pl := m.cursorPlaylist(); pl != nil {
+		m.actions = actionsPane{open: true, title: pl.Name, subtitle: playlistOwner(*pl)}
+		m.actions.verbs = m.actionsForPlaylist(*pl)
+		return len(m.actions.verbs) > 0
+	}
+
 	t := m.cursorTrack()
 	if t == nil {
 		return false
 	}
 
-	m.actions = actionsPane{open: true, on: *t}
+	m.actions = actionsPane{open: true, title: t.Title, subtitle: strings.Join(t.Artists, ", ")}
 	m.actions.verbs = m.actionsFor(*t)
 	return len(m.actions.verbs) > 0
 }
@@ -121,8 +155,8 @@ func (m *Model) actionsKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 // of a list would need one to be legible.
 func (m Model) actionsBlock(w, rows int) []string {
 	lines := []string{
-		fit(m.styles.Title.Render(m.actions.on.Title), w),
-		fit(m.styles.Artist.Render(strings.Join(m.actions.on.Artists, ", ")), w),
+		fit(m.styles.Title.Render(m.actions.title), w),
+		fit(m.styles.Artist.Render(m.actions.subtitle), w),
 		"",
 	}
 
@@ -141,8 +175,19 @@ func (m Model) actionsBlock(w, rows int) []string {
 	return stack(lines, w, rows)
 }
 
-// trackLink is the address a track has outside Spotify's own applications.
-func trackLink(id string) string { return "https://open.spotify.com/track/" + id }
+// playlistOwner is what the menu says under a playlist's name: whose it is, and
+// how much of it there is, because "add all of it" is worth being able to price.
+func playlistOwner(p player.Playlist) string {
+	if p.Tracks > 0 {
+		return fmt.Sprintf("%s · %d tracks", p.Owner, p.Tracks)
+	}
+	return p.Owner
+}
+
+// trackLink and playlistLink are the addresses a thing has outside Spotify's
+// own applications.
+func trackLink(id string) string    { return "https://open.spotify.com/track/" + id }
+func playlistLink(id string) string { return "https://open.spotify.com/playlist/" + id }
 
 // copyLink puts text on the clipboard through the terminal itself.
 //

@@ -247,6 +247,22 @@ func (m Model) cursorTrack() *player.Track {
 	}
 }
 
+// cursorPlaylist is the playlist under the cursor, where the cursor is on a
+// playlist rather than on a track: the library's top level, and the search's
+// playlists. Nil everywhere else, which is how the screens that have no such
+// row say so.
+func (m Model) cursorPlaylist() *player.Playlist {
+	switch {
+	case m.tab == tabLibrary && m.playlists.open == nil:
+		return m.playlists.selected()
+	case m.tab == tabSearch && m.search.kind == player.SearchPlaylists:
+		found := m.search.current()
+		return atPlaylist(found.playlists, found.cursor.cursor)
+	default:
+		return nil
+	}
+}
+
 // at is the element under an index, or nil when the cursor has outrun the list.
 // One for each kind, because Go has no way to say it once that is worth reading.
 func at(tracks []player.Track, i int) *player.Track {

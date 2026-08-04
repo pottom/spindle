@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -226,6 +227,61 @@ func (m *Model) enqueue(trackID string) tea.Cmd {
 		}),
 		fetchQueueCmd(p),
 	)
+}
+
+// enqueueMost is how much of a playlist is taken when the whole of it is added
+// to the queue. Some playlists run to thousands of tracks; a queue that long is
+// not a queue, and the tail of it would be replaced long before it was reached.
+const enqueueMost = 200
+
+// enqueuePlaylist puts a whole playlist at the back of the queue.
+//
+// The tracks are fetched first and then sent as one order where the device
+// takes one: appending them one at a time is a request per track, which is how
+// the rate limiter is met and how half a playlist ends up queued. Only where
+// the queue cannot be rewritten — anything that is not our own daemon — does it
+// fall back to appending, and there the cap is what keeps it honest.
+func (m *Model) enqueuePlaylist(id, name string) tea.Cmd {
+	p := m.player
+	queued := m.handQueued()
+
+	m.said, m.saidAt = "Adding "+name+" to the queue", time.Now()
+	return tea.Sequence(queuePlaylistCmd(p, id, queued), fetchQueueCmd(p))
+}
+
+// queuePlaylistCmd is the request itself: read the list, then put it at the
+// back of the queue.
+func queuePlaylistCmd(p player.Player, id string, queued []string) tea.Cmd {
+	return controlWithin("queue playlist", bulkTimeout, func(ctx context.Context) error {
+		ids, err := playlistTrackIDs(ctx, p, id)
+		if err != nil || len(ids) == 0 {
+			return err
+		}
+
+		if editor, ok := p.(player.QueueEditor); ok {
+			return editor.SetQueue(ctx, append(queued, ids...))
+		}
+		for _, track := range ids {
+			if err := p.AddToQueue(ctx, track); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// handQueued is what has been queued by hand and is still waiting, which the
+// device holds as one run at the front of the list. Rewriting the queue means
+// naming it in full, so anything already put there has to be carried across.
+func (m Model) handQueued() []string {
+	ids := make([]string, 0, len(m.queue))
+	for _, t := range m.queue {
+		if !t.Queued {
+			break
+		}
+		ids = append(ids, t.ID)
+	}
+	return ids
 }
 
 // editable reports whether the queue can be reordered, which only the local

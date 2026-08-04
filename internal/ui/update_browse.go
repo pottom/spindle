@@ -118,6 +118,10 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 
 	case key.Matches(k, m.keys.Enqueue):
 		if m.playlists.open == nil {
+			// The whole list, since the whole list is what the cursor is on.
+			if sel := m.playlists.selected(); sel != nil {
+				return m.enqueuePlaylist(sel.ID, sel.Name), true
+			}
 			return nil, true
 		}
 		if i := m.playlists.inner.cursor; i >= 0 && i < len(m.playlists.tracks) {
@@ -167,6 +171,9 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		return nil, true
 
 	case key.Matches(k, m.keys.Enqueue), key.Matches(k, m.keys.EnqueueTyped):
+		if pl := m.cursorPlaylist(); pl != nil {
+			return m.enqueuePlaylist(pl.ID, pl.Name), true
+		}
 		if sel := m.search.selected(); sel != nil {
 			return m.enqueue(sel.ID), true
 		}
