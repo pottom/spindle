@@ -182,14 +182,25 @@ func artworkArea(interior, bodyHeight int, mode layoutMode, cell cover.CellSize)
 // chart of nothing in particular.
 const queueScopeMin = 28
 
-// queueScopeWidth is the trace's share of the column beside the queue's
-// artwork, and zero when the detail panel needs all of it. The detail keeps the
-// left half; what the words do not use is empty on that screen anyway.
+// queueBlockWidth is the queue screen's content, artwork and all. queueRowWidth
+// is what its rows are laid out in: the scrollbar's column is held whether there
+// is a bar or not, so the columns do not step sideways the moment the list grows
+// past the screen.
+func queueBlockWidth(l layout) int { return l.artWidth + columnGap + l.infoWidth }
+func queueRowWidth(l layout) int   { return queueBlockWidth(l) - scrollCols }
+
+// queueSplit is where the right-hand half of the queue screen begins. The trace
+// above and the artists below start on the same column, which is what makes the
+// screen read as two columns rather than four.
+func queueSplit(l layout) int { return rowSecondaryAt(queueRowWidth(l)) }
+
+// queueScopeWidth is the trace's share of the row, and zero when the detail
+// panel beside the artwork would be left too narrow to read.
 func queueScopeWidth(l layout) int {
-	if !l.hasArt() {
+	if !l.hasArt() || queueDetailWidth(l) < minInfoCols {
 		return 0
 	}
-	w := l.infoWidth - columnGap - queueDetailWidth(l)
+	w := queueBlockWidth(l) - queueSplit(l)
 	if w < queueScopeMin {
 		return 0
 	}
@@ -198,7 +209,7 @@ func queueScopeWidth(l layout) int {
 
 // queueDetailWidth is what the detail panel keeps once the trace has its share.
 func queueDetailWidth(l layout) int {
-	return max(minInfoCols, l.infoWidth/2)
+	return queueSplit(l) - l.artWidth - 2*columnGap
 }
 
 // fitsMinimum reports whether the player screen can be drawn at all.

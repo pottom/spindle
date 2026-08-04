@@ -80,14 +80,14 @@ func (m Model) browsePane(l layout, rows int) []string {
 // below. The list is the point of the screen, so it gets the width; the detail
 // panel fills what would otherwise be empty beside the artwork.
 func (m Model) queueBlock(l layout, rows int) []string {
-	w := l.artWidth + columnGap + l.infoWidth
+	w := queueBlockWidth(l)
 
 	top := min(l.artHeight, rows)
 	art := alignTop(strings.Split(m.artworkCells(), "\n"), l.artWidth, top)
 
-	// The trace takes the far side of the detail panel's column, which the
-	// words have never reached. Nothing below it moves: the list starts where
-	// the artwork ends either way.
+	// The trace hangs from the same column the artists below start at, so the
+	// screen reads as two halves. Nothing under it moves when it appears: the
+	// list starts where the artwork ends either way.
 	detailWidth := l.infoWidth
 	var trace []string
 	if m.scopeVisible() {
@@ -133,10 +133,7 @@ func (m Model) queueBlock(l layout, rows int) []string {
 	_, playing := m.nowPlayingRow()
 	from, to := m.queuePane.cursor.window(len(rowsOf), body)
 	bar := m.scrollColumn(body, len(rowsOf), m.queuePane.cursor.top)
-	rowWidth := w
-	if bar != nil {
-		rowWidth = w - scrollCols
-	}
+	rowWidth := queueRowWidth(l)
 
 	for i := from; i < to; i++ {
 		number := i + 1
@@ -476,13 +473,72 @@ func (m Model) tempoCell(t player.Track) string {
 // right-hand columns are dropped when the pane is too narrow to carry them,
 // rather than squeezing every column into uselessness.
 func (m Model) row(w int, selected bool, primary, secondary, trailing string) string {
-	return m.rowWithTempo(w, selected, primary, secondary, "", trailing)
+	// A playlist's owner is a name, not a list of them, so the second column is
+	// left at its usual width however wide the terminal is.
+	return m.rowCols(w, selected, primary, secondary, "", trailing, false)
+}
+
+const (
+	// rowGutter is the column the cursor stands in, to the left of every row.
+	rowGutter = 2
+
+	// shareAbove is the row width at which the artists start taking a share of
+	// what the title is not using. It is where the column reaches its cap: below
+	// that the row has nothing spare to give away.
+	shareAbove = 3 * secondaryCols
+)
+
+// rowWidths divides a row's body between the title, the artists, the tempo and
+// the duration. The tempo's column is held whether the track has one or not, so
+// the durations stay in line down the list instead of stepping in and out.
+//
+// share lets the artists grow past their usual cap once the row has room to
+// spare. A title is rarely long enough to earn twice the artists' room, and on a
+// wide terminal the gap it leaves in the middle of the row is the widest thing
+// on the screen. The growth is eased in from the cap and stops at an even split,
+// so a resize moves the column rather than jumping it.
+func rowWidths(body int, share bool) (main, second, beat int) {
+	second = min(body/3, secondaryCols)
+
+	beat = tempoCols
+	main = body - second - beat - trailingCols - 2
+	if main < 16 {
+		// Too narrow for everything: the tempo goes first, then the artist.
+		beat = 0
+		main = body - second - trailingCols - 2
+	}
+	if main < 16 {
+		return body - trailingCols - 1, 0, 0
+	}
+
+	if share {
+		free := body - beat - trailingCols - 2
+		if grown := min(secondaryCols+(body-shareAbove)/2, free/2); grown > second {
+			second, main = grown, free-grown
+		}
+	}
+	return main, second, beat
+}
+
+// rowSecondaryAt is the column a track row's artists begin at, counted from the
+// start of the row. The queue hangs its trace from the same line, so the screen
+// reads as two columns rather than four.
+func rowSecondaryAt(w int) int {
+	main, second, _ := rowWidths(w-rowGutter, true)
+	if second == 0 {
+		return w
+	}
+	return rowGutter + main + 1
 }
 
 // rowWithTempo is row with a beat rate between the artist and the duration.
 // An empty tempo still holds its column, so the durations stay in line whether
 // a track has been heard before or not.
 func (m Model) rowWithTempo(w int, selected bool, primary, secondary, tempo, trailing string) string {
+	return m.rowCols(w, selected, primary, secondary, tempo, trailing, true)
+}
+
+func (m Model) rowCols(w int, selected bool, primary, secondary, tempo, trailing string, share bool) string {
 	gutter := "  "
 	if selected {
 		gutter = m.styles.Cursor.Render(rowCursor) + " "
@@ -499,20 +555,7 @@ func (m Model) rowWithTempo(w int, selected bool, primary, secondary, tempo, tra
 		return gutter + fit(primary, max(body, 0))
 	}
 
-	second := min(body/3, secondaryCols)
-
-	// The column is held whether the track has a tempo or not, so the durations
-	// stay in line down the list instead of stepping in and out.
-	beat := tempoCols
-	main := body - second - beat - trailingCols - 2
-	if main < 16 {
-		// Too narrow for everything: the tempo goes first, then the artist.
-		beat = 0
-		main = body - second - trailingCols - 2
-	}
-	if main < 16 {
-		main, second = body-trailingCols-1, 0
-	}
+	main, second, beat := rowWidths(body, share)
 
 	line := gutter + fit(primary, max(main, 0)) + " "
 	if second > 0 {

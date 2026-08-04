@@ -93,6 +93,17 @@ func TestQueueDrawsTheTraceWithoutMovingTheList(t *testing.T) {
 	}
 }
 
+// columnOf is where want sits inside its own line, which is what "the same
+// column" means on a screen whose lines are not all the same length.
+func columnOf(screen, want string) int {
+	for _, line := range strings.Split(screen, "\n") {
+		if at := strings.Index(line, want); at >= 0 {
+			return at
+		}
+	}
+	return -1
+}
+
 func rowOf(screen, want string) int {
 	for i, line := range strings.Split(screen, "\n") {
 		if strings.Contains(line, want) {
@@ -111,4 +122,41 @@ func hasBraille(s string) bool {
 		}
 	}
 	return false
+}
+
+// The trace hangs from the same column the artists below start at. Two blocks
+// that nearly line up read as a mistake; the same line reads as a column.
+func TestQueueTraceStartsWhereTheArtistsDo(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{TrackID: "now", Title: "playing", Playing: true, DeviceName: "spindle"}
+	m.tab = tabQueue
+	m.queue = []player.Track{{ID: "a", Title: "a", Artists: []string{"someone"}}}
+	m.width, m.height = 200, 45
+	m.resize()
+
+	l := m.layout()
+	if !m.scopeVisible() {
+		t.Fatal("the trace is not drawn on a terminal with room for it")
+	}
+	trace := l.artWidth + columnGap + queueDetailWidth(l) + columnGap
+	if want := queueSplit(l); trace != want {
+		t.Errorf("the trace starts at column %d and the artists at %d", trace, want)
+	}
+}
+
+// The right-hand columns must not step sideways when the list grows past the
+// screen and the scrollbar appears.
+func TestQueueColumnsDoNotMoveWhenTheBarAppears(t *testing.T) {
+	at := func(tracks int) int {
+		m := queueModel(0)
+		for i := range tracks {
+			m.queue = append(m.queue, player.Track{ID: string(rune('a' + i)), Title: "title", Artists: []string{"THE ARTIST"}})
+		}
+		m.width, m.height = 180, 40
+		m.resize()
+		return columnOf(ansiOff(m.render()), "THE ARTIST")
+	}
+	if short, long := at(3), at(60); short != long {
+		t.Errorf("the artists sit at %d with a short list and %d with a scrollbar", short, long)
+	}
 }
