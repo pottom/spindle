@@ -15,10 +15,8 @@ func tempConfig(t *testing.T) {
 func TestClientIDRoundTrip(t *testing.T) {
 	tempConfig(t)
 
-	// A fresh config authenticates as the application spindle ships with, which
-	// is the whole point of shipping one.
-	if got, err := ClientID(); err != nil || got != DefaultClientID {
-		t.Fatalf("ClientID on a fresh config = %q, %v — want the default", got, err)
+	if _, err := ClientID(); !errors.Is(err, ErrNoClientID) {
+		t.Fatalf("ClientID on a fresh config = %v, want ErrNoClientID", err)
 	}
 
 	const id = "1c227ccd43c64c89918ce162bfc38c7b"
@@ -85,8 +83,8 @@ func TestMalformedEnvironmentIsReported(t *testing.T) {
 	}
 }
 
-// A settings file that cannot be read falls back to the shipped application,
-// rather than refusing to start over a stray character.
+// A settings file that cannot be read sends us back to asking, rather than
+// refusing to start over a stray character.
 func TestUnreadableSettingsAreTreatedAsAbsent(t *testing.T) {
 	tempConfig(t)
 	if err := SaveClientID("1c227ccd43c64c89918ce162bfc38c7b"); err != nil {
@@ -96,8 +94,8 @@ func TestUnreadableSettingsAreTreatedAsAbsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, err := ClientID(); err != nil || got != DefaultClientID {
-		t.Errorf("ClientID = %q, %v — want the default", got, err)
+	if _, err := ClientID(); !errors.Is(err, ErrNoClientID) {
+		t.Errorf("ClientID = %v, want ErrNoClientID", err)
 	}
 }
 
