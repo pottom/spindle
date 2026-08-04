@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -337,5 +338,31 @@ func TestPlayRequestsAreHeldToAFloor(t *testing.T) {
 	}
 	if got := m.ps.TrackID; got != "f" {
 		t.Errorf("the mark is on %q, want the last press", got)
+	}
+}
+
+// Spotify refuses the audio key for some tracks inside the list they belong to,
+// and the device moves past them. On screen that is a list skipping a track by
+// itself, which reads as a fault here rather than there.
+func TestASkippedTrackIsSaidOutLoud(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{TrackID: "b", Title: "b", Playing: true}
+	m.queue = []player.Track{{ID: "gated", Title: "Sofia"}}
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(msg.StateFetched{State: &player.State{
+		TrackID: "b", Title: "b", Playing: true, Unplayable: "gated",
+	}})
+
+	got := tm.(Model)
+	text, _, ok := got.notice()
+	if !ok || !strings.Contains(text, "Sofia") {
+		t.Errorf("notice = %q, want the name of the track that was skipped", text)
+	}
+
+	// It is news, not a state: it goes once it has been read.
+	got.skippedAt = time.Now().Add(-unplayableWindow - time.Second)
+	if _, _, ok := got.notice(); ok {
+		t.Error("the line was still there long after the skip")
 	}
 }

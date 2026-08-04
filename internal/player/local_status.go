@@ -5,6 +5,7 @@ import "time"
 // localStatus is what the daemon's /status endpoint answers with.
 type localStatus struct {
 	DeviceID    string `json:"device_id"`
+	Unplayable  string `json:"unplayable"`
 	DeviceName  string `json:"device_name"`
 	Stopped     bool   `json:"stopped"`
 	Paused      bool   `json:"paused"`
@@ -47,6 +48,7 @@ func (s *localStatus) toState() *State {
 		Repeat:     repeatFromLocal(s.RepeatContext, s.RepeatTrack),
 		Volume:     percentOf(s.Volume, s.VolumeSteps),
 		DeviceID:   s.DeviceID,
+		Unplayable: trackIDFromURI(s.Unplayable),
 		DeviceName: s.DeviceName,
 		Bitrate:    s.Bitrate,
 		Tempo:      s.Tempo,

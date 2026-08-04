@@ -41,6 +41,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.nextPollAt = time.Now().Add(activePoll)
 		}
 		m.adopt(message.State)
+		m.noteUnplayable(message.State)
 		m.fillFromQueue()
 		m.noDevice = false
 		m.err = nil
@@ -327,6 +328,33 @@ func (m *Model) adopt(st *player.State) {
 	m.ps.DeviceName = st.DeviceName
 	m.ps.Bitrate = st.Bitrate
 	m.ps.Tempo = st.Tempo
+}
+
+// noteUnplayable picks up a track the device gave up on. Spotify refuses the
+// audio key for some tracks inside the list they belong to, and the device
+// moves past them — which on screen is a list skipping a track by itself, and
+// reads as a fault here rather than there.
+func (m *Model) noteUnplayable(st *player.State) {
+	if st == nil || st.Unplayable == "" || st.Unplayable == m.skipped {
+		return
+	}
+	m.skipped, m.skippedAt = st.Unplayable, time.Now()
+}
+
+// unplayableNotice is what to say about it, while it is still news.
+func (m Model) unplayableNotice() (string, bool) {
+	if m.skipped == "" || time.Since(m.skippedAt) > unplayableWindow {
+		return "", false
+	}
+
+	name := m.skipped
+	for _, t := range m.queue {
+		if t.ID == m.skipped && t.Title != "" {
+			name = t.Title
+			break
+		}
+	}
+	return name, true
 }
 
 // fillFromQueue borrows what the device left out of its answer. The names come

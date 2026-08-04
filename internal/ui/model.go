@@ -99,6 +99,11 @@ type Model struct {
 	playPending  *playRequest
 	playSentAt   time.Time
 
+	// skipped is the track the device could not play, and when it said so. It
+	// is shown for a moment and then let go: it is news, not a state.
+	skipped   string
+	skippedAt time.Time
+
 	// awaitingTrack is the track a skip is trying to move away from, and
 	// confirmUntil is when to stop asking whether it has. expecting is the one
 	// it is trying to move to, where the caller knew which that would be.

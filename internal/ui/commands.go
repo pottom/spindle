@@ -65,6 +65,11 @@ const (
 	// unplayable for a while. Holding the key down is not a reason to punish
 	// the next minute of listening.
 	playFloor = 700 * time.Millisecond
+
+	// unplayableWindow is how long to keep saying that a track was skipped. It
+	// is news rather than a state: nothing is wrong now, and the line would
+	// otherwise sit there over music that is playing perfectly well.
+	unplayableWindow = 6 * time.Second
 )
 
 // lyricsCmd fetches the words of a track. A failure is reported as a track

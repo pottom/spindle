@@ -15,9 +15,15 @@ const (
 // notice is the one line between the player and the help bar. It clears itself
 // when the cause resolves; it never needs acknowledging. SCREENS.md 4.6.
 //
-// Precedence matters: a throttle is transient and tells you why nothing is
-// moving, so it outranks the standing explanations behind it.
+// Precedence matters: what just happened outranks what is standing. A skipped
+// track and a throttle are both news about this moment; the explanations behind
+// them are true either way and will still be there.
 func (m Model) notice() (string, lipgloss.Style, bool) {
+	if name, ok := m.unplayableNotice(); ok {
+		return fmt.Sprintf("%s Spotify would not play %s here — skipped", warnGlyph, name),
+			m.styles.Warning, true
+	}
+
 	switch {
 	case m.throttled():
 		left := time.Until(m.rateLimitedUntil).Round(time.Second)
