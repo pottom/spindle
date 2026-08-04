@@ -94,7 +94,7 @@ func (m Model) queueBlock(l layout, rows int) []string {
 		detailWidth = queueDetailWidth(l)
 		trace = stack(m.scopeRender(queueScopeWidth(l)), queueScopeWidth(l), top)
 	}
-	detail := stack(m.trackDetail(detailWidth), detailWidth, top)
+	detail := stack(m.trackDetail(detailWidth, top), detailWidth, top)
 
 	out := make([]string, 0, rows)
 	gap := strings.Repeat(" ", columnGap)
@@ -176,7 +176,8 @@ func (m Model) scrollColumn(rows, total, offset int) []string {
 // trackDetail is everything Spotify will say about one track, laid out beside
 // the cover. It follows the player screen: the name first and large, the facts
 // beneath it in a quiet column, so the two screens read as the same program.
-func (m Model) trackDetail(w int) []string {
+// rows is how tall the panel is; the playhead is only drawn where it fits.
+func (m Model) trackDetail(w, rows int) []string {
 	t := m.queuedTrack()
 	if t == nil {
 		return nil
@@ -193,7 +194,22 @@ func (m Model) trackDetail(w int) []string {
 		s.Artist.Render(strings.Join(t.Artists, ", ")),
 		"",
 	}
-	for _, f := range trackFacts(*t) {
+
+	// The playhead, for the one track it can belong to. Its row is kept whether
+	// this is that track or not: without that the panel would shift by a row
+	// every time the cursor passed the track playing, and a bar is not worth
+	// making the facts beside it move. It goes in only where there is room for
+	// it at all, because those facts are the point of the panel.
+	facts := trackFacts(*t)
+	if rows >= len(facts)+6 {
+		bar := ""
+		if m.ps != nil && m.ps.TrackID == t.ID {
+			bar = m.progressLine(w)
+		}
+		lines = append(lines, bar, "")
+	}
+
+	for _, f := range facts {
 		lines = append(lines, m.fact(f.label, f.value, w))
 	}
 	if t.Popularity != nil {

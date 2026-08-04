@@ -264,13 +264,13 @@ func TestDetailFollowsTheCursor(t *testing.T) {
 	m.width, m.height = 100, 44
 	m.resize()
 
-	if got := strings.Join(m.trackDetail(40), "\n"); !strings.Contains(got, "First Album") {
+	if got := strings.Join(m.trackDetail(40, 20), "\n"); !strings.Contains(got, "First Album") {
 		t.Errorf("trackDetail() = %q, want the first track", got)
 	}
 
 	var tm tea.Model = m
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyDown})
-	if got := strings.Join(tm.(Model).trackDetail(40), "\n"); !strings.Contains(got, "Second Album") {
+	if got := strings.Join(tm.(Model).trackDetail(40, 20), "\n"); !strings.Contains(got, "Second Album") {
 		t.Errorf("trackDetail() = %q, want the second track after moving down", got)
 	}
 }
@@ -447,19 +447,19 @@ func TestPopularityShownEvenAtZero(t *testing.T) {
 
 	m.queue[0].Popularity = &zero
 	m.queuePane.cursor.cursor = queueRowOf(0)
-	if got := plain(strings.Join(m.trackDetail(40), "\n")); !strings.Contains(got, "Popularity") {
+	if got := plain(strings.Join(m.trackDetail(40, 20), "\n")); !strings.Contains(got, "Popularity") {
 		t.Errorf("trackDetail() = %q, want a rating of zero shown", got)
 	}
 
 	m.queue[1].Popularity = &fifty
 	m.queuePane.cursor.cursor = queueRowOf(1)
-	if got := plain(strings.Join(m.trackDetail(40), "\n")); !strings.Contains(got, strings.Repeat(starFull, 3)) {
+	if got := plain(strings.Join(m.trackDetail(40, 20), "\n")); !strings.Contains(got, strings.Repeat(starFull, 3)) {
 		t.Errorf("trackDetail() = %q, want three of five stars for a rating of fifty", got)
 	}
 
 	// A backend that does not rate tracks says nothing rather than zero.
 	m.queue[1].Popularity = nil
-	if got := plain(strings.Join(m.trackDetail(40), "\n")); strings.Contains(got, "Popularity") {
+	if got := plain(strings.Join(m.trackDetail(40, 20), "\n")); strings.Contains(got, "Popularity") {
 		t.Errorf("trackDetail() = %q, want no rating when the backend does not give one", got)
 	}
 }
@@ -684,5 +684,29 @@ func TestAPollDoesNotUndoAWaitingMove(t *testing.T) {
 	tm, _ = tm.Update(msg.QueueFetched{Tracks: queueOf(0, "a", "b", "c")})
 	if got := ids(tm.(Model).queue); got[0] != "b" || got[1] != "a" {
 		t.Errorf("queue = %v, want the move to have survived the poll", got)
+	}
+}
+
+// The playhead belongs to the track sounding, and its row is kept for every
+// other one: without that the panel would shift by a row each time the cursor
+// passed the track playing.
+func TestQueueDetailShowsThePlayhead(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.ps = &player.State{TrackID: "a", Playing: true, Duration: 2 * time.Minute}
+	m.queue[0].Duration = 2 * time.Minute
+
+	playing := plain(strings.Join(m.trackDetail(40, 20), "\n"))
+	if !strings.Contains(playing, knob) {
+		t.Errorf("detail = %q, want the playhead on the track sounding", playing)
+	}
+
+	m.queuePane.cursor.cursor = queueRowOf(1)
+	other := m.trackDetail(40, 20)
+	if got := plain(strings.Join(other, "\n")); strings.Contains(got, knob) {
+		t.Errorf("detail = %q, want no playhead on a track that is not playing", got)
+	}
+	if len(other) != len(m.trackDetail(40, 20)) || len(other) != len(strings.Split(playing, "\n")) {
+		t.Errorf("the panel is %d rows without the playhead and %d with it",
+			len(other), len(strings.Split(playing, "\n")))
 	}
 }
