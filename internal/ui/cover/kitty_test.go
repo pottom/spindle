@@ -3,6 +3,8 @@ package cover
 import (
 	"bytes"
 	"image/color"
+	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -15,7 +17,7 @@ import (
 func TestPlaceholderGrid(t *testing.T) {
 	const cols, rows = 20, 10
 
-	grid := placeholderGrid(cols, rows)
+	grid := placeholderGrid(testImageID, cols, rows)
 	lines := strings.Split(grid, "\n")
 	if len(lines) != rows {
 		t.Fatalf("got %d lines, want %d", len(lines), rows)
@@ -50,7 +52,7 @@ func TestPlaceholderGrid(t *testing.T) {
 }
 
 func TestPlaceholderGridRefusesOversizedArea(t *testing.T) {
-	if got := placeholderGrid(len(rowColumnDiacritics)+1, 1); got != "" {
+	if got := placeholderGrid(testImageID, len(rowColumnDiacritics)+1, 1); got != "" {
 		t.Errorf("got %q, want an empty grid when the area exceeds the diacritic table", got)
 	}
 }
@@ -129,5 +131,25 @@ func TestNewGeometryClearsTheOldPlacement(t *testing.T) {
 		t.Error("the new placement was never sent")
 	case del > place:
 		t.Error("the delete came after the new placement, which undoes it")
+	}
+}
+
+// testImageID stands in for the per-process id, which the grid only carries.
+const testImageID = 1
+
+// Two spindles on one machine must not share an image id. The id belongs to the
+// terminal, and every cover is preceded by a delete of that id's placements: a
+// shared number would take the other one's picture off the screen with every
+// track change.
+func TestEachRendererHasItsOwnImageID(t *testing.T) {
+	k := NewKitty(io.Discard, CellSize{Width: 10, Height: 20, Measured: true})
+	if k.imageID == 0 {
+		t.Error("image id 0 is not one the protocol accepts")
+	}
+	if k.imageID > 0xFFFFFF {
+		t.Errorf("image id %d does not fit the 24 bits a placeholder carries", k.imageID)
+	}
+	if k.imageID != os.Getpid()&0xFFFFFF|1 {
+		t.Errorf("image id = %d, want it derived from the process", k.imageID)
 	}
 }

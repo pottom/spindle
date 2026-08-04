@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/png"
 	"io"
+	"os"
 	"strings"
 	"sync"
 
@@ -19,10 +20,9 @@ const (
 	// Because it is ordinary text, Bubble Tea's line diff handles it correctly.
 	placeholder = '\U0010EEEE'
 
-	// imageID is reused for every cover. Re-transmitting under the same id
-	// replaces the image, which is exactly the swap wanted on a track change,
-	// and it keeps the terminal's image store from filling up.
-	imageID = 1
+	// imageIDMask keeps an id inside the 24 bits a placeholder cell can carry,
+	// which is the whole address space available here.
+	imageIDMask = 0xFFFFFF
 
 	// chunkSize is the escape-sequence payload limit the protocol imposes.
 	chunkSize = 4096
@@ -39,6 +39,18 @@ const (
 type Kitty struct {
 	Cell CellSize
 
+	// imageID is this spindle's own. One id is reused for every cover, because
+	// re-transmitting under the same id replaces the picture — that is exactly
+	// the swap a track change wants, and it keeps the terminal's image store
+	// from filling up.
+	//
+	// It cannot be the same in two spindles at once. The id belongs to the
+	// terminal rather than to the program, and every cover is preceded by a
+	// delete of the id's placements: a second spindle sharing the number would
+	// take the first one's picture off the screen with every track change. The
+	// process id is what the two of them cannot both have.
+	imageID int
+
 	mu  sync.Mutex
 	out io.Writer // the tty; written to from the pipeline, never from View
 
@@ -50,7 +62,9 @@ type Kitty struct {
 }
 
 func NewKitty(out io.Writer, cell CellSize) *Kitty {
-	return &Kitty{Cell: cell, out: out}
+	// Zero is not an id the protocol accepts, and a pid can be anything.
+	id := os.Getpid()&imageIDMask | 1
+	return &Kitty{Cell: cell, out: out, imageID: id}
 }
 
 func (k *Kitty) Name() string { return "kitty" }
@@ -87,7 +101,7 @@ func (k *Kitty) Render(img image.Image, wCells, hCells int, seq uint64) (string,
 	if err := k.transmit(buf.Bytes(), cols, rows, seq); err != nil {
 		return "", err
 	}
-	return placeholderGrid(cols, rows), nil
+	return placeholderGrid(k.imageID, cols, rows), nil
 }
 
 // transmit uploads the image and creates a virtual placement under imageID.
@@ -102,7 +116,7 @@ func (k *Kitty) transmit(data []byte, cols, rows int, seq uint64) error {
 	// the same id replaces the picture but not the placement it already has, so
 	// without this the terminal keeps drawing into the old rectangle and only
 	// the corner of the new cover that fits inside it is ever seen.
-	fmt.Fprintf(&sb, "\x1b_Ga=d,d=I,i=%d,q=2\x1b\\", imageID)
+	fmt.Fprintf(&sb, "\x1b_Ga=d,d=I,i=%d,q=2\x1b\\", k.imageID)
 
 	first := true
 	for len(encoded) > 0 {
@@ -119,7 +133,7 @@ func (k *Kitty) transmit(data []byte, cols, rows int, seq uint64) error {
 
 		if first {
 			fmt.Fprintf(&sb, "\x1b_Ga=T,q=2,f=100,t=d,i=%d,U=1,c=%d,r=%d,m=%d;%s\x1b\\",
-				imageID, cols, rows, more, chunk)
+				k.imageID, cols, rows, more, chunk)
 			first = false
 			continue
 		}
@@ -144,7 +158,7 @@ func (k *Kitty) transmit(data []byte, cols, rows int, seq uint64) error {
 // its row and column as combining diacritics, and the run's foreground colour
 // carries the image id, so the terminal can reassemble the picture wherever the
 // characters end up.
-func placeholderGrid(cols, rows int) string {
+func placeholderGrid(imageID, cols, rows int) string {
 	if rows > len(rowColumnDiacritics) || cols > len(rowColumnDiacritics) {
 		return ""
 	}
