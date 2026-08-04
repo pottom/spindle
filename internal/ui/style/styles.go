@@ -2,6 +2,7 @@ package style
 
 import (
 	"image/color"
+	"math"
 
 	"charm.land/lipgloss/v2"
 )
@@ -60,10 +61,15 @@ type Styles struct {
 	ScrollThumb lipgloss.Style
 	ScrollTrack lipgloss.Style
 
-	// Scope is the waveform's palette, quietest first. The trace is coloured by
-	// how loud each moment is rather than by where it sits on the screen, so it
-	// breathes with the music instead of reading as a fixed band.
-	Scope []lipgloss.Style
+	// The waveform is drawn in two families: the middle of the trace runs
+	// through the artwork's accent, and its extremes through the theme's cool
+	// grey. The contrast between the two is what gives the line a lit core and
+	// pale tips rather than one flat colour top to bottom.
+	//
+	// Within each family the step is chosen by how loud the moment is, so the
+	// trace also flares on a hit and recedes between them.
+	ScopeCore []lipgloss.Style
+	ScopeEdge []lipgloss.Style
 
 	// Status line.
 	DeviceOn  lipgloss.Style
@@ -111,7 +117,8 @@ func New(isDark bool, accent color.Color) Styles {
 		ScrollThumb: fg(accent),
 		ScrollTrack: fg(t.Faint),
 
-		Scope: scopeRamp(t, accent),
+		ScopeCore: coreRamp(accent),
+		ScopeEdge: edgeRamp(t),
 
 		Quality: fg(t.Faint),
 
@@ -147,31 +154,111 @@ func New(isDark bool, accent color.Color) Styles {
 	}
 }
 
-// scopeLevels is how many strengths the waveform is drawn in. Five is enough
-// for the trace to flare and recede without breaking it into so many runs that
-// the row stops compressing.
-const scopeLevels = 5
+// scopeLevels is how many strengths each waveform family is drawn in. Four is
+// enough for the trace to flare and recede without breaking a row into so many
+// runs that it stops compressing.
+const scopeLevels = 4
 
-// scopeRamp builds the waveform's palette: from a colour that recedes into the
-// background at the quiet end, through the artwork's accent, to a lifted
-// version of it for the moments that hit hardest.
-func scopeRamp(t Theme, accent color.Color) []lipgloss.Style {
-	quiet := blend(t.Faint, accent, 0.35)
-	loud := blend(accent, t.Text, 0.45)
+// coreRamp is the middle of the trace: the artwork's accent, swept through a
+// little of the hue on either side of it. A quiet passage sits a touch cooler
+// and darker, a hit lifts warmer and brighter — the colour moves with the music
+// without ever leaving the accent's family.
+func coreRamp(accent color.Color) []lipgloss.Style {
+	quiet := shift(accent, -14, 0.80, 0.86)
+	hot := shift(accent, 13, 1.12, 1.14)
+	return ramp(quiet, accent, hot)
+}
+
+// edgeRamp is the extremes of the swing: the theme's own cool grey, which reads
+// against the accent as a different colour rather than merely a dimmer one.
+func edgeRamp(t Theme) []lipgloss.Style {
+	return ramp(t.Faint, t.Muted, blend(t.Muted, t.Text, 0.35))
+}
+
+// ramp builds the palette between three stops, the middle one two thirds of the
+// way up so most of the trace sits on it and only the peaks lift past.
+func ramp(low, mid, high color.Color) []lipgloss.Style {
+	const knee = 0.66
 
 	out := make([]lipgloss.Style, scopeLevels)
 	for i := range out {
-		// The accent sits two thirds of the way up, so most of the trace is the
-		// artwork's colour and only the peaks lift out of it.
+		f := float64(i) / float64(scopeLevels-1)
 		var c color.Color
-		if f := float64(i) / float64(scopeLevels-1); f <= 0.66 {
-			c = blend(quiet, accent, f/0.66)
+		if f <= knee {
+			c = blend(low, mid, f/knee)
 		} else {
-			c = blend(accent, loud, (f-0.66)/0.34)
+			c = blend(mid, high, (f-knee)/(1-knee))
 		}
 		out[i] = lipgloss.NewStyle().Foreground(c)
 	}
 	return out
+}
+
+// shift rotates a colour's hue by the given degrees and scales its saturation
+// and lightness, which keeps a derived colour recognisably related to the one
+// it came from — blending toward white or grey does not.
+func shift(c color.Color, degrees, sat, light float64) color.Color {
+	h, s, l := toHSL(c)
+	h = math.Mod(h+degrees+360, 360)
+	return fromHSL(h, min(s*sat, 1), min(l*light, 1))
+}
+
+func toHSL(c color.Color) (h, s, l float64) {
+	r0, g0, b0, _ := c.RGBA()
+	r, g, b := float64(r0>>8)/255, float64(g0>>8)/255, float64(b0>>8)/255
+
+	maxc, minc := max(r, g, b), min(r, g, b)
+	l = (maxc + minc) / 2
+	if maxc == minc {
+		return 0, 0, l
+	}
+
+	d := maxc - minc
+	if l > 0.5 {
+		s = d / (2 - maxc - minc)
+	} else {
+		s = d / (maxc + minc)
+	}
+
+	switch maxc {
+	case r:
+		h = math.Mod((g-b)/d+6, 6)
+	case g:
+		h = (b-r)/d + 2
+	default:
+		h = (r-g)/d + 4
+	}
+	return h * 60, s, l
+}
+
+func fromHSL(h, s, l float64) color.Color {
+	if s == 0 {
+		v := uint8(l*255 + 0.5)
+		return color.RGBA{R: v, G: v, B: v, A: 0xff}
+	}
+
+	q := l * (1 + s)
+	if l >= 0.5 {
+		q = l + s - l*s
+	}
+	p := 2*l - q
+
+	channel := func(t float64) uint8 {
+		t = math.Mod(t+1, 1)
+		switch {
+		case t < 1.0/6:
+			return uint8((p+(q-p)*6*t)*255 + 0.5)
+		case t < 1.0/2:
+			return uint8(q*255 + 0.5)
+		case t < 2.0/3:
+			return uint8((p+(q-p)*(2.0/3-t)*6)*255 + 0.5)
+		default:
+			return uint8(p*255 + 0.5)
+		}
+	}
+
+	hk := h / 360
+	return color.RGBA{R: channel(hk + 1.0/3), G: channel(hk), B: channel(hk - 1.0/3), A: 0xff}
 }
 
 // blend mixes two colours, t running from a to b.

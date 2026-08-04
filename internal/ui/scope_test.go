@@ -342,12 +342,12 @@ func TestScopeColoursByLoudness(t *testing.T) {
 	m.scope.frame = f
 	m.scope.follow(f)
 
-	if len(m.styles.Scope) < 2 {
+	if len(m.styles.ScopeCore) < 2 {
 		t.Fatal("the waveform has no palette to colour with")
 	}
-	if got := scopeLevel(0.05, len(m.styles.Scope)); got >= scopeLevel(1, len(m.styles.Scope)) {
-		t.Errorf("a whisper is coloured %d and a hit %d, want the hit brighter",
-			got, scopeLevel(1, len(m.styles.Scope)))
+	n := len(m.styles.ScopeCore)
+	if got := scopeLevel(0.05, n); got >= scopeLevel(1, n) {
+		t.Errorf("a whisper is coloured %d and a hit %d, want the hit brighter", got, scopeLevel(1, n))
 	}
 }
 

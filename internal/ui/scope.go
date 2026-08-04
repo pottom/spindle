@@ -78,10 +78,6 @@ const (
 	// reads as afterglow; more than that smears, because a thirtieth of a
 	// second is long enough for the wave to have moved right across the screen.
 	scopeTrail = 2
-
-	// scopeEdgeFalloff is how many steps back from the accent the top and
-	// bottom rows are drawn, so the trace has a lit core.
-	scopeEdgeFalloff = 2
 )
 
 // follow updates the loudness envelope from a new frame.
@@ -142,7 +138,7 @@ func (m Model) scopeLines(w int) []string {
 // scopeLinesFrom draws the frame beginning at a given sample. Where that sample
 // is decided is scopeTrigger's business; this only draws.
 func (m Model) scopeLinesFrom(w, start int) []string {
-	if w <= 0 || len(m.styles.Scope) == 0 {
+	if w <= 0 || len(m.styles.ScopeCore) == 0 {
 		return nil
 	}
 	grid, loud := m.scopeGrid(w, start)
@@ -192,23 +188,24 @@ func (m Model) scopeDraw(w int, grid []uint8, loud []float32) []string {
 	for r := range scopeRows {
 		var sb strings.Builder
 
+		// The extremes of the swing are drawn in the theme's cool grey and the
+		// middle of the trace in the artwork's accent. Two families rather than
+		// two strengths: a pale tip reads as a different colour, which is what
+		// gives the line a lit core instead of a uniform band.
+		ramp := m.styles.ScopeCore
+		if r == 0 || r == scopeRows-1 {
+			ramp = m.styles.ScopeEdge
+		}
+
 		// Runs of one colour are rendered together, so a row costs about as
 		// much output as a line of text rather than one escape per cell.
 		var run strings.Builder
 		level := -1
 		flush := func() {
 			if run.Len() > 0 {
-				sb.WriteString(m.styles.Scope[level].Render(run.String()))
+				sb.WriteString(ramp[level].Render(run.String()))
 				run.Reset()
 			}
-		}
-
-		// The extremes of the swing are drawn back from the accent and the middle
-		// of the trace sits in it, which gives the line a lit core rather than
-		// one flat colour across its whole height.
-		falloff := 0
-		if r == 0 || r == scopeRows-1 {
-			falloff = scopeEdgeFalloff
 		}
 
 		for c := range w {
@@ -216,15 +213,14 @@ func (m Model) scopeDraw(w int, grid []uint8, loud []float32) []string {
 			bits := grid[at]
 
 			// Whatever the beam is not covering, the glow might be.
-			want := max(scopeLevel(loud[c], len(m.styles.Scope))-falloff, 0)
+			want := scopeLevel(loud[c], len(ramp))
 			for age, old := range m.scope.trail {
 				if len(old) != len(grid) || old[at] == 0 {
 					continue
 				}
 				if glow := len(m.scope.trail) - age - 1; bits == 0 {
 					bits = old[at]
-					want = min(glow, len(m.styles.Scope)-1)
-					want = max(want-falloff, 0)
+					want = min(glow, len(ramp)-1)
 				} else {
 					bits |= old[at]
 				}
