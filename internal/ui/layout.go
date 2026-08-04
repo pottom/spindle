@@ -159,6 +159,15 @@ func artworkArea(interior, bodyHeight int, mode layoutMode, cell cover.CellSize)
 
 	maxWidth := max(min(interior-leftMargin-columnGap-minInfoCols-rightMargin, share), 1)
 	maxHeight := max(bodyHeight-2*artMargin-1, 1)
+
+	// The picture never takes more than two thirds of the height it is given.
+	// Filling the body edge to edge reads as cramped however large the picture
+	// is, and the rows it leaves are where the waveform goes — a cover that
+	// grows until there is no room for it would make the trace disappear on
+	// exactly the terminals with the most space.
+	if mode == modePlayer {
+		maxHeight = max(min(maxHeight, bodyHeight*2/3), 1)
+	}
 	if mode == modeQueue {
 		maxHeight = max(min(maxHeight, bodyHeight/3), 1)
 	}

@@ -529,3 +529,20 @@ func TestCompactDropsOnlyTheArtwork(t *testing.T) {
 		t.Errorf("render() = %d rows, want %d", len(rows), m.height)
 	}
 }
+
+// The waveform lives in the rows the artwork leaves. A cover free to grow until
+// it fills the body took those rows away, and the trace vanished on exactly the
+// terminals with the most space to draw it — so the cover is held to two thirds
+// of the height.
+func TestWaveformSurvivesAGrowingCover(t *testing.T) {
+	for _, size := range [][2]int{
+		{80, 30}, {100, 30}, {100, 44}, {132, 40}, {160, 45}, {200, 50}, {200, 60},
+	} {
+		m := scopeModel(size[0], size[1])
+		if !m.scopeAvailable() {
+			l := m.layout()
+			t.Errorf("%dx%d: no room for the waveform (body %d, art %dx%d, room %d)",
+				size[0], size[1], l.bodyHeight, l.artWidth, l.artHeight, m.scopeRoom(l))
+		}
+	}
+}
