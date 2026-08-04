@@ -144,11 +144,13 @@ func (m Model) scopeAvailable() bool {
 	return m.listTab() && queueScopeWidth(l) > 0 && l.artHeight >= scopeRows
 }
 
-// listTab reports whether the current screen is one of the lists, which all
-// share a composition: the cover and a detail panel across the top, the list
-// itself below.
+// listTab reports whether the current screen is one that draws the trace.
+//
+// The lists share a composition, but not this: the library is read while
+// deciding what to hear next, and something moving beside the words is exactly
+// the wrong thing there. The queue is the list you watch, and keeps it.
 func (m Model) listTab() bool {
-	return m.tab == tabQueue || m.tab == tabLibrary
+	return m.tab == tabQueue
 }
 
 // scopeMode is the visualiser the current tab is set to.

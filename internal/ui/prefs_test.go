@@ -173,3 +173,30 @@ func TestQueueColumnsDoNotMoveWhenTheBarAppears(t *testing.T) {
 		t.Errorf("the artists sit at %d with a short list and %d with a scrollbar", short, long)
 	}
 }
+
+// The library is read while deciding what to hear next, and something moving
+// beside the words is the wrong thing there.
+func TestTheLibraryDrawsNoTrace(t *testing.T) {
+	m := scopeModel(200, 45)
+	m.tab = tabLibrary
+	m.resize()
+
+	if m.scopeAvailable() {
+		t.Error("the library offers the visualiser")
+	}
+	if m.scopeVisible() {
+		t.Error("the library is drawing the visualiser")
+	}
+
+	// The key does nothing there, and the help does not offer it.
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
+	if tm.(Model).scope.modes[tabLibrary] != scopeOff {
+		t.Error("v turned something on in the library")
+	}
+	for _, binding := range m.helpKeys().short {
+		if strings.Contains(binding.Help().Desc, "waveform") {
+			t.Error("the library's help offers the visualiser")
+		}
+	}
+}
