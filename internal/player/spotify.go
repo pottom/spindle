@@ -15,10 +15,11 @@ const (
 	// detail is invisible in a terminal and only costs bandwidth.
 	maxCoverPixels = 640
 
-	// searchLimit and listLimit bound the pages we ask for. One screenful is
-	// generous; the lists are for finding something, not for reading end to end.
-	searchLimit = 50
-	listLimit   = 50
+	// pageLimit is how much of a browsing list one request asks for. Fifty is
+	// the most the Web API hands back for a search, for the user's playlists and
+	// for a playlist's items alike, so anything smaller would only mean more
+	// round trips for the same list.
+	pageLimit = 50
 )
 
 // Spotify drives playback through the Spotify Web API.
@@ -117,33 +118,44 @@ func (s *Spotify) AddToQueue(ctx context.Context, trackID string) error {
 }
 
 func (s *Spotify) Search(ctx context.Context, query string) ([]Track, error) {
+	page, err := s.SearchPage(ctx, query, 0)
+	return page.Items, err
+}
+
+func (s *Spotify) SearchPage(ctx context.Context, query string, offset int) (Page[Track], error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
-		return nil, nil
+		return Page[Track]{}, nil
 	}
 
-	res, err := s.client.Search(ctx, query, spotify.SearchTypeTrack, spotify.Limit(searchLimit))
+	res, err := s.client.Search(ctx, query, spotify.SearchTypeTrack,
+		spotify.Limit(pageLimit), spotify.Offset(max(offset, 0)))
 	if err != nil {
-		return nil, fmt.Errorf("search: %w", err)
+		return Page[Track]{}, fmt.Errorf("search: %w", err)
 	}
 	if res == nil || res.Tracks == nil {
-		return nil, nil
+		return Page[Track]{}, nil
 	}
 
 	out := make([]Track, 0, len(res.Tracks.Tracks))
 	for i := range res.Tracks.Tracks {
 		out = append(out, trackFromFull(&res.Tracks.Tracks[i]))
 	}
-	return out, nil
+	return Page[Track]{Items: out, More: res.Tracks.Next != ""}, nil
 }
 
 func (s *Spotify) Playlists(ctx context.Context) ([]Playlist, error) {
-	page, err := s.client.CurrentUsersPlaylists(ctx, spotify.Limit(listLimit))
+	page, err := s.PlaylistsPage(ctx, 0)
+	return page.Items, err
+}
+
+func (s *Spotify) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist], error) {
+	page, err := s.client.CurrentUsersPlaylists(ctx, spotify.Limit(pageLimit), spotify.Offset(max(offset, 0)))
 	if err != nil {
-		return nil, fmt.Errorf("fetch playlists: %w", err)
+		return Page[Playlist]{}, fmt.Errorf("fetch playlists: %w", err)
 	}
 	if page == nil {
-		return nil, nil
+		return Page[Playlist]{}, nil
 	}
 
 	out := make([]Playlist, 0, len(page.Playlists))
@@ -159,16 +171,22 @@ func (s *Spotify) Playlists(ctx context.Context) ([]Playlist, error) {
 			// up would mean fetching every track. The UI omits what is zero.
 		})
 	}
-	return out, nil
+	return Page[Playlist]{Items: out, More: page.Next != ""}, nil
 }
 
 func (s *Spotify) PlaylistTracks(ctx context.Context, playlistID string) ([]Track, error) {
-	page, err := s.client.GetPlaylistItems(ctx, spotify.ID(playlistID), spotify.Limit(listLimit))
+	page, err := s.PlaylistTracksPage(ctx, playlistID, 0)
+	return page.Items, err
+}
+
+func (s *Spotify) PlaylistTracksPage(ctx context.Context, playlistID string, offset int) (Page[Track], error) {
+	page, err := s.client.GetPlaylistItems(ctx, spotify.ID(playlistID),
+		spotify.Limit(pageLimit), spotify.Offset(max(offset, 0)))
 	if err != nil {
-		return nil, fmt.Errorf("fetch playlist tracks: %w", err)
+		return Page[Track]{}, fmt.Errorf("fetch playlist tracks: %w", err)
 	}
 	if page == nil {
-		return nil, nil
+		return Page[Track]{}, nil
 	}
 
 	out := make([]Track, 0, len(page.Items))
@@ -179,7 +197,11 @@ func (s *Spotify) PlaylistTracks(ctx context.Context, playlistID string) ([]Trac
 		}
 		out = append(out, trackFromFull(item.Track.Track))
 	}
-	return out, nil
+
+	// What follows is taken from Spotify's own link to the next page rather than
+	// from the length of this one: the items dropped just above would otherwise
+	// make a full page look like the last one.
+	return Page[Track]{Items: out, More: page.Next != ""}, nil
 }
 
 func (s *Spotify) Play(ctx context.Context) error {

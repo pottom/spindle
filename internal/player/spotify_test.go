@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"testing"
 	"time"
 
@@ -160,6 +162,119 @@ func TestPlaylistTracksSkipsWhatIsNotATrack(t *testing.T) {
 	}
 	if tracks[0].Duration != 361*time.Second {
 		t.Errorf("duration = %v, want 6m01s", tracks[0].Duration)
+	}
+}
+
+// newQueryStub answers everything with the same body and keeps the query string
+// it was asked with, which is where an offset shows up.
+func newQueryStub(t *testing.T, body string) (*Spotify, *url.Values) {
+	t.Helper()
+	var got url.Values
+
+	s := newStub(t, func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.Query()
+		w.Write([]byte(body)) //nolint:errcheck // test server
+	})
+	return s, &got
+}
+
+// Every browsing list can be longer than one request, and asking for the first
+// page and stopping is how a playlist of three hundred tracks became one of
+// fifty. Each call has to carry the offset it was given and the page size the
+// backend settled on.
+func TestPagingSendsOffsetAndLimit(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		call func(*Spotify) error
+	}{
+		{"search", `{"tracks":{"items":[]}}`, func(s *Spotify) error {
+			_, err := s.SearchPage(context.Background(), "bowie", 150)
+			return err
+		}},
+		{"playlists", `{"items":[]}`, func(s *Spotify) error {
+			_, err := s.PlaylistsPage(context.Background(), 150)
+			return err
+		}},
+		{"playlist tracks", `{"items":[]}`, func(s *Spotify) error {
+			_, err := s.PlaylistTracksPage(context.Background(), "p1", 150)
+			return err
+		}},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s, got := newQueryStub(t, c.body)
+			if err := c.call(s); err != nil {
+				t.Fatal(err)
+			}
+			if got.Get("offset") != "150" {
+				t.Errorf("offset = %q, want 150", got.Get("offset"))
+			}
+			if want := strconv.Itoa(pageLimit); got.Get("limit") != want {
+				t.Errorf("limit = %q, want %q", got.Get("limit"), want)
+			}
+		})
+	}
+}
+
+// An offset below zero is the caller's arithmetic going wrong, not a request to
+// read backwards; Spotify answers 400 to a negative one.
+func TestPagingClampsNegativeOffset(t *testing.T) {
+	s, got := newQueryStub(t, `{"items":[]}`)
+
+	if _, err := s.PlaylistTracksPage(context.Background(), "p1", -20); err != nil {
+		t.Fatal(err)
+	}
+	if got.Get("offset") != "0" {
+		t.Errorf("offset = %q, want 0", got.Get("offset"))
+	}
+}
+
+// Whether more follows is Spotify's own answer — the link to the next page —
+// and not something inferred here.
+func TestPageReportsWhatFollows(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want bool
+	}{
+		{"a next page", `{"items":[],"next":"https://api.spotify.com/v1/me/playlists?offset=50"}`, true},
+		{"the end of the list", `{"items":[],"next":null}`, false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s, _ := newQueryStub(t, c.body)
+			page, err := s.PlaylistsPage(context.Background(), 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if page.More != c.want {
+				t.Errorf("More = %v, want %v", page.More, c.want)
+			}
+		})
+	}
+}
+
+// A page thinned out by podcast episodes is still a full page as far as the
+// list is concerned. Counting the tracks that survived would end the scroll on
+// whichever page happened to hold one.
+func TestShortPageStillHasMore(t *testing.T) {
+	s, _ := newQueryStub(t, `{"next":"https://api.spotify.com/v1/playlists/p1/tracks?offset=50","items":[
+	  {"track":{"type":"track","id":"t1","name":"Heroes","artists":[],"album":{"images":[]}}},
+	  {"track":null}
+	]}`)
+
+	page, err := s.PlaylistTracksPage(context.Background(), "p1", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 {
+		t.Fatalf("%d tracks, want the one that is playable", len(page.Items))
+	}
+	if !page.More {
+		t.Error("More = false on a page that was only short because an item was dropped")
 	}
 }
 
