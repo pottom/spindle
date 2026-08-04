@@ -503,3 +503,35 @@ func TestPlayingTrackPrefersTheLiveTempo(t *testing.T) {
 		t.Errorf("tempo = %.0f, want the remembered one while nothing is measured", got.Tempo)
 	}
 }
+
+// The tempo column holds its width whether a track has been heard or not, so
+// the durations stay in line down the list instead of stepping in and out.
+func TestTempoColumnHoldsItsPlace(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.queue[0].Tempo = 118
+	m.width, m.height = 100, 44
+	m.resize()
+
+	rows := strings.Split(plain(m.render()), "\n")
+	var withTempo, without string
+	for _, r := range rows {
+		switch {
+		case strings.Contains(r, " a "):
+			withTempo = r
+		case strings.Contains(r, " b "):
+			without = r
+		}
+	}
+	if withTempo == "" || without == "" {
+		t.Fatalf("could not find both rows:\n%s", strings.Join(rows, "\n"))
+	}
+
+	// The duration is the last thing on the row, so its column is the test.
+	at := func(line string) int { return strings.LastIndex(strings.TrimRight(line, " "), "3:00") }
+	if a, b := at(withTempo), at(without); a != b {
+		t.Errorf("durations sit at %d and %d, want the same column\n  %q\n  %q", a, b, withTempo, without)
+	}
+	if !strings.Contains(withTempo, "118") {
+		t.Errorf("row = %q, want the tempo in it", withTempo)
+	}
+}

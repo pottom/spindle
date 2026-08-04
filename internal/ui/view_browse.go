@@ -49,6 +49,10 @@ const (
 
 	// trailingCols holds a duration or a count, right aligned.
 	trailingCols = 8
+
+	// tempoCols holds a beat rate, right aligned. It is the first column to go
+	// when the pane is narrow: a tempo is worth knowing, a title is worth more.
+	tempoCols = 4
 )
 
 // browsePane is the right-hand side of the playlists and search tabs: a heading,
@@ -281,9 +285,10 @@ func (m Model) queueRow(t player.Track, w int, selected bool, number int) string
 	}
 	// The mark stands in the same columns the track number would, or the titles
 	// beside it would sit one indent out.
-	return m.row(w, selected,
+	return m.rowWithTempo(w, selected,
 		m.styles.Cursor.Render(padLeft(nowMark, ordinalCols))+"  "+primary.Render(m.withMarks(t, t.Title)),
 		m.styles.RowSecondary.Render(strings.Join(t.Artists, ", ")),
+		m.tempoCell(t),
 		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
 	)
 }
@@ -412,17 +417,34 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 		title = nowMark + " " + title
 	}
 
-	return m.row(w, selected,
+	return m.rowWithTempo(w, selected,
 		primary.Render(title),
 		m.styles.RowSecondary.Render(strings.Join(t.Artists, ", ")),
+		m.tempoCell(t),
 		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
 	)
+}
+
+// tempoCell is the beat rate for a list row, or nothing for a track that has
+// never been played: a tempo has to be heard to exist.
+func (m Model) tempoCell(t player.Track) string {
+	if t.Tempo <= 0 {
+		return ""
+	}
+	return m.styles.Quality.Render(fmt.Sprintf("%.0f", t.Tempo))
 }
 
 // row lays out the cursor gutter and the three columns of a list row. The two
 // right-hand columns are dropped when the pane is too narrow to carry them,
 // rather than squeezing every column into uselessness.
 func (m Model) row(w int, selected bool, primary, secondary, trailing string) string {
+	return m.rowWithTempo(w, selected, primary, secondary, "", trailing)
+}
+
+// rowWithTempo is row with a beat rate between the artist and the duration.
+// An empty tempo still holds its column, so the durations stay in line whether
+// a track has been heard before or not.
+func (m Model) rowWithTempo(w int, selected bool, primary, secondary, tempo, trailing string) string {
 	gutter := "  "
 	if selected {
 		gutter = m.styles.Cursor.Render(rowCursor) + " "
@@ -434,7 +456,16 @@ func (m Model) row(w int, selected bool, primary, secondary, trailing string) st
 	}
 
 	second := min(secondaryCols, body/3)
-	main := body - second - trailingCols - 2
+
+	// The column is held whether the track has a tempo or not, so the durations
+	// stay in line down the list instead of stepping in and out.
+	beat := tempoCols
+	main := body - second - beat - trailingCols - 2
+	if main < 16 {
+		// Too narrow for everything: the tempo goes first, then the artist.
+		beat = 0
+		main = body - second - trailingCols - 2
+	}
 	if main < 16 {
 		main, second = body-trailingCols-1, 0
 	}
@@ -442,6 +473,9 @@ func (m Model) row(w int, selected bool, primary, secondary, trailing string) st
 	line := gutter + fit(primary, max(main, 0)) + " "
 	if second > 0 {
 		line += fit(secondary, second) + " "
+	}
+	if beat > 0 {
+		line += padLeft(tempo, beat)
 	}
 	return line + padLeft(trailing, trailingCols)
 }
