@@ -346,3 +346,19 @@ func TestVolumeKeyClearsTheMute(t *testing.T) {
 		t.Error("the old level came back after the volume had been set by hand")
 	}
 }
+
+// The row is laid out from the right, so a reading that narrows drags the bar
+// along with it. It holds three columns whatever it says.
+func TestVolumeBarDoesNotMoveWithTheReading(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{Volume: 100, Playing: true, Duration: time.Minute}
+
+	at := func(v int) int {
+		m.ps.Volume = v
+		return strings.Index(ansiOff(m.transportLine(70)), meterEmpty+" ")
+	}
+	full, two, one := at(100), at(90), at(5)
+	if full != two || two != one {
+		t.Errorf("the bar ends at %d, %d and %d for 100, 90 and 5, want it still", full, two, one)
+	}
+}

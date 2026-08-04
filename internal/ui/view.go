@@ -287,7 +287,9 @@ func (m Model) transportLine(w int) string {
 		repeat = s.ToggleOn.Render(iconRep + "1")
 	}
 
-	volume := m.volumeLine(volumeCells) + s.Volume.Render(fmt.Sprintf(" %d", m.ps.Volume))
+	// The reading holds three columns whatever it says: the row is laid out
+	// from the right, so a number that narrows drags the bar along with it.
+	volume := m.volumeLine(volumeCells) + s.Volume.Render(fmt.Sprintf(" %3d", m.ps.Volume))
 
 	return spread(transport+"    "+shuffle+"  "+repeat, volume, w)
 }
