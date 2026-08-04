@@ -136,9 +136,18 @@ func (m Model) body(l layout) []string {
 			break
 		}
 
-		art := center(strings.Split(m.artworkCells(), "\n"), l.artWidth, rows)
-		if full {
-			art = alignTop(strings.Split(m.artworkCells(), "\n"), l.artWidth, rows)
+		// The picture stays where it is. It is laid out in its own area first
+		// and only then padded into whatever the block turns out to be, so
+		// showing the words moves the column beside it and nothing else —
+		// centring it in the taller block instead lands a row out, because two
+		// halvings round differently from one. The browsing tabs align it to
+		// the top, where it heads a list rather than sitting beside a caption.
+		cells := strings.Split(m.artworkCells(), "\n")
+		var art []string
+		if m.tab == tabPlayer {
+			art = center(center(cells, l.artWidth, l.artHeight), l.artWidth, rows)
+		} else {
+			art = alignTop(cells, l.artWidth, rows)
 		}
 		gap := strings.Repeat(" ", columnGap)
 

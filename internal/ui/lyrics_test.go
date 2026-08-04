@@ -282,3 +282,31 @@ func TestWindowIsSymmetric(t *testing.T) {
 		t.Errorf("%d rows above the lit line and %d below, want them equal", above, below)
 	}
 }
+
+// Showing the words moves the column beside the picture and nothing else. A
+// visualiser that makes the cover jump is worse than no visualiser, and the
+// same holds here.
+func TestLyricsDoNotMoveTheArtwork(t *testing.T) {
+	m := lyricsModel(120, 44)
+	l := m.layout()
+
+	m.lyrics.on = false
+	off := strings.Split(plain(m.render()), "\n")
+	m.lyrics.on = true
+	on := strings.Split(plain(m.render()), "\n")
+
+	if len(off) != len(on) {
+		t.Fatalf("%d rows without the words, %d with", len(off), len(on))
+	}
+
+	// The artwork column is everything left of the gap.
+	cut := leftMargin + l.artWidth
+	for i := range off {
+		a, b := []rune(off[i]), []rune(on[i])
+		end := min(cut, min(len(a), len(b)))
+		if string(a[:end]) != string(b[:end]) {
+			t.Errorf("row %d moved in the artwork column:\n  off: %q\n  on:  %q",
+				i, string(a[:end]), string(b[:end]))
+		}
+	}
+}
