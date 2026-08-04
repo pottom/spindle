@@ -480,3 +480,52 @@ func colourUsed(line string) string {
 	}
 	return line[start : start+end+1]
 }
+
+// Two terminals side by side on a laptop is about eighty columns each, and the
+// artwork has to survive that: it is most of why the screen looks the way it
+// does. Below that there is a point where the words need the room more, and
+// the picture is what goes.
+func TestArtworkSurvivesAHalfScreen(t *testing.T) {
+	for w := compactBelow; w <= 100; w += 2 {
+		m := scopeModel(w, 45)
+		l := m.layout()
+		if !l.hasArt() {
+			t.Errorf("%d columns: no artwork, want it kept", w)
+			continue
+		}
+		if l.infoWidth < minInfoCols {
+			t.Errorf("%d columns: %d for the words, want at least %d", w, l.infoWidth, minInfoCols)
+		}
+	}
+
+	// And nothing is drawn wider than the terminal at any of them.
+	for w := minWidth; w <= 200; w += 3 {
+		m := scopeModel(w, 45)
+		for i, row := range strings.Split(plain(m.render()), "\n") {
+			if got := len([]rune(row)); got > w {
+				t.Fatalf("%d columns: row %d is %d wide", w, i, got)
+			}
+		}
+	}
+}
+
+// Below the artwork's floor everything still works: the text and the lists take
+// the whole width, which is the point of dropping the picture.
+func TestCompactDropsOnlyTheArtwork(t *testing.T) {
+	m := scopeModel(compactBelow-4, 30)
+	l := m.layout()
+	if l.hasArt() {
+		t.Fatal("the artwork survived below its floor")
+	}
+	if l.infoWidth != l.interior-leftMargin-rightMargin {
+		t.Errorf("info column is %d, want the whole width (%d)", l.infoWidth, l.interior-leftMargin-rightMargin)
+	}
+
+	out := plain(m.render())
+	if !strings.Contains(out, "playing") {
+		t.Errorf("the track is not named:\n%s", out)
+	}
+	if rows := strings.Split(out, "\n"); len(rows) != m.height {
+		t.Errorf("render() = %d rows, want %d", len(rows), m.height)
+	}
+}

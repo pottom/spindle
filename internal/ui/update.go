@@ -197,7 +197,7 @@ func (m *Model) resize() {
 	if !fitsMinimum(m.width, m.height) {
 		return
 	}
-	m.help.SetWidth(min(m.width, maxFrameWidth) - leftMargin - rightMargin)
+	m.help.SetWidth(m.layout().interior - leftMargin - rightMargin)
 }
 
 // handleTick advances the local clock and resynchronises every fifth second.

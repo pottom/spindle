@@ -110,6 +110,11 @@ func (m Model) scopeAvailable() bool {
 // scopeRoom is how many blank rows sit below the artwork, which is what the
 // trace has to fit into. scopeTop is the first of them.
 func (m Model) scopeRoom(l layout) int {
+	// Without a picture the body has no blank rows: the text and the list have
+	// already taken them, and they are the reason the picture was dropped.
+	if !l.hasArt() {
+		return 0
+	}
 	return max(l.bodyHeight-m.scopeTop(l), 0)
 }
 

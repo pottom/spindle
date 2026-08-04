@@ -8,7 +8,33 @@ const (
 	minWidth  = 64
 	minHeight = 20
 
-	maxFrameWidth = 100
+	// A table earns its width; prose does not. The lists take whatever the
+	// terminal gives — a title cut short at column 60 on a 200-column screen is
+	// the one thing nobody would choose — while the player screen stays narrow,
+	// because a line of text that wide is harder to read, not easier.
+	maxTableWidth = 200
+	maxProseWidth = 100
+
+	// On a wide terminal the player screen is let out too, but only enough for
+	// the artwork to grow: past this the text beside it starts to drift away
+	// from the picture it belongs to.
+	maxProseWidthWide = 140
+
+	// compactBelow is where the artwork stops being worth its columns. Two
+	// terminals side by side on a laptop is about eighty columns each, and the
+	// picture has to survive that — it is most of why the screen looks the way
+	// it does. Only well below that is there truly no room for it.
+	compactBelow = 68
+
+	// wideAbove is where there is room to spare rather than room to fit, and
+	// narrowBelow is where it has to be shared out carefully.
+	wideAbove   = 132
+	narrowBelow = 96
+
+	// maxBrowseArt caps the picture on the screens where it is a preview rather
+	// than the subject. Left to grow with the terminal it would take half of a
+	// very wide screen from the list, which is the thing being read there.
+	maxBrowseArt = 40
 
 	leftMargin  = 3
 	rightMargin = 2
@@ -22,6 +48,28 @@ const (
 	// line separating them from the body.
 	tabBarHeight = 3
 )
+
+// widthTier is how much room the terminal has given. It decides the one thing
+// width alone can decide: whether there is space for a picture.
+type widthTier int
+
+const (
+	// tierCompact has no artwork. Everything else keeps working.
+	tierCompact widthTier = iota
+	tierNormal
+	tierWide
+)
+
+func tierFor(w int) widthTier {
+	switch {
+	case w < compactBelow:
+		return tierCompact
+	case w >= wideAbove:
+		return tierWide
+	default:
+		return tierNormal
+	}
+}
 
 // layoutMode is how a screen divides its body. The three differ in what the
 // artwork is competing with: nothing on the player, a list beside it while
@@ -38,16 +86,29 @@ const (
 // and the pixel size of a cell.
 type layout struct {
 	interior   int // content width, capped so an ultrawide terminal stays readable
-	artWidth   int // artwork area, in cells
+	artWidth   int // artwork area in cells, or zero when there is no room for one
 	artHeight  int
-	infoWidth  int // the column next to the artwork
+	infoWidth  int // the column beside the artwork, or the whole width without one
 	bodyHeight int // rows above the help bar
 }
+
+// hasArt reports whether this layout has room for a picture.
+func (l layout) hasArt() bool { return l.artWidth > 0 && l.artHeight > 0 }
 
 // computeLayout resolves the frame geometry for a terminal of w × h cells. It
 // assumes the size already passed fitsMinimum.
 func computeLayout(w, h, helpHeight int, hasBanner bool, mode layoutMode, cell cover.CellSize) layout {
-	interior := min(w, maxFrameWidth)
+	tier := tierFor(w)
+
+	// The lists are tables and take the room; the player is read and does not.
+	limit := maxProseWidth
+	switch {
+	case mode != modePlayer:
+		limit = maxTableWidth
+	case tier == tierWide:
+		limit = maxProseWidthWide
+	}
+	interior := min(w, limit)
 
 	// Above the body: the tab labels, their rule and a blank line. Below it: a
 	// blank line and the help bar, plus one more for a banner.
@@ -57,12 +118,18 @@ func computeLayout(w, h, helpHeight int, hasBanner bool, mode layoutMode, cell c
 	}
 	bodyHeight := max(h-chrome, 0)
 
-	artWidth, artHeight := artworkArea(interior, bodyHeight, mode, cell)
+	var artWidth, artHeight int
+	infoWidth := interior - leftMargin - rightMargin
+	if tier != tierCompact {
+		artWidth, artHeight = artworkArea(interior, bodyHeight, mode, cell)
+		infoWidth -= artWidth + columnGap
+	}
+
 	return layout{
 		interior:   interior,
 		artWidth:   artWidth,
 		artHeight:  artHeight,
-		infoWidth:  interior - leftMargin - artWidth - columnGap - rightMargin,
+		infoWidth:  infoWidth,
 		bodyHeight: bodyHeight,
 	}
 }
@@ -81,7 +148,12 @@ func computeLayout(w, h, helpHeight int, hasBanner bool, mode layoutMode, cell c
 // third of the body. Anything more and the list it heads would be a footnote.
 func artworkArea(interior, bodyHeight int, mode layoutMode, cell cover.CellSize) (width, height int) {
 	share := interior / 2
-	if mode != modePlayer {
+	switch {
+	case mode != modePlayer:
+		share = min(interior*2/5, maxBrowseArt)
+	case interior < narrowBelow:
+		// Where there is little to go round, the words get more of it: a title
+		// cut in half is a worse loss than a smaller picture.
 		share = interior * 2 / 5
 	}
 
