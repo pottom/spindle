@@ -61,10 +61,19 @@ func (m Model) lyricsAvailable() bool {
 // lyricsVisible reports whether the words are on screen right now.
 func (m Model) lyricsVisible() bool { return m.lyrics.on && m.lyricsAvailable() }
 
+// artTop is the row the picture begins on, which is as high as the track
+// information is allowed to go.
+func (m Model) artTop(l layout, rows int) int {
+	if !l.hasArt() {
+		return 0
+	}
+	return max((rows-l.artHeight)/2, 0)
+}
+
 // lyricsRows is how many rows are free under the information block once it has
-// been moved to the top of the body.
+// been raised to the top of the picture.
 func (m Model) lyricsRows(l layout) int {
-	return max(l.bodyHeight-len(m.infoBlock(l.infoWidth))-1, 0)
+	return max(l.bodyHeight-m.artTop(l, l.bodyHeight)-len(m.infoBlock(l.infoWidth))-1, 0)
 }
 
 // lyricsBlock is the words, laid out to fill the rows given.
@@ -171,6 +180,14 @@ func (m Model) lyricsNote(w, rows int, text string) []string {
 // where it sits without the words — so only this column rearranges.
 func (m Model) infoWithLyrics(l layout, rows int) []string {
 	out := make([]string, 0, rows)
+
+	// Only as far as the top of the picture, never past it: the two columns
+	// belong together, and text starting above the sleeve reads as two screens
+	// side by side rather than one.
+	for range m.artTop(l, rows) {
+		out = append(out, strings.Repeat(" ", l.infoWidth))
+	}
+
 	for _, line := range m.infoBlock(l.infoWidth) {
 		if len(out) == rows {
 			return out

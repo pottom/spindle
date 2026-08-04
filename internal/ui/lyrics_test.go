@@ -345,3 +345,25 @@ func TestWordsAndWaveformCoexist(t *testing.T) {
 			firstTrace, lastWord)
 	}
 }
+
+// The information rises only as far as the top of the picture. Above that the
+// two columns stop reading as one screen.
+func TestInfoRisesNoHigherThanTheArtwork(t *testing.T) {
+	m := lyricsModel(120, 44)
+	l := m.layout()
+
+	col := m.infoWithLyrics(l, l.bodyHeight)
+	first := -1
+	for i, row := range col {
+		if strings.TrimSpace(plain(row)) != "" {
+			first = i
+			break
+		}
+	}
+	if want := m.artTop(l, l.bodyHeight); first != want {
+		t.Errorf("the information starts at row %d, want %d — the top of the picture", first, want)
+	}
+	if first == 0 {
+		t.Error("the information went to the very top of the body")
+	}
+}
