@@ -4,3 +4,4 @@ CLAUDE.md
 docs/brief.md
 .DS_Store
 .playwright-mcp/
+*.png
