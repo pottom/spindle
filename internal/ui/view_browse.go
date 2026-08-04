@@ -68,15 +68,6 @@ const (
 	tempoCols = 4
 )
 
-// browsePane is the right-hand side of the playlists and search tabs: a heading,
-// a blank line, then as many rows as fit.
-func (m Model) browsePane(l layout, rows int) []string {
-	if m.tab == tabSearch {
-		return m.searchPaneView(l, rows)
-	}
-	return nil
-}
-
 // listBlock is the shape every list screen shares: the cover and the details of
 // whatever the cursor rests on across the top, a heading, then the list itself
 // across the full width below. The list is the point of the screen, so it gets
@@ -546,54 +537,36 @@ func openPlaylistSubtitle(p player.Playlist, tracks []player.Track) string {
 }
 
 func (m Model) searchPaneView(l layout, rows int) []string {
-	head := []string{m.searchField(l.infoWidth), ""}
-
 	empty := "Type to search the catalogue."
 	if strings.TrimSpace(m.search.input.Value()) != "" {
 		empty = "Nothing matched."
 	}
-	return m.listPane(l, rows, head,
-		len(m.search.results), &m.search.cursor, empty,
-		func(i, w int, selected bool) string {
+
+	return m.listBlock(l, rows, listScreen{
+		detail: m.trackDetail,
+		// The field is the heading: it is what the screen is about, and it has
+		// to be where the eye already goes for a heading rather than in a band
+		// of its own above one.
+		heading:  func(w int) string { return m.searchField(max(w/2, 8)) },
+		subtitle: func() string { return m.styles.Album.Render(searchSubtitle(m.search.results)) },
+		count:    len(m.search.results),
+		state:    &m.search.cursor,
+		empty:    empty,
+		row: func(i, w int, selected bool) string {
 			return m.trackRow(m.search.results[i], w, selected, 0)
 		},
-	)
+	})
 }
 
-// listPane assembles a heading and a scrolling list into exactly artHeight rows,
-// so the pane and the artwork beside it always end level.
-func (m Model) listPane(l layout, height int, head []string, count int, state *listState, empty string, row func(i, w int, selected bool) string) []string {
-	w := l.infoWidth
-	lines := make([]string, 0, height)
-	for _, h := range head {
-		lines = append(lines, fit(h, w))
+// searchSubtitle counts what came back, and says nothing before anything has.
+func searchSubtitle(results []player.Track) string {
+	if len(results) == 0 {
+		return ""
 	}
-	lines = append(lines, "")
-
-	rows := max(height-len(lines), 0)
-	if count == 0 {
-		lines = append(lines, fit(m.styles.Empty.Render(empty), w))
+	if len(results) == 1 {
+		return "1 result"
 	}
-
-	from, to := state.window(count, rows)
-	bar := m.scrollColumn(rows, count, state.top)
-	rowWidth := w
-	if bar != nil {
-		rowWidth = w - scrollCols
-	}
-
-	for i := from; i < to; i++ {
-		line := fit(row(i, rowWidth, i == state.cursor), rowWidth)
-		if bar != nil {
-			line += " " + bar[i-from]
-		}
-		lines = append(lines, line)
-	}
-
-	for len(lines) < height {
-		lines = append(lines, strings.Repeat(" ", w))
-	}
-	return lines[:height]
+	return fmt.Sprintf("%d results", len(results))
 }
 
 func (m Model) playlistRow(p player.Playlist, w int, selected bool) string {

@@ -953,3 +953,43 @@ func TestTheLibraryMarksWhatIsPlaying(t *testing.T) {
 		t.Errorf("row = %q, want it to keep its place in the list", strings.TrimSpace(row))
 	}
 }
+
+// Search is the last screen that was laid out its own way. Every list is the
+// same act, and three compositions for one act read as three programs.
+func TestSearchUsesTheSameShapeAsTheQueue(t *testing.T) {
+	p := player.NewMock()
+	m := New(p, nil, defaultTestCell)
+	m.tab = tabSearch
+	m.search.input.SetValue("queen")
+	res, err := p.Search(t.Context(), "queen")
+	if err != nil || len(res) < 2 {
+		t.Fatalf("Search: %v (%d results)", err, len(res))
+	}
+	m.search.results = res
+	m.width, m.height = 150, 36
+	m.resize()
+
+	l := m.layout()
+	block := m.searchPaneView(l, l.bodyHeight)
+	if len(block) != l.bodyHeight {
+		t.Fatalf("the block is %d rows, want the whole body of %d", len(block), l.bodyHeight)
+	}
+
+	// The panel beside the cover describes what the cursor rests on.
+	head := plain(strings.Join(block[:l.artRows], "\n"))
+	if !strings.Contains(head, res[0].Title) || !strings.Contains(head, "Album") {
+		t.Errorf("the panel = %q, want the result under the cursor described", head)
+	}
+
+	// The field is the heading, with the count set against it.
+	heading := plain(block[l.artHeight+1])
+	if !strings.Contains(heading, "queen") || !strings.Contains(heading, "results") {
+		t.Errorf("heading = %q, want the query and the count", heading)
+	}
+
+	// And the results run the whole width, artists out where they are elsewhere.
+	row := plain(block[l.artHeight+3])
+	if at := strings.Index(row, res[0].Artists[0]); at < len(row)/3 {
+		t.Errorf("the artists sit at column %d of %d, want them out with the others", at, len(row))
+	}
+}

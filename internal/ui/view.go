@@ -114,6 +114,9 @@ func (m Model) body(l layout) []string {
 	case m.tab == tabLibrary && !m.devices.open:
 		block = m.playlistPaneView(l, max(l.bodyHeight, 1))
 
+	case m.tab == tabSearch && !m.devices.open:
+		block = m.searchPaneView(l, max(l.bodyHeight, 1))
+
 	default:
 		// The player centres its text against the cover. The browsing tabs, and
 		// the player once the words are showing, give the right-hand column
@@ -124,16 +127,16 @@ func (m Model) body(l layout) []string {
 			rows = max(l.bodyHeight, l.artHeight)
 		}
 
-		right := m.browsePane(l, rows)
+		var right []string
 		switch {
 		case m.devices.open:
 			right = m.devicePicker(l.infoWidth, rows)
-		case right == nil && m.lyricsVisible():
+		case m.lyricsVisible():
 			// The words need room, so the information goes to the top of the
 			// body rather than sitting in the middle of it, and they take
 			// everything under it.
 			right = m.infoWithLyrics(l, rows)
-		case right == nil:
+		default:
 			right = stack(m.infoBlock(l.infoWidth), l.infoWidth, rows)
 		}
 
