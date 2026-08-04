@@ -238,7 +238,7 @@ func (l *Local) SetRepeat(ctx context.Context, mode string) error {
 // own play endpoint cannot start something on another device.
 
 func (l *Local) PlayTrack(ctx context.Context, trackID string) error {
-	return l.web.PlayTrack(ctx, trackID)
+	return l.web.PlayTrackOn(ctx, trackID, l.deviceID())
 }
 
 // PlayFrom brings an upcoming track to the front and starts it. Everything else
@@ -257,7 +257,20 @@ func (l *Local) PlayFrom(ctx context.Context, trackID string) error {
 }
 
 func (l *Local) PlayPlaylist(ctx context.Context, playlistID string, offset int) error {
-	return l.web.PlayPlaylist(ctx, playlistID, offset)
+	return l.web.PlayPlaylistOn(ctx, playlistID, offset, l.deviceID())
+}
+
+// deviceID is the daemon's own Connect device, as it last reported it. Calls
+// that go out through the Web API have to name it: Spotify keeps no record of
+// which device is active until something tells it, and a call that names none
+// is answered with 404 rather than being sent to the obvious candidate.
+func (l *Local) deviceID() string {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	if l.snapshot == nil {
+		return ""
+	}
+	return l.snapshot.DeviceID
 }
 
 // Everything the daemon does not know about.

@@ -216,9 +216,18 @@ func (s *Spotify) SetRepeat(ctx context.Context, mode string) error {
 
 // PlayTrack starts one track on its own, with no surrounding context.
 func (s *Spotify) PlayTrack(ctx context.Context, trackID string) error {
+	return s.PlayTrackOn(ctx, trackID, "")
+}
+
+// PlayTrackOn is PlayTrack aimed at one device. Naming the device is not a
+// nicety: measured against a live account, a play call with no device answers
+// 404 "No active device found" whenever Spotify does not already consider one
+// active — which is most of the time, including while our own daemon is playing.
+func (s *Spotify) PlayTrackOn(ctx context.Context, trackID, deviceID string) error {
 	uri := spotify.URI("spotify:track:" + trackID)
 	return classify("play track", s.client.PlayOpt(ctx, &spotify.PlayOptions{
-		URIs: []spotify.URI{uri},
+		DeviceID: deviceRef(deviceID),
+		URIs:     []spotify.URI{uri},
 	}))
 }
 
@@ -246,12 +255,29 @@ func (s *Spotify) PlayFrom(ctx context.Context, trackID string) error {
 // PlayPlaylist starts a playlist at the given position, so the rest of it stays
 // queued behind the track that was chosen.
 func (s *Spotify) PlayPlaylist(ctx context.Context, playlistID string, offset int) error {
+	return s.PlayPlaylistOn(ctx, playlistID, offset, "")
+}
+
+// PlayPlaylistOn is PlayPlaylist aimed at one device. See PlayTrackOn for why
+// the device has to be named.
+func (s *Spotify) PlayPlaylistOn(ctx context.Context, playlistID string, offset int, deviceID string) error {
 	uri := spotify.URI("spotify:playlist:" + playlistID)
 	pos := max(offset, 0)
 	return classify("play playlist", s.client.PlayOpt(ctx, &spotify.PlayOptions{
+		DeviceID:        deviceRef(deviceID),
 		PlaybackContext: &uri,
 		PlaybackOffset:  &spotify.PlaybackOffset{Position: &pos},
 	}))
+}
+
+// deviceRef is the id in the shape PlayOptions wants, and nil for "wherever
+// Spotify thinks playback is", which is what a spindle without a daemon means.
+func deviceRef(deviceID string) *spotify.ID {
+	if deviceID == "" {
+		return nil
+	}
+	id := spotify.ID(deviceID)
+	return &id
 }
 
 // TransferTo moves playback to another device, keeping whatever was playing

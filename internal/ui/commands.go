@@ -191,7 +191,7 @@ func fetchPlaylistsCmd(p player.Player) tea.Cmd {
 
 		items, err := p.Playlists(ctx)
 		if err != nil {
-			return msg.Error{Err: fmt.Errorf("fetch playlists: %w", err)}
+			return msg.Error{Err: err}
 		}
 		return msg.PlaylistsFetched{Playlists: items}
 	}
@@ -204,7 +204,7 @@ func fetchPlaylistTracksCmd(p player.Player, id string) tea.Cmd {
 
 		tracks, err := p.PlaylistTracks(ctx, id)
 		if err != nil {
-			return msg.Error{Err: fmt.Errorf("fetch playlist tracks: %w", err)}
+			return msg.Error{Err: err}
 		}
 		return msg.PlaylistTracksFetched{PlaylistID: id, Tracks: tracks}
 	}
@@ -217,7 +217,7 @@ func searchCmd(p player.Player, query string, seq int) tea.Cmd {
 
 		tracks, err := p.Search(ctx, query)
 		if err != nil {
-			return msg.Error{Err: fmt.Errorf("search: %w", err)}
+			return msg.Error{Err: err}
 		}
 		return msg.SearchResults{Seq: seq, Tracks: tracks, Query: query, Matched: true}
 	}
