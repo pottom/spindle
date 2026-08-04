@@ -41,6 +41,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.nextPollAt = time.Now().Add(activePoll)
 		}
 		m.adopt(message.State)
+		m.fillFromQueue()
 		m.noDevice = false
 		m.err = nil
 
@@ -78,6 +79,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if len(message.Current) > 0 {
 			m.nowQueued = &message.Current[0]
 		}
+		m.fillFromQueue()
 		if m.tab == tabQueue {
 			return m, m.syncCover()
 		}
@@ -293,6 +295,30 @@ func (m *Model) adopt(st *player.State) {
 	m.ps.DeviceName = st.DeviceName
 	m.ps.Bitrate = st.Bitrate
 	m.ps.Tempo = st.Tempo
+}
+
+// fillFromQueue borrows what the device left out of its answer. The names come
+// off the audio stream, and there is not always one — a session picked up from
+// elsewhere is playing before it has loaded anything of its own — but the queue
+// still knows what is on. A screen gone blank over music that is plainly
+// playing is worse than one that is a moment behind.
+func (m *Model) fillFromQueue() {
+	if m.ps == nil || m.ps.Title != "" || m.nowQueued == nil {
+		return
+	}
+	if m.ps.TrackID != "" && m.ps.TrackID != m.nowQueued.ID {
+		return
+	}
+
+	t := m.nowQueued
+	m.ps.TrackID = t.ID
+	m.ps.Title = t.Title
+	m.ps.Artists = t.Artists
+	m.ps.Album = t.Album
+	m.ps.CoverURL = t.CoverURL
+	if m.ps.Duration == 0 {
+		m.ps.Duration = t.Duration
+	}
 }
 
 func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {

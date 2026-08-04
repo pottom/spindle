@@ -125,3 +125,43 @@ func TestPausedPositionDoesNotDrift(t *testing.T) {
 		t.Errorf("elapsed = %v, want it unchanged at 1m", got)
 	}
 }
+
+// The names come off the audio stream and there is not always one, but the
+// queue still knows what is playing. A blank screen over music that is plainly
+// playing is the one answer that helps nobody.
+func TestABlankStateIsFilledFromTheQueue(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{Playing: true}
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(msg.QueueFetched{
+		Current: []player.Track{{
+			ID: "now", Title: "Sandokan", Artists: []string{"Neoton Familia"},
+			Album: "Sandokan", CoverURL: "http://cover", Duration: 3*time.Minute + 27*time.Second,
+		}},
+	})
+
+	got := tm.(Model)
+	if got.ps.Title != "Sandokan" || got.ps.TrackID != "now" {
+		t.Errorf("state = %q/%q, want the queue's answer", got.ps.TrackID, got.ps.Title)
+	}
+	if got.ps.Duration == 0 || got.ps.CoverURL == "" {
+		t.Errorf("duration = %v, cover = %q — want both borrowed too", got.ps.Duration, got.ps.CoverURL)
+	}
+}
+
+// What the device does say is never overwritten by the queue: the device is the
+// one that knows, and the queue lags it.
+func TestTheQueueDoesNotOverwriteWhatTheDeviceSaid(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{TrackID: "now", Title: "the device's answer", Playing: true}
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(msg.QueueFetched{
+		Current: []player.Track{{ID: "now", Title: "the queue's answer"}},
+	})
+
+	if got := tm.(Model).ps.Title; got != "the device's answer" {
+		t.Errorf("title = %q, want the device's", got)
+	}
+}
