@@ -115,7 +115,7 @@ func (m Model) body(l layout) []string {
 		block = m.queueBlock(l, max(l.bodyHeight, 1))
 
 	case m.tab == tabLibrary && !m.devices.open:
-		block = m.playlistPaneView(l, max(l.bodyHeight, 1))
+		block = m.libraryPaneView(l, max(l.bodyHeight, 1))
 
 	case m.tab == tabSearch && !m.devices.open:
 		block = m.searchPaneView(l, max(l.bodyHeight, 1))

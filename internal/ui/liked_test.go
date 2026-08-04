@@ -32,7 +32,7 @@ func likedModel(t *testing.T) Model {
 	}
 
 	var tm tea.Model = m
-	tm, _ = tm.Update(msg.PlaylistsFetched{Playlists: page.Items, More: page.More, Next: page.Next})
+	tm, _ = tm.Update(msg.LibraryFetched{Kind: int(libraryPlaylists), Playlists: page.Items, More: page.More, Next: page.Next})
 	tm, _ = tm.Update(msg.OpenedFetched{
 		ID: likedID, Tracks: liked.Items, More: liked.More, Next: liked.Next,
 	})
@@ -44,7 +44,7 @@ func likedModel(t *testing.T) Model {
 func TestLikedSongsHeadTheLibrary(t *testing.T) {
 	m := likedModel(t)
 
-	first := m.playlists.items[0]
+	first := m.library.playlists[0]
 	if !isLiked(first.ID) {
 		t.Fatalf("the library starts with %q, want the saved tracks", first.Name)
 	}
@@ -60,10 +60,10 @@ func TestLikedSongsHeadTheLibrary(t *testing.T) {
 
 	var tm tea.Model = m
 	tm, _ = tm.Update(msg.OpenedFetched{
-		ID: likedID, Tracks: m.playlists.liked, More: false,
+		ID: likedID, Tracks: m.library.liked, More: false,
 	})
-	if got := tm.(Model).playlists.items[0].Tracks; got != len(m.playlists.liked) {
-		t.Errorf("the row says %d tracks once the list is read out, want %d", got, len(m.playlists.liked))
+	if got := tm.(Model).library.playlists[0].Tracks; got != len(m.library.liked) {
+		t.Errorf("the row says %d tracks once the list is read out, want %d", got, len(m.library.liked))
 	}
 
 	row := plain(m.playlistRow(first, 80, false))
@@ -93,7 +93,7 @@ func TestOpeningLikedSongsShowsThemAtOnce(t *testing.T) {
 // track by track — and the rest of what has been read follows it.
 func TestPlayingALikedSongCarriesTheRest(t *testing.T) {
 	m := likedModel(t)
-	showOpen(&m, player.Playlist{ID: likedID, Name: "Liked Songs"}, m.playlists.liked)
+	showOpen(&m, player.Playlist{ID: likedID, Name: "Liked Songs"}, m.library.liked)
 
 	req := m.playOpenList(1)
 	if err := req.call(context.Background(), m.player); err != nil {
@@ -104,7 +104,7 @@ func TestPlayingALikedSongCarriesTheRest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("State: %v", err)
 	}
-	if want := m.playlists.liked[1].ID; state.TrackID != want {
+	if want := m.library.liked[1].ID; state.TrackID != want {
 		t.Errorf("playing %q, want the track the cursor was on (%q)", state.TrackID, want)
 	}
 

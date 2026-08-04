@@ -23,7 +23,7 @@ func libraryModel(t *testing.T) Model {
 
 	m := New(p, nil, defaultTestCell)
 	m.tab = tabLibrary
-	m.playlists.items = page.Items
+	m.library.playlists = page.Items
 	m.width, m.height = 100, 40
 	m.resize()
 	return m
@@ -38,7 +38,7 @@ func TestQueueingAPlaylistSendsOneOrder(t *testing.T) {
 	sent := make(chan []string, 1)
 	m.player = recordingEditor{Player: m.player, sent: sent}
 
-	pl := m.playlists.items[0]
+	pl := m.library.playlists[0]
 	want, err := listTrackIDs(context.Background(), m.player, openPlaylist, pl.ID)
 	if err != nil {
 		t.Fatalf("listTrackIDs: %v", err)
@@ -65,7 +65,7 @@ func TestQueueingAPlaylistSendsOneOrder(t *testing.T) {
 // the whole list is what is queued.
 func TestTheQueueKeyTakesAWholePlaylist(t *testing.T) {
 	m := libraryModel(t)
-	name := m.playlists.items[0].Name
+	name := m.library.playlists[0].Name
 
 	var tm tea.Model = m
 	tm, cmd := tm.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
@@ -84,7 +84,7 @@ func TestTheMenuOverAPlaylistActsOnAllOfIt(t *testing.T) {
 	if !m.openActions() {
 		t.Fatal("no menu over a playlist")
 	}
-	if m.actions.title != m.playlists.items[0].Name {
+	if m.actions.title != m.library.playlists[0].Name {
 		t.Errorf("the menu is headed %q, want the playlist under the cursor", m.actions.title)
 	}
 

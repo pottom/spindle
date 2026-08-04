@@ -217,18 +217,36 @@ func fetchQueueCmd(p player.Player) tea.Cmd {
 	}
 }
 
-func fetchPlaylistsCmd(p player.Player, offset int) tea.Cmd {
+// fetchLibraryCmd asks for one page of one of the library's lists.
+func fetchLibraryCmd(p player.Player, kind libraryKind, offset int) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 		defer cancel()
 
-		page, err := p.PlaylistsPage(ctx, offset)
-		if err != nil {
-			return msg.Error{Err: err}
+		out := msg.LibraryFetched{Kind: int(kind), Offset: offset}
+		switch kind {
+		case libraryAlbums:
+			page, err := p.SavedAlbums(ctx, offset)
+			if err != nil {
+				return msg.Error{Err: err}
+			}
+			out.Albums, out.More, out.Next = page.Items, page.More, page.Next
+
+		case libraryArtists:
+			page, err := p.FollowedArtists(ctx, offset)
+			if err != nil {
+				return msg.Error{Err: err}
+			}
+			out.Artists, out.More, out.Next = page.Items, page.More, page.Next
+
+		default:
+			page, err := p.PlaylistsPage(ctx, offset)
+			if err != nil {
+				return msg.Error{Err: err}
+			}
+			out.Playlists, out.More, out.Next = page.Items, page.More, page.Next
 		}
-		return msg.PlaylistsFetched{
-			Playlists: page.Items, Offset: offset, More: page.More, Next: page.Next,
-		}
+		return out
 	}
 }
 

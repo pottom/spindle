@@ -478,18 +478,74 @@ func queueSubtitle(tracks []player.Track) string {
 	return fmt.Sprintf("%d tracks · %s", len(tracks), formatSpan(total))
 }
 
-func (m Model) playlistPaneView(l layout, rows int) []string {
-	return m.listBlock(l, rows, listScreen{
-		detail:   m.playlistDetail,
+func (m Model) libraryPaneView(l layout, rows int) []string {
+	screen := listScreen{
+		detail:   m.libraryDetail,
 		heading:  func(int) string { return m.styles.Title.Render("Library") },
-		subtitle: func() string { return m.styles.Album.Render(playlistSubtitle(m.playlists.items)) },
-		count:    len(m.playlists.items),
-		state:    &m.playlists.cursor,
+		subtitle: m.libraryKinds,
+		count:    m.library.count(),
+		state:    &m.library.cursors[m.library.kind],
 		empty:    "Nothing saved yet.",
-		row: func(i, w int, selected bool) string {
-			return m.playlistRow(m.playlists.items[i], w, selected)
-		},
-	})
+	}
+
+	switch m.library.kind {
+	case libraryAlbums:
+		screen.empty = "No saved albums."
+		screen.row = func(i, w int, selected bool) string {
+			return m.albumRow(blankMark, m.library.albums[i], w, selected)
+		}
+	case libraryArtists:
+		screen.empty = "Nobody followed yet."
+		screen.row = func(i, w int, selected bool) string {
+			return m.artistRow(blankMark, m.library.artists[i], w, selected)
+		}
+	default:
+		screen.row = func(i, w int, selected bool) string {
+			return m.playlistRow(m.library.playlists[i], w, selected)
+		}
+	}
+	return m.listBlock(l, rows, screen)
+}
+
+// libraryKinds is the strip beside the heading: the three lists the tab holds,
+// the one on screen lit, each with what has been read of it.
+//
+// It sits where a subtitle would because it is one — it says what is being
+// looked at — and because a row of its own would cost the list a line to say
+// something three words long.
+func (m Model) libraryKinds() string {
+	var parts []string
+	for _, kind := range []libraryKind{libraryPlaylists, libraryAlbums, libraryArtists} {
+		style := m.styles.Album
+		if kind == m.library.kind {
+			style = m.styles.Title
+		}
+
+		label := kind.String()
+		if n := m.library.countOf(kind); n > 0 {
+			count := fmt.Sprintf("%d", n)
+			if m.library.pages[kind].more {
+				// What has been read, not what exists.
+				count += "+"
+			}
+			label += " " + count
+		}
+		parts = append(parts, style.Render(label))
+	}
+	return strings.Join(parts, m.styles.Album.Render(" · "))
+}
+
+// libraryDetail is the panel beside the cover: whichever kind is on screen, it
+// describes the row under the cursor.
+func (m Model) libraryDetail(w, rows int) []string {
+	switch {
+	case m.library.atAlbum() != nil:
+		return m.albumDetail(m.library.atAlbum(), w)
+	case m.library.atArtist() != nil:
+		return m.artistDetail(m.library.atArtist(), w)
+	default:
+		return m.playlistDetailOf(m.library.selected(), w, rows)
+	}
 }
 
 // openPageView is whatever has been opened: a playlist, an album, or an
@@ -517,7 +573,7 @@ func (m Model) openPageView(l layout, rows int) []string {
 		screen.detail = m.openAlbumDetail
 		screen.empty = "No records here."
 		screen.row = func(i, w int, selected bool) string {
-			return m.albumRow(page.albums[i], w, selected)
+			return m.albumRow("", page.albums[i], w, selected)
 		}
 	}
 	return m.listBlock(l, rows, screen)
@@ -533,10 +589,15 @@ func (m Model) openAlbumDetail(w, rows int) []string {
 // made of, and how much of it there is.
 func (m Model) openSubtitle(page openPage) string {
 	if page.holdsAlbums() {
-		if n := len(page.albums); n > 0 {
+		n := len(page.albums)
+		switch {
+		case n == 0:
+			return page.subtitle
+		case page.subtitle == "":
+			return fmt.Sprintf("%d releases", n)
+		default:
 			return fmt.Sprintf("%s · %d releases", page.subtitle, n)
 		}
-		return page.subtitle
 	}
 
 	// The running time is only added up once every track is in: a total that
@@ -555,13 +616,6 @@ func (m Model) openSubtitle(page openPage) string {
 		total += t.Duration
 	}
 	return out + " · " + formatSpan(total)
-}
-
-// playlistDetail is the panel beside the cover at the top level: what the
-// cursor is resting on, laid out like a track's so the two levels of the tab
-// read as one screen.
-func (m Model) playlistDetail(w, rows int) []string {
-	return m.playlistDetailOf(m.playlists.selected(), w, rows)
 }
 
 // playlistDetailOf is the same panel for a playlist from anywhere, so a search
@@ -668,9 +722,9 @@ func (m Model) searchRow(i, w int, selected bool) string {
 	found := m.search.current()
 	switch m.search.kind {
 	case player.SearchAlbums:
-		return m.albumRow(found.albums[i], w, selected)
+		return m.albumRow("", found.albums[i], w, selected)
 	case player.SearchArtists:
-		return m.artistRow(found.artists[i], w, selected)
+		return m.artistRow("", found.artists[i], w, selected)
 	case player.SearchPlaylists:
 		return m.playlistRow(found.playlists[i], w, selected)
 	default:
@@ -679,7 +733,7 @@ func (m Model) searchRow(i, w int, selected bool) string {
 }
 
 // albumRow is a record: its name, who made it, and how many tracks it holds.
-func (m Model) albumRow(a player.Album, w int, selected bool) string {
+func (m Model) albumRow(lead string, a player.Album, w int, selected bool) string {
 	primary := m.styles.RowPrimary
 	if selected {
 		primary = m.styles.RowSelected
@@ -690,7 +744,7 @@ func (m Model) albumRow(a player.Album, w int, selected bool) string {
 		year = strings.TrimSpace(year + " " + a.AlbumType)
 	}
 	return m.row(w, selected,
-		primary.Render(a.Name),
+		lead+primary.Render(a.Name),
 		m.styles.RowSecondary.Render(strings.Join(a.Artists, ", ")),
 		m.styles.RowTrailing.Render(year),
 	)
@@ -698,15 +752,24 @@ func (m Model) albumRow(a player.Album, w int, selected bool) string {
 
 // artistRow is a name and how many people follow it, which is the only measure
 // of an artist that arrives with the list.
-func (m Model) artistRow(a player.Artist, w int, selected bool) string {
+func (m Model) artistRow(lead string, a player.Artist, w int, selected bool) string {
 	primary := m.styles.RowPrimary
 	if selected {
 		primary = m.styles.RowSelected
 	}
+	// Genres and a follower count are what an artist row is made of, and
+	// neither is always sent: measured against a live account, the followed
+	// list answers with a name and a picture and nothing else. The columns stay
+	// empty rather than saying nought followers, which is a number and not an
+	// absence.
+	followers := ""
+	if a.Followers > 0 {
+		followers = m.styles.RowTrailing.Render(formatCount(a.Followers))
+	}
 	return m.row(w, selected,
-		primary.Render(a.Name),
+		lead+primary.Render(a.Name),
 		m.styles.RowSecondary.Render(strings.Join(a.Genres, ", ")),
-		m.styles.RowTrailing.Render(formatCount(a.Followers)),
+		followers,
 	)
 }
 
@@ -808,8 +871,12 @@ func (m Model) libraryMark(p player.Playlist) string {
 	if isLiked(p.ID) {
 		return m.styles.Cursor.Render(likedMark) + " "
 	}
-	return "  "
+	return blankMark
 }
+
+// blankMark is that column held open. Every library row carries it, whichever
+// kind is on screen, so turning between them moves no name sideways.
+const blankMark = "  "
 
 // trackRow draws one track. A number of 0 omits the ordinal, which is what the
 // search results want.
@@ -957,28 +1024,6 @@ func (m Model) searchField(w int) string {
 		return m.styles.Empty.Render("⌕ press / to search")
 	}
 	return in.View()
-}
-
-func playlistSubtitle(items []player.Playlist) string {
-	// The saved tracks sit in this list and are not a playlist, so they are not
-	// counted as one. Their own number is not known until they have all been
-	// read, and a total that grew as the reader scrolled would be worse than no
-	// total at all.
-	var lists, total int
-	for _, p := range items {
-		if isLiked(p.ID) {
-			continue
-		}
-		lists++
-		total += p.Tracks
-	}
-	if lists == 0 {
-		return ""
-	}
-	if total == 0 {
-		return fmt.Sprintf("%d playlists", lists)
-	}
-	return fmt.Sprintf("%d playlists · %d tracks", lists, total)
 }
 
 // formatSpan renders a long duration as hours and minutes, for playlist lengths

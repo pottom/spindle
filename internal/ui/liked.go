@@ -49,7 +49,7 @@ func likedPlaylist(tracks []player.Track, all bool) player.Playlist {
 // likedRow is the saved tracks as the library shows them, from whatever has
 // been read of them so far.
 func (m Model) likedRow() player.Playlist {
-	return likedPlaylist(m.playlists.liked, m.playlists.likedAll)
+	return likedPlaylist(m.library.liked, m.library.likedAll)
 }
 
 // refreshLikedRow puts a freshly read first page onto the row already on
@@ -57,9 +57,9 @@ func (m Model) likedRow() player.Playlist {
 // answer first, so the row is built from whichever arrives and mended by the
 // other.
 func (m *Model) refreshLikedRow() {
-	for i, pl := range m.playlists.items {
+	for i, pl := range m.library.playlists {
 		if isLiked(pl.ID) {
-			m.playlists.items[i] = m.likedRow()
+			m.library.playlists[i] = m.likedRow()
 			return
 		}
 	}

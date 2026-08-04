@@ -4,14 +4,25 @@ import (
 	"charm.land/bubbles/v2/textinput"
 
 	"github.com/pottom/spindle/internal/player"
+	"github.com/pottom/spindle/internal/ui/msg"
 )
 
-// playlistPane is the library tab. It has two levels: the playlists themselves,
-// and the tracks inside whichever one is open.
-type playlistPane struct {
-	items  []player.Playlist
-	cursor listState
-	pages  paging
+// libraryPane is the library tab: what the account has kept, one kind at a
+// time.
+//
+// Three lists rather than one, because they are three kinds of thing and a
+// screen that mixed them would have to explain which row was which. Each keeps
+// its own cursor and its own paging, so switching kinds and coming back lands
+// where the reader left off — the same bargain the search tab makes.
+type libraryPane struct {
+	kind libraryKind
+
+	playlists []player.Playlist
+	albums    []player.Album
+	artists   []player.Artist
+
+	cursors [libraryKinds]listState
+	pages   [libraryKinds]paging
 
 	// liked is the first page of the saved tracks, read whenever the library
 	// is, so the row at the top of it has a cover before it is opened and opens
@@ -19,6 +30,71 @@ type playlistPane struct {
 	// only time the count on the row can be trusted.
 	liked    []player.Track
 	likedAll bool
+}
+
+// libraryKind is which of the three is on screen.
+type libraryKind int
+
+const (
+	libraryPlaylists libraryKind = iota
+	libraryAlbums
+	libraryArtists
+
+	// libraryKinds is how many there are, and the width of the arrays above.
+	libraryKinds = 3
+)
+
+// String is what the strip under the heading calls the kind.
+func (k libraryKind) String() string {
+	switch k {
+	case libraryAlbums:
+		return "albums"
+	case libraryArtists:
+		return "artists"
+	default:
+		return "playlists"
+	}
+}
+
+// count is how many rows the kind has read so far.
+func (p libraryPane) countOf(k libraryKind) int {
+	switch k {
+	case libraryAlbums:
+		return len(p.albums)
+	case libraryArtists:
+		return len(p.artists)
+	default:
+		return len(p.playlists)
+	}
+}
+
+func (p libraryPane) count() int { return p.countOf(p.kind) }
+
+// cursor and paging are the state of whichever kind is on screen.
+func (p *libraryPane) cursor() *listState { return &p.cursors[p.kind] }
+func (p *libraryPane) paging() *paging    { return &p.pages[p.kind] }
+
+// at is where the cursor rests on the current kind, and nil when it rests on a
+// row of another kind — which is how the actions menu tells what it is over.
+func (p libraryPane) atPlaylist() *player.Playlist {
+	if p.kind != libraryPlaylists {
+		return nil
+	}
+	return atPlaylist(p.playlists, p.cursors[libraryPlaylists].cursor)
+}
+
+func (p libraryPane) atAlbum() *player.Album {
+	if p.kind != libraryAlbums {
+		return nil
+	}
+	return atAlbum(p.albums, p.cursors[libraryAlbums].cursor)
+}
+
+func (p libraryPane) atArtist() *player.Artist {
+	if p.kind != libraryArtists {
+		return nil
+	}
+	return atArtist(p.artists, p.cursors[libraryArtists].cursor)
 }
 
 // paging is what a list has read so far and what is left. Lists arrive fifty at
@@ -48,22 +124,61 @@ func (p *paging) took(more bool, next int) {
 	p.more, p.next, p.loading = more, next, false
 }
 
-// selected returns the playlist under the cursor at the top level.
-func (p playlistPane) selected() *player.Playlist {
-	if p.cursor.cursor < 0 || p.cursor.cursor >= len(p.items) {
-		return nil
+// adopt takes a page of one of the lists. The first page replaces what was
+// read and sends that kind's cursor home; a later one is added to it.
+//
+// liked is the row that heads the playlists and is not one: it is passed in
+// rather than built here, because what is known about it comes from a request
+// of its own.
+func (p *libraryPane) adopt(m msg.LibraryFetched, liked player.Playlist) {
+	kind := libraryKind(m.Kind)
+	first := m.Offset == 0
+
+	switch kind {
+	case libraryAlbums:
+		if first {
+			p.albums = m.Albums
+		} else {
+			p.albums = append(p.albums, m.Albums...)
+		}
+	case libraryArtists:
+		if first {
+			p.artists = m.Artists
+		} else {
+			p.artists = append(p.artists, m.Artists...)
+		}
+	default:
+		if first {
+			p.playlists = append([]player.Playlist{liked}, m.Playlists...)
+		} else {
+			p.playlists = append(p.playlists, m.Playlists...)
+		}
 	}
-	return &p.items[p.cursor.cursor]
+
+	if first {
+		p.cursors[kind].reset()
+	}
+	p.pages[kind].took(m.More, m.Next)
 }
+
+// selected is the playlist under the cursor at the top level, which is the one
+// row kind the library had before it had three.
+func (p libraryPane) selected() *player.Playlist { return p.atPlaylist() }
 
 // cover is the artwork this pane wants shown: the open playlist's, or the one
 // under the cursor. The playing track's cover is deliberately not used here —
 // it already has a whole tab of its own.
-func (p playlistPane) cover() string {
-	if sel := p.selected(); sel != nil {
-		return sel.CoverURL
+func (p libraryPane) cover() string {
+	switch {
+	case p.atAlbum() != nil:
+		return p.atAlbum().CoverURL
+	case p.atArtist() != nil:
+		return p.atArtist().ImageURL
+	case p.selected() != nil:
+		return p.selected().CoverURL
+	default:
+		return ""
 	}
-	return ""
 }
 
 // queuePane is the queue tab. It holds no tracks of its own: the model already
@@ -276,7 +391,7 @@ func (m Model) cursorPlaylist() *player.Playlist {
 	case m.open() != nil:
 		return nil
 	case m.tab == tabLibrary:
-		return m.playlists.selected()
+		return m.library.selected()
 	case m.tab == tabSearch && m.search.kind == player.SearchPlaylists:
 		found := m.search.current()
 		return atPlaylist(found.playlists, found.cursor.cursor)

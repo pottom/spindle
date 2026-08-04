@@ -157,7 +157,7 @@ func TestTheEndsAreOneKeyAway(t *testing.T) {
 	m := New(player.NewMock(), nil, defaultTestCell)
 	m.tab = tabLibrary
 	for i := range 30 {
-		m.playlists.items = append(m.playlists.items, player.Playlist{
+		m.library.playlists = append(m.library.playlists, player.Playlist{
 			ID: fmt.Sprintf("p%02d", i), Name: fmt.Sprintf("playlist %02d", i),
 		})
 	}
@@ -166,11 +166,11 @@ func TestTheEndsAreOneKeyAway(t *testing.T) {
 
 	var tm tea.Model = m
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
-	if got := tm.(Model).playlists.cursor.cursor; got != 29 {
+	if got := tm.(Model).library.cursors[libraryPlaylists].cursor; got != 29 {
 		t.Errorf("end landed on %d, want the last playlist", got)
 	}
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyHome})
-	if got := tm.(Model).playlists.cursor.cursor; got != 0 {
+	if got := tm.(Model).library.cursors[libraryPlaylists].cursor; got != 0 {
 		t.Errorf("home landed on %d, want the first playlist", got)
 	}
 

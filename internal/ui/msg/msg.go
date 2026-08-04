@@ -65,11 +65,15 @@ type QueueFetched struct {
 	Tracks  []player.Track
 }
 
-// PlaylistsFetched carries one page of the library listing. Offset says where
-// the page starts, so a page that arrives out of order can be told from the
-// first one and appended rather than replacing what is already read.
-type PlaylistsFetched struct {
+// LibraryFetched carries one page of one of the library's lists. Kind says
+// which — it is the ui's own numbering, passed back untouched — and Offset says
+// where the page starts, so a page that arrives out of order can be told from
+// the first one and appended rather than replacing what is already read.
+type LibraryFetched struct {
+	Kind      int
 	Playlists []player.Playlist
+	Albums    []player.Album
+	Artists   []player.Artist
 	Offset    int
 	More      bool
 	Next      int

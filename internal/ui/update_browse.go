@@ -37,8 +37,8 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 		// Fetched every time rather than once: a playlist made or renamed
 		// elsewhere would otherwise never appear until spindle was restarted,
 		// and one page of a library is a cheap answer.
-		m.playlists.pages.loading = true
-		cmds = append(cmds, fetchPlaylistsCmd(m.player, 0), fetchOpenCmd(m.player, openPlaylist, likedID, 0))
+		m.library.paging().loading = true
+		cmds = append(cmds, fetchLibraryCmd(m.player, m.library.kind, 0), fetchOpenCmd(m.player, openPlaylist, likedID, 0))
 	case t == tabQueue:
 		// The queue is kept for the sake of instant skipping, which only needs
 		// the first entry to be right. Looking at the whole list is a different
@@ -60,7 +60,7 @@ func (m *Model) browseKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	case tabQueue:
 		return m.queueKey(k)
 	case tabLibrary:
-		return m.playlistKey(k)
+		return m.libraryKey(k)
 	case tabSearch:
 		return m.searchKey(k)
 	default:
@@ -134,31 +134,70 @@ func (m *Model) openKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	return nil, false
 }
 
-func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
-	if m.listKey(k, &m.playlists.cursor, len(m.playlists.items), true) {
+func (m *Model) libraryKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
+	if m.listKey(k, m.library.cursor(), m.library.count(), true) {
 		return tea.Batch(m.previewCover(), m.readAhead()), true
 	}
 
 	switch {
-	case key.Matches(k, m.keys.Enter):
-		sel := m.playlists.selected()
-		if sel == nil {
-			return nil, true
+	case key.Matches(k, m.keys.SearchKind), key.Matches(k, m.keys.SearchKindBack):
+		delta := 1
+		if key.Matches(k, m.keys.SearchKindBack) {
+			delta = -1
 		}
-		return m.push(openedPlaylist(*sel)), true
+		return m.turnLibraryKind(delta), true
+
+	case key.Matches(k, m.keys.Enter):
+		return m.openLibraryRow(), true
 
 	case key.Matches(k, m.keys.Actions):
 		m.openActions()
 		return nil, true
 
 	case key.Matches(k, m.keys.Enqueue):
-		// The whole list, since the whole list is what the cursor is on.
-		if sel := m.playlists.selected(); sel != nil {
+		// The whole thing, since the whole thing is what the cursor is on. An
+		// artist is the exception: what "all of it" would mean there is every
+		// record they ever made, which is not a queue anybody asked for.
+		switch {
+		case m.library.atAlbum() != nil:
+			a := m.library.atAlbum()
+			return m.enqueueList(openAlbum, a.ID, a.Name), true
+		case m.library.selected() != nil:
+			sel := m.library.selected()
 			return m.enqueueList(openPlaylist, sel.ID, sel.Name), true
 		}
 		return nil, true
 	}
 	return nil, false
+}
+
+// openLibraryRow goes into whatever the cursor is on, whichever kind it is.
+func (m *Model) openLibraryRow() tea.Cmd {
+	switch {
+	case m.library.atAlbum() != nil:
+		return m.push(openedAlbum(*m.library.atAlbum()))
+	case m.library.atArtist() != nil:
+		return m.push(openedArtist(*m.library.atArtist()))
+	case m.library.selected() != nil:
+		return m.push(openedPlaylist(*m.library.selected()))
+	default:
+		return nil
+	}
+}
+
+// turnLibraryKind moves to the next kind that has anything in it, and asks for
+// it if it has never been read. Kinds nobody has opened cost no requests: the
+// tab loads the one it is showing and no more.
+func (m *Model) turnLibraryKind(delta int) tea.Cmd {
+	next := libraryKind((int(m.library.kind) + delta + libraryKinds) % libraryKinds)
+	m.library.kind = next
+
+	cmds := []tea.Cmd{m.syncCover()}
+	if m.library.countOf(next) == 0 && !m.library.pages[next].loading {
+		m.library.pages[next].loading = true
+		cmds = append(cmds, fetchLibraryCmd(m.player, next, 0))
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
@@ -456,11 +495,11 @@ func (m *Model) readAhead() tea.Cmd {
 		return m.openMut().readAhead(m.player)
 
 	case m.tab == tabLibrary:
-		if !m.playlists.pages.wants(m.playlists.cursor.cursor, len(m.playlists.items)) {
+		if !m.library.paging().wants(m.library.cursor().cursor, m.library.count()) {
 			return nil
 		}
-		m.playlists.pages.loading = true
-		return fetchPlaylistsCmd(m.player, m.playlists.pages.next)
+		m.library.paging().loading = true
+		return fetchLibraryCmd(m.player, m.library.kind, m.library.paging().next)
 
 	case m.tab == tabSearch:
 		found := m.search.current()

@@ -145,7 +145,7 @@ func (m *Model) push(page openPage) tea.Cmd {
 	// A playlist that was read once already shows itself while the request
 	// that refreshes it is in flight.
 	if isLiked(page.id) {
-		page.tracks = m.playlists.liked
+		page.tracks = m.library.liked
 	}
 	page.pages = paging{loading: true}
 

@@ -59,7 +59,7 @@ type Model struct {
 
 	tab       tabID
 	queuePane queuePane
-	playlists playlistPane
+	library   libraryPane
 	search    searchPane
 
 	// stack is what has been opened on top of a tab's own list: a playlist, an
@@ -224,7 +224,7 @@ func (m Model) coverTarget() string {
 		}
 		return ""
 	case tabLibrary:
-		return m.playlists.cover()
+		return m.library.cover()
 	case tabSearch:
 		return m.search.cover()
 	default:

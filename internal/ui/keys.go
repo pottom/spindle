@@ -408,6 +408,7 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 		short := []key.Binding{
 			selectHint,
 			hint("enter", "open"),
+			hint("ctrl+t", "kind"),
 			hint(".", "actions"),
 			hint("a", "queue"),
 		}
@@ -419,7 +420,7 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 		return tabKeys{
 			short: append(short, hint("?", "help")),
 			full: [][]key.Binding{
-				{k.Down, k.Enter, k.Enqueue, k.Back, k.NextTab},
+				{k.Down, k.Enter, k.SearchKind, k.Enqueue, k.NextTab},
 				second,
 				k.moveKeys(true),
 			},

@@ -785,12 +785,12 @@ func TestPlaylistsUseTheSameShapeAsTheQueue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Playlists: %v", err)
 	}
-	m.playlists.items = lists
+	m.library.playlists = lists
 	m.width, m.height = 200, 45
 	m.resize()
 
 	l := m.layout()
-	block := m.playlistPaneView(l, l.bodyHeight)
+	block := m.libraryPaneView(l, l.bodyHeight)
 	if len(block) != l.bodyHeight {
 		t.Fatalf("the block is %d rows, want the whole body of %d", len(block), l.bodyHeight)
 	}
@@ -874,7 +874,7 @@ func TestPlayOnlyThisTrack(t *testing.T) {
 	// At the top level there is no track under the cursor, so the key is a
 	// no-op rather than playing something the cursor is not on.
 	m.closeOpen()
-	if cmd, _ := m.playlistKey(tea.KeyPressMsg{Code: 'o', Text: "o"}); cmd != nil {
+	if cmd, _ := m.libraryKey(tea.KeyPressMsg{Code: 'o', Text: "o"}); cmd != nil {
 		t.Error("o played something from the list of playlists")
 	}
 }
