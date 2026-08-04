@@ -17,7 +17,19 @@ import (
 // runLogin authorises spindle and reports who it authorised as. It is the one
 // place the browser flow is meant to be triggered by hand, and the one place
 // that asks for the client id.
-func runLogin(ctx context.Context) error {
+//
+// An argument sets the application to authenticate as, which is easier to hand
+// to someone than a prompt, and is what a second application wants.
+func runLogin(ctx context.Context, args []string) error {
+	if len(args) > 1 {
+		return fmt.Errorf("spindle login takes one client id, got %d arguments", len(args))
+	}
+	if len(args) == 1 {
+		if err := auth.SaveClientID(strings.TrimSpace(args[0])); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stdout, "Saved to %s\n\n", auth.SettingsPath())
+	}
 	if err := ensureClientID(os.Stdin, os.Stdout); err != nil {
 		return err
 	}

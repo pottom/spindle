@@ -36,7 +36,7 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "login":
-			if err := runLogin(context.Background()); err != nil {
+			if err := runLogin(context.Background(), os.Args[2:]); err != nil {
 				reportFatal(err)
 			}
 			return
