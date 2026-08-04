@@ -140,7 +140,9 @@ func New(isDark bool, accent color.Color) Styles {
 		Remaining: fg(t.Border),
 		Knob:      fg(accent),
 
-		Controls:  fg(t.Text),
+		// The transport is the artwork's colour, like everything else on the
+		// screen that acts rather than merely reports.
+		Controls:  fg(accent),
 		ToggleOn:  fg(accent),
 		ToggleOff: fg(t.Faint),
 		Volume:    fg(t.Muted),

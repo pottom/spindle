@@ -294,3 +294,16 @@ func TestVolumeIsShapedLikeTheProgressBar(t *testing.T) {
 		}
 	}
 }
+
+// The transport is drawn in the artwork's accent, like the bars beside it.
+func TestTransportIsAccent(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{Volume: 50, Duration: time.Minute, Playing: true}
+
+	if got, want := m.styles.Controls.GetForeground(), m.styles.Accent; got != want {
+		t.Errorf("the transport is %v, want the accent %v", got, want)
+	}
+	if !strings.Contains(m.transportLine(60), m.styles.Controls.Render(iconPrev)) {
+		t.Error("the transport row is not drawn in that colour")
+	}
+}
