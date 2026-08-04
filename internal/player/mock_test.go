@@ -124,3 +124,46 @@ func TestMockReorderTakesTracksOutOfTheRotation(t *testing.T) {
 		t.Errorf("%d tracks coming after the move, want the %d there were", len(after.Upcoming), len(before.Upcoming))
 	}
 }
+
+// A track can be waiting in the queue and still be sitting in the rotation it
+// was copied out of. Reordering must not leave both, or it plays twice.
+func TestMockReorderDropsTheSecondCopy(t *testing.T) {
+	m, _ := newTestMock()
+	ctx := t.Context()
+
+	before, err := m.Queue(ctx)
+	if err != nil {
+		t.Fatalf("Queue: %v", err)
+	}
+	twice := before.Upcoming[1].ID
+	if err := m.AddToQueue(ctx, twice); err != nil {
+		t.Fatalf("AddToQueue: %v", err)
+	}
+
+	// Reorder over the run that holds both copies.
+	list, err := m.Queue(ctx)
+	if err != nil {
+		t.Fatalf("Queue: %v", err)
+	}
+	ids := make([]string, 0, len(list.Upcoming))
+	for _, track := range list.Upcoming {
+		ids = append(ids, track.ID)
+	}
+	if err := m.Reorder(ctx, ids); err != nil {
+		t.Fatalf("Reorder: %v", err)
+	}
+
+	after, err := m.Queue(ctx)
+	if err != nil {
+		t.Fatalf("Queue: %v", err)
+	}
+	seen := 0
+	for _, track := range after.Upcoming {
+		if track.ID == twice {
+			seen++
+		}
+	}
+	if seen != 1 {
+		t.Errorf("%s is waiting %d times after the reorder, want once", twice, seen)
+	}
+}

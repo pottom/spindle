@@ -244,19 +244,19 @@ func (m *Mock) SetQueue(ctx context.Context, trackIDs []string) error {
 // order can be set, so a track has to be lifted into it to be moved.
 func (m *Mock) Reorder(ctx context.Context, trackIDs []string) error {
 	return m.mutate(ctx, func() error {
-		want := make(map[string]int, len(trackIDs))
-		for i, id := range trackIDs {
-			want[id] = i
-		}
+		// Matched slot by slot rather than through a map of ids: the same track
+		// can legitimately be waiting twice, and a map would collapse the two
+		// into one and leave a slot that nothing ever fills.
 		found := make([]Track, len(trackIDs))
 		left := len(trackIDs)
 		take := func(t Track) bool {
-			i, ok := want[t.ID]
-			if !ok || found[i].ID != "" {
-				return false
+			for i, id := range trackIDs {
+				if id == t.ID && found[i].ID == "" {
+					found[i], left = t, left-1
+					return true
+				}
 			}
-			found[i], left = t, left-1
-			return true
+			return false
 		}
 
 		var spare []Track
@@ -280,7 +280,17 @@ func (m *Mock) Reorder(ctx context.Context, trackIDs []string) error {
 			return fmt.Errorf("reorder: %d of the tracks are not waiting", left)
 		}
 
-		m.queued = append(append(found, spare...), passed...)
+		// A track cannot be waiting twice: the three lists are drawn from the
+		// queue and from the rotation, and the same song can be in both.
+		m.queued = m.queued[:0]
+		seen := make(map[string]bool, len(found))
+		for _, t := range append(append(found, spare...), passed...) {
+			if seen[t.ID] {
+				continue
+			}
+			seen[t.ID] = true
+			m.queued = append(m.queued, t)
+		}
 
 		// Everything lifted out leaves the rotation, which is what stops it
 		// being heard a second time when the rotation comes round again. What
