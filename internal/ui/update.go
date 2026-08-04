@@ -195,6 +195,13 @@ func (m Model) handleTick() (tea.Model, tea.Cmd) {
 	if cmd := m.spinDevice(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
+	// A banner appearing or clearing changes the height of the body, and with
+	// it the artwork area. Nothing else notices, and a cover drawn into an area
+	// that has since changed size is shown with a corner cut off. This costs
+	// nothing when the size is unchanged.
+	if cmd := m.syncCover(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 
 	// The tick no longer counts anything: elapsed derives the position from the
 	// clock. It is still what notices a track running out, and what keeps the
