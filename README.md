@@ -83,6 +83,25 @@ Settings live in `~/.config/spindle`:
     spindle daemon stop                  stop the playback device
     spindle --cover-info                 what the terminal was found to support
 
+### From a shell
+
+The daemon can be driven and read without opening the interface, which is what a
+key binding or a status bar wants:
+
+    spindle play | pause | toggle        resume, stop, or flip between them
+    spindle next | prev                  move through the queue
+    spindle status                       what is playing, one field per line
+    spindle queue                        the playing track and what follows
+    spindle volume [0-100]               report the level, or set it
+    spindle seek 90 | +30 | -15          to a position, or by an offset
+
+Output is plain text, one thing per line and never coloured; `--json` on any of
+them prints the daemon's own answer instead, for `jq`. Nothing starts a daemon:
+these talk to the one already running, and say so when there is none.
+
+The exit code says which it was: `0` done, `1` refused, `3` no daemon is
+running, `4` the daemon is running but nothing is playing.
+
 ## What it needs
 
 A terminal, a Premium account, and Go 1.26 to build. CGO is required — the audio
