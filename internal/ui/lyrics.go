@@ -2,6 +2,7 @@ package ui
 
 import (
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -25,6 +26,10 @@ const (
 	// half: the fade falls away evenly on both sides, which is what makes the
 	// block read as a surface curving away rather than as a list with a tail.
 	lyricsLead = lyricsMaxRows / 2
+
+	// lyricsDefaultLine is how long the last line of a lyric is assumed to last,
+	// there being nothing after it to measure against.
+	lyricsDefaultLine = 4 * time.Second
 )
 
 // lyricsState is the words of the track playing, and whether they are on screen.
@@ -122,11 +127,34 @@ func (m Model) lyricsBlock(w, rows int) []string {
 		// not worth showing. The continuation carries the same strength, so a
 		// long line still reads as one line.
 		style := m.lyricStyle(i - at)
-		for _, part := range wrapWords(words, w) {
+		parts := wrapWords(words, w)
+
+		if i != at {
+			for _, part := range parts {
+				if len(out) == rows {
+					break
+				}
+				out = append(out, fit(style.Render(part), w))
+			}
+			continue
+		}
+
+		// The line being sung is swept through as it goes. The words are not
+		// timed individually — only lines are — so this claims no more than the
+		// progress bar does about a track: not which word, but how far in.
+		cut := m.lyricsSweep(i, len([]rune(words)))
+		seen := 0
+		for _, part := range parts {
 			if len(out) == rows {
 				break
 			}
-			out = append(out, fit(style.Render(part), w))
+			runes := []rune(part)
+			split := min(max(cut-seen, 0), len(runes))
+			seen += len(runes) + 1 // the space the wrap ate
+
+			out = append(out, fit(
+				style.Render(string(runes[:split]))+
+					m.styles.LyricAhead.Render(string(runes[split:])), w))
 		}
 	}
 	for len(out) < rows {
@@ -168,6 +196,30 @@ func (m Model) lyricsAt() int {
 		at = i
 	}
 	return at
+}
+
+// lyricsSweep is how many characters of the current line have been reached,
+// spread evenly over the time the line is given.
+//
+// Evenly is a guess — nobody sings at a constant rate — so this is deliberately
+// not drawn as though it knew which word was being sung. It is the same claim a
+// progress bar makes about a track.
+func (m Model) lyricsSweep(i, length int) int {
+	if !m.lyrics.synced || i < 0 || i >= len(m.lyrics.lines) {
+		return length
+	}
+
+	start := m.lyrics.lines[i].At
+	end := start + int64(lyricsDefaultLine/time.Millisecond)
+	if i+1 < len(m.lyrics.lines) {
+		end = m.lyrics.lines[i+1].At
+	}
+	if end <= start {
+		return length
+	}
+
+	frac := float64(m.elapsed().Milliseconds()-start) / float64(end-start)
+	return min(max(int(frac*float64(length)+0.5), 0), length)
 }
 
 // lyricsNote is what stands in the words' place when there are none to show.

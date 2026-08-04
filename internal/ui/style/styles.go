@@ -58,6 +58,11 @@ type Styles struct {
 	// rather than to a wall of even text.
 	LyricFade []lipgloss.Style
 
+	// LyricAhead is the part of the line being sung that has not been reached
+	// yet: the accent, held back, so the sweep across it reads as progress
+	// through the line rather than as two different lines.
+	LyricAhead lipgloss.Style
+
 	// Detail panel.
 	FactLabel lipgloss.Style
 	StarOn    lipgloss.Style
@@ -110,7 +115,8 @@ func New(isDark bool, accent color.Color) Styles {
 		RowPlaying:   fg(accent),
 		Empty:        fg(t.Faint),
 
-		LyricFade: lyricFade(t, accent),
+		LyricFade:  lyricFade(t, accent),
+		LyricAhead: lipgloss.NewStyle().Foreground(shift(accent, 0, 0.62, 0.6)),
 
 		FactLabel: fg(t.Faint),
 		StarOn:    fg(accent),

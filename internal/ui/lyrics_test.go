@@ -385,3 +385,67 @@ func TestNothingIsLitBeforeTheFirstLine(t *testing.T) {
 		t.Error("nothing is lit once the first line's time has come")
 	}
 }
+
+// The line being sung is swept through as it goes. Only lines are timed — no
+// track measured had per-syllable data — so this claims no more than a progress
+// bar does about a track: not which word, but how far in.
+func TestLyricSweep(t *testing.T) {
+	m := lyricsModel(120, 44)
+	m.lyrics.lines = []player.Lyric{
+		{At: 0, Words: "the first line"},
+		{At: 4000, Words: "and here is the second one"},
+		{At: 8000, Words: "then a third"},
+	}
+	const length = 26
+
+	m.setProgress(4 * time.Second)
+	if got := m.lyricsSweep(1, length); got != 0 {
+		t.Errorf("at the line's start %d characters are swept, want none", got)
+	}
+
+	m.setProgress(6 * time.Second)
+	if got := m.lyricsSweep(1, length); got < length/2-2 || got > length/2+2 {
+		t.Errorf("halfway through the line %d of %d are swept, want about half", got, length)
+	}
+
+	// It never runs past the line, whatever the clock says.
+	m.setProgress(30 * time.Second)
+	if got := m.lyricsSweep(1, length); got != length {
+		t.Errorf("past the line %d of %d are swept, want all of it", got, length)
+	}
+
+	// And an unsynced lyric has nothing to sweep against, so the line stands
+	// whole rather than creeping at a made-up rate.
+	m.lyrics.synced = false
+	if got := m.lyricsSweep(1, length); got != length {
+		t.Errorf("an unsynced line swept to %d, want it drawn whole", got)
+	}
+}
+
+// The sweep runs across the whole line, not restarting on each wrapped row: it
+// is one line however many rows it takes.
+func TestSweepCarriesAcrossWrappedRows(t *testing.T) {
+	m := lyricsModel(120, 44)
+	words := strings.Fields(strings.Repeat("word ", 12))
+	m.lyrics.lines = []player.Lyric{
+		{At: 0, Words: "before"},
+		{At: 4000, Words: strings.Join(words, " ")},
+		{At: 12000, Words: "after"},
+	}
+	length := len(strings.Join(words, " "))
+
+	// A quarter of the way in, the sweep is a quarter through the whole line —
+	// which is well past the end of the first wrapped row.
+	m.setProgress(6 * time.Second)
+	at := m.lyricsSweep(1, length)
+	if at < length/5 || at > length/3 {
+		t.Errorf("a quarter of the way in %d of %d is swept, want about a quarter", at, length)
+	}
+
+	rowWidth := 24
+	if rows := wrapWords(m.lyrics.lines[1].Words, rowWidth); len(rows) < 2 {
+		t.Fatal("the line did not wrap, so there is nothing to carry across")
+	} else if at <= len(rows[0]) {
+		t.Errorf("the sweep reached %d, still inside the first row of %d", at, len(rows[0]))
+	}
+}
