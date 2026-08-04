@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/zmb3/spotify/v2"
@@ -76,7 +77,16 @@ func classify(action string, err error) error {
 	if errors.As(err, &apiErr) {
 		switch apiErr.Status {
 		case http.StatusForbidden:
-			return ErrPremiumRequired
+			// A 403 on a player call is usually not about the subscription at
+			// all: Spotify answers one for a command it will not carry out in
+			// the present state — pressing play faster than it can act on it
+			// is the common way to see one — and it says which in the message.
+			// Reporting them all as "Premium required" tells a paying listener
+			// something false and hides what actually went wrong.
+			if isPremiumRefusal(apiErr.Message) {
+				return ErrPremiumRequired
+			}
+			return fmt.Errorf("%s: %s", action, refusal(apiErr.Message))
 		case http.StatusNotFound:
 			// Spotify answers a control call with 404 when the device it was
 			// aimed at has gone away.
@@ -84,4 +94,23 @@ func classify(action string, err error) error {
 		}
 	}
 	return fmt.Errorf("%s: %w", action, err)
+}
+
+// isPremiumRefusal reports whether a 403 was about the subscription. Spotify
+// names that reason; everything else it refuses for is a different sentence.
+func isPremiumRefusal(message string) bool {
+	m := strings.ToLower(message)
+	return strings.Contains(m, "premium") || strings.Contains(m, "non-premium")
+}
+
+// refusal tidies Spotify's wording for a line the user has to read at a glance.
+// "Player command failed: Restriction violated" is its own prefix twice over.
+func refusal(message string) string {
+	if message == "" {
+		return "refused by Spotify"
+	}
+	if _, rest, ok := strings.Cut(message, "Player command failed: "); ok {
+		return rest
+	}
+	return message
 }

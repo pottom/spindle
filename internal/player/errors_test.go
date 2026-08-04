@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -72,7 +73,7 @@ func TestClassify(t *testing.T) {
 		in   error
 		want error
 	}{
-		{"premium", spotify.Error{Status: http.StatusForbidden, Message: "Player command failed"}, ErrPremiumRequired},
+		{"premium", spotify.Error{Status: http.StatusForbidden, Message: "Player command failed: Premium required"}, ErrPremiumRequired},
 		{"device gone", spotify.Error{Status: http.StatusNotFound, Message: "Device not found"}, ErrNoActiveDevice},
 		{"nothing at all", nil, nil},
 	}
@@ -82,6 +83,20 @@ func TestClassify(t *testing.T) {
 				t.Errorf("classify = %v, want %v", got, c.want)
 			}
 		})
+	}
+
+	// A 403 that is not about the subscription must not be reported as one: a
+	// paying listener pressing play too fast gets one of these, and being told
+	// to buy what they already have hides what actually happened.
+	refused := classify("play track", spotify.Error{
+		Status:  http.StatusForbidden,
+		Message: "Player command failed: Restriction violated",
+	})
+	if errors.Is(refused, ErrPremiumRequired) {
+		t.Errorf("classify = %v, want the reason Spotify gave", refused)
+	}
+	if got := refused.Error(); !strings.Contains(got, "Restriction violated") || strings.Contains(got, "Player command failed") {
+		t.Errorf("classify = %q, want Spotify's reason without its prefix", got)
 	}
 
 	// Anything unrecognised keeps its context and comes through intact.
