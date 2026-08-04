@@ -366,9 +366,9 @@ func (m Model) drawScope(body []string, l layout) []string {
 
 	w := l.interior - leftMargin - rightMargin
 
-	lines := m.scopeLines(w)
-	if m.scope.mode.bars() {
-		lines = m.barsLines(w)
+	lines := m.barsLines(w)
+	if m.scope.mode.wave() {
+		lines = m.scopeLines(w)
 	}
 	for i, line := range lines {
 		body[at+i] = m.pad(line, l)

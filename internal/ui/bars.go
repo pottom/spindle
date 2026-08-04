@@ -77,5 +77,9 @@ func (m Model) barsLines(w int) []string {
 			loud[c] = 1
 		}
 	}
-	return m.scopeDraw(w, grid, loud)
+	// Drawn without the trail: that belongs to the waveform, and with no samples
+	// arriving it holds a flat centre line that burns straight across the bars.
+	bare := m
+	bare.scope.trail = nil
+	return bare.scopeDraw(w, grid, loud)
 }

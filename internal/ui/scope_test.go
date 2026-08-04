@@ -636,3 +636,40 @@ func TestPeakMarkersDoNotFallInStep(t *testing.T) {
 		t.Errorf("the markers are still %.2f apart, want them falling at their own rates", gap)
 	}
 }
+
+// The glow belongs to the waveform. In the spectrum no samples arrive, so the
+// trail holds a flat centre line — and it burned straight across the bars, over
+// bands that were silent and past the last one entirely.
+func TestBarsCarryNoWaveformTrail(t *testing.T) {
+	m := scopeModel(120, 44)
+	m.scope.mode = scopeBars
+	w := m.layout().interior - leftMargin - rightMargin
+
+	// A trail as it would be left by silence: the flat centre line.
+	m.scope.frame = make([]float32, 2*player.WaveformWindow)
+	m.scope.follow(m.scope.frame)
+	for range scopeTrail {
+		grid, _ := m.scopeGrid(w, 0)
+		m.scope.remember(grid)
+	}
+
+	bands := make([]float32, 28)
+	bands[2] = 0.9
+	m.scope.adoptBands(bands)
+
+	rows := m.barsLines(w)
+	if len(rows) != scopeRows {
+		t.Fatalf("barsLines = %d rows, want %d", len(rows), scopeRows)
+	}
+
+	// The far right has no band with any level, so it has to be empty.
+	for i, row := range rows {
+		tail := []rune(plain(row))
+		if len(tail) < 10 {
+			continue
+		}
+		if strings.TrimSpace(string(tail[len(tail)-10:])) != "" {
+			t.Errorf("row %d has something drawn past the last band: %q", i, string(tail[len(tail)-10:]))
+		}
+	}
+}

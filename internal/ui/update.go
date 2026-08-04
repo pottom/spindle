@@ -168,7 +168,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.scope.frame = message.Samples
 		m.scope.follow(message.Samples)
 		m.scope.adoptBands(message.Bands)
-		m.rememberScope()
+		if m.scope.mode.wave() {
+			m.rememberScope()
+		}
 		return m, scopeFrameCmd(m.player, m.scope.mode)
 
 	case spinner.TickMsg:
