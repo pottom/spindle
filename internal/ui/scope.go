@@ -39,8 +39,10 @@ type scopeMode int
 const (
 	scopeOff scopeMode = iota
 	scopeWave
+	// scopeBars is the spectrum with the peak markers. A plain version without
+	// them was built alongside it and dropped: the markers are what give the
+	// meter its character, and without them it is only a row of blocks.
 	scopeBars
-	scopeBarsPeak
 	scopeModes // how many there are, for the cycle
 )
 
@@ -49,7 +51,7 @@ func (s scopeMode) next() scopeMode { return (s + 1) % scopeModes }
 
 // wants reports whether a mode needs the waveform rather than the bands.
 func (s scopeMode) wave() bool { return s == scopeWave }
-func (s scopeMode) bars() bool { return s == scopeBars || s == scopeBarsPeak }
+func (s scopeMode) bars() bool { return s == scopeBars }
 
 // scopeState is the visualiser the player screen is drawing, and what it is
 // drawing.
@@ -366,7 +368,7 @@ func (m Model) drawScope(body []string, l layout) []string {
 
 	lines := m.scopeLines(w)
 	if m.scope.mode.bars() {
-		lines = m.barsLines(w, m.scope.mode == scopeBarsPeak)
+		lines = m.barsLines(w)
 	}
 	for i, line := range lines {
 		body[at+i] = m.pad(line, l)

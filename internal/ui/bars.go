@@ -30,7 +30,7 @@ func (s *scopeState) adoptBands(bands []float32) {
 //
 // The bands arrive spaced by octave and scaled in decibels, so what is drawn is
 // already what the ear hears as even; the drawing only has to place it.
-func (m Model) barsLines(w int, peaks bool) []string {
+func (m Model) barsLines(w int) []string {
 	if w <= 0 || len(m.scope.bands) == 0 || len(m.styles.ScopeCore) == 0 {
 		return nil
 	}
@@ -56,7 +56,7 @@ func (m Model) barsLines(w int, peaks bool) []string {
 				grid[(dy/dotsPerCellY)*w+c] |= 1 << brailleBit[0][dy%dotsPerCellY]
 				grid[(dy/dotsPerCellY)*w+c] |= 1 << brailleBit[1][dy%dotsPerCellY]
 			}
-			if !peaks || peak <= height {
+			if peak <= height {
 				continue
 			}
 			// The marker sits one dot thick at the height reached, which is

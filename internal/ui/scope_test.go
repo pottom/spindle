@@ -28,7 +28,7 @@ func TestScopeKeyTogglesTheTrace(t *testing.T) {
 	}
 
 	// The key cycles: waveform, bars, bars with peak markers, off, and round.
-	want := []scopeMode{scopeBars, scopeBarsPeak, scopeOff, scopeWave}
+	want := []scopeMode{scopeBars, scopeOff, scopeWave}
 	var tm tea.Model = m
 	for i, mode := range want {
 		var cmd tea.Cmd
@@ -570,7 +570,7 @@ func TestBarsPutBassOnTheLeft(t *testing.T) {
 	bands[1] = 1 // a low band, loud
 	m.scope.adoptBands(bands)
 
-	lines := m.barsLines(w, false)
+	lines := m.barsLines(w)
 	if len(lines) != scopeRows {
 		t.Fatalf("barsLines = %d rows, want %d", len(lines), scopeRows)
 	}
