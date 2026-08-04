@@ -605,7 +605,34 @@ func TestPeakMarkersFallBack(t *testing.T) {
 	for range 200 {
 		m.scope.adoptBands(quiet)
 	}
-	if m.scope.peaks[0] > 0.05 {
+	if m.scope.peaks[0] != 0 {
 		t.Errorf("the marker is still at %.2f after two hundred frames", m.scope.peaks[0])
+	}
+}
+
+// Markers fall by a share of where they are, not by a fixed step. With a fixed
+// step every marker descends at one rate, so markers that started together stay
+// together — and drew a straight line clean across the screen, over bands that
+// were silent.
+func TestPeakMarkersDoNotFallInStep(t *testing.T) {
+	m := scopeModel(120, 44)
+
+	// Two bands that reached different heights.
+	start := make([]float32, 28)
+	start[0], start[1] = 1, 0.4
+	m.scope.adoptBands(start)
+
+	quiet := make([]float32, 28)
+	for range 8 {
+		m.scope.adoptBands(quiet)
+	}
+
+	high, low := m.scope.peaks[0], m.scope.peaks[1]
+	if high <= low {
+		t.Fatalf("markers at %.2f and %.2f, want the higher one still higher", high, low)
+	}
+	// The gap has to have closed, which a fixed step never does.
+	if gap := high - low; gap >= 0.6 {
+		t.Errorf("the markers are still %.2f apart, want them falling at their own rates", gap)
 	}
 }

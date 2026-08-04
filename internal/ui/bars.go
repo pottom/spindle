@@ -1,9 +1,16 @@
 package ui
 
 const (
-	// barsPeakFall is how much of its height a peak marker gives up each frame.
-	// Slow enough to hang where a hit reached, fast enough not to look stuck.
-	barsPeakFall = 0.012
+	// barsPeakDecay is what a marker keeps of its height each frame. A marker
+	// falls by a share of where it is rather than by a fixed step: a fixed step
+	// leaves every marker descending at one rate, and markers that started
+	// together stay together — which drew a straight line clean across the
+	// screen, over bands that were silent.
+	barsPeakDecay = 0.93
+
+	// barsPeakFloor is the level below which a band has no marker at all.
+	// Nothing is sounding there, so nothing reached anything.
+	barsPeakFloor = 0.04
 
 	// barsGap is the blank column between bars, so they read as separate bands
 	// rather than as one filled shape.
@@ -21,7 +28,10 @@ func (s *scopeState) adoptBands(bands []float32) {
 		s.peaks = make([]float32, len(bands))
 	}
 	for i, v := range bands {
-		s.peaks[i] = max(v, s.peaks[i]-barsPeakFall)
+		s.peaks[i] = max(v, s.peaks[i]*barsPeakDecay)
+		if s.peaks[i] < barsPeakFloor {
+			s.peaks[i] = 0
+		}
 	}
 }
 
@@ -56,7 +66,7 @@ func (m Model) barsLines(w int) []string {
 				grid[(dy/dotsPerCellY)*w+c] |= 1 << brailleBit[0][dy%dotsPerCellY]
 				grid[(dy/dotsPerCellY)*w+c] |= 1 << brailleBit[1][dy%dotsPerCellY]
 			}
-			if peak <= height {
+			if peak <= height || m.scope.peaks[b] < barsPeakFloor {
 				continue
 			}
 			// The marker sits one dot thick at the height reached, which is
