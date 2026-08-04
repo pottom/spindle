@@ -476,9 +476,19 @@ func TestTempoShownOnlyWhenMeasured(t *testing.T) {
 		t.Errorf("trackFacts() = %q, want the measured tempo", got)
 	}
 
+	// The row stays even with nothing in it: a tempo takes a dozen seconds to
+	// measure, and a row appearing then would push everything under it down
+	// while it is being read.
 	never := player.Track{Album: "Hot Space", Duration: 4 * time.Minute}
-	if got := factLines(trackFacts(never)); strings.Contains(got, "bpm") {
-		t.Errorf("trackFacts() = %q, want no tempo for a track never played", got)
+	got := factLines(trackFacts(never))
+	if strings.Contains(got, "bpm") {
+		t.Errorf("trackFacts() = %q, want no number for a track never played", got)
+	}
+	if !strings.Contains(got, "Tempo "+unknownValue) {
+		t.Errorf("trackFacts() = %q, want the tempo row held open", got)
+	}
+	if a, b := len(trackFacts(measured)), len(trackFacts(never)); a != b {
+		t.Errorf("the panel is %d rows with a tempo and %d without, want the same height", a, b)
 	}
 }
 

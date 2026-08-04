@@ -50,6 +50,10 @@ const (
 	// trailingCols holds a duration or a count, right aligned.
 	trailingCols = 8
 
+	// unknownValue stands where a fact would be, for the ones that are pending
+	// rather than absent.
+	unknownValue = "—"
+
 	// tempoCols holds a beat rate, right aligned. It is the first column to go
 	// when the pane is narrow: a tempo is worth knowing, a title is worth more.
 	tempoCols = 4
@@ -254,11 +258,14 @@ func trackFacts(t player.Track) []trackFact {
 	}
 	facts = append(facts, trackFact{"length", "Length", formatDuration(t.Duration)})
 
-	// Measured while the track sounded, so it exists for what has been heard
-	// and for nothing else.
+	// The row is always here, even with nothing to put in it. A tempo takes a
+	// dozen seconds to measure, so it arrives mid-track — and a row appearing
+	// then would push everything under it down while it is being read.
+	tempo := unknownValue
 	if t.Tempo > 0 {
-		facts = append(facts, trackFact{"tempo", "Tempo", fmt.Sprintf("%.0f bpm", t.Tempo)})
+		tempo = fmt.Sprintf("%.0f bpm", t.Tempo)
 	}
+	facts = append(facts, trackFact{"tempo", "Tempo", tempo})
 	return facts
 }
 
