@@ -20,6 +20,10 @@ const (
 	// lyricsMaxRows is the most shown at once. A whole lyric on screen is a
 	// page of text to search through; a handful of lines around the one being
 	// sung is something to follow.
+	// lyricsAhead is how far in front of the playhead the words are read. See
+	// lyricsClock.
+	lyricsAhead = 300 * time.Millisecond
+
 	lyricsMaxRows = 11
 
 	// lyricsLead is how many of those rows sit above the current line. Exactly
@@ -202,7 +206,7 @@ func (m Model) lyricsAt() int {
 
 	// Songs open with a bar or two of music. Lighting the first line through it
 	// says it is being sung when it is not.
-	pos := m.elapsed().Milliseconds()
+	pos := m.lyricsClock()
 	at := -1
 	for i, line := range m.lyrics.lines {
 		if line.At > pos {
@@ -233,8 +237,19 @@ func (m Model) lyricsSweep(i, length int) int {
 		return length
 	}
 
-	frac := float64(m.elapsed().Milliseconds()-start) / float64(end-start)
+	frac := float64(m.lyricsClock()-start) / float64(end-start)
 	return min(max(int(frac*float64(length)+0.5), 0), length)
+}
+
+// lyricsClock is the playhead the words are read against, run a little ahead of
+// the one the progress bar shows.
+//
+// The lead covers what sits between the sound and the eye: the daemon reports
+// where it is a moment after it is there, the screen is redrawn on a tick, and
+// a line lit exactly on its timestamp is read after it has been sung. Measured
+// by ear it ran a third of a second late, which is what this gives back.
+func (m Model) lyricsClock() int64 {
+	return m.elapsed().Milliseconds() + int64(lyricsAhead/time.Millisecond)
 }
 
 // lyricsNote is what stands in the words' place when there are none to show.

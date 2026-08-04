@@ -398,12 +398,14 @@ func TestLyricSweep(t *testing.T) {
 	}
 	const length = 26
 
-	m.setProgress(4 * time.Second)
+	// The words are read against a clock that runs a little ahead of the
+	// playhead, so the line has just begun to sweep as its timestamp arrives.
+	m.setProgress(4*time.Second - lyricsAhead)
 	if got := m.lyricsSweep(1, length); got != 0 {
 		t.Errorf("at the line's start %d characters are swept, want none", got)
 	}
 
-	m.setProgress(6 * time.Second)
+	m.setProgress(6*time.Second - lyricsAhead)
 	if got := m.lyricsSweep(1, length); got < length/2-2 || got > length/2+2 {
 		t.Errorf("halfway through the line %d of %d are swept, want about half", got, length)
 	}
