@@ -216,8 +216,14 @@ func hot(t player.Track) bool {
 // leadIn is the track's place in the list. It arrives already styled: a running
 // order is part of the row and is drawn like one, while the mark for the track
 // playing belongs to the cursor.
-func leadIn(place string) string {
-	return padLeft(place, ordinalCols) + "  "
+func (m Model) leadIn(place string) string {
+	// A list of four never reaches double figures, so the second column of the
+	// ordinal is space that only pushes the rows out of line with their heading.
+	width := ordinalCols
+	if m.rowsAreFlush {
+		width = 1
+	}
+	return padLeft(place, width) + "  "
 }
 
 // withMark is a title with the flag for a track most of Spotify is playing.
@@ -304,7 +310,7 @@ func (m Model) queueRow(t player.Track, w int, selected bool, number int) string
 		primary = m.styles.RowSelected
 	}
 	return m.rowWithTempo(w, selected,
-		leadIn(m.styles.Cursor.Render(nowMark))+m.withMark(t, primary.Render(t.Title)),
+		m.leadIn(m.styles.Cursor.Render(nowMark))+m.withMark(t, primary.Render(t.Title)),
 		m.styles.RowSecondary.Render(strings.Join(t.Artists, ", ")),
 		m.tempoCell(t),
 		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
@@ -430,9 +436,9 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 	title := m.withMark(t, primary.Render(t.Title))
 	switch {
 	case m.ps != nil && m.ps.TrackID == t.ID:
-		title = leadIn(m.styles.Cursor.Render(nowMark)) + title
+		title = m.leadIn(m.styles.Cursor.Render(nowMark)) + title
 	case number > 0:
-		title = leadIn(primary.Render(fmt.Sprintf("%d", number))) + title
+		title = m.leadIn(primary.Render(fmt.Sprintf("%d", number))) + title
 	}
 
 	return m.rowWithTempo(w, selected,
@@ -466,6 +472,12 @@ func (m Model) rowWithTempo(w int, selected bool, primary, secondary, tempo, tra
 	gutter := "  "
 	if selected {
 		gutter = m.styles.Cursor.Render(rowCursor) + " "
+	}
+	if m.rowsAreFlush {
+		// Nothing on this list can be pointed at, so the column the cursor
+		// would stand in is dead space that pushes every row out of line with
+		// its own heading.
+		gutter = ""
 	}
 
 	body := w - lipgloss.Width(gutter)

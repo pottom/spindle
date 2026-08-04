@@ -93,3 +93,27 @@ func TestPeekNeedsTheBand(t *testing.T) {
 		t.Error("the glance appeared with no band to put it in")
 	}
 }
+
+// The glance has no cursor and never reaches double figures, so it gives up
+// both the column the cursor would stand in and the second digit of the
+// ordinal: without that the whole list sits indented from its own heading.
+func TestPeekRowsAreFlushWithTheHeading(t *testing.T) {
+	m := peekModel()
+	m.peek.on = true
+
+	var heading, first int = -1, -1
+	for _, row := range strings.Split(plain(m.render()), "\n") {
+		switch {
+		case strings.Contains(row, "Up next"):
+			heading = strings.Index(row, "Up next")
+		case first < 0 && strings.Contains(row, "first"):
+			first = strings.Index(row, "1")
+		}
+	}
+	if heading < 0 || first < 0 {
+		t.Fatal("could not find the heading and the first row")
+	}
+	if heading != first {
+		t.Errorf("the heading starts at column %d and the first row at %d, want them flush", heading, first)
+	}
+}

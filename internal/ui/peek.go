@@ -47,10 +47,12 @@ func (m Model) drawPeek(body []string, l layout) []string {
 		w,
 	), l)
 
+	flush := m
+	flush.rowsAreFlush = true
 	for i := range peekRows {
 		row := strings.Repeat(" ", w)
 		if i < len(m.queue) {
-			row = m.trackRow(m.queue[i], w, false, i+1)
+			row = flush.trackRow(m.queue[i], w, false, i+1)
 		}
 		body[i+1] = m.pad(row, l)
 	}

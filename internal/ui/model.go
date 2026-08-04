@@ -141,6 +141,10 @@ type Model struct {
 
 	// peek is the glance at what is coming, above the artwork.
 	peek peekState
+
+	// rowsAreFlush drops the cursor column from list rows, for the lists that
+	// have no cursor. Set while drawing one and cleared straight after.
+	rowsAreFlush bool
 }
 
 // New wires a model around a playback backend and an artwork loader. The palette
