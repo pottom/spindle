@@ -14,7 +14,7 @@ func (m *Model) deviceKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	// behind it to go back to.
 	active := m.devices.open || (m.tab == tabPlayer && m.noDevice)
 	if !active {
-		if key.Matches(k, m.keys.Devices) && m.tab != tabSearch {
+		if key.Matches(k, m.keys.Devices) && !m.search.typing {
 			m.devices.open = true
 			return tea.Batch(fetchDevicesCmd(m.player), m.syncCover()), true
 		}

@@ -408,7 +408,7 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.switchTab(m.tab.next(1))
 	case key.Matches(k, m.keys.PrevTab):
 		return m, m.switchTab(m.tab.next(-1))
-	case key.Matches(k, m.keys.GoTab) && m.tab != tabSearch:
+	case key.Matches(k, m.keys.GoTab) && !m.search.typing:
 		// Not on the search tab: there the digits belong to the query, and a
 		// key that types on one screen must not navigate on it.
 		if t, ok := tabAt(k.String()); ok {
@@ -460,6 +460,11 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.peek.on = !m.peek.on
 		return m, m.savePrefs()
+
+	case key.Matches(k, m.keys.SearchType):
+		// From anywhere: the shortest way to a search is one key, not a tab
+		// switch and then a key.
+		return m, m.startTyping()
 
 	case key.Matches(k, m.keys.Help):
 		// Expanding the help shortens the body, which shrinks the artwork, so

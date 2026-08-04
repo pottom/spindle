@@ -137,15 +137,20 @@ func (m *Model) playlistKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 }
 
 func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
-	found := m.search.current()
+	if m.search.typing {
+		return m.searchTypingKey(k)
+	}
 
-	// No g and G on this tab: they are letters, and every letter here is part
-	// of the query.
-	if m.listKey(k, &found.cursor, found.count(), false) {
+	found := m.search.current()
+	if m.listKey(k, &found.cursor, found.count(), true) {
 		return tea.Batch(m.previewCover(), m.readAhead()), true
 	}
 
 	switch {
+	case key.Matches(k, m.keys.SearchType):
+		m.startTyping()
+		return nil, true
+
 	case key.Matches(k, m.keys.SearchKind), key.Matches(k, m.keys.SearchKindBack):
 		delta := 1
 		if key.Matches(k, m.keys.SearchKindBack) {
@@ -157,13 +162,24 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	case key.Matches(k, m.keys.Enter):
 		return m.playSearchHit(), true
 
-	case key.Matches(k, m.keys.ActionsTyped):
+	case key.Matches(k, m.keys.Actions), key.Matches(k, m.keys.ActionsTyped):
 		m.openActions()
 		return nil, true
 
-	case key.Matches(k, m.keys.EnqueueTyped):
+	case key.Matches(k, m.keys.Enqueue), key.Matches(k, m.keys.EnqueueTyped):
 		if sel := m.search.selected(); sel != nil {
 			return m.enqueue(sel.ID), true
+		}
+		return nil, true
+
+	case key.Matches(k, m.keys.PlayOne):
+		if sel := m.search.selected(); sel != nil {
+			id := sel.ID
+			return m.startPlay(playRequest{
+				action: "play track",
+				track:  *sel,
+				call:   func(ctx context.Context, p player.Player) error { return p.PlayNow(ctx, id) },
+			}), true
 		}
 		return nil, true
 
@@ -176,7 +192,41 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		return m.syncCover(), true
 	}
 
-	// Anything else is typing. The query drives a fresh search each keystroke;
+	// Everything else belongs to whoever handles it next: the digits reach the
+	// tabs, d opens the devices, v turns the trace. That is the whole point of
+	// typing being a mode rather than the default.
+	return nil, false
+}
+
+// searchTypingKey drives the query while the keyboard belongs to it.
+func (m *Model) searchTypingKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
+	found := m.search.current()
+
+	// No g and G while typing: they are letters, and every letter is the query.
+	if m.listKey(k, &found.cursor, found.count(), false) {
+		return tea.Batch(m.previewCover(), m.readAhead()), true
+	}
+
+	switch {
+	case key.Matches(k, m.keys.Enter), key.Matches(k, m.keys.Back):
+		// Enter hands the results to the keyboard; escape does the same, and
+		// then clears the query on a second press. Neither leaves the tab
+		// while there is something to come back to.
+		m.stopTyping()
+		return nil, true
+
+	case key.Matches(k, m.keys.ActionsTyped):
+		m.openActions()
+		return nil, true
+
+	case key.Matches(k, m.keys.EnqueueTyped):
+		if sel := m.search.selected(); sel != nil {
+			return m.enqueue(sel.ID), true
+		}
+		return nil, true
+	}
+
+	// Anything else is the query. It drives a fresh search on each keystroke;
 	// the sequence number keeps a slow one from overwriting a newer answer.
 	before := m.search.input.Value()
 
@@ -192,6 +242,20 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	m.search.found = nil
 	m.search.current().pages.loading = true
 	return tea.Batch(cmd, searchCmd(m.player, m.search.input.Value(), "", m.search.seq, 0)), true
+}
+
+// startTyping hands the keyboard to the query, from whichever tab asked.
+func (m *Model) startTyping() tea.Cmd {
+	cmd := m.switchTab(tabSearch)
+	m.search.typing = true
+	m.search.input.Focus()
+	return cmd
+}
+
+// stopTyping gives the keyboard back to the list.
+func (m *Model) stopTyping() {
+	m.search.typing = false
+	m.search.input.Blur()
 }
 
 // turnSearchKind moves to the next kind that matched anything, so a query with

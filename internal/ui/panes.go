@@ -89,6 +89,14 @@ type queuePane struct {
 // coming back to where you were is the whole point of switching.
 type searchPane struct {
 	input textinput.Model
+
+	// typing is whether the keyboard belongs to the query. Off to begin with,
+	// so the tab answers the same keys as every other list until / is pressed:
+	// a screen where the digits cannot reach the tabs and a full stop cannot
+	// open the menu is a screen you have to escape from before you can use the
+	// program.
+	typing bool
+
 	kind  player.SearchKind
 	found map[player.SearchKind]*searchResults
 

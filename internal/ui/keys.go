@@ -53,6 +53,10 @@ type keyMap struct {
 	Actions      key.Binding
 	ActionsTyped key.Binding
 
+	// SearchType starts typing a query, and is how the search tab is entered
+	// from anywhere.
+	SearchType key.Binding
+
 	// SearchKind moves between the kinds of thing a query matched. Control keys
 	// because every printable one on that tab is the query.
 	SearchKind     key.Binding
@@ -171,6 +175,10 @@ func newKeyMap() keyMap {
 			key.WithHelp("m", "mute"),
 		),
 
+		SearchType: key.NewBinding(
+			key.WithKeys("/"),
+			key.WithHelp("/", "search"),
+		),
 		SearchKind: key.NewBinding(
 			key.WithKeys("ctrl+right", "ctrl+t"),
 			key.WithHelp("ctrl+t", "kind"),
@@ -392,13 +400,14 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 		return tabKeys{
 			short: []key.Binding{
 				hint("type", "to search"),
+				hint("/", "search"),
 				selectHint,
 				hint("enter", "play"),
-				hint("ctrl+o", "actions"),
-				hint("ctrl+a", "queue"),
+				hint("ctrl+t", "kind"),
+				hint(".", "actions"),
 			},
 			full: [][]key.Binding{
-				{k.Down, k.Enter, k.ActionsTyped, k.EnqueueTyped, k.Back},
+				{k.SearchType, k.Down, k.Enter, k.SearchKind, k.Actions},
 				{hint("ctrl+c", "quit"), k.Help},
 				// No g and G here: the query has them.
 				k.moveKeys(false),

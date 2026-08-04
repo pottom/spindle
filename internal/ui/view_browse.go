@@ -886,9 +886,18 @@ func (m Model) rowCols(w int, selected bool, primary, secondary, tempo, trailing
 }
 
 // searchField renders the query line, keeping the prompt in the accent.
+// searchField is the query line. It shows whether the keyboard belongs to it:
+// a prompt in the accent while typing, quiet otherwise, so there is never a
+// question about where a keystroke will go.
 func (m Model) searchField(w int) string {
 	in := m.search.input
 	in.SetWidth(max(w-4, 8))
+	if !m.search.typing {
+		if v := in.Value(); v != "" {
+			return m.styles.Album.Render("⌕ " + fit(v, max(w-2, 4)))
+		}
+		return m.styles.Empty.Render("⌕ press / to search")
+	}
 	return in.View()
 }
 

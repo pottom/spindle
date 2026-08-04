@@ -192,8 +192,9 @@ func TestTheEndsAreOneKeyAway(t *testing.T) {
 	}
 }
 
-// On the search tab every printable key belongs to the query, so g has to type
-// rather than jump. The keys that are not letters still move the results.
+// While the query has the keyboard every printable key belongs to it, so g has
+// to type rather than jump. The keys that are not letters still move the
+// results.
 func TestGTypesOnTheSearchTabAndPageUpDoesNot(t *testing.T) {
 	m := New(player.NewMock(), nil, defaultTestCell)
 	m.tab = tabSearch
@@ -206,6 +207,7 @@ func TestGTypesOnTheSearchTabAndPageUpDoesNot(t *testing.T) {
 	m.resize()
 
 	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	got := tm.(Model)
 	if q := got.search.input.Value(); q != "g" {

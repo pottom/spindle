@@ -211,8 +211,16 @@ func TestDigitsSwitchTabs(t *testing.T) {
 		t.Errorf("tab = %v after 1, want now playing", got)
 	}
 
-	// On the search tab the digit is a query, not a destination.
+	// The search tab is a list like any other until the query is asked for, so
+	// the digits still reach the tabs there.
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: '4', Text: "4"})
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
+	if got := tm.(Model).tab; got != tabQueue {
+		t.Errorf("tab = %v, want the digit to still switch tabs", got)
+	}
+
+	// Once / has asked for the query, the digit is what is being typed.
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
 	got := tm.(Model)
 	if got.tab != tabSearch {
@@ -220,6 +228,25 @@ func TestDigitsSwitchTabs(t *testing.T) {
 	}
 	if q := got.search.input.Value(); q != "2" {
 		t.Errorf("query = %q, want the digit typed", q)
+	}
+}
+
+// / is how the query asks for the keyboard, and enter hands it back: the
+// results are a list, and a list you cannot move with j is not one.
+func TestSlashTakesTheKeyboardAndEnterGivesItBack(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.width, m.height = 100, 40
+	m.resize()
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	if got := tm.(Model); got.tab != tabSearch || !got.search.typing {
+		t.Fatalf("tab = %v typing = %v, want / to open the query", got.tab, got.search.typing)
+	}
+
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if tm.(Model).search.typing {
+		t.Error("enter left the keyboard with the query, want it back on the list")
 	}
 }
 
