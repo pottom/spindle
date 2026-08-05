@@ -125,10 +125,8 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 
 	switch {
 	case key.Matches(k, m.keys.Gag):
-		// Whatever fills a solo, without waiting for one. Which of them is a
-		// coin: the point of the key is to see them, and seeing the same one
-		// every time would defeat it.
-		m.pullFace()
+		// The record, put on without waiting for a solo to ask for it.
+		m.putOnTheRecord()
 		return nil, true
 
 	case key.Matches(k, m.keys.Scope):

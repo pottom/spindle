@@ -42,8 +42,8 @@ type keyMap struct {
 	Devices  key.Binding
 	Refresh  key.Binding
 	Scope    key.Binding
-	// Stage gives the whole terminal to the visualiser, and Gag puts one of the
-	// things that fill a solo up without waiting for one.
+	// Stage gives the whole terminal to the visualiser, and Gag puts the turning
+	// record on without waiting for a solo to ask for it.
 	Stage  key.Binding
 	Gag    key.Binding
 	Lyrics key.Binding
@@ -200,7 +200,7 @@ func newKeyMap() keyMap {
 		),
 		Gag: key.NewBinding(
 			key.WithKeys("F"),
-			key.WithHelp("F", "one of the solo's faces, now"),
+			key.WithHelp("F", "put the record on"),
 		),
 		Lyrics: key.NewBinding(
 			key.WithKeys("l"),

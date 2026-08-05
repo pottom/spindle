@@ -659,11 +659,9 @@ func TestWordsHangTheMeterFromTheCeilingToo(t *testing.T) {
 	}
 }
 
-// A lyric sheet marks the bars it has no words for with a note, and a note two
-// hundred dots tall is a dull thing to look at for the length of a solo. Those
-// bars are drawn instead — a face or the chase — so nothing is set in type for
-// them at all.
-func TestWordsDrawRatherThanSetTheSolos(t *testing.T) {
+// A lyric sheet marks the bars it has no words for with a note. Nothing is set
+// in type for those: the screen puts the record on instead.
+func TestWordsPutTheRecordOnThroughASolo(t *testing.T) {
 	m := scopeModel(100, 44)
 	m.width, m.height = 60, 16
 	m.ps.TrackID = "now"
@@ -675,73 +673,18 @@ func TestWordsDrawRatherThanSetTheSolos(t *testing.T) {
 	m.setProgress(2 * time.Second)
 
 	if lines, _ := m.wordsComing(); len(lines) != 0 {
-		t.Errorf("an instrumental bar asked for %q to be set, want it drawn", lines)
+		t.Errorf("an instrumental bar asked for %q to be set, want the record on", lines)
 	}
-
-	// And the screen is not blank for it: the bar is one of the drawn ones.
-	m.chaseNow()
-	if !m.chase.on && !m.words.drawn {
-		t.Error("an instrumental bar drew neither a face nor the chase")
+	if !m.recordNow() {
+		t.Fatal("an instrumental bar left the screen empty")
 	}
 	if m.wordsSilent() {
-		t.Error("a bar with a face on it was taken for silence")
+		t.Error("a bar with the record on it was taken for silence")
 	}
 
-	// Forty of them are not all the same face.
-	seen := map[faceKind]bool{}
-	for at := range int64(40) {
-		seen[faceFor(at*7_000)] = true
-	}
-	t.Logf("forty instrumental bars pulled %d of the %d faces", len(seen), faceKinds)
-	if len(seen) < int(faceKinds)-1 {
-		t.Errorf("forty bars only pulled %d faces of %d", len(seen), faceKinds)
-	}
-
-	// And the same bar always pulls the same one.
-	if a, b := faceFor(12_345), faceFor(12_345); a != b {
-		t.Errorf("one bar pulled face %d and then %d", a, b)
-	}
-}
-
-// The cheering face goes up through a solo with its arms in the air, and it
-// would be a waste to let it simply vanish when the singer comes back: the hands
-// throw on the beat, and let go of everything a moment before the words return.
-func TestCheerThrowsFromItsHands(t *testing.T) {
-	const w, rows = 80, 20
-
-	m := scopeModel(100, 44)
-	m.width, m.height = w, rows
-	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
-	m.ps.TrackID = "now"
-
-	m.words.drawn = true
-	m.face = faceState{kind: faceCheer}
-
-	// A beat: a spark or two from each hand.
-	m.scope.envelope, m.words.wasLoud = 0.9, 0.2
-	m.wordsCheerFlow(w, rows)
-	if len(m.stage.drops) == 0 {
-		t.Error("the hands threw nothing on the beat")
-	}
-	onBeat := len(m.stage.drops)
-
-	// And everything they had, just before the words come back.
-	m.lyrics.synced, m.lyrics.forTrack = true, "now"
-	m.lyrics.lines = []player.Lyric{{At: 0, Words: "♪"}, {At: 10_000, Words: "words"}}
-	m.words.ends = 10_000
-	m.setProgress(10*time.Second - wordsCheerBurst/2 - lyricsAhead)
-
-	m.wordsCheerFlow(w, rows)
-	t.Logf("%d sparks on a beat, %d once it let go", onBeat, len(m.stage.drops))
-
-	if len(m.stage.drops) < onBeat+wordsCheerMost/2 {
-		t.Errorf("the burst threw %d sparks, want at least %d", len(m.stage.drops)-onBeat, wordsCheerMost/2)
-	}
-
-	// Only once, though.
-	before := len(m.stage.drops)
-	m.wordsCheerFlow(w, rows)
-	if len(m.stage.drops) > before+4 {
-		t.Error("it let go twice")
+	// And it comes off again when the words come back.
+	m.setProgress(61 * time.Second)
+	if m.recordNow() {
+		t.Error("the record stayed on through the words")
 	}
 }
