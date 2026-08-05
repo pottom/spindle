@@ -56,7 +56,8 @@ func TestGrindStretchesADarkCover(t *testing.T) {
 		}
 	}
 
-	g := Grind(img, 40, 10, 2, 4)
+	// A square picture in a square grid, so there is no margin to count.
+	g := Grind(img, 40, 20, 2, 4)
 
 	var lo, hi uint8 = 255, 0
 	var lit int
@@ -104,25 +105,43 @@ func TestGrindQuantisesTheColours(t *testing.T) {
 	}
 }
 
-// A cover is square and a terminal is not, so it is cropped from the middle
-// rather than squashed.
-func TestGrindCropsRatherThanSquashes(t *testing.T) {
-	// A tall image drawn in a wide picture: what survives has to be the middle
-	// band of it, so the middle row is the middle row of the original.
+// The whole sleeve, not a piece of it: a cover is square and a terminal is not,
+// so the picture keeps its own shape and the screen is left dark either side of
+// it. Cropping to the window would fill it and throw away the corners, which on
+// a record sleeve is where half the design is.
+func TestGrindShowsTheWholeCover(t *testing.T) {
+	// A tall image in a wide grid, with a bright band across its middle and a
+	// bright line along its very top.
 	img := image.NewRGBA(image.Rect(0, 0, 100, 400))
 	for y := range 400 {
 		v := uint8(0)
-		if y > 190 && y < 210 {
-			v = 255 // a bright stripe across the middle
+		if (y > 190 && y < 210) || y < 8 {
+			v = 255
 		}
 		for x := range 100 {
 			img.Set(x, y, color.RGBA{R: v, G: v, B: v, A: 255})
 		}
 	}
 
-	g := Grind(img, 40, 10, 2, 4)
-	mid := int(g.Lum[(g.DotsY/2)*g.DotsX+g.DotsX/2])
-	if mid < 200 {
-		t.Errorf("the middle of the cropped cover reads %d, want the stripe that was there", mid)
+	g := Grind(img, 60, 10, 2, 4) // 120 x 40 dots, for a picture 4 times as tall as wide
+	at := func(x, y int) int { return int(g.Lum[y*g.DotsX+x]) }
+
+	// The band across the middle is there.
+	if mid := at(g.DotsX/2, g.DotsY/2); mid < 200 {
+		t.Errorf("the middle of the cover reads %d, want the band that was there", mid)
+	}
+	// So is the line along its top, which a crop to the window would have kept
+	// but a squash would have lost. The picture starts at the first row here,
+	// because the cover is taller than the grid.
+	if top := at(g.DotsX/2, 0); top < 200 {
+		t.Errorf("the top of the cover reads %d, want the line that was there", top)
+	}
+	// And the sides are dark, because the picture is narrower than the screen.
+	for _, x := range []int{0, 2, g.DotsX - 1} {
+		for y := range g.DotsY {
+			if v := at(x, y); v != 0 {
+				t.Fatalf("column %d row %d reads %d, want the margin left dark", x, y, v)
+			}
+		}
 	}
 }

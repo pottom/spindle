@@ -61,23 +61,43 @@ func Grind(img image.Image, cellsX, cellsY, perX, perY int) Grain {
 		CellsY: cellsY,
 	}
 
-	// The cover is square and the screen is not, so it is fitted rather than
-	// stretched: a record squashed to the shape of a terminal is not the record.
-	src := fit(img, g.DotsX, g.DotsY)
+	// The whole sleeve, not a piece of it. A cover is square and a terminal is
+	// not, so the picture is the largest one of its own shape that fits, set in
+	// the middle with the screen dark either side of it. Cropping to the shape
+	// of the window would fill it, and would also throw away whatever the
+	// designer put in the corners.
+	//
+	// A braille dot happens to be about square — a cell is twice as tall as it
+	// is wide and holds two dots across by four down — so a square picture is
+	// as many dots one way as the other, and no aspect correction is needed
+	// beyond counting them.
+	pw, ph := inside(img.Bounds().Dx(), img.Bounds().Dy(), g.DotsX, g.DotsY)
+	if pw <= 0 || ph <= 0 {
+		return g
+	}
+	offX, offY := (g.DotsX-pw)/2, (g.DotsY-ph)/2
 
-	scaled := image.NewRGBA(image.Rect(0, 0, g.DotsX, g.DotsY))
-	draw.CatmullRom.Scale(scaled, scaled.Bounds(), src, src.Bounds(), draw.Src, nil)
+	scaled := image.NewRGBA(image.Rect(0, 0, pw, ph))
+	draw.CatmullRom.Scale(scaled, scaled.Bounds(), img, img.Bounds(), draw.Src, nil)
 
-	g.Lum = make([]uint8, g.DotsX*g.DotsY)
-	for y := range g.DotsY {
-		for x := range g.DotsX {
+	// The brightness is stretched over the picture alone: with the dark margin
+	// counted in, every cover would come out as an overexposed stamp in the
+	// middle of a black screen.
+	lum := make([]uint8, pw*ph)
+	for y := range ph {
+		for x := range pw {
 			c := scaled.RGBAAt(x, y)
 			// Rec. 601 luma: what the eye reads as brightness, rather than the
 			// average of three channels it does not weigh equally.
-			g.Lum[y*g.DotsX+x] = uint8((299*int(c.R) + 587*int(c.G) + 114*int(c.B)) / 1000)
+			lum[y*pw+x] = uint8((299*int(c.R) + 587*int(c.G) + 114*int(c.B)) / 1000)
 		}
 	}
-	stretch(g.Lum)
+	stretch(lum)
+
+	g.Lum = make([]uint8, g.DotsX*g.DotsY)
+	for y := range ph {
+		copy(g.Lum[(y+offY)*g.DotsX+offX:], lum[y*pw:(y+1)*pw])
+	}
 
 	g.Cell = make([]color.RGBA, cellsX*cellsY)
 	for cy := range cellsY {
@@ -85,7 +105,11 @@ func Grind(img image.Image, cellsX, cellsY, perX, perY int) Grain {
 			var r, gr, b, n int
 			for y := cy * perY; y < (cy+1)*perY; y++ {
 				for x := cx * perX; x < (cx+1)*perX; x++ {
-					c := scaled.RGBAAt(x, y)
+					px, py := x-offX, y-offY
+					if px < 0 || py < 0 || px >= pw || py >= ph {
+						continue
+					}
+					c := scaled.RGBAAt(px, py)
 					r, gr, b, n = r+int(c.R), gr+int(c.G), b+int(c.B), n+1
 				}
 			}
@@ -98,6 +122,18 @@ func Grind(img image.Image, cellsX, cellsY, perX, perY int) Grain {
 		}
 	}
 	return g
+}
+
+// inside is the largest picture of the cover's own shape that fits in the space
+// there is.
+func inside(imgW, imgH, w, h int) (int, int) {
+	if imgW <= 0 || imgH <= 0 {
+		return 0, 0
+	}
+	if imgW*h > w*imgH {
+		return w, max(w*imgH/imgW, 1) // the width runs out first
+	}
+	return max(h*imgW/imgH, 1), h
 }
 
 // round takes a channel to one of grainLevels steps.
@@ -143,36 +179,4 @@ func stretch(lum []uint8) {
 	}
 }
 
-// fit crops a cover to the shape it is being drawn in, from the middle.
-func fit(img image.Image, w, h int) image.Image {
-	b := img.Bounds()
-	want := float64(w) / float64(h)
-	have := float64(b.Dx()) / float64(b.Dy())
 
-	switch {
-	case have > want:
-		// Too wide: take a middle column of it.
-		keep := int(float64(b.Dy()) * want)
-		off := (b.Dx() - keep) / 2
-		return crop(img, image.Rect(b.Min.X+off, b.Min.Y, b.Min.X+off+keep, b.Max.Y))
-	case have < want:
-		keep := int(float64(b.Dx()) / want)
-		off := (b.Dy() - keep) / 2
-		return crop(img, image.Rect(b.Min.X, b.Min.Y+off, b.Max.X, b.Min.Y+off+keep))
-	}
-	return img
-}
-
-// crop is SubImage where the image has it, and a copy where it does not.
-func crop(img image.Image, r image.Rectangle) image.Image {
-	type subImager interface {
-		SubImage(image.Rectangle) image.Image
-	}
-	if s, ok := img.(subImager); ok {
-		return s.SubImage(r)
-	}
-
-	out := image.NewRGBA(image.Rect(0, 0, r.Dx(), r.Dy()))
-	draw.Draw(out, out.Bounds(), img, r.Min, draw.Src)
-	return out
-}
