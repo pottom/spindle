@@ -255,7 +255,8 @@ func TestWordsKeepTheColourTheyWereSungIn(t *testing.T) {
 	m.setProgress(500 * time.Millisecond)
 	m.wordsFlow(w, rows)
 
-	first := m.words.paint[0]
+	early := m.words.sung
+	first := m.words.paint[early]
 	if !first.set {
 		t.Fatal("the word being sung was not painted at all")
 	}
@@ -271,17 +272,17 @@ func TestWordsKeepTheColourTheyWereSungIn(t *testing.T) {
 
 	was := shape()
 	m.wordsFlow(w, rows)
-	t.Logf("word 0 kept hue %d, and the word being sung is %d", first.hue, m.words.sung)
+	t.Logf("word %d kept hue %d, and the word being sung is now %d", early, first.hue, m.words.sung)
 
-	if m.words.sung == 0 {
-		t.Fatal("the singer never reached the second word")
+	if m.words.sung <= early {
+		t.Fatalf("the singer never got past word %d", early)
 	}
 	if got := m.words.paint[m.words.sung]; !got.set || got.hue == first.hue {
 		t.Errorf("a word sung over a cymbal took hue %d, the same as one sung over a bass note", got.hue)
 	}
 	// The earlier word kept what it was sung in rather than following the music.
-	if m.words.paint[0].hue != first.hue {
-		t.Errorf("the first word repainted itself from %d to %d", first.hue, m.words.paint[0].hue)
+	if m.words.paint[early].hue != first.hue {
+		t.Errorf("the earlier word repainted itself from %d to %d", first.hue, m.words.paint[early].hue)
 	}
 	// And nothing moved.
 	if shape() != was {
@@ -423,5 +424,108 @@ func TestWordsLandOnTheLine(t *testing.T) {
 	t.Logf("the line arrives %v before it is sung, %v of the gathering already spent", wait, spent)
 	if spent < 0 || spent > wordsGather {
 		t.Errorf("%v of the gathering is spent on arrival, want between 0 and %v", spent, wordsGather)
+	}
+}
+
+// A lyric sheet says when a line starts and nothing else, so how far into it the
+// singer has got is a guess. Spreading the words evenly over the gap to the next
+// line is a bad guess — measured over three hundred lines, a line fills about
+// half of its gap — so the length is guessed from the line itself instead, and
+// the guess is made to fail early rather than late.
+func TestWordsGuessTheLineLengthFromTheLine(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.width, m.height = 90, 20
+	m.ps.TrackID = "now"
+
+	m.lyrics.synced, m.lyrics.forTrack = true, "now"
+	// A short line with a long gap after it: the singer is done well before the
+	// next line arrives, and the old arithmetic would have been halfway through
+	// the line when they had finished it.
+	m.lyrics.lines = []player.Lyric{
+		{At: 0, Words: "one two three four"},
+		{At: 30_000, Words: "long after"},
+	}
+	m.words.where.Count = 4
+
+	// Two seconds in, a line of eighteen characters is over at any singing rate.
+	m.setProgress(2 * time.Second)
+	if got := m.wordsSung(); got < 3 {
+		t.Errorf("two seconds into a four word line the picture is on word %d, want it at the end", got)
+	}
+
+	// And it holds there rather than running past it.
+	m.setProgress(20 * time.Second)
+	if got := m.wordsSung(); got != 3 {
+		t.Errorf("twenty seconds in the picture is on word %d, want it held on the last", got)
+	}
+
+	// A line that genuinely fills its gap is still followed through it.
+	m.lyrics.lines = []player.Lyric{
+		{At: 0, Words: "one two three four"},
+		{At: 1_500, Words: "hard after"},
+	}
+	m.setProgress(200 * time.Millisecond)
+	early := m.wordsSung()
+	m.setProgress(900 * time.Millisecond)
+	if late := m.wordsSung(); late <= early {
+		t.Errorf("through a tight line the picture went from word %d to %d", early, late)
+	}
+}
+
+// The note a lyric sheet puts where a line would be is not a line: nobody sings
+// it, so nothing paints it once and keeps it. It beats with the music instead.
+func TestWordsBeatWhenThereIsNothingToSing(t *testing.T) {
+	for _, line := range []string{"♪", "♪ ♪ ♪", "…"} {
+		if !wordsBeats(line) {
+			t.Errorf("%q was taken for words", line)
+		}
+	}
+	for _, line := range []string{"better off alone", "1979", "♪ and then"} {
+		if wordsBeats(line) {
+			t.Errorf("%q was taken for a mark", line)
+		}
+	}
+
+	const w, rows = 90, 14
+
+	m := scopeModel(100, 44)
+	m.width, m.height = w, rows
+	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
+
+	lines := []string{"♪"}
+	img, layout, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
+	if !ok {
+		t.Skip("the face has no note to draw")
+	}
+	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	m.words.cellsX, m.words.cellsY, m.words.where = w, rows, layout
+	m.words.since = time.Now().Add(-time.Second)
+	m.words.beats = true
+
+	paint := func() string { return strings.Join(m.wordsLines(w, rows), "") }
+
+	bass := make([]float32, 28)
+	for i := range bass {
+		bass[i] = 0.1
+	}
+	bass[1] = 1
+	m.scope.bands = bass
+	for range 30 {
+		m.wordsFlow(w, rows)
+	}
+	was := paint()
+
+	high := make([]float32, 28)
+	for i := range high {
+		high[i] = 0.1
+	}
+	high[26] = 1
+	m.scope.bands = high
+	for range 30 {
+		m.wordsFlow(w, rows)
+	}
+
+	if paint() == was {
+		t.Error("the mark kept its colour while the music moved under it")
 	}
 }

@@ -192,13 +192,17 @@ func (m Model) barsDraw(w, rows int, grid []uint8, paint []int8) []string {
 			hue[r*w+c] = int8(min(c*freqs/w, freqs-1))
 		}
 	}
-	return m.drawCells(w, rows, grid, paint, hue)
+	return m.drawCells(w, rows, grid, paint, hue, m.styles.Bars)
 }
 
 // drawCells turns a dot grid into rows of braille. Each cell is drawn in the
 // palette's hue for where it sits and the step in paint for how strong it is;
 // a cell with no dots, or none the caller painted, is left blank.
-func (m Model) drawCells(w, rows int, grid []uint8, paint, hue []int8) []string {
+//
+// Which palette is the caller's business: the lyric is set in an arc twice as
+// wide as the spectrum's, because there the colour is what separates one word
+// from the next rather than a gradient across one shape.
+func (m Model) drawCells(w, rows int, grid []uint8, paint, hue []int8, palette [][]lipgloss.Style) []string {
 	lines := make([]string, rows)
 	for r := range rows {
 		var sb strings.Builder
@@ -222,7 +226,7 @@ func (m Model) drawCells(w, rows int, grid []uint8, paint, hue []int8) []string 
 				continue
 			}
 
-			want := m.styles.Bars[hue[at]][paint[at]]
+			want := palette[hue[at]][paint[at]]
 			if !lit || want.GetForeground() != style.GetForeground() {
 				flush()
 				style, lit = want, true

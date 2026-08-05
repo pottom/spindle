@@ -84,6 +84,13 @@ type Styles struct {
 	// which is the whole of how a stack of lamps has ever been read.
 	Ladder []lipgloss.Style
 
+	// Words is what a lyric is set in: hue by the sound a word was sung on,
+	// strength by how loud it was. Indexed [hue][level], like the spectrum, and
+	// cut from the same accent — but around a far wider arc, because on that
+	// picture the colour is the only thing separating one word from the next,
+	// and a narrow sweep leaves a whole line one colour.
+	Words [][]lipgloss.Style
+
 	// Status line.
 	DeviceOn  lipgloss.Style
 	DeviceOff lipgloss.Style
@@ -136,6 +143,7 @@ func New(isDark bool, accent color.Color) Styles {
 
 		Bars:   barPalette(t, accent),
 		Ladder: ladderPalette(t, accent),
+		Words:  huePalette(t, accent, wordsHueArc),
 
 		Quality: fg(t.Faint),
 
@@ -295,6 +303,11 @@ const (
 	barFreqSteps  = 10
 	barLevelSteps = 6
 
+	// wordsHueArc is how far a lyric's colours travel. Much wider than the
+	// spectrum's: there the sweep is a gradient across one shape, here it is
+	// what separates one word from the next.
+	wordsHueArc = 170
+
 	// ladderSteps is how many colours the segmented meter climbs through, and
 	// ladderHueArc how far round the wheel that climb travels.
 	//
@@ -354,13 +367,19 @@ func ladderPalette(t Theme, accent color.Color) []lipgloss.Style {
 // out of a dim base into a lit tip, which is what makes a meter look like it is
 // burning rather than merely tall.
 func barPalette(t Theme, accent color.Color) [][]lipgloss.Style {
+	return huePalette(t, accent, barHueArc)
+}
+
+// huePalette builds one of those: hue across a given arc, strength up the
+// height.
+func huePalette(t Theme, accent color.Color, arc float64) [][]lipgloss.Style {
 	base, sat, light := toHSL(accent)
 
 	out := make([][]lipgloss.Style, barFreqSteps)
 	for f := range out {
 		// Centred on the accent, so the middle of the spectrum is the album's
 		// own colour and the ends lean either side of it.
-		offset := (float64(f)/float64(barFreqSteps-1) - 0.5) * barHueArc
+		offset := (float64(f)/float64(barFreqSteps-1) - 0.5) * arc
 		hue := math.Mod(base+offset+360, 360)
 
 		out[f] = make([]lipgloss.Style, barLevelSteps)

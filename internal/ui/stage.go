@@ -268,7 +268,7 @@ func (m Model) stageArt(w, rows int) []string {
 		place(d.col, int(d.at), int8(min(int(d.bright*float32(levels)), levels-1)))
 	}
 
-	return m.drawCells(w, rows, grid, paint, hue)
+	return m.drawCells(w, rows, grid, paint, hue, m.styles.Bars)
 }
 
 // stageSpan is how many dot rows a column has to rise through, and whether the
@@ -310,13 +310,34 @@ func (m Model) stageLevel(x, dotsX int) float32 {
 //
 // It is a step of a simulation rather than a drawing, so it happens in the
 // update loop and leaves the drawing a pure function of what it left behind.
-func (m *Model) stageFlow(w, rows int) {
+func (m *Model) stageFlow(w, rows int) { m.stageFlowIn(w, rows, stageThrows{}) }
+
+// stageThrows is how far the water goes, for the pictures that do not keep it
+// inside their own columns.
+//
+// On the words screen the meter is a band along the foot and the rest of the
+// terminal is the lyric, so a drop leaves the tips of a band a few rows tall and
+// is given the whole screen to cross. Left to work itself out from the picture
+// it is drawn in, it would either be born halfway up the screen or never leave
+// the band.
+type stageThrows struct {
+	// span is how far a drop may travel before it is forgotten, reach how high
+	// the columns it leaves from stand, and lift what the throw is multiplied by
+	// to carry it that far. All in dot rows; zero means work it out from the
+	// picture, which is what every other screen wants.
+	span, reach, lift float32
+}
+
+func (m *Model) stageFlowIn(w, rows int, t stageThrows) {
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
 	if dotsX <= 0 || dotsY <= 0 {
 		return
 	}
 
-	span, _ := stageSpan(dotsY)
+	span := t.span
+	if span <= 0 {
+		span, _ = stageSpan(dotsY)
+	}
 
 	kept := m.stage.drops[:0]
 	for _, d := range m.stage.drops {
@@ -336,8 +357,14 @@ func (m *Model) stageFlow(w, rows int) {
 		m.stage.was = make([]float32, dotsX)
 	}
 
-	reach := stageReach * span
+	reach := t.reach
+	if reach <= 0 {
+		reach = stageReach * span
+	}
 	throw := stageThrow * float32(math.Sqrt(float64(span)))
+	if t.lift > 0 {
+		throw *= t.lift
+	}
 	for x := 0; x < dotsX; x += stagePitch {
 		now := m.stageLevel(x, dotsX)
 		jump := now - m.stage.was[x]

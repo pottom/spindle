@@ -242,6 +242,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.words.asked = ""
 		m.words.have, m.words.text = message.Grain, message.Text
 		m.words.move = wordsMoveFor(message.Text)
+		m.words.beats = wordsBeats(message.Text)
 		m.words.where, m.words.paint, m.words.sung = message.Words, nil, 0
 		m.words.cellsX, m.words.cellsY = message.CellsX, message.CellsY
 
@@ -291,7 +292,14 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.stage.on && m.scopeMode().words() {
 			m.wordsFlow(m.width, m.height)
-			m.stageFlow(m.width, m.height)
+			// Thrown from the tips of the band along the foot, and given the
+			// whole terminal to cross rather than the band it came from.
+			_, tall := m.wordsRoom(m.height)
+			m.stageFlowIn(m.width, m.height, stageThrows{
+				span:  float32(m.height * dotsPerCellY),
+				reach: stageReach * float32(tall*dotsPerCellY),
+				lift:  wordsLift,
+			})
 			if cmd := m.wordsGrind(); cmd != nil {
 				return m, tea.Batch(cmd, scopeFrameCmd(m.player, m.frameMode()))
 			}

@@ -368,6 +368,17 @@ type wordsState struct {
 	// the ones that have been and the ones still to come.
 	where msg.WordLayout
 
+	// beats says the line is not words at all — the note a lyric sheet puts in
+	// place of a line it has none for. Those follow the music rather than being
+	// painted once and kept: there is no singer to follow, so the sound itself
+	// is what the colour has to answer to.
+	beats bool
+
+	// low and high are the range the sound's centre of gravity has been moving
+	// through lately, which is what the colours are spread over. See
+	// wordsColourNow.
+	low, high float32
+
 	// starts is when the line on screen is sung, on the playback clock. The
 	// gathering is timed against it rather than against the moment the picture
 	// happened to be built, so the words are complete as the line begins rather
@@ -426,6 +437,50 @@ const (
 	// distraction.
 	wordsBand = 6
 
+	// wordsRate is how fast a line is taken to be sung, in characters a second,
+	// and wordsLeast the shortest a line is ever given.
+	//
+	// A lyric sheet says when a line starts and nothing else, so how far into it
+	// the singer has got is a guess whatever we do. Spreading the words evenly
+	// over the gap to the next line — which is the obvious guess, and what this
+	// did — is a bad one: measured over three hundred lines of six records, the
+	// rate that assumption implies runs from two and a half characters a second
+	// to twenty-two, a fivefold spread inside a single song, and a line at a
+	// plausible singing rate fills only about half of its gap. Half the time the
+	// highlight was therefore pointing at a word the singer had left.
+	//
+	// Guessing the length from the line itself is the better guess: it is wrong
+	// in the safe direction. Finishing early leaves the last word lit while it
+	// is still being sung; finishing late points at a word already gone.
+	wordsRate  = 12
+	wordsLeast = 800 * time.Millisecond
+
+	// wordsNext is how brightly the word after the one being sung is drawn,
+	// between what is waiting and what is burning.
+	//
+	// The edge is soft on purpose. Where the line is sung is a guess, and a hard
+	// spotlight on one word claims a precision the timing does not have: with
+	// the next word already half lit, being a word out reads as "about here"
+	// rather than as pointing at the wrong word.
+	wordsNext = 0.6
+
+	// wordsRangeLeast is the narrowest range of sound the colours are spread
+	// over, in bands, and wordsRangeClose how fast the range closes back in when
+	// the sound stops going that far. Slow: a chorus that opens the range should
+	// still be using it a verse later.
+	wordsRangeLeast = 2.5
+	wordsRangeClose = 0.0015
+
+	// wordsLift is what the water's throw is multiplied by on this screen.
+	//
+	// Set so that a hard hit carries a drop the height of the terminal: a drop
+	// rises by its speed squared over twice the gravity, and the ordinary throw
+	// is cut for a picture whose columns are the whole of it. Here they are a
+	// band along the foot and everything above them is the lyric, which is
+	// exactly what the water is for — it is the one thing on this screen that
+	// crosses everything else on it.
+	wordsLift = 2
+
 	// wordsSungLift is how much of its own strength a word keeps once it has
 	// been sung. Below the word being sung, above the ones still to come, so the
 	// line reads as three states at a glance.
@@ -440,7 +495,7 @@ func (m Model) wordsLines(w, rows int) []string {
 	}
 
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
-	freqs, levels := len(m.styles.Bars), len(m.styles.Bars[0])
+	freqs, levels := len(m.styles.Words), len(m.styles.Words[0])
 
 	grid := make([]uint8, w*rows)
 	paint := make([]int8, w*rows)
@@ -469,11 +524,20 @@ func (m Model) wordsLines(w, rows int) []string {
 	paints := make([]wordPaint, m.words.where.Count)
 	for i := range paints {
 		switch {
+		case m.words.beats:
+			// Not words: a mark standing in for a line nobody sings. It takes
+			// the colour of the moment, over and over, so it beats with the
+			// music instead of sitting there in the colour it arrived in.
+			paints[i] = wordPaint{hue: nowHue, level: nowLevel, set: true}
 		case i < m.words.sung && i < len(m.words.paint) && m.words.paint[i].set:
 			p := m.words.paint[i]
 			paints[i] = wordPaint{hue: p.hue, level: int8(float32(p.level) * wordsSungLift), set: true}
 		case i == m.words.sung:
 			paints[i] = wordPaint{hue: nowHue, level: nowLevel, set: true}
+		case i == m.words.sung+1:
+			// The soft edge: the next word is already partly lit, so a guess a
+			// word out reads as roughly here rather than as plainly wrong.
+			paints[i] = wordPaint{hue: nowHue, level: int8(float32(nowLevel) * wordsNext), set: true}
 		default:
 			paints[i] = wordPaint{level: int8(min(int(wordsAhead*float32(levels)), levels-1))}
 		}
@@ -529,20 +593,74 @@ func (m Model) wordsLines(w, rows int) []string {
 		}
 	}
 
-	lines := m.drawCells(w, rows, grid, paint, hue)
+	// Whatever the words left over goes to the music, drawn into the same grid
+	// rather than into a picture of its own — which is what lets the water off
+	// the leash: a drop thrown from the meter can cross the whole screen and
+	// pass through the lyric, instead of stopping at the top of a box.
+	if _, tall := m.wordsRoom(rows); tall >= wordsBand {
+		m.wordsUnder(grid, paint, hue, w, rows, tall)
+	}
 
-	// Whatever the words left over goes to the music. The band is measured from
-	// the foot of the lowest line of type, so it grows and shrinks with how much
-	// the lyric needed.
-	if from, tall := m.wordsRoom(rows); tall >= wordsBand {
-		under := m.stageArt(w, tall)
-		for i, line := range under {
-			if from+i < len(lines) {
-				lines[from+i] = line
-			}
+	return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
+}
+
+// wordsUnder draws the meter into the rows the words left over, and its water
+// over the whole screen.
+func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall int) {
+	dotsX := w * dotsPerCellX
+	dotsY := rows * dotsPerCellY
+	levels, freqs := len(m.styles.Words[0]), len(m.styles.Words)
+
+	// The floor the columns stand on and the water is thrown from: the foot of
+	// the screen, which is also the foot of the band.
+	floor := dotsY - 1
+
+	light := func(x, y int, step int8) {
+		if x < 0 || y < 0 || x >= dotsX || y >= dotsY {
+			return
+		}
+		cell := (y/dotsPerCellY)*w + x/dotsPerCellX
+		grid[cell] |= 1 << brailleBit[x%dotsPerCellX][y%dotsPerCellY]
+		if step > paint[cell] {
+			paint[cell] = step
+			hue[cell] = int8(min(x/dotsPerCellX*freqs/w, freqs-1))
 		}
 	}
-	return lines
+
+	// The columns, standing on the floor, as tall as the band allows.
+	reach := stageReach * float32(tall*dotsPerCellY)
+	for x := range dotsX {
+		if x%stagePitch != 0 {
+			continue
+		}
+		height := int(m.stageLevel(x, dotsX) * reach)
+		for y := range height {
+			up := float32(y) / float32(max(height-1, 1))
+			light(x, floor-y, int8(min(int(up*float32(levels)), levels-1)))
+		}
+	}
+
+	// The water, which belongs to the whole screen. A drop thrown hard enough
+	// rises past the words and falls back through them, which is the one thing
+	// on this picture that crosses everything else on it.
+	for _, d := range m.stage.drops {
+		light(d.col, floor-int(d.at), int8(min(int(d.bright*float32(levels)), levels-1)))
+	}
+}
+
+// wordsBeats reports that a line is a mark rather than words: the note a lyric
+// sheet puts where a line would be if anyone were singing one.
+func wordsBeats(text string) bool {
+	var marks int
+	for _, r := range text {
+		switch {
+		case unicode.IsLetter(r), unicode.IsDigit(r):
+			return false
+		case !unicode.IsSpace(r):
+			marks++
+		}
+	}
+	return marks > 0
 }
 
 // wordsSilent reports that the song has words but is not singing any right now:
@@ -659,6 +777,10 @@ func (m *Model) wordsFlow(w, rows int) {
 		m.words.paint = make([]wordPaint, m.words.where.Count)
 	}
 
+	if centre, _ := wordsCentre(m.scope.bands); len(m.scope.bands) > 0 {
+		m.wordsFollowCentre(centre)
+	}
+
 	m.words.sung = m.wordsSung()
 
 	// The word being sung takes the colour of this moment, over and over, so
@@ -682,44 +804,95 @@ func (m Model) wordsSung() int {
 	}
 
 	line := m.lyrics.lines[at].Words
-	reached := m.lyricsSweep(at, line)
 
-	// The sweep is a place in the line; the picture counts in words.
-	var words int
-	for i, r := range []rune(line) {
-		if i >= reached {
-			break
-		}
-		if unicode.IsSpace(r) {
-			words++
-		}
+	// How long the line is taken to last: what it would take to sing it, rather
+	// than the whole gap before the next one. See wordsRate.
+	slot := lyricsDefaultLine
+	if at+1 < len(m.lyrics.lines) {
+		slot = time.Duration(m.lyrics.lines[at+1].At-m.lyrics.lines[at].At) * time.Millisecond
 	}
-	return min(words, m.words.where.Count-1)
+	sung := time.Duration(float64(len([]rune(line)))/wordsRate*float64(time.Second))
+	sung = min(max(sung, wordsLeast), slot)
+	if sung <= 0 {
+		return 0
+	}
+
+	along := float64(m.lyricsClock()-m.lyrics.lines[at].At) / float64(sung/time.Millisecond)
+	along = min(max(along, 0), 1)
+
+	// Which word that lands on: the line's own words, so a line broken over
+	// three display lines still counts as one sentence.
+	return min(int(along*float64(len(strings.Fields(line)))), m.words.where.Count-1)
 }
 
-// wordsColourNow is the colour of the sound in the air: the hue from where the
-// loudest of the spectrum sits, the strength from how loud it is.
+// wordsColourNow is the colour of the sound in the air: the hue from where its
+// weight sits across the spectrum, the strength from how loud it is.
 //
-// This is what a word is painted with as it goes by. It is the same mapping the
-// spectrum itself uses — low on one side of the palette's arc, high on the other
-// — so a word sung over a bass note and the bass note itself are the same
-// colour on two different pictures.
+// Two things had to be measured to get this to give more than one colour.
+//
+// The first: the loudest band is not where the sound is. Measured over seventy
+// seconds of a record, the loudest of twenty-eight bands was the second one
+// thirty-eight per cent of the time and anywhere in the top half only twenty —
+// so a hue taken from it sat at one end of the palette almost always. The centre
+// of gravity of the whole spectrum moves where the loudest band does not: a
+// word sung over a bass line and one sung over a cymbal are genuinely different
+// numbers.
+//
+// The second: it does not move far. Over the same stretch that centre ran from
+// about twelve to seventeen of twenty-eight, so mapped straight onto the palette
+// it would still have used a third of it. What is drawn is where it sits in the
+// range it has been moving through lately, which spends the whole arc whatever
+// the material — the same trick the spectrum's own envelope plays with loudness.
 func (m Model) wordsColourNow() (hue, level int8) {
-	freqs, levels := len(m.styles.Bars), len(m.styles.Bars[0])
+	freqs, levels := len(m.styles.Words), len(m.styles.Words[0])
 
 	bands := m.scope.bands
 	if len(bands) == 0 {
 		return int8(freqs / 2), int8(levels - 1)
 	}
 
-	loudest, at := bands[0], 0
+	centre, loud := wordsCentre(bands)
+
+	span := max(m.words.high-m.words.low, wordsRangeLeast)
+	at := (centre - m.words.low) / span
+
+	hue = int8(min(max(int(at*float32(freqs)), 0), freqs-1))
+	level = int8(min(int((0.45+0.55*loud)*float32(levels)), levels-1))
+	return hue, level
+}
+
+// wordsCentre is where the weight of the spectrum sits, in bands, and how loud
+// it is altogether.
+func wordsCentre(bands []float32) (centre, loud float32) {
+	var sum, weighted float32
 	for i, v := range bands {
-		if v > loudest {
-			loudest, at = v, i
-		}
+		sum += v
+		weighted += float32(i) * v
+		loud = max(loud, v)
+	}
+	if sum == 0 {
+		return float32(len(bands)) / 2, 0
+	}
+	return weighted / sum, loud
+}
+
+// wordsFollowCentre keeps the range the centre of gravity has been moving
+// through: quick to open when the sound goes somewhere new, slow to close, so
+// the colours spread over what this record is doing rather than over what a
+// spectrum could theoretically do.
+func (m *Model) wordsFollowCentre(centre float32) {
+	if m.words.high <= m.words.low {
+		m.words.low, m.words.high = centre-wordsRangeLeast/2, centre+wordsRangeLeast/2
 	}
 
-	hue = int8(min(at*freqs/len(bands), freqs-1))
-	level = int8(min(int((0.45+0.55*loudest)*float32(levels)), levels-1))
-	return hue, level
+	if centre < m.words.low {
+		m.words.low = centre
+	} else {
+		m.words.low += (centre - m.words.low) * wordsRangeClose
+	}
+	if centre > m.words.high {
+		m.words.high = centre
+	} else {
+		m.words.high += (centre - m.words.high) * wordsRangeClose
+	}
 }
