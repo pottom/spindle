@@ -95,6 +95,8 @@ key binding or a status bar wants:
     spindle volume [0-100]               report the level, or set it
     spindle seek 90 | +30 | -15          to a position, or by an offset
     spindle notify on | off              announce each new track to the desktop
+    spindle daemon start | stop          the playback device itself
+    spindle daemon restart | status      restart it, or ask whether one is running
 
 Output is plain text, one thing per line and never coloured; `--json` on any of
 them prints the daemon's own answer instead, for `jq`. Nothing starts a daemon:

@@ -28,10 +28,25 @@ func runDaemon(args []string) error {
 		switch arg {
 		case foregroundFlag, "-f":
 			foreground = true
+
+		// "spindle daemon" starts one, and so does "spindle daemon start" —
+		// which is what everybody types, and what used to be answered with an
+		// error and no daemon. A command that refuses the obvious word for what
+		// it does is a command that looks broken.
+		case "start":
+
 		case "stop":
 			return stopDaemon()
+		case "restart":
+			if err := stopDaemon(); err != nil {
+				return err
+			}
+			return detachDaemon()
+		case "status":
+			return reportDaemon()
+
 		default:
-			return fmt.Errorf("unknown option %q for spindle daemon", arg)
+			return fmt.Errorf("unknown option %q for spindle daemon: want start, stop, restart or status", arg)
 		}
 	}
 
@@ -83,6 +98,19 @@ func stopDaemon() error {
 		return err
 	}
 	fmt.Println("spindle: daemon stopped")
+	return nil
+}
+
+// reportDaemon says whether one is running, for a script or for somebody who
+// has lost track of it. The answer leaves through the exit code as well, and
+// through the same one the other commands use for it: nothing went wrong, the
+// answer is simply no.
+func reportDaemon() error {
+	if !daemon.Running() {
+		fmt.Println("spindle: no daemon is running")
+		os.Exit(exitNoDaemon)
+	}
+	fmt.Println("spindle: a daemon is running")
 	return nil
 }
 

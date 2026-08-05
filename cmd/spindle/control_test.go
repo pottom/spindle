@@ -408,3 +408,20 @@ func TestTheCommandIsFoundPastTheFlags(t *testing.T) {
 		t.Errorf("arguments = %v, want both flags kept", rest)
 	}
 }
+
+// "spindle daemon status" asks the daemon command about itself, and has nothing
+// to do with the status of what is playing. Looking for a control command past
+// the flags meant the wrong one of the two answered it.
+func TestTheDaemonKeepsItsOwnWords(t *testing.T) {
+	if _, _, ok := controlCommandIn([]string{"daemon", "status"}); ok {
+		t.Error("the daemon's own status was answered by the playback command")
+	}
+	if _, _, ok := controlCommandIn([]string{"notify", "on"}); ok {
+		t.Error("a setting command was taken for a playback command")
+	}
+
+	// And the flags are still looked past for the commands that are one.
+	if name, rest, ok := controlCommandIn([]string{"--json", "status"}); !ok || name != "status" || len(rest) != 1 {
+		t.Errorf("controlCommandIn() = %q, %v, %v; want the status command", name, rest, ok)
+	}
+}

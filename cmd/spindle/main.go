@@ -25,8 +25,16 @@ import (
 // controlCommandIn finds the daemon-driving command in an argument list, and
 // hands back everything else as its arguments — wherever the flags were
 // written.
+//
+// It stops at the first word that is a command of another kind. "spindle daemon
+// status" asks the daemon command about itself and has nothing to do with the
+// status of what is playing; without this it was answered by the wrong one of
+// the two.
 func controlCommandIn(args []string) (name string, rest []string, ok bool) {
 	for i, arg := range args {
+		if otherCommands[arg] {
+			return "", nil, false
+		}
 		if !controlCommands[arg] {
 			continue
 		}
@@ -34,6 +42,13 @@ func controlCommandIn(args []string) (name string, rest []string, ok bool) {
 		return arg, append(rest, args[i+1:]...), true
 	}
 	return "", nil, false
+}
+
+// otherCommands are the subcommands that are not about a running daemon's
+// playback. They own every word that follows them.
+var otherCommands = map[string]bool{
+	"login": true, "quality": true, "crossfade": true,
+	"notify": true, "daemon": true,
 }
 
 func reportFatal(err error) {
