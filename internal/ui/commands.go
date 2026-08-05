@@ -17,6 +17,10 @@ const (
 	// callTimeout bounds every backend call so a hung request cannot wedge the loop.
 	callTimeout = 10 * time.Second
 
+	// recentMost is how much of the listening history is asked for. Spotify
+	// keeps about this many and answers no more.
+	recentMost = 50
+
 	// bulkTimeout covers a control that has to read a list before it can act:
 	// queueing a whole playlist is a page of it per request.
 	bulkTimeout = 60 * time.Second
@@ -238,6 +242,15 @@ func fetchLibraryCmd(p player.Player, kind libraryKind, offset int) tea.Cmd {
 				return msg.Error{Err: err}
 			}
 			out.Artists, out.More, out.Next = page.Items, page.More, page.Next
+
+		case libraryRecent:
+			// The history is asked for whole: it is short by design, and there
+			// is no offset to walk it by.
+			tracks, err := p.RecentlyPlayed(ctx, recentMost)
+			if err != nil {
+				return msg.Error{Err: err}
+			}
+			out.Tracks = tracks
 
 		default:
 			page, err := p.PlaylistsPage(ctx, offset)

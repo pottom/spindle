@@ -74,6 +74,7 @@ type LibraryFetched struct {
 	Playlists []player.Playlist
 	Albums    []player.Album
 	Artists   []player.Artist
+	Tracks    []player.Track
 	Offset    int
 	More      bool
 	Next      int

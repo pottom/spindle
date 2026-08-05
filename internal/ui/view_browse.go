@@ -499,6 +499,14 @@ func (m Model) libraryPaneView(l layout, rows int) []string {
 		screen.row = func(i, w int, selected bool) string {
 			return m.artistRow(blankMark, m.library.artists[i], w, selected)
 		}
+	case libraryRecent:
+		screen.detail = m.trackDetail
+		screen.empty = "Nothing played yet."
+		screen.row = func(i, w int, selected bool) string {
+			// Numbered by how far back it was, which is what the list is: the
+			// first row is the last thing heard.
+			return m.trackRow(m.library.recent[i], w, selected, i+1)
+		}
 	default:
 		screen.row = func(i, w int, selected bool) string {
 			return m.playlistRow(m.library.playlists[i], w, selected)
@@ -515,7 +523,7 @@ func (m Model) libraryPaneView(l layout, rows int) []string {
 // something three words long.
 func (m Model) libraryKinds() string {
 	var parts []string
-	for _, kind := range []libraryKind{libraryPlaylists, libraryAlbums, libraryArtists} {
+	for _, kind := range []libraryKind{libraryPlaylists, libraryAlbums, libraryArtists, libraryRecent} {
 		style := m.styles.Album
 		if kind == m.library.kind {
 			style = m.styles.Title

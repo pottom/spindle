@@ -99,3 +99,50 @@ func itoa(n int) string {
 	}
 	return string(out)
 }
+
+// The history is one of the library's lists, and it is of tracks: a row there
+// plays rather than opens, and the queue survives it.
+func TestTheHistoryPlaysATrackAndKeepsTheQueue(t *testing.T) {
+	m := likedModel(t)
+	recent, err := m.player.RecentlyPlayed(context.Background(), recentMost)
+	if err != nil || len(recent) < 2 {
+		t.Fatalf("RecentlyPlayed: %v (%d tracks)", err, len(recent))
+	}
+
+	m.library.kind = libraryRecent
+	m.library.recent = recent
+	m.library.cursors[libraryRecent].move(1, len(recent))
+
+	if got := m.cursorTrack(); got == nil || got.ID != recent[1].ID {
+		t.Fatalf("cursorTrack = %v, want the row under the cursor", got)
+	}
+
+	cmd, handled := m.libraryKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !handled || cmd == nil {
+		t.Fatal("enter did nothing on the history")
+	}
+	runControls(cmd)
+
+	q, err := m.player.Queue(context.Background())
+	if err != nil {
+		t.Fatalf("Queue: %v", err)
+	}
+	if q.Current == nil || q.Current.ID != recent[1].ID {
+		t.Errorf("playing %v, want the track that was chosen", q.Current)
+	}
+}
+
+// The history is not a page: Spotify keeps a fixed few and walks them by
+// timestamp, so what arrives replaces what was there rather than adding to it.
+func TestTheHistoryIsNotPaged(t *testing.T) {
+	m := likedModel(t)
+	recent, _ := m.player.RecentlyPlayed(context.Background(), recentMost)
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(msg.LibraryFetched{Kind: int(libraryRecent), Tracks: recent})
+	tm, _ = tm.Update(msg.LibraryFetched{Kind: int(libraryRecent), Tracks: recent})
+
+	if got := tm.(Model).library.countOf(libraryRecent); got != len(recent) {
+		t.Errorf("the history holds %d rows after two answers, want %d", got, len(recent))
+	}
+}

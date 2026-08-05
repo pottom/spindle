@@ -20,6 +20,7 @@ type libraryPane struct {
 	playlists []player.Playlist
 	albums    []player.Album
 	artists   []player.Artist
+	recent    []player.Track
 
 	cursors [libraryKinds]listState
 	pages   [libraryKinds]paging
@@ -39,9 +40,10 @@ const (
 	libraryPlaylists libraryKind = iota
 	libraryAlbums
 	libraryArtists
+	libraryRecent
 
 	// libraryKinds is how many there are, and the width of the arrays above.
-	libraryKinds = 3
+	libraryKinds = 4
 )
 
 // String is what the strip under the heading calls the kind.
@@ -51,6 +53,8 @@ func (k libraryKind) String() string {
 		return "albums"
 	case libraryArtists:
 		return "artists"
+	case libraryRecent:
+		return "recent"
 	default:
 		return "playlists"
 	}
@@ -63,6 +67,8 @@ func (p libraryPane) countOf(k libraryKind) int {
 		return len(p.albums)
 	case libraryArtists:
 		return len(p.artists)
+	case libraryRecent:
+		return len(p.recent)
 	default:
 		return len(p.playlists)
 	}
@@ -95,6 +101,15 @@ func (p libraryPane) atArtist() *player.Artist {
 		return nil
 	}
 	return atArtist(p.artists, p.cursors[libraryArtists].cursor)
+}
+
+// atTrack is the same for the one list here that is of tracks: what has been
+// played lately.
+func (p libraryPane) atTrack() *player.Track {
+	if p.kind != libraryRecent {
+		return nil
+	}
+	return at(p.recent, p.cursors[libraryRecent].cursor)
 }
 
 // paging is what a list has read so far and what is left. Lists arrive fifty at
@@ -147,6 +162,10 @@ func (p *libraryPane) adopt(m msg.LibraryFetched, liked player.Playlist) {
 		} else {
 			p.artists = append(p.artists, m.Artists...)
 		}
+	case libraryRecent:
+		// The history is not a page: Spotify keeps some fifty entries and walks
+		// them by timestamp rather than by offset, so what arrives is all of it.
+		p.recent = m.Tracks
 	default:
 		if first {
 			p.playlists = append([]player.Playlist{liked}, m.Playlists...)
@@ -170,6 +189,8 @@ func (p libraryPane) selected() *player.Playlist { return p.atPlaylist() }
 // it already has a whole tab of its own.
 func (p libraryPane) cover() string {
 	switch {
+	case p.atTrack() != nil:
+		return p.atTrack().CoverURL
 	case p.atAlbum() != nil:
 		return p.atAlbum().CoverURL
 	case p.atArtist() != nil:
@@ -351,6 +372,8 @@ func (m Model) cursorTrack() *player.Track {
 		return at(page.tracks, page.cursor.cursor)
 	case m.tab == tabQueue:
 		return m.queuedTrack()
+	case m.tab == tabLibrary:
+		return m.library.atTrack()
 	case m.tab == tabSearch:
 		return m.search.selected()
 	default:

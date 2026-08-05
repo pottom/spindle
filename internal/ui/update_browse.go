@@ -148,6 +148,17 @@ func (m *Model) libraryKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		return m.turnLibraryKind(delta), true
 
 	case key.Matches(k, m.keys.Enter):
+		// A row in the history is a track, and a track plays rather than opens.
+		// The queue is kept: this list is for reaching back for one thing, not
+		// for starting the afternoon again.
+		if t := m.library.atTrack(); t != nil {
+			id := t.ID
+			return m.startPlay(playRequest{
+				action: "play track",
+				track:  *t,
+				call:   func(ctx context.Context, p player.Player) error { return p.PlayNow(ctx, id) },
+			}), true
+		}
 		return m.openLibraryRow(), true
 
 	case key.Matches(k, m.keys.Actions):
@@ -159,6 +170,8 @@ func (m *Model) libraryKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		// artist is the exception: what "all of it" would mean there is every
 		// record they ever made, which is not a queue anybody asked for.
 		switch {
+		case m.library.atTrack() != nil:
+			return m.enqueue(m.library.atTrack().ID), true
 		case m.library.atAlbum() != nil:
 			a := m.library.atAlbum()
 			return m.enqueueList(openAlbum, a.ID, a.Name), true
