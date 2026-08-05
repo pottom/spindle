@@ -52,7 +52,17 @@ func runDaemon(args []string) error {
 		return err
 	}
 
-	err = daemon.Run(ctx, daemon.Options{Log: os.Stderr, Quality: quality, Crossfade: crossfade})
+	notify, err := auth.Notify()
+	if err != nil {
+		return err
+	}
+
+	err = daemon.Run(ctx, daemon.Options{
+		Log:       os.Stderr,
+		Quality:   quality,
+		Crossfade: crossfade,
+		Notify:    notify,
+	})
 	if errors.Is(err, daemon.ErrAlreadyRunning) {
 		// Nothing to complain about: the device the caller wanted exists.
 		fmt.Fprintln(os.Stderr, "spindle: a daemon is already running")

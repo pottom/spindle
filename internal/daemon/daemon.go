@@ -46,6 +46,9 @@ type Options struct {
 	// Crossfade is how long one track overlaps the next. Zero is gapless.
 	Crossfade time.Duration
 
+	// Notify says whether each new track is announced to the desktop.
+	Notify bool
+
 	// Log receives the daemon's own logging.
 	Log io.Writer
 }
@@ -128,6 +131,13 @@ func Run(ctx context.Context, opts Options) error {
 		return fmt.Errorf("create daemon: %w", err)
 	}
 	defer app.Close() //nolint:errcheck // nothing useful to do while shutting down
+
+	// The announcer talks to the API this daemon has just started, over
+	// loopback, so it goes up with it rather than being wired into the player:
+	// what is playing is a question the API already answers.
+	if opts.Notify {
+		go watchAndNotify(ctx, port)
+	}
 
 	if err := app.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("run daemon: %w", err)

@@ -25,6 +25,11 @@ type settings struct {
 	ClientID  string `json:"client_id"`
 	Quality   string `json:"quality,omitempty"`
 	Crossfade string `json:"crossfade,omitempty"`
+
+	// Notify says whether the daemon announces each new track to the desktop.
+	// Empty means off: a notification every three minutes is somebody else's
+	// idea of useful, and it is asked for once with a command.
+	Notify string `json:"notify,omitempty"`
 }
 
 // load reads the settings file, treating an unreadable one as empty: spindle
@@ -135,6 +140,28 @@ func Crossfade() (string, error) {
 		return "", err
 	}
 	return s.Crossfade, nil
+}
+
+// Notify reports whether track changes are announced.
+func Notify() (bool, error) {
+	s, err := load()
+	if err != nil {
+		return false, err
+	}
+	return s.Notify == "on", nil
+}
+
+// SaveNotify records whether they are, keeping everything else.
+func SaveNotify(on bool) error {
+	s, err := load()
+	if err != nil {
+		return err
+	}
+	s.Notify = ""
+	if on {
+		s.Notify = "on"
+	}
+	return save(s)
 }
 
 // SaveCrossfade records the overlap, keeping everything else.
