@@ -907,11 +907,19 @@ func TestSomeLinesLean(t *testing.T) {
 // lean in every solo of every record or in none of them. Theirs comes from when
 // the bar is, the way their moves do.
 func TestTheNotesLeanBySolo(t *testing.T) {
+	const w, rows = 74, 20
+	_, layout, ok := wordsImage([]string{wordsNotes}, w*dotsPerCellX, rows*dotsPerCellY)
+	if !ok {
+		t.Fatal("the notes would not draw")
+	}
+
+	m := scopeModel(100, 44)
+	m.words.where, m.words.text, m.words.beats = layout, wordsNotes, true
+
 	var leaning int
 	for at := range int64(30) {
-		m := Model{}
-		m.words.text, m.words.beats, m.words.starts = wordsNotes, true, at*7_000
-		if m.wordsLeanSeed()%3 == 0 {
+		m.words.starts = at * 7_000
+		if tilt, _ := m.wordsTilting(layout.Count); tilt != nil {
 			leaning++
 		}
 	}
@@ -919,6 +927,27 @@ func TestTheNotesLeanBySolo(t *testing.T) {
 
 	if leaning == 0 || leaning == 30 {
 		t.Errorf("%d of thirty solos lean, want some of them", leaning)
+	}
+
+	// A mark is slanted sideways, not tipped: what it turns about is a row
+	// across the middle of the type rather than a column down the middle of
+	// itself, which is what a note with a long straight stem needs to lean at
+	// all. Anything else moves the stem without ever tipping it.
+	for at := range int64(30) {
+		m.words.starts = at * 7_000
+		tilt, middle := m.wordsTilting(layout.Count)
+		if tilt == nil {
+			continue
+		}
+
+		if got := abs32(tilt[0]); got != 0 && got != wordsTiltMark {
+			t.Errorf("a note slants by %.3f, want the marks' own slant", tilt[0])
+		}
+		if middle[0] < layout.Tops[0] || middle[0] > layout.Bottoms[0] {
+			t.Errorf("a note leans about row %d, which is not inside the type at %d..%d",
+				middle[0], layout.Tops[0], layout.Bottoms[0])
+		}
+		break
 	}
 
 	// And the same bar answers the same way twice.

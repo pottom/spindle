@@ -476,6 +476,11 @@ const (
 	wordsLeanRise = 0.35
 	wordsTiltMost = 0.16
 
+	// wordsTiltMark is how far a mark slants instead, sideways over its own
+	// height — a shade past what a type designer would call italic, because
+	// three notes leaning are meant to be noticed and a lower case l is not.
+	wordsTiltMark = 0.22
+
 	// wordsWordRide is how far a word rides its own part of the sound, and
 	// wordsLineRide how far a whole line nods with the loudest of it. Both well
 	// under what a note is given: these have to be read while they move.
@@ -619,10 +624,15 @@ func (m Model) wordsLines(w, rows int) []string {
 				}
 				if word < len(tilt) && tilt[word] != 0 {
 					// A shear rather than a turn. At these angles the two look
-					// the same, and a shear moves whole columns of a word
-					// together — a real rotation would open holes between them
-					// and the letter would come apart at the seams.
-					to += int(math.Round(float64(x-middle[word]) * float64(tilt[word])))
+					// the same, and a shear moves whole columns of a word — or
+					// whole rows of a mark — together; a real rotation would
+					// open holes between them and the shape would come apart at
+					// the seams.
+					if m.words.beats {
+						at += int(math.Round(float64(middle[word]-y) * float64(tilt[word])))
+					} else {
+						to += int(math.Round(float64(x-middle[word]) * float64(tilt[word])))
+					}
 				}
 				if to < 0 || to >= dotsY {
 					continue
@@ -1089,9 +1099,24 @@ func (m Model) wordsRiding(count int) []int {
 // own height — enough that the line looks hand-set rather than typeset, little
 // enough that nobody has to tip their head. Which lines and which way is the
 // line's own business, so a song reads the same twice.
+// A bar of marks is sheared the other way about. A word is mostly horizontal
+// strokes, so slanting its baseline is what reads as a lean; a note is a stem
+// with a head on it, and a vertical shear slides that stem up and down without
+// ever tipping it over. What tips a stem is the shear type has always used for
+// its italics — the rows moved sideways, further the higher they are.
+//
+// Which way each is sheared, and so what the middle it turns about means, is
+// the marks' business: see wordsSlanting.
 func (m Model) wordsTilting(count int) ([]float32, []int) {
+	// Marks lean oftener as well as differently: a solo is the one place there
+	// is nothing else on the screen for it to be doing.
+	every := uint64(3)
+	if m.words.beats {
+		every = 2
+	}
+
 	seed := m.wordsLeanSeed()
-	if count <= 0 || seed%3 != 0 {
+	if count <= 0 || seed%every != 0 {
 		return nil, nil
 	}
 
@@ -1101,7 +1126,7 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 	// the middle of the screen — which would fling the ends of the line about,
 	// and how tall the line it belongs to is set, which is what it leans by.
 	where := m.words.where
-	first, last, tall := make([]int, count), make([]int, count), make([]int, count)
+	first, last, tall, mid := make([]int, count), make([]int, count), make([]int, count), make([]int, count)
 	for i := range first {
 		first[i], last[i] = -1, -1
 	}
@@ -1116,14 +1141,22 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 		last[at] = x
 		if line < len(where.Tops) && line < len(where.Bottoms) {
 			tall[at] = where.Bottoms[line] - where.Tops[line] + 1
+			mid[at] = (where.Tops[line] + where.Bottoms[line]) / 2
 		}
 	}
 
 	for i := range tilt {
-		middle[i] = (max(first[i], 0) + max(last[i], 0)) / 2
-
 		wide := max(last[i]-first[i]+1, 1)
+
+		// A word turns about the column down its own middle and leans by a
+		// share of its height; a mark turns about the row across its middle and
+		// leans like an italic, by a slant that does not depend on how wide the
+		// shape happens to be.
 		lean := min(wordsLeanRise*float32(tall[i])/float32(wide), wordsTiltMost)
+		middle[i] = (max(first[i], 0) + max(last[i], 0)) / 2
+		if m.words.beats {
+			lean, middle[i] = wordsTiltMark, mid[i]
+		}
 
 		// Three ways for a word: this way, that way, or flat.
 		h := seed ^ uint64(i+1)*0x9e3779b97f4a7c15
