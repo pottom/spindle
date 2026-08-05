@@ -42,10 +42,10 @@ type keyMap struct {
 	Devices  key.Binding
 	Refresh  key.Binding
 	Scope    key.Binding
-	// Stage gives the whole terminal to the visualiser, and Gag puts the turning
-	// record on without waiting for a solo to ask for it.
+	// Stage gives the whole terminal to the visualiser, and Tell puts the
+	// record's own name up there without waiting for a solo to make room.
 	Stage  key.Binding
-	Gag    key.Binding
+	Tell   key.Binding
 	Lyrics key.Binding
 	Peek   key.Binding
 	Mute   key.Binding
@@ -197,6 +197,10 @@ func newKeyMap() keyMap {
 		Stage: key.NewBinding(
 			key.WithKeys("f"),
 			key.WithHelp("f", "full screen"),
+		),
+		Tell: key.NewBinding(
+			key.WithKeys("t"),
+			key.WithHelp("t", "what is playing"),
 		),
 		Lyrics: key.NewBinding(
 			key.WithKeys("l"),

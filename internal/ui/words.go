@@ -381,6 +381,14 @@ func (m Model) wordsNow() []string {
 // second after the singer got there. Asked for early and timed against the
 // line's own timestamp, the words finish arriving exactly as it begins.
 func (m Model) wordsComing() ([]string, int64) {
+	// Asked for by hand, and so before everything: whatever the record is doing
+	// it can wait four seconds. See soloForcing.
+	if m.soloForcing() {
+		if name := m.soloName(); len(name) > 0 {
+			return name, m.words.forced.UnixMilli()
+		}
+	}
+
 	if m.lyrics.synced && m.ps != nil && m.lyrics.forTrack == m.ps.TrackID {
 		at, clock := m.wordsAt(), m.wordsClock()
 
@@ -501,6 +509,10 @@ type wordsState struct {
 	// keep a colour: nobody is singing it, so there is no moment to paint it
 	// with and it follows the music instead.
 	beats bool
+
+	// forced is when the record's name was last asked for by hand, so that the
+	// one thing on this screen that happens on purpose can be seen on purpose.
+	forced time.Time
 
 	// telling says what is on screen is the record's own name, put up once in
 	// the middle of a solo. It arrives the same way every time and it holds

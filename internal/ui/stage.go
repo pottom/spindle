@@ -3,6 +3,7 @@ package ui
 import (
 	"math"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -135,6 +136,12 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		m.stage.drops = nil
 		return tea.Batch(m.startScope(), m.savePrefs()), true
+
+	case key.Matches(k, m.keys.Tell):
+		// Says what is playing, there and then. Like the picture key, it does
+		// something up here rather than putting the screen away.
+		m.words.forced = time.Now()
+		return nil, true
 
 	case key.Matches(k, m.keys.PlayPause),
 		key.Matches(k, m.keys.VolUp), key.Matches(k, m.keys.VolDown),

@@ -131,8 +131,20 @@ func (m Model) soloCard() (soloGap, bool) {
 	return soloGap{middle - half, middle + half}, true
 }
 
+// soloForcing reports that the card was asked for by hand.
+//
+// A record's own moment comes once and may not come at all, which is the point
+// of it — but it does mean there is no way to look at the thing on purpose. The
+// key puts the same card up, drawn the same way, wherever the record is.
+func (m Model) soloForcing() bool {
+	return !m.words.forced.IsZero() && time.Since(m.words.forced) < soloTells
+}
+
 // soloTelling reports that the moment is now.
 func (m Model) soloTelling() bool {
+	if m.soloForcing() {
+		return true
+	}
 	if _, in := m.soloNow(); !in {
 		return false
 	}

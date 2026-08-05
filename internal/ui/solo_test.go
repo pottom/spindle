@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/pottom/spindle/internal/player"
 )
 
@@ -174,5 +176,39 @@ func TestTheCardHoldsStill(t *testing.T) {
 	}
 	if tilt, _ := m.wordsTilting(3); tilt != nil {
 		t.Errorf("the card leans by %v, want it upright", tilt)
+	}
+}
+
+// The record's own moment comes once and may not come at all. The key is how it
+// gets looked at on purpose: the same card, drawn the same way, wherever the
+// record happens to be — and it does not put the big screen away.
+func TestTheNameCanBeAskedFor(t *testing.T) {
+	m := sung(30, 45, 90, 200, 210, 225)
+	m.setProgress(5 * time.Second) // nowhere near a solo
+
+	if lines, _ := m.wordsComing(); len(lines) == 1 && lines[0] == m.ps.Title {
+		t.Fatal("the name was up before it was asked for")
+	}
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = tm.(Model)
+
+	if !m.stage.on {
+		t.Fatal("asking what is playing put the big screen away")
+	}
+	if !m.soloTelling() {
+		t.Fatal("the name was asked for and the model does not know it")
+	}
+
+	lines, _ := m.wordsComing()
+	if len(lines) != 2 || lines[0] != m.ps.Title || lines[1] != "The Band" {
+		t.Errorf("the screen has %q, want the record and the artist", lines)
+	}
+
+	// It goes again on its own, the way the record's own moment does.
+	m.words.forced = time.Now().Add(-soloTells - time.Second)
+	if m.soloTelling() {
+		t.Error("the card asked for is still up long after it went up")
 	}
 }
