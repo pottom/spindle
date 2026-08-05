@@ -1,0 +1,281 @@
+package ui
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/pottom/spindle/internal/auth"
+	"github.com/pottom/spindle/internal/daemon"
+	"github.com/pottom/spindle/internal/ui/msg"
+)
+
+// The settings, on a screen rather than in a command.
+//
+// Everything here was already settable — spindle quality, spindle crossfade,
+// spindle notify — which is fine for something set once and never again, and
+// wrong for anything somebody might want to try. A screen makes them visible:
+// what is on offer, what it is set to now, and which of them the device has to
+// be restarted to hear.
+type settingsPane struct {
+	cursor listState
+
+	// What the settings file says, as it was last read or written. The screen
+	// draws these rather than asking the disk on every frame.
+	quality   daemon.Quality
+	crossfade time.Duration
+	notify    bool
+
+	// changed marks a setting the running daemon has not picked up. The device
+	// takes its audio settings when it starts, so this is the difference
+	// between what is written down and what can be heard.
+	changed bool
+
+	// loaded says the file has been read. Until it has, the screen shows what
+	// it has rather than defaults it would then correct.
+	loaded bool
+}
+
+// settingsMsg carries the file's contents back into the model.
+type settingsMsg struct {
+	quality   daemon.Quality
+	crossfade time.Duration
+	notify    bool
+}
+
+// loadSettingsCmd reads what has been chosen before. A file that cannot be read
+// is not worth a complaint on this screen: it means nothing has been chosen,
+// and the defaults are what is in force anyway.
+func loadSettingsCmd() tea.Cmd {
+	return func() tea.Msg {
+		out := settingsMsg{quality: daemon.DefaultQuality}
+
+		if name, err := auth.Quality(); err == nil {
+			if q, err := daemon.ParseQuality(name); err == nil {
+				out.quality = q
+			}
+		}
+		if value, err := auth.Crossfade(); err == nil {
+			if d, err := daemon.ParseCrossfade(value); err == nil {
+				out.crossfade = d
+			}
+		}
+		if on, err := auth.Notify(); err == nil {
+			out.notify = on
+		}
+		return out
+	}
+}
+
+// The settings, in the order they matter to somebody listening.
+const (
+	settingQuality = iota
+	settingCrossfade
+	settingNotify
+	settingArtwork
+
+	settingsCount
+)
+
+// settingsKey drives the screen. Left and right change the setting under the
+// cursor; enter does the same, because on a screen of switches it is what the
+// hand reaches for.
+func (m *Model) settingsKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
+	if m.listKey(k, &m.settings.cursor, settingsCount, true) {
+		return nil, true
+	}
+
+	switch {
+	case key.Matches(k, m.keys.SeekFwd), key.Matches(k, m.keys.Enter):
+		return m.turnSetting(1), true
+	case key.Matches(k, m.keys.SeekBack):
+		return m.turnSetting(-1), true
+	}
+	return nil, false
+}
+
+// turnSetting moves the setting under the cursor one step, and writes it down.
+func (m *Model) turnSetting(delta int) tea.Cmd {
+	switch m.settings.cursor.cursor {
+	case settingQuality:
+		m.settings.quality = turnQuality(m.settings.quality, delta)
+		m.settings.changed = true
+		return saveSettingCmd(func() error { return auth.SaveQuality(string(m.settings.quality)) })
+
+	case settingCrossfade:
+		m.settings.crossfade = turnCrossfade(m.settings.crossfade, delta)
+		m.settings.changed = true
+		return saveSettingCmd(func() error { return auth.SaveCrossfade(crossfadeValue(m.settings.crossfade)) })
+
+	case settingNotify:
+		m.settings.notify = !m.settings.notify
+		m.settings.changed = true
+		on := m.settings.notify
+		return saveSettingCmd(func() error { return auth.SaveNotify(on) })
+	}
+
+	// The artwork row is a fact about the terminal, not a choice: it is here
+	// because it explains the picture, and there is nothing to turn.
+	return nil
+}
+
+// saveSettingCmd writes one setting away from the update loop. A failure
+// arrives as any other error does, on the notice line.
+func saveSettingCmd(save func() error) tea.Cmd {
+	return func() tea.Msg {
+		if err := save(); err != nil {
+			return msg.Error{Err: err}
+		}
+		return nil
+	}
+}
+
+// turnQuality steps through what Spotify offers, in the order it sounds.
+func turnQuality(q daemon.Quality, delta int) daemon.Quality {
+	order := []daemon.Quality{daemon.QualityLow, daemon.QualityMiddle, daemon.QualityHigh}
+	at := len(order) - 1
+	for i, one := range order {
+		if one == q {
+			at = i
+		}
+	}
+	return order[((at+delta)%len(order)+len(order))%len(order)]
+}
+
+// turnCrossfade steps the overlap by a second at a time, from gapless to the
+// longest Spotify's own clients offer.
+func turnCrossfade(d time.Duration, delta int) time.Duration {
+	step := time.Duration(delta) * time.Second
+	next := d + step
+	switch {
+	case next < 0:
+		return daemon.MaxCrossfade
+	case next > daemon.MaxCrossfade:
+		return 0
+	default:
+		return next
+	}
+}
+
+// crossfadeValue is how the setting is written down: seconds, or the word for
+// none.
+func crossfadeValue(d time.Duration) string {
+	if d <= 0 {
+		return "off"
+	}
+	return fmt.Sprintf("%d", int(d.Seconds()))
+}
+
+// settingRow is one line of the screen.
+type settingRow struct {
+	name  string
+	value string
+
+	// says is what the setting is for, shown under the cursor. One sentence:
+	// somebody is here to change something, not to read a manual.
+	says string
+
+	// live says the change is heard at once. The rest wait for the device to
+	// be started again, and saying which is which is the whole reason this
+	// screen can be trusted.
+	live bool
+}
+
+// settingRows is the screen's contents, from what has been chosen.
+func (m Model) settingRows() []settingRow {
+	artwork := "half blocks"
+	if m.covers != nil && m.covers.Renderer() != nil {
+		artwork = m.covers.Renderer().Name()
+	}
+
+	return []settingRow{{
+		name:  "Sound quality",
+		value: string(m.settings.quality),
+		says:  "What to ask Spotify for. High is 320 kbps, and needs Premium.",
+	}, {
+		name:  "Crossfade",
+		value: describeOverlap(m.settings.crossfade),
+		says:  "How long one track overlaps the next as it ends.",
+	}, {
+		name:  "Track notifications",
+		value: onOff(m.settings.notify),
+		says:  "Announce each new track to the desktop, for when the window is not in front of you.",
+	}, {
+		name:  "Artwork",
+		value: artwork,
+		says:  "How the cover is drawn. kitty is the picture itself; half blocks are an approximation.",
+		live:  true,
+	}}
+}
+
+func onOff(on bool) string {
+	if on {
+		return "on"
+	}
+	return "off"
+}
+
+// describeOverlap says a crossfade the way somebody would.
+func describeOverlap(d time.Duration) string {
+	if d <= 0 {
+		return "off"
+	}
+	return fmt.Sprintf("%d seconds", int(d.Seconds()))
+}
+
+// settingsPanel draws the screen.
+func (m Model) settingsPanel(l layout, rows int) []string {
+	w := l.interior - leftMargin - rightMargin
+	s := m.styles
+
+	lines := []string{
+		fit(s.Title.Render("Settings"), w),
+		fit(s.Album.Render("what spindle keeps between runs"), w),
+		strings.Repeat(" ", w),
+	}
+
+	items := m.settingRows()
+	for i, row := range items {
+		style, gutter := s.RowPrimary, "  "
+		if i == m.settings.cursor.cursor {
+			style, gutter = s.RowSelected, s.Cursor.Render(rowCursor)+" "
+		}
+
+		// The value is set against the name rather than out at the edge: they
+		// are one statement — this is called that — and a field of dots between
+		// them would be a form.
+		name := fit(style.Render(row.name), settingsNameCols)
+		value := s.Artist.Render(row.value)
+		lines = append(lines, fit(gutter+name+value, w))
+	}
+
+	// What the cursor is on, explained, and what it will take to hear it. Both
+	// under the list rather than beside it: the sentence is long and the values
+	// are short, and a column that fits one badly fits the other worse.
+	lines = append(lines, strings.Repeat(" ", w))
+	if at := m.settings.cursor.cursor; at >= 0 && at < len(items) {
+		lines = append(lines, fit(s.Detail.Render(items[at].says), w))
+		if !items[at].live {
+			lines = append(lines, fit(s.Empty.Render("The device takes this when it starts."), w))
+		}
+	}
+
+	if m.settings.changed {
+		lines = append(lines,
+			strings.Repeat(" ", w),
+			fit(s.Warning.Render(warnGlyph+" Restart the device to hear the change — spindle daemon restart"), w),
+		)
+	}
+
+	for len(lines) < rows {
+		lines = append(lines, strings.Repeat(" ", w))
+	}
+	return lines[:rows]
+}
+
+// settingsNameCols is the column the names are set in, so the values line up
+// under each other.
+const settingsNameCols = 26

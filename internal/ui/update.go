@@ -28,6 +28,13 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		return m.handleKey(message)
 
+	case settingsMsg:
+		m.settings.quality = message.quality
+		m.settings.crossfade = message.crossfade
+		m.settings.notify = message.notify
+		m.settings.loaded = true
+		return m, nil
+
 	case prefsMsg:
 		m.applyPrefs(prefs(message))
 		return m, tea.Batch(m.startScope(), m.fetchLyrics())

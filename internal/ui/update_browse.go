@@ -61,6 +61,8 @@ func (m *Model) browseKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	switch m.tab {
+	case tabSettings:
+		return m.settingsKey(k)
 	case tabQueue:
 		return m.queueKey(k)
 	case tabLibrary:

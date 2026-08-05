@@ -450,6 +450,24 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 			},
 		}
 
+	case tabSettings:
+		return tabKeys{
+			short: []key.Binding{
+				selectHint,
+				hint("← / →", "change it"),
+				hint("?", "help"),
+			},
+			full: [][]key.Binding{
+				{k.Down, hint("← / →", "change the setting"), k.NextTab, k.Quit},
+			},
+		}
+
+	case tabHelp:
+		return tabKeys{
+			short: []key.Binding{hint("1–6", "go to a screen"), hint("tab", "next"), hint("q", "quit")},
+			full:  [][]key.Binding{{k.NextTab, k.GoTab, k.Quit, k.QuitAll}},
+		}
+
 	case tabSearch:
 		return tabKeys{
 			short: []key.Binding{

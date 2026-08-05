@@ -34,7 +34,7 @@ var tabNames = [...]string{
 	tabLibrary:  "library",
 	tabSearch:   "search",
 	tabSettings: "settings",
-	tabHelp:     "keys",
+	tabHelp:     "help",
 }
 
 func (t tabID) String() string { return tabNames[t] }

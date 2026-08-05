@@ -62,6 +62,9 @@ type Model struct {
 	library   libraryPane
 	search    searchPane
 
+	// settings is the screen for what spindle keeps between runs.
+	settings settingsPane
+
 	// find is a search through the list on screen, which is a different act
 	// from the search tab: nothing is asked of Spotify, and what it walks is
 	// already in front of you.
@@ -348,6 +351,7 @@ func (m Model) Init() tea.Cmd {
 		tickCmd(),
 		fetchStateCmd(m.player),
 		loadPrefsCmd(),
+		loadSettingsCmd(),
 	}
 	// A backend that reports its own changes is followed rather than polled.
 	if w, ok := m.player.(player.Watcher); ok {
