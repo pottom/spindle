@@ -24,7 +24,7 @@ const (
 	// sparkIdle is the chance a crest sheds something on an ordinary frame, and
 	// sparkHit how much a rise in loudness multiplies that. Together: a steady
 	// passage glitters faintly along its peaks, a hit throws a handful.
-	sparkIdle = 0.06
+	sparkIdle = 0.16
 	sparkHit  = 5.0
 
 	// sparkThrow is how hard a throw goes, per root of the half-height it is
@@ -48,12 +48,12 @@ const (
 	// the water on the big screen: this is a spark off a beam, not a drop.
 	sparkDim = 0.93
 
-	// sparkSpray is the share of the columns that throw when they jump. All of
-	// them would be a second waveform drawn above the first.
-	sparkSpray = 0.45
+	// sparkSpray is how much of all that actually leaves. Below one it keeps the
+	// spray ragged rather than drawing a second waveform above the first.
+	sparkSpray = 0.85
 
 	// sparkMost is how many can be in the air at once.
-	sparkMost = 512
+	sparkMost = 1024
 )
 
 // spark is one bead: which cell column it left, how far it is from the centre
