@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"math"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -27,6 +28,15 @@ const (
 	// takes, leaving somewhere for the drops to go.
 	stageReach = 0.72
 
+	// stageReachTight is the same on a canvas too shallow for that to make
+	// sense. In the strip under the artwork a half-height is seven dot rows: a
+	// quarter of that held back for water is two rows nobody can see anything
+	// in, and the columns want them more than the drops do.
+	stageReachTight = 0.92
+
+	// stageTight is the half-height below which that applies.
+	stageTight = 16
+
 	// stageGap is how many dot rows are left clear along the middle, so the two
 	// halves read as a reflection rather than as one shape.
 	stageGap = 1
@@ -36,11 +46,15 @@ const (
 	// fine lines, which is the whole look of the thing.
 	stagePitch = 3
 
-	// stageThrow is how much of a band's jump becomes speed for the drops it
-	// throws off, in dot rows a frame. A hard hit is a jump of about half the
-	// scale, and that has to arc rather than leave the screen: at this and the
-	// gravity below it goes about ten rows up and comes back inside a second.
-	stageThrow = 5
+	// stageThrow is how hard a band's jump throws the drops off it, per root of
+	// the half-height it is drawn in.
+	//
+	// The root is what makes the same picture work at any size: a drop rises by
+	// its speed squared over the gravity, so a speed set by the root of the
+	// canvas arcs to the same fraction of it whether that is eighty dot rows on
+	// a full screen or eight in the strip under the artwork. A fixed speed
+	// would send every drop clean off the small one.
+	stageThrow = 0.65
 
 	// stageGravity is what pulls them back, in dot rows a frame. Together with
 	// the throw it sets the arc: about a second in the air for a hard hit.
@@ -48,15 +62,19 @@ const (
 
 	// stageJump is how much a band has to rise in a frame before it throws
 	// anything at all. Below this it is the music breathing, not hitting.
-	stageJump = 0.04
+	stageJump = 0.02
 
 	// stageSpray is the share of the columns that throw when they jump. All of
-	// them would put up a solid curtain; some of them is water.
-	stageSpray = 0.35
+	// them at once would be a curtain going up rather than water coming off,
+	// but most of them is what makes the air busy enough to watch.
+	stageSpray = 0.7
 
-	// stageDim is what a drop keeps of its light each frame. Water thrown up is
-	// brightest as it leaves.
-	stageDim = 0.97
+	// stageDim is what a drop keeps of its light each frame.
+	//
+	// Water thrown up is brightest as it leaves, and it has to stay lit long
+	// enough to be watched all the way back down: what makes the picture read
+	// as water rather than as sparks is the falling, not the throwing.
+	stageDim = 0.99
 
 	// stageDrops is the most that can be in the air. A wide screen on a busy
 	// track keeps a few hundred; the cap is what stops a stuck display from
@@ -210,7 +228,7 @@ func (m Model) stageArt(w, rows int) []string {
 	}
 
 	// The columns, and their reflections.
-	reach := stageReach * float32(middle-stageGap)
+	reach := stageReachAt(float32(middle - stageGap))
 	for x := range dotsX {
 		if x%stagePitch != 0 {
 			continue
@@ -236,6 +254,15 @@ func (m Model) stageArt(w, rows int) []string {
 	}
 
 	return m.drawCells(w, rows, grid, paint, hue)
+}
+
+// stageReachAt is how far up its half of the picture a band at the top of the
+// scale reaches, given how much half there is.
+func stageReachAt(half float32) float32 {
+	if half < stageTight {
+		return stageReachTight * half
+	}
+	return stageReach * half
 }
 
 // stageLevel is how loud the column at x is, 0..1.
@@ -268,8 +295,8 @@ func (m Model) stageLevel(x, dotsX int) float32 {
 //
 // It is a step of a simulation rather than a drawing, so it happens in the
 // update loop and leaves the drawing a pure function of what it left behind.
-func (m *Model) stageFlow() {
-	dotsX, dotsY := m.width*dotsPerCellX, m.height*dotsPerCellY
+func (m *Model) stageFlow(w, rows int) {
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
 	if dotsX <= 0 || dotsY <= 0 {
 		return
 	}
@@ -292,7 +319,9 @@ func (m *Model) stageFlow() {
 		m.stage.was = make([]float32, dotsX)
 	}
 
-	reach := stageReach * float32(dotsY/2-stageGap)
+	half := float32(dotsY/2 - stageGap)
+	reach := stageReachAt(half)
+	throw := stageThrow * float32(math.Sqrt(float64(half)))
 	for x := 0; x < dotsX; x += stagePitch {
 		now := m.stageLevel(x, dotsX)
 		jump := now - m.stage.was[x]
@@ -310,7 +339,7 @@ func (m *Model) stageFlow() {
 		m.stage.drops = append(m.stage.drops, stageDrop{
 			col:    x,
 			at:     now * reach,
-			speed:  jump * stageThrow,
+			speed:  jump * throw,
 			bright: min(now+jump, 1),
 		})
 	}

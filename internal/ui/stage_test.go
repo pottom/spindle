@@ -116,7 +116,7 @@ func TestStageThrowsWaterAndTakesItBack(t *testing.T) {
 		quiet[i] = 0.2
 	}
 	m.scope.bands = quiet
-	m.stageFlow()
+	m.stageFlow(100, 40)
 
 	// A hit across the bottom of the range.
 	hit := make([]float32, 28)
@@ -125,7 +125,7 @@ func TestStageThrowsWaterAndTakesItBack(t *testing.T) {
 		hit[i] = 1
 	}
 	m.scope.bands = hit
-	m.stageFlow()
+	m.stageFlow(100, 40)
 
 	if len(m.stage.drops) == 0 {
 		t.Fatal("a hit threw nothing into the air")
@@ -135,7 +135,7 @@ func TestStageThrowsWaterAndTakesItBack(t *testing.T) {
 	// Left alone, every one of them comes back.
 	m.scope.bands = quiet
 	for range 400 {
-		m.stageFlow()
+		m.stageFlow(100, 40)
 	}
 	if len(m.stage.drops) != 0 {
 		t.Errorf("%d drops are still in the air after the music stopped jumping", len(m.stage.drops))

@@ -132,7 +132,7 @@ func scopeFrameCmd(p player.Player, mode scopeMode) tea.Cmd {
 				out.Samples = source.Waveform()
 			}
 		}
-		if mode.bars() {
+		if mode.spectrum() {
 			if source, ok := p.(player.Spectrum); ok {
 				out.Bands = source.Bands()
 			}

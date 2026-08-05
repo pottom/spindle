@@ -45,6 +45,9 @@ const (
 	// them was built alongside it and dropped: the markers are what give the
 	// meter its character, and without them it is only a row of blocks.
 	scopeBars
+	// scopeMirror is the big screen's picture, in the strip: the spectrum about
+	// a middle line with the water thrown off it. See stage.go.
+	scopeMirror
 	scopeModes // how many there are, for the cycle
 )
 
@@ -53,7 +56,12 @@ func (s scopeMode) next() scopeMode { return (s + 1) % scopeModes }
 
 // wants reports whether a mode needs the waveform rather than the bands.
 func (s scopeMode) wave() bool { return s == scopeWave }
-func (s scopeMode) bars() bool { return s == scopeBars }
+func (s scopeMode) bars() bool   { return s == scopeBars }
+func (s scopeMode) mirror() bool { return s == scopeMirror }
+
+// spectrum reports whether a mode is drawn from the bands, whichever way it
+// draws them.
+func (s scopeMode) spectrum() bool { return s.bars() || s.mirror() }
 
 // scopeState is the visualiser the player screen is drawing, and what it is
 // drawing.
@@ -182,10 +190,14 @@ func (m Model) scopeWidth(l layout) int {
 
 // scopeRender draws whichever visualiser is on, across w cells.
 func (m Model) scopeRender(w int) []string {
-	if m.scopeMode().wave() {
+	switch {
+	case m.scopeMode().wave():
 		return m.scopeLines(w)
+	case m.scopeMode().mirror():
+		return m.stageArt(w, scopeRows)
+	default:
+		return m.barsLines(w, scopeRows)
 	}
-	return m.barsLines(w, scopeRows)
 }
 
 // scopeRoom is how many blank rows sit below the artwork, which is what the

@@ -48,7 +48,7 @@ bottom. The ones worth knowing:
 | `↑` `↓` | volume ±5 (on the player screen) |
 | `m` | mute, remembering the level |
 | `s` `r` | shuffle, cycle repeat |
-| `v` | waveform → spectrum → off |
+| `v` | waveform → spectrum → mirrored, with water → off |
 | `V` | the visualiser, full screen — `v` switches it there, any other key comes back |
 | `l` | lyrics |
 | `u` | a glance at what is next |
