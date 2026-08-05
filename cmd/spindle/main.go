@@ -51,6 +51,45 @@ var otherCommands = map[string]bool{
 	"notify": true, "daemon": true,
 }
 
+// usage is what --help prints.
+//
+// The flag package only knows about flags, and spindle is mostly subcommands:
+// the default help listed three options and none of the eight things the
+// program actually does, which reads as a program that does almost nothing.
+func usage() {
+	fmt.Fprint(os.Stderr, `spindle — a Spotify player for the terminal
+
+    spindle                              open the interface
+    spindle login [client id]            authorise, once
+
+  The playback device, which keeps playing after the interface is closed:
+
+    spindle daemon start | stop          start or stop it
+    spindle daemon restart | status      restart it, or ask whether one runs
+
+  Driving what is already playing, for a key binding or a status bar:
+
+    spindle play | pause | toggle        resume, stop, or flip between them
+    spindle next | prev                  move through the queue
+    spindle status [--line | --format]   what is playing; --follow to keep going
+    spindle queue                        the playing track and what follows
+    spindle volume [0-100]               report the level, or set it
+    spindle seek 90 | +30 | -15          to a position, or by an offset
+
+  Settings, kept between runs:
+
+    spindle quality [low|normal|high]    what to ask Spotify for
+    spindle crossfade [seconds|off]      how long one track overlaps the next
+    spindle notify on | off              announce each new track to the desktop
+
+  --json on any of the driving commands prints the daemon's own answer.
+  Exit codes: 0 done, 1 refused, 3 no daemon is running, 4 nothing is playing.
+
+Options for the interface:
+`)
+	flag.PrintDefaults()
+}
+
 func reportFatal(err error) {
 	if errors.Is(err, auth.ErrNoClientID) {
 		fmt.Fprintln(os.Stderr, auth.SetupHelp())
@@ -75,6 +114,12 @@ func main() {
 		}
 
 		switch os.Args[1] {
+		// The word as well as the flags: somebody looking for help types
+		// whichever comes to mind first, and one of the two answering with the
+		// interface is a poor joke.
+		case "help", "--help", "-h":
+			usage()
+			return
 		case "login":
 			if err := runLogin(context.Background(), os.Args[2:]); err != nil {
 				reportFatal(err)
@@ -106,6 +151,7 @@ func main() {
 	mock := flag.Bool("mock", false, "run against the offline mock backend, without auth or network")
 	backend := flag.String("cover", "auto", "artwork backend: auto, kitty or halfblock")
 	info := flag.Bool("cover-info", false, "report what the terminal supports and exit")
+	flag.Usage = usage
 	flag.Parse()
 
 	if *info {
