@@ -274,3 +274,29 @@ func TestNothingIsTakenBeforeTheDaemonAppears(t *testing.T) {
 		t.Error("an attempt was recorded against a device that was not there")
 	}
 }
+
+// A screen showing what is out there has to keep looking. The list used to be
+// fetched only when a state poll came back with nothing playing, so a daemon
+// started a moment later never appeared on it.
+func TestTheDeviceScreenKeepsLooking(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.noDevice = true
+
+	if cmd := m.refreshDevices(); cmd == nil {
+		t.Fatal("the device screen never asked for a list")
+	}
+	if cmd := m.refreshDevices(); cmd != nil {
+		t.Error("the list was asked for twice in the same moment")
+	}
+
+	m.devicesAt = m.devicesAt.Add(-devicesEvery - time.Second)
+	if cmd := m.refreshDevices(); cmd == nil {
+		t.Error("the list went stale and was not asked for again")
+	}
+
+	// And nowhere else: a player screen has no list on it to keep current.
+	quiet := New(player.NewMock(), nil, defaultTestCell)
+	if cmd := quiet.refreshDevices(); cmd != nil {
+		t.Error("a screen with no device list on it asked for one")
+	}
+}

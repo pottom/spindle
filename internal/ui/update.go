@@ -312,8 +312,34 @@ func (m Model) handleTick() (tea.Model, tea.Cmd) {
 		m.notePolled()
 		cmds = append(cmds, fetchStateCmd(m.player))
 	}
+	if cmd := m.refreshDevices(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 	return m, tea.Batch(cmds...)
 }
+
+// refreshDevices keeps the device list current while a screen of it is up.
+//
+// It used to be fetched only when a state poll came back with nothing playing,
+// which left the screen showing whatever the list was when it opened: a daemon
+// started a moment later did not appear on it, and neither did anything else,
+// and the key that asks for a refresh was the only way back — when it worked at
+// all. A list of what is out there has to keep looking.
+func (m *Model) refreshDevices() tea.Cmd {
+	if !m.noDevice && !m.devices.open {
+		return nil
+	}
+	if time.Since(m.devicesAt) < devicesEvery {
+		return nil
+	}
+
+	m.devicesAt = time.Now()
+	return fetchDevicesCmd(m.player)
+}
+
+// devicesEvery is how often that happens. Spotify lists a device within a few
+// seconds of it appearing, so this is about as often as it can say anything new.
+const devicesEvery = 3 * time.Second
 
 // adopt merges a server snapshot. Inside the optimistic window only metadata is
 // taken over, so a poll that has not yet seen a local change cannot undo it.

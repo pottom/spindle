@@ -97,6 +97,10 @@ type Model struct {
 	volumeSent   int
 	volumeSentAt time.Time
 
+	// devicesAt is when the device list was last asked for, so a screen showing
+	// one keeps it current without asking on every tick.
+	devicesAt time.Time
+
 	// tookOwnDeviceAt is when the device spindle started for itself was last
 	// claimed, so a claim that failed is tried again and one that worked is not
 	// repeated every time the list arrives.
