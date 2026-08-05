@@ -498,7 +498,7 @@ func TestWordsBeatWhenThereIsNothingToSing(t *testing.T) {
 	m.width, m.height = w, rows
 	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
 
-	lines := []string{"x"}
+	lines := []string{wordsNotes}
 	img, layout, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
 	if !ok {
 		t.Fatal("the face could not be drawn")
@@ -674,8 +674,8 @@ func TestWordsSetTheNoteThroughASolo(t *testing.T) {
 
 	m.setProgress(2 * time.Second)
 	lines, _ := m.wordsComing()
-	if len(lines) != 1 || lines[0] != "♪" {
-		t.Errorf("an instrumental bar set %q, want the note", lines)
+	if len(lines) != 1 || lines[0] != wordsNotes {
+		t.Errorf("an instrumental bar set %q, want %q", lines, wordsNotes)
 	}
 	if m.wordsSilent() {
 		t.Error("an instrumental bar was taken for silence")
@@ -692,5 +692,42 @@ func TestWordsSetTheNoteThroughASolo(t *testing.T) {
 	m.wordsGrind()
 	if m.words.beats {
 		t.Error("a line of words was taken for a mark")
+	}
+}
+
+// A mark standing in for a line is set smaller than a line would be, so the
+// meter has its band above and below it: one character given the whole height
+// is a note two hundred dots tall with nothing else on the screen.
+func TestTheNoteLeavesRoomForTheMeter(t *testing.T) {
+	const w, rows = 60, 30
+
+	tall := func(line string) (top, bottom int) {
+		_, layout, ok := wordsImage([]string{line}, w*dotsPerCellX, rows*dotsPerCellY)
+		if !ok {
+			t.Fatalf("%q could not be drawn", line)
+		}
+		return layout.Tops[0], layout.Bottoms[0]
+	}
+
+	noteTop, noteBottom := tall("♪")
+	wordTop, wordBottom := tall("A")
+	t.Logf("the note covers rows %d..%d, a letter %d..%d", noteTop, noteBottom, wordTop, wordBottom)
+
+	if noteBottom-noteTop >= wordBottom-wordTop {
+		t.Errorf("the note is %d dots tall and a letter %d, want the note held back",
+			noteBottom-noteTop, wordBottom-wordTop)
+	}
+
+	// And what it leaves is enough for the meter to be drawn in.
+	m := scopeModel(100, 44)
+	m.width, m.height = w, rows
+	_, layout, _ := wordsImage([]string{"♪"}, w*dotsPerCellX, rows*dotsPerCellY)
+	m.words.where = layout
+
+	if _, room := m.wordsRoom(rows); room < wordsBand {
+		t.Errorf("the note leaves %d rows under it, want at least %d", room, wordsBand)
+	}
+	if head := m.wordsHeadroom(rows); head < wordsBand*dotsPerCellY {
+		t.Errorf("the note leaves %d dots over it, want at least %d", head, wordsBand*dotsPerCellY)
 	}
 }

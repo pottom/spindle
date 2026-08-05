@@ -82,7 +82,17 @@ func wordsImage(lines []string, w, h int) (*image.Gray, msg.WordLayout, bool) {
 		return nil, msg.WordLayout{}, false
 	}
 
-	size := wordsSize(lines, w, h)
+	// A mark is set smaller than a line would be. One character given the whole
+	// height is a note two hundred dots tall with nothing else on the screen —
+	// which is what this looked like the first time, and what was wrong with it.
+	// Held to a third, the meter has its band above and below, and the picture
+	// is the same shape as it is when there are words.
+	fit := h
+	if len(lines) == 1 && wordsBeats(lines[0]) {
+		fit = int(float64(h) * wordsMark)
+	}
+
+	size := wordsSize(lines, w, fit)
 	if size < 4 {
 		return nil, msg.WordLayout{}, false
 	}
@@ -299,6 +309,12 @@ func (m Model) wordsComing() ([]string, int64) {
 
 		if at >= 0 && at < len(m.lyrics.lines) {
 			if line := strings.TrimSpace(m.lyrics.lines[at].Words); line != "" {
+				// A bar the sheet marks rather than writes: three notes rather
+				// than the one it wrote, so the picture has the width of a line
+				// and each of them can answer a different part of the sound.
+				if wordsBeats(line) {
+					return []string{wordsNotes}, m.lyrics.lines[at].At
+				}
 				return wordsWrap(line, m.width*dotsPerCellX, m.height*dotsPerCellY),
 					m.lyrics.lines[at].At
 			}
@@ -489,6 +505,13 @@ const (
 	wordsRangeLeast = 2.5
 	wordsRangeClose = 0.0015
 
+	// wordsNotes is what goes up for a bar with no words in it.
+	wordsNotes = "♪ ♫ ♪"
+
+	// wordsMark is how much of the height a mark standing in for a line is set
+	// in, as against a line of words, which is given all of it.
+	wordsMark = 0.34
+
 	// wordsTitle is how long the record's name is worth at the top of it.
 	wordsTitle = 5 * time.Second
 
@@ -559,10 +582,11 @@ func (m Model) wordsLines(w, rows int) []string {
 
 		switch ahead := i - m.words.sung; {
 		case m.words.beats:
-			// The note: it takes the colour of this moment, over and over, so
-			// it beats with the music rather than sitting in the colour it
-			// happened to arrive in.
-			paints[i] = wordPaint{hue: nowHue, level: nowLevel, set: true}
+			// The notes: each takes the colour of the part of the sound it
+			// stands over, over and over — the one on the left answers the bass
+			// and the one on the right the cymbals — so they beat with the music
+			// rather than sitting in the colour they happened to arrive in.
+			paints[i] = m.wordsBeatPaint(i, len(paints), freqs, levels)
 
 		case ahead < 0:
 			// Behind the light: what it was sung in, kept, and dimmed so that
@@ -922,6 +946,37 @@ func (m Model) wordsSung() int {
 	// Which word that lands on: the line's own words, so a line broken over
 	// three display lines still counts as one sentence.
 	return min(int(along*float64(len(strings.Fields(line)))), m.words.where.Count-1)
+}
+
+// wordsBeatPaint is what one of the notes burns at: its own share of the
+// spectrum, low to high from left to right.
+//
+// By its place in the row rather than by where it landed on the screen. The
+// notes are set small and sit together in the middle, so their columns all fall
+// over the same few bands — read that way, three notes would answer the same
+// sound three times.
+func (m Model) wordsBeatPaint(word, count, freqs, levels int) wordPaint {
+	bands := m.scope.bands
+	if len(bands) == 0 || count <= 0 {
+		hue, level := m.wordsColourNow()
+		return wordPaint{hue: hue, level: level, set: true}
+	}
+
+	// The share of the range this one answers for, and the loudest thing in it.
+	from := word * len(bands) / count
+	to := max((word+1)*len(bands)/count, from+1)
+
+	var loud float32
+	for _, v := range bands[from:min(to, len(bands))] {
+		loud = max(loud, v)
+	}
+
+	share := (float32(word) + 0.5) / float32(count)
+	return wordPaint{
+		hue:   int8(min(int(share*float32(freqs)), freqs-1)),
+		level: int8(min(int((0.3+0.7*loud)*float32(levels)), levels-1)),
+		set:   true,
+	}
 }
 
 // wordsColourNow is the colour of the sound in the air: the hue from where its
