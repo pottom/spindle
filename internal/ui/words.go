@@ -322,9 +322,15 @@ func (m Model) wordsComing() ([]string, int64) {
 		return nil, 0
 	}
 
-	// The record, then: its name over the artist's, which is the order a sleeve
-	// puts them in and the order somebody asks about them. It is not sung, so it
-	// has no time of its own to arrive at.
+	// The record, then — but only at the top of it. A title is worth reading
+	// once, as the record starts, the way a sleeve is worth a look as it goes
+	// on the turntable; held up for the whole of a song with no words in the
+	// database it is a caption on a picture nobody is looking at any more. After
+	// its few seconds the screen goes to the music.
+	if m.elapsed() > wordsTitle {
+		return nil, 0
+	}
+
 	lines := []string{m.ps.Title}
 	if len(m.ps.Artists) > 0 {
 		lines = append(lines, strings.Join(m.ps.Artists, ", "))
@@ -488,6 +494,9 @@ const (
 	// still be using it a verse later.
 	wordsRangeLeast = 2.5
 	wordsRangeClose = 0.0015
+
+	// wordsTitle is how long the record's name is worth at the top of it.
+	wordsTitle = 5 * time.Second
 
 	// wordsCheer is the face that has arms, and wordsCheerBurst is how long
 	// before its bar ends the hands let go.
@@ -878,10 +887,6 @@ func (m Model) wordsHands(w int) (left, right, high int) {
 // its title, which is worth looking at for three minutes; a song between two
 // lines is a song playing, and what belongs on the screen then is the playing.
 func (m Model) wordsSilent() bool {
-	if !m.lyrics.synced || m.ps == nil || m.lyrics.forTrack != m.ps.TrackID {
-		return false
-	}
-
 	// What is coming counts as words: the gathering of the next line begins
 	// before the singer reaches it. So does a chase, which has no words in it
 	// but is very much something to look at.

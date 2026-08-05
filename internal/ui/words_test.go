@@ -379,10 +379,16 @@ func TestWordsGiveTheScreenBackBetweenLines(t *testing.T) {
 		t.Error("the screen held a line up through the solo")
 	}
 
-	// A song with no lyrics at all keeps its title instead.
+	// A song with no lyrics at all shows its name as it starts, and then gives
+	// the screen over as well: a title is worth reading once.
 	m.lyrics.synced = false
+	m.setProgress(2 * time.Second)
 	if m.wordsSilent() {
-		t.Error("a song with no lyrics gave up its title")
+		t.Error("a song with no lyrics gave up its title as it started")
+	}
+	m.setProgress(wordsTitle + time.Second)
+	if !m.wordsSilent() {
+		t.Error("a song with no lyrics held its title up long after it started")
 	}
 }
 
