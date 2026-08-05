@@ -958,3 +958,80 @@ func TestTheNotesLeanBySolo(t *testing.T) {
 		t.Error("one bar answered differently twice")
 	}
 }
+
+// A comma is not part of the word in front of it. It is cut off and counted as
+// something of its own, so it answers its own part of the sound and rides it —
+// while what is between the ends of a word, an apostrophe or a dash, stays put.
+func TestPunctuationIsItsOwnWord(t *testing.T) {
+	for _, c := range []struct {
+		line string
+		want []string
+	}{
+		{"Hello, is it me you're looking for?",
+			[]string{"Hello", ",", "is", "it", "me", "you're", "looking", "for", "?"}},
+		{"(this is a whisper) ... and then it stops.",
+			[]string{"(", "this", "is", "a", "whisper", ")", "...", "and", "then", "it", "stops", "."}},
+		{"don't stop me now — I'm having a good time;",
+			[]string{"don't", "stop", "me", "now", "—", "I'm", "having", "a", "good", "time", ";"}},
+		{"no marks here at all", []string{"no", "marks", "here", "at", "all"}},
+		{wordsNotes, []string{"♪", "♫", "♪"}},
+	} {
+		var got []string
+		for _, p := range wordsPieces(c.line) {
+			got = append(got, c.line[p.from:p.to])
+		}
+		if len(got) != len(c.want) {
+			t.Errorf("%q cut into %q, want %q", c.line, got, c.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != c.want[i] {
+				t.Errorf("%q cut into %q, want %q", c.line, got, c.want)
+				break
+			}
+		}
+	}
+}
+
+// And the mark's own dots are the ones it is given: a piece that claimed the
+// wrong columns would ride the letters beside it about instead of itself.
+func TestAMarkOwnsItsOwnDots(t *testing.T) {
+	const w, rows = 90, 12
+	const line = "Hello, world!"
+
+	img, layout, ok := wordsImage([]string{line}, w*dotsPerCellX, rows*dotsPerCellY)
+	if !ok {
+		t.Fatal("the line would not draw")
+	}
+	if layout.Count != 4 {
+		t.Fatalf("%q came out as %d pieces, want the two words and the two marks", line, layout.Count)
+	}
+
+	// Every lit dot belongs to something, and the pieces are in reading order:
+	// the comma to the right of "Hello" and the mark to the right of "world".
+	first := make([]int, layout.Count)
+	last := make([]int, layout.Count)
+	for i := range first {
+		first[i], last[i] = 1<<30, -1
+	}
+	for y := range rows * dotsPerCellY {
+		for x := range w * dotsPerCellX {
+			if img.GrayAt(x, y).Y < wordsLit {
+				continue
+			}
+			at := layout.WordAt(x, y)
+			if at < 0 {
+				t.Fatalf("a lit dot at %d,%d belongs to no piece", x, y)
+			}
+			first[at], last[at] = min(first[at], x), max(last[at], x)
+		}
+	}
+
+	for i := 1; i < layout.Count; i++ {
+		if first[i] <= last[i-1] {
+			t.Errorf("piece %d starts at %d, before piece %d ends at %d", i, first[i], i-1, last[i-1])
+		}
+	}
+	t.Logf("the comma has %d columns of its own, the exclamation mark %d",
+		last[1]-first[1]+1, last[3]-first[3]+1)
+}

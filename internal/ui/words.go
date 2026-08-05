@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -135,19 +136,104 @@ func wordsImage(lines []string, w, h int) (*image.Gray, msg.WordLayout, bool) {
 		layout.Tops = append(layout.Tops, max(baseline-metrics.Ascent.Round(), 0))
 		layout.Bottoms = append(layout.Bottoms, min(baseline+metrics.Descent.Round(), h-1))
 
-		at := left
-		for _, word := range strings.Fields(line) {
-			wide := d.MeasureString(word).Round()
-			for x := at; x < at+wide && x < w; x++ {
-				if x >= 0 {
-					layout.At[i*w+x] = int16(layout.Count)
-				}
+		// Measured as prefixes of the line rather than piece by piece, so that
+		// where a piece is taken to be is where the drawer actually put it: a
+		// face kerns its pairs, and a run of widths added up separately walks
+		// away from the line under it.
+		for _, piece := range wordsPieces(line) {
+			from := left + d.MeasureString(line[:piece.from]).Round()
+			to := left + d.MeasureString(line[:piece.to]).Round()
+			for x := max(from, 0); x < to && x < w; x++ {
+				layout.At[i*w+x] = int16(layout.Count)
 			}
-			at += wide + d.MeasureString(" ").Round()
 			layout.Count++
 		}
 	}
 	return img, layout, true
+}
+
+// wordsPiece is a run of a line that moves as one thing, as byte offsets into
+// it.
+type wordsPiece struct{ from, to int }
+
+// wordsPieces cuts a line into what keeps its own time: its words, and the
+// punctuation hanging off either end of them.
+//
+// A comma is not part of the word in front of it. It is a mark of its own with
+// its own shape, and on this screen — where everything answers a band of the
+// spectrum and rides it — giving it to the word means it can only ever do what
+// the word does. Cut loose it bounces on its own, which is what a full stop at
+// the end of a line ought to be doing while the line is being sung.
+func wordsPieces(line string) []wordsPiece {
+	var out []wordsPiece
+
+	from := -1
+	cut := func(to int) {
+		if from >= 0 {
+			out = append(out, wordsCut(line, from, to)...)
+			from = -1
+		}
+	}
+	for i, r := range line {
+		if unicode.IsSpace(r) {
+			cut(i)
+			continue
+		}
+		if from < 0 {
+			from = i
+		}
+	}
+	cut(len(line))
+	return out
+}
+
+// wordsCut takes one word off the line and separates the marks at its ends
+// from the word itself. What is between them stays where it is: a hyphen holds
+// two halves of a word together and an apostrophe is part of one.
+func wordsCut(line string, from, to int) []wordsPiece {
+	field := line[from:to]
+
+	head := 0
+	for _, r := range field {
+		if !wordsPunct(r) {
+			break
+		}
+		head += utf8.RuneLen(r)
+	}
+	if head == len(field) {
+		return []wordsPiece{{from, to}} // all marks, and so one thing
+	}
+
+	tail := len(field)
+	for tail > head {
+		r, size := utf8.DecodeLastRuneInString(field[:tail])
+		if size == 0 || !wordsPunct(r) {
+			break
+		}
+		tail -= size
+	}
+
+	var out []wordsPiece
+	if head > 0 {
+		out = append(out, wordsPiece{from, from + head})
+	}
+	out = append(out, wordsPiece{from + head, from + tail})
+	if tail < len(field) {
+		out = append(out, wordsPiece{from + tail, to})
+	}
+	return out
+}
+
+// wordsPunct reports that a rune is a mark that lives its own life.
+//
+// Not the apostrophe, straight or curly: "don't" and "singin'" are one word
+// each wherever it falls in them, and cutting it off leaves a tick bouncing
+// about on its own with nothing to do with the line.
+func wordsPunct(r rune) bool {
+	if r == '\'' || r == '’' {
+		return false
+	}
+	return unicode.IsPunct(r) || unicode.IsSymbol(r)
 }
 
 // wordsDrawable reports whether the face has every glyph the lines need.
