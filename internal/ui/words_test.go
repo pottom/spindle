@@ -659,10 +659,10 @@ func TestWordsHangTheMeterFromTheCeilingToo(t *testing.T) {
 	}
 }
 
-// A lyric sheet marks the bars it has no words for with a note, and a note is
-// not a line: nothing is set for those bars, and the screen goes to the music
-// until the singer comes back.
-func TestWordsGiveASoloToTheMusic(t *testing.T) {
+// A lyric sheet marks the bars it has no words for with a note. The note is set
+// like any other line — with the meter above and below it and the water crossing
+// it — but it keeps no colour: nobody is singing it, so it follows the music.
+func TestWordsSetTheNoteThroughASolo(t *testing.T) {
 	m := scopeModel(100, 44)
 	m.width, m.height = 60, 16
 	m.ps.TrackID = "now"
@@ -673,15 +673,24 @@ func TestWordsGiveASoloToTheMusic(t *testing.T) {
 	}
 
 	m.setProgress(2 * time.Second)
-	if lines, _ := m.wordsComing(); len(lines) != 0 {
-		t.Errorf("an instrumental bar asked for %q to be set, want the music", lines)
+	lines, _ := m.wordsComing()
+	if len(lines) != 1 || lines[0] != "♪" {
+		t.Errorf("an instrumental bar set %q, want the note", lines)
 	}
-	if !m.wordsSilent() {
-		t.Error("an instrumental bar kept the screen from the music")
+	if m.wordsSilent() {
+		t.Error("an instrumental bar was taken for silence")
 	}
 
+	// It is drawn as a mark rather than as a word: no colour is kept for it.
+	m.wordsGrind()
+	if !m.words.beats {
+		t.Error("the note was taken for words")
+	}
+
+	// And an ordinary line is not.
 	m.setProgress(31 * time.Second)
-	if m.wordsSilent() {
-		t.Error("the words came back and the screen did not")
+	m.wordsGrind()
+	if m.words.beats {
+		t.Error("a line of words was taken for a mark")
 	}
 }

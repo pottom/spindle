@@ -299,12 +299,6 @@ func (m Model) wordsComing() ([]string, int64) {
 
 		if at >= 0 && at < len(m.lyrics.lines) {
 			if line := strings.TrimSpace(m.lyrics.lines[at].Words); line != "" {
-				// A bar with no words for it. Nothing is set: what goes up there
-				// is drawn — a face, or the chase — so there is no type to ask
-				// for and the picture is put together as it is shown.
-				if wordsBeats(line) {
-					return nil, m.lyrics.lines[at].At
-				}
 				return wordsWrap(line, m.width*dotsPerCellX, m.height*dotsPerCellY),
 					m.lyrics.lines[at].At
 			}
@@ -380,12 +374,6 @@ type wordsState struct {
 	// the ones that have been and the ones still to come.
 	where msg.WordLayout
 
-	// beats says the line is not words at all — the note a lyric sheet puts in
-	// place of a line it has none for. Those follow the music rather than being
-	// painted once and kept: there is no singer to follow, so the sound itself
-	// is what the colour has to answer to.
-	beats bool
-
 	// low and high are the range the sound's centre of gravity has been moving
 	// through lately, which is what the colours are spread over. See
 	// wordsColourNow.
@@ -393,6 +381,15 @@ type wordsState struct {
 
 	// ends is when the line on screen gives way to the next.
 	ends int64
+
+	// beats says what is on screen is a mark rather than words — the note a
+	// lyric sheet puts where a line would be if anyone were singing one.
+	//
+	// It is set like any other line, and drawn like any other line, with the
+	// meter above and below it and the water crossing it. What it does not do is
+	// keep a colour: nobody is singing it, so there is no moment to paint it
+	// with and it follows the music instead.
+	beats bool
 
 	// starts is when the line on screen is sung, on the playback clock. The
 	// gathering is timed against it rather than against the moment the picture
@@ -561,6 +558,12 @@ func (m Model) wordsLines(w, rows int) []string {
 		waiting := int8(min(int(wordsAhead*float32(levels)), levels-1))
 
 		switch ahead := i - m.words.sung; {
+		case m.words.beats:
+			// The note: it takes the colour of this moment, over and over, so
+			// it beats with the music rather than sitting in the colour it
+			// happened to arrive in.
+			paints[i] = wordPaint{hue: nowHue, level: nowLevel, set: true}
+
 		case ahead < 0:
 			// Behind the light: what it was sung in, kept, and dimmed so that
 			// the front of the line is the brightest thing on the screen.
@@ -848,6 +851,7 @@ func (m *Model) wordsGrind() tea.Cmd {
 		return nil
 	}
 	m.words.starts, m.words.ends = starts, m.wordsEnds(starts)
+	m.words.beats = len(lines) == 1 && wordsBeats(lines[0])
 
 	text := strings.Join(lines, "\n")
 	if m.words.text == text && m.words.cellsX == m.width && m.words.cellsY == m.height {
