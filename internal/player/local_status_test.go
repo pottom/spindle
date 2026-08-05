@@ -101,7 +101,7 @@ func TestTrackIDFromURI(t *testing.T) {
 // An idle daemon has nothing to say, and the caller has to fall through to the
 // Web API rather than show an empty player.
 func TestStoppedDaemonHasNoState(t *testing.T) {
-	l := &Local{snapshot: &localStatus{Stopped: true, DeviceName: "spindle"}}
+	l := &Local{live: true, snapshot: &localStatus{Stopped: true, DeviceName: "spindle"}}
 	if st := l.localState(); st != nil {
 		t.Errorf("localState = %+v, want nil while stopped", st)
 	}
@@ -111,7 +111,7 @@ func TestStoppedDaemonHasNoState(t *testing.T) {
 }
 
 func TestPlayingDaemonReportsState(t *testing.T) {
-	l := &Local{snapshot: &localStatus{
+	l := &Local{live: true, snapshot: &localStatus{
 		DeviceName: "spindle", VolumeSteps: 100, Volume: 70,
 		Track: &localTrack{URI: "spotify:track:x", Name: "something"},
 	}}
@@ -153,6 +153,7 @@ func TestNotifyCoalesces(t *testing.T) {
 // the progress bar tick forward and snap back on every poll.
 func TestPositionCarriesForwardBetweenEvents(t *testing.T) {
 	l := &Local{
+		live: true,
 		snapshot: &localStatus{
 			DeviceName: "spindle", VolumeSteps: 100,
 			Track: &localTrack{URI: "spotify:track:x", Position: 60000, Duration: 300000},
@@ -172,6 +173,7 @@ func TestPositionCarriesForwardBetweenEvents(t *testing.T) {
 // A paused track does not move, however long ago the snapshot was taken.
 func TestPausedPositionStaysPut(t *testing.T) {
 	l := &Local{
+		live: true,
 		snapshot: &localStatus{
 			DeviceName: "spindle", VolumeSteps: 100, Paused: true,
 			Track: &localTrack{URI: "spotify:track:x", Position: 60000, Duration: 300000},
@@ -187,6 +189,7 @@ func TestPausedPositionStaysPut(t *testing.T) {
 // A stale snapshot must not run past the end of the track.
 func TestPositionStopsAtTheEnd(t *testing.T) {
 	l := &Local{
+		live: true,
 		snapshot: &localStatus{
 			DeviceName: "spindle", VolumeSteps: 100,
 			Track: &localTrack{URI: "spotify:track:x", Position: 290000, Duration: 300000},
@@ -196,5 +199,39 @@ func TestPositionStopsAtTheEnd(t *testing.T) {
 
 	if st := l.localState(); st.Progress != 300*time.Second {
 		t.Errorf("progress = %v, want it clamped to the 5m duration", st.Progress)
+	}
+}
+
+// A daemon that has stopped answering has no view to report. Carrying its last
+// one forward with the clock is what kept a playhead crossing a track that had
+// stopped playing when the daemon was killed under the interface.
+func TestALostDaemonReportsNothing(t *testing.T) {
+	l := &Local{
+		live:    true,
+		changes: make(chan struct{}, 1),
+		snapshot: &localStatus{
+			DeviceName: "spindle", VolumeSteps: 100,
+			Track: &localTrack{URI: "spotify:track:x", Position: 60000, Duration: 300000},
+		},
+		snapshotAt: time.Now(),
+	}
+
+	if l.localState() == nil {
+		t.Fatal("a daemon that is answering reports nothing")
+	}
+
+	l.lost()
+	if st := l.localState(); st != nil {
+		t.Errorf("localState = %+v after the daemon went away, want nothing", st)
+	}
+	if !l.idle() {
+		t.Error("idle = false with no daemon answering")
+	}
+
+	// And the reader is told, so the screen does not sit on what it had.
+	select {
+	case <-l.changes:
+	default:
+		t.Error("nobody was woken when the daemon went away")
 	}
 }

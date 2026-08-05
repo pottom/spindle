@@ -33,8 +33,11 @@ func (l *Local) Watch(ctx context.Context) {
 	for ctx.Err() == nil {
 		if err := l.listen(ctx); err != nil && ctx.Err() == nil {
 			// A dropped connection is expected when the daemon restarts, and
-			// there is nothing useful to say about it: the snapshot goes stale,
-			// the periodic resync notices, and the next dial reconnects.
+			// there is nothing useful to say about it — but it does have to be
+			// noticed: what the daemon last said stops being what is happening
+			// the moment it stops answering.
+			l.lost()
+
 			select {
 			case <-ctx.Done():
 			case <-time.After(reconnectDelay):
@@ -77,7 +80,12 @@ func (l *Local) resync(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			_ = l.refresh(ctx)
+			// The look also answers whether the daemon is there at all, which
+			// the event stream can be slow to notice: a socket held open by a
+			// process that has gone away reads as connected until it is used.
+			if err := l.refresh(ctx); err != nil && ctx.Err() == nil {
+				l.lost()
+			}
 		}
 	}
 }

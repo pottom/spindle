@@ -31,6 +31,12 @@ type Local struct {
 	snapshot   *localStatus
 	snapshotAt time.Time
 
+	// live says the daemon is answering. The snapshot is carried forward with
+	// the clock between events — that is what keeps the playhead moving — and
+	// without this it would be carried forward past the daemon's own death: the
+	// screen counting through a track that stopped playing minutes ago.
+	live bool
+
 	changes chan struct{}
 }
 
@@ -48,6 +54,18 @@ func NewLocal(web *Spotify, addr string, client *http.Client) *Local {
 		// wake-up covering everything it missed, which is all it needs.
 		changes: make(chan struct{}, 1),
 	}
+}
+
+// lost records that the daemon has stopped answering. Whatever it last said
+// stays where it is — the screen keeps the track's name and its cover rather
+// than blanking, which is what a device that vanished for a second deserves —
+// but nothing is carried forward from it any more.
+func (l *Local) lost() {
+	l.mu.Lock()
+	l.live = false
+	l.mu.Unlock()
+
+	l.notify()
 }
 
 // Changes implements Watcher.
@@ -69,10 +87,13 @@ func (l *Local) State(ctx context.Context) (*State, error) {
 // kept current by the event stream, so this costs no network at all.
 func (l *Local) localState() *State {
 	l.mu.RLock()
-	snapshot, taken := l.snapshot, l.snapshotAt
+	snapshot, taken, live := l.snapshot, l.snapshotAt, l.live
 	l.mu.RUnlock()
 
-	if snapshot == nil || snapshot.Stopped {
+	// A daemon that is not answering has no view to report. What it last said
+	// is not what is happening now, and the Web API can at least say whether
+	// the music went somewhere else or stopped altogether.
+	if !live || snapshot == nil || snapshot.Stopped {
 		return nil
 	}
 
@@ -114,7 +135,7 @@ func (l *Local) refresh(ctx context.Context) error {
 	}
 
 	l.mu.Lock()
-	l.snapshot, l.snapshotAt = &status, time.Now()
+	l.snapshot, l.snapshotAt, l.live = &status, time.Now(), true
 	l.mu.Unlock()
 
 	l.notify()
