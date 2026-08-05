@@ -528,11 +528,10 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.previewCover(), m.readAhead())
 
 	case key.Matches(k, m.keys.Help):
-		// Expanding the help shortens the body, which shrinks the artwork, so
-		// the cover has to be rendered again at the new size.
-		m.help.ShowAll = !m.help.ShowAll
-		m.resize()
-		return m, m.syncCover()
+		// A screen rather than a taller bar: unfolding it pushed the list off
+		// the bottom of the tabs with the longest lists, which are exactly the
+		// ones whose keys somebody is looking up.
+		return m, m.switchTab(tabHelp)
 	}
 
 	// With nothing playing there is nothing to control.

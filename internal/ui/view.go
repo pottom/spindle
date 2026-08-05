@@ -108,6 +108,9 @@ func (m Model) body(l layout) []string {
 	case m.tab == tabPlayer && m.ps == nil:
 		block = []string{m.styles.Detail.Render("Connecting…")}
 
+	case m.tab == tabHelp && !m.devices.open:
+		block = m.helpPanel(l, max(l.bodyHeight, 1))
+
 	case m.open() != nil && !m.devices.open:
 		block = m.openPageView(l, max(l.bodyHeight, 1))
 

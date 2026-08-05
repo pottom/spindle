@@ -19,6 +19,8 @@ const (
 	tabQueue
 	tabLibrary
 	tabSearch
+	tabSettings
+	tabHelp
 
 	// tabCount sizes the per-tab state: each screen remembers its own
 	// visualiser, and an array indexed by the tab keeps that beside the tab
@@ -27,10 +29,12 @@ const (
 )
 
 var tabNames = [...]string{
-	tabPlayer:  "now playing",
-	tabQueue:   "queue",
-	tabLibrary: "library",
-	tabSearch:  "search",
+	tabPlayer:   "now playing",
+	tabQueue:    "queue",
+	tabLibrary:  "library",
+	tabSearch:   "search",
+	tabSettings: "settings",
+	tabHelp:     "keys",
 }
 
 func (t tabID) String() string { return tabNames[t] }

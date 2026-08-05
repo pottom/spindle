@@ -115,7 +115,7 @@ func TestHeaderPutsTheDeviceLeftAndTheTabsRight(t *testing.T) {
 	if !strings.HasPrefix(strings.TrimLeft(top, " "), "◐") && !strings.Contains(top, "spindle") {
 		t.Errorf("header row = %q, want the device on the left", top)
 	}
-	if !strings.HasSuffix(strings.TrimRight(top, " "), "search") {
+	if !strings.HasSuffix(strings.TrimRight(top, " "), tabNames[len(tabNames)-1]) {
 		t.Errorf("header row = %q, want the tabs flush right", top)
 	}
 
@@ -147,7 +147,7 @@ func TestHeaderKeepsTheTabsWhole(t *testing.T) {
 	m.ps = &player.State{DeviceName: strings.Repeat("very long name ", 6), Playing: true, Bitrate: 320}
 
 	top := ansiOff(m.header(minWidth - leftMargin - rightMargin)[0])
-	if !strings.HasSuffix(strings.TrimRight(top, " "), "search") {
+	if !strings.HasSuffix(strings.TrimRight(top, " "), tabNames[len(tabNames)-1]) {
 		t.Errorf("header row = %q, want the tabs intact", top)
 	}
 	if !strings.Contains(top, "…") {

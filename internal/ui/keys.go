@@ -134,8 +134,8 @@ func newKeyMap() keyMap {
 		),
 		PrevTab: key.NewBinding(key.WithKeys("shift+tab")),
 		GoTab: key.NewBinding(
-			key.WithKeys("1", "2", "3", "4"),
-			key.WithHelp("1–4", "go to tab"),
+			key.WithKeys("1", "2", "3", "4", "5", "6"),
+			key.WithHelp("1–6", "go to tab"),
 		),
 		Up:   key.NewBinding(key.WithKeys("up")),
 		Down: key.NewBinding(key.WithKeys("down"), key.WithHelp("↑↓", "select")),
