@@ -245,13 +245,20 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.scope.running = false
 			return m, nil
 		}
-		m.scope.frame = message.Samples
-		m.scope.follow(message.Samples)
-		m.scope.adoptBands(message.Bands)
-		if m.scopeMode().wave() {
-			m.rememberScope()
+		// Paused, what arrives is the last thing that was heard, over and over:
+		// the analyser is fed by the output, and a stopped output feeds it
+		// nothing. Drawn as it comes, the picture freezes mid-beat and stays
+		// there, which reads as a crash rather than as a pause. So the music
+		// stopping is drawn as the music stopping — everything sinks to where
+		// silence would have left it.
+		if m.ps != nil && !m.ps.Playing {
+			m.scope.settle()
+		} else {
+			m.scope.frame = message.Samples
+			m.scope.follow(message.Samples)
+			m.scope.adoptBands(message.Bands)
 		}
-		if m.stage.on && m.scopeMode().wave() {
+		if m.scopeMode().wave() {
 			m.rememberScope()
 		}
 		// The water is only stirred where it is being drawn, and the big screen

@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/pottom/spindle/internal/ui/msg"
 )
 
 // stageModel is a player screen with the big picture up and something to draw.
@@ -236,5 +238,70 @@ func TestStageAndStripAgree(t *testing.T) {
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
 	if got := tm.(Model); got.scopeMode() != after.scopeMode() {
 		t.Errorf("the strip came back as %d after the big screen was left at %d", got.scopeMode(), after.scopeMode())
+	}
+}
+
+// Paused, the analyser keeps handing over the last thing it heard, because a
+// stopped output feeds it nothing new. Drawn as it arrives, the picture freezes
+// mid-beat and sits there looking crashed; it has to sink to where silence
+// would have left it instead.
+func TestPausedPictureSettles(t *testing.T) {
+	m := stageModel(100, 40)
+	m.scope.frame = make([]float32, 2*256)
+	for i := range m.scope.frame {
+		m.scope.frame[i] = 0.9
+	}
+	m.scope.follow(m.scope.frame)
+	m.scope.adoptBands(m.scope.bands)
+
+	loud := m.scope.bands[0]
+	if loud < 0.5 {
+		t.Fatalf("the spectrum starts at %.2f, so there is nothing to watch fall", loud)
+	}
+
+	m.ps.Playing = false
+	var tm tea.Model = m
+
+	// A second of frames, all carrying the same stale measurement.
+	for range 30 {
+		tm, _ = tm.Update(msg.WaveformReady{
+			Bands:   []float32{0.9, 0.9, 0.9},
+			Samples: []float32{0.9, -0.9, 0.9, -0.9},
+		})
+	}
+
+	got := tm.(Model)
+	for i, v := range got.scope.bands {
+		if v > 0.05 {
+			t.Errorf("band %d still reads %.2f a second after the music stopped", i, v)
+		}
+	}
+	for i, v := range got.scope.frame {
+		if v > 0.05 || v < -0.05 {
+			t.Errorf("the trace still swings to %.2f at sample %d", v, i)
+			break
+		}
+	}
+
+	// And the picture that draws them is empty rather than held.
+	for r, line := range got.stageArt(100, 40) {
+		if strings.TrimSpace(ansiOff(line)) != "" {
+			t.Errorf("row %d of the paused picture still has %q in it", r, strings.TrimSpace(ansiOff(line)))
+			break
+		}
+	}
+}
+
+// And it picks up again the moment the music does.
+func TestPlayingPictureIsNotSettled(t *testing.T) {
+	m := stageModel(100, 40)
+	m.ps.Playing = true
+
+	var tm tea.Model = m
+	for range 10 {
+		tm, _ = tm.Update(msg.WaveformReady{Bands: []float32{0.9, 0.9, 0.9}})
+	}
+	if got := tm.(Model).scope.bands[0]; got < 0.5 {
+		t.Errorf("the spectrum reads %.2f while the music plays, want what arrived", got)
 	}
 }

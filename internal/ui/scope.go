@@ -122,6 +122,11 @@ const (
 	// hertz: below the note being played, above the beat.
 	scopeTriggerFollow = 0.2
 
+	// scopeSettle is what a paused picture keeps of itself each frame. Fast
+	// enough to be over in about a second, slow enough that the eye reads it as
+	// the music settling rather than as the screen being cleared.
+	scopeSettle = 0.88
+
 	// scopeDwell is how much of a cell's brightness comes from how long the beam
 	// spent in it rather than from how loud that moment was.
 	//
@@ -133,6 +138,23 @@ const (
 	// flares rather than going dark for being fast.
 	scopeDwell = 0.6
 )
+
+// settle sinks everything the visualisers draw towards nothing, a frame at a
+// time, for when the music has stopped.
+//
+// The envelope is deliberately left where it is: the trace is drawn against it,
+// so bringing both down together would leave the picture exactly as it was.
+func (s *scopeState) settle() {
+	for i := range s.bands {
+		s.bands[i] *= scopeSettle
+	}
+	for i := range s.peaks {
+		s.peaks[i] *= scopeSettle
+	}
+	for i := range s.frame {
+		s.frame[i] *= scopeSettle
+	}
+}
 
 // follow updates the loudness envelope from a new frame.
 func (s *scopeState) follow(frame []float32) {
