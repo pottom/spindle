@@ -474,6 +474,11 @@ const (
 	wordsRangeLeast = 2.5
 	wordsRangeClose = 0.0015
 
+	// wordsBounce is how far a note rides its own part of the sound, in dots.
+	// Half a cell at a beat: enough to see them keeping time, little enough that
+	// three of them do not turn into a fairground.
+	wordsBounce = 6
+
 	// wordsNotes is what goes up for a bar with no words in it.
 	wordsNotes = "♪ ♫ ♪"
 
@@ -566,6 +571,18 @@ func (m Model) wordsLines(w, rows int) []string {
 		}
 	}
 
+	// A word stands still, because a word is there to be read. A note is not:
+	// it is a mark standing in for a line nobody is singing, so it may as well
+	// ride the part of the sound it answers for — the first jumps on the kick
+	// and the last on the cymbals.
+	var bounce []int
+	if m.words.beats {
+		bounce = make([]int, len(paints))
+		for i := range bounce {
+			bounce[i] = -int(m.wordsBeatRide(i, len(bounce)) * wordsBounce)
+		}
+	}
+
 	for y := range dotsY {
 		for x := range dotsX {
 			if g.Lum[y*dotsX+x] < grainLit {
@@ -580,6 +597,13 @@ func (m Model) wordsLines(w, rows int) []string {
 			// How far along this particular dot is. Some of the moves arrive a
 			// row or a column at a time, so each dot has its own share of the
 			// gathering rather than all of them having the whole of it.
+			if word := m.words.where.WordAt(x, y); word >= 0 && word < len(bounce) {
+				to += bounce[word]
+				if to < 0 || to >= dotsY {
+					continue
+				}
+			}
+
 			p := wordsAlong(m.words.move, gather, x, y, dotsX, dotsY)
 
 			if p < 1 {
@@ -948,6 +972,24 @@ func (m *Model) wordsFlow(w, rows int) {
 	if centre, _ := wordsCentre(m.scope.bands); len(m.scope.bands) > 0 {
 		m.wordsFollowCentre(centre)
 	}
+}
+
+// wordsBeatRide is how hard the part of the sound a note answers for is going,
+// 0..1 — which is how far it jumps.
+func (m Model) wordsBeatRide(word, count int) float32 {
+	bands := m.scope.bands
+	if len(bands) == 0 || count <= 0 {
+		return 0
+	}
+
+	from := word * len(bands) / count
+	to := max((word+1)*len(bands)/count, from+1)
+
+	var loud float32
+	for _, v := range bands[from:min(to, len(bands))] {
+		loud = max(loud, v)
+	}
+	return loud
 }
 
 // wordsBeatPaint is what one of the notes burns at: its own share of the

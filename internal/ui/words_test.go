@@ -714,3 +714,81 @@ func TestTheLineBeforeLeaves(t *testing.T) {
 		t.Error("the line before it never finished leaving")
 	}
 }
+
+// A word stands still, because a word is there to be read. A note is not: it
+// rides the part of the sound it answers for, so the first jumps on the kick and
+// the last on the cymbals.
+func TestTheNotesRideTheBeat(t *testing.T) {
+	const w, rows = 70, 16
+
+	m := scopeModel(100, 44)
+	m.width, m.height = w, rows
+	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
+
+	img, layout, ok := wordsImage([]string{wordsNotes}, w*dotsPerCellX, rows*dotsPerCellY)
+	if !ok {
+		t.Fatal("the notes could not be drawn")
+	}
+	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	m.words.cellsX, m.words.cellsY, m.words.where = w, rows, layout
+	m.words.since = time.Now().Add(-time.Second)
+	m.words.beats = true
+
+	rowsOf := func() map[int]bool {
+		out := map[int]bool{}
+		for r, line := range m.wordsLines(w, rows) {
+			if strings.TrimSpace(ansiOff(line)) != "" {
+				out[r] = true
+			}
+		}
+		return out
+	}
+
+	quiet := make([]float32, 28)
+	m.scope.bands = quiet
+	still := rowsOf()
+
+	loud := make([]float32, 28)
+	for i := range loud {
+		loud[i] = 1
+	}
+	m.scope.bands = loud
+	jumped := rowsOf()
+
+	t.Logf("still on rows %v, on a beat %v", keys(still), keys(jumped))
+	if len(still) == 0 || len(jumped) == 0 {
+		t.Fatal("the notes drew nothing")
+	}
+	if same(still, jumped) {
+		t.Error("the notes did not move when the music did")
+	}
+
+	// And the words themselves never do.
+	m.words.beats = false
+	m.scope.bands = quiet
+	a := rowsOf()
+	m.scope.bands = loud
+	if b := rowsOf(); !same(a, b) {
+		t.Error("a line of words moved with the music, want it still")
+	}
+}
+
+func keys(m map[int]bool) []int {
+	out := make([]int, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
+func same(a, b map[int]bool) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k := range a {
+		if !b[k] {
+			return false
+		}
+	}
+	return true
+}
