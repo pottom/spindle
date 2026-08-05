@@ -307,12 +307,16 @@ type wordsState struct {
 	// something you notice has happened.
 	since time.Time
 
-	// sway is where the slow wave through the letters has got to, and lift is
-	// how far each column of dots is being raised by the band under it. A line
-	// that has settled and then stands perfectly still stops looking like it is
-	// made of anything; these keep it breathing without smearing it.
-	sway float32
-	lift []float32
+	// glow is how hot each column of the line is burning, following the band of
+	// the spectrum that sits under it.
+	//
+	// This is what moves once a line has settled, rather than the letters
+	// themselves: they are here to be read, and a letter that wanders is a
+	// letter that has to be worked out. The colour can carry the music without
+	// costing the words anything — the bass lights the left of the line and the
+	// cymbals the right, so a beat runs through the words the way it runs
+	// through the spectrum.
+	glow []float32
 }
 
 const (
@@ -330,24 +334,15 @@ const (
 	// together, at one the last dot only starts as the first one finishes.
 	wordsStagger = 0.55
 
-	// The idle motion of a settled line. It is deliberately tiny: this is the
-	// one picture here whose job is to be read, and a letter that wanders by
-	// more than a dot or two is a letter that has to be worked out.
-	//
-	// wordsSwayHigh is how far the slow wave lifts a column, in dots;
-	// wordsSwayStep how far the wave travels each frame — a whole cycle takes
-	// about four seconds — and wordsSwayWave how many dots it takes to come
-	// round, which is what makes it a wave through the words rather than the
-	// whole line bobbing.
-	wordsSwayHigh = 1.6
-	wordsSwayStep = 0.05
-	wordsSwayWave = 0.035
+	// wordsGlowFloor is the dimmest a letter is ever drawn, as a share of the
+	// palette. A line whose quiet end goes out is a line with holes in it, and
+	// the words have to survive the silence between two beats.
+	wordsGlowFloor = 0.3
 
-	// wordsLiftHigh is how far the loudest band raises the columns it covers,
-	// and wordsLiftEase how fast that follows. Between them the words move with
-	// the music without ever being thrown about by it.
-	wordsLiftHigh = 2.2
-	wordsLiftEase = 0.18
+	// How fast the colour follows the music: quick to light and slower to fall,
+	// the way a meter is, so a hit shows and then recedes rather than flickering.
+	wordsGlowRise = 0.55
+	wordsGlowFall = 0.12
 )
 
 // wordsLines draws the words, w cells across and rows deep.
@@ -378,7 +373,18 @@ func (m Model) wordsLines(w, rows int) []string {
 	if since := time.Since(m.words.since); since < wordsGather {
 		gather = float32(since) / float32(wordsGather)
 	}
-	step := int8(min(int(gather*float32(levels)), levels-1))
+
+	// What each column is burning at: the music, dimmed by however much of the
+	// gathering is still to come.
+	heat := make([]int8, w)
+	for c := range heat {
+		var glow float32
+		if len(m.words.glow) == dotsX {
+			glow = m.words.glow[min(c*dotsPerCellX, dotsX-1)]
+		}
+		v := (wordsGlowFloor + (1-wordsGlowFloor)*glow) * gather
+		heat[c] = int8(min(int(v*float32(levels)), levels-1))
+	}
 
 	for y := range dotsY {
 		for x := range dotsX {
@@ -390,14 +396,6 @@ func (m Model) wordsLines(w, rows int) []string {
 			// where the dot belongs rather than stored, so a screenful of them
 			// costs nothing to remember and comes apart the same way twice.
 			at, to := x, y
-
-			// The settled line still breathes: a slow wave along it, and a lift
-			// from whatever band is sounding under this column.
-			sway := wordsSwayHigh * float32(math.Sin(float64(m.words.sway+float32(x)*wordsSwayWave)))
-			if len(m.words.lift) == dotsX {
-				sway -= m.words.lift[x]
-			}
-			to += int(sway)
 
 			// How far along this particular dot is. Some of the moves arrive a
 			// row or a column at a time, so each dot has its own share of the
@@ -421,7 +419,7 @@ func (m Model) wordsLines(w, rows int) []string {
 
 			cell := (to/dotsPerCellY)*w + at/dotsPerCellX
 			grid[cell] |= 1 << brailleBit[at%dotsPerCellX][to%dotsPerCellY]
-			if step > paint[cell] {
+			if step := heat[at/dotsPerCellX]; step > paint[cell] {
 				paint[cell] = step
 			}
 		}
@@ -499,28 +497,29 @@ func (m *Model) wordsGrind() tea.Cmd {
 	return wordsCmd(lines, m.width, m.height)
 }
 
-// wordsFlow moves the settled line on by a frame: the wave travels along it and
-// the lift follows the spectrum.
+// wordsFlow carries the colour along by a frame: every column follows the band
+// of the spectrum beneath it.
 func (m *Model) wordsFlow(w, rows int) {
 	dotsX := w * dotsPerCellX
 	if dotsX <= 0 {
 		return
 	}
 
-	m.words.sway += wordsSwayStep
-	if m.words.sway > 2*math.Pi {
-		m.words.sway -= 2 * math.Pi
+	if len(m.words.glow) != dotsX {
+		m.words.glow = make([]float32, dotsX)
 	}
 
-	if len(m.words.lift) != dotsX {
-		m.words.lift = make([]float32, dotsX)
-	}
 	bands := m.scope.bands
 	for x := range dotsX {
 		var want float32
 		if len(bands) > 0 {
-			want = bands[min(x*len(bands)/dotsX, len(bands)-1)] * wordsLiftHigh
+			want = bands[min(x*len(bands)/dotsX, len(bands)-1)]
 		}
-		m.words.lift[x] += (want - m.words.lift[x]) * wordsLiftEase
+
+		rate := float32(wordsGlowFall)
+		if want > m.words.glow[x] {
+			rate = wordsGlowRise
+		}
+		m.words.glow[x] += (want - m.words.glow[x]) * rate
 	}
 }

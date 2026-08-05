@@ -205,10 +205,11 @@ func TestWordsMoveComesFromTheLine(t *testing.T) {
 	}
 }
 
-// The settled line is not a still picture: a slow wave runs along it and the
-// bands lift the columns under them, so it breathes without ever wandering far
-// enough to be hard to read.
-func TestWordsBreatheWhenSettled(t *testing.T) {
+// A settled line stands still and its colour moves: the letters are here to be
+// read, and the music is carried by how they burn rather than by where they are.
+// The bass lights the left of the line and the cymbals the right, so a beat runs
+// through the words the way it runs through the spectrum.
+func TestWordsColourFollowsTheMusic(t *testing.T) {
 	const w, rows = 90, 14
 
 	m := scopeModel(100, 44)
@@ -216,48 +217,71 @@ func TestWordsBreatheWhenSettled(t *testing.T) {
 	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
 
 	lines := wordsWrap("better off alone", w*dotsPerCellX, rows*dotsPerCellY)
-	img, _ := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
+	img, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
+	if !ok {
+		t.Fatal("the face could not draw the test line")
+	}
 	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
 	m.words.cellsX, m.words.cellsY = w, rows
 	m.words.since = time.Now().Add(-time.Second)
 
-	draw := func() (string, map[int]bool) {
+	// The shape of the line, with the colours taken off, and the whole of it
+	// with them left on.
+	shape := func() string {
 		var sb strings.Builder
-		lit := map[int]bool{}
-		for r, line := range m.wordsLines(w, rows) {
-			plain := ansiOff(line)
-			sb.WriteString(plain)
-			if strings.TrimSpace(plain) != "" {
-				lit[r] = true
-			}
+		for _, line := range m.wordsLines(w, rows) {
+			sb.WriteString(ansiOff(line))
 		}
-		return sb.String(), lit
+		return sb.String()
+	}
+	painted := func() string {
+		return strings.Join(m.wordsLines(w, rows), "")
 	}
 
-	first, firstRows := draw()
-	var moved int
-	all := map[int]bool{}
-	for r := range firstRows {
-		all[r] = true
+	quiet := make([]float32, 28)
+	for i := range quiet {
+		quiet[i] = 0.1
 	}
-	for range 60 {
+	m.scope.bands = quiet
+	for range 40 {
 		m.wordsFlow(w, rows)
-		now, lit := draw()
-		for r := range lit {
-			all[r] = true
-		}
-		if now != first {
-			moved++
-		}
+	}
+	wasShape, wasPaint := shape(), painted()
+
+	// A hit in the bass alone: the left of the line has to light and the right
+	// stay where it was.
+	loud := make([]float32, 28)
+	copy(loud, quiet)
+	for i := range 6 {
+		loud[i] = 1
+	}
+	m.scope.bands = loud
+	for range 10 {
+		m.wordsFlow(w, rows)
 	}
 
-	t.Logf("%d of 60 frames differ from the first; the line used %d rows, from %d", moved, len(all), len(firstRows))
-
-	if moved == 0 {
-		t.Error("the settled line never moved, so it is a still picture")
+	if shape() != wasShape {
+		t.Error("the letters moved when the music did, want them still")
 	}
-	// And it stays where it can be read: a dot or two of sway, not a wander.
-	if len(all) > len(firstRows)+2 {
-		t.Errorf("the line wandered over %d rows from %d, want it kept legible", len(all), len(firstRows))
+	if painted() == wasPaint {
+		t.Error("the colour did not change with the music")
+	}
+
+	// Left louder than right: the glow under the first columns has to have
+	// risen further than the glow under the last.
+	left, right := m.words.glow[2], m.words.glow[len(m.words.glow)-3]
+	t.Logf("after a bass hit the line burns %.2f on the left and %.2f on the right", left, right)
+	if left <= right {
+		t.Errorf("the bass lit the line at %.2f on the left and %.2f on the right, want the left hotter", left, right)
+	}
+
+	// And it never goes out: a line whose quiet end is dark is a line with holes
+	// in it.
+	m.scope.bands = quiet
+	for range 200 {
+		m.wordsFlow(w, rows)
+	}
+	if shape() != wasShape {
+		t.Error("the line lost letters once the music went quiet")
 	}
 }
