@@ -474,6 +474,12 @@ const (
 	wordsRangeLeast = 2.5
 	wordsRangeClose = 0.0015
 
+	// wordsWordRide is how far a word rides its own part of the sound, and
+	// wordsLineRide how far a whole line nods with the loudest of it. Both well
+	// under what a note is given: these have to be read while they move.
+	wordsWordRide = 3
+	wordsLineRide = 4
+
 	// wordsBounce is how far a note rides its own part of the sound, in dots.
 	// Half a cell at a beat: enough to see them keeping time, little enough that
 	// three of them do not turn into a fairground.
@@ -571,17 +577,7 @@ func (m Model) wordsLines(w, rows int) []string {
 		}
 	}
 
-	// A word stands still, because a word is there to be read. A note is not:
-	// it is a mark standing in for a line nobody is singing, so it may as well
-	// ride the part of the sound it answers for — the first jumps on the kick
-	// and the last on the cymbals.
-	var bounce []int
-	if m.words.beats {
-		bounce = make([]int, len(paints))
-		for i := range bounce {
-			bounce[i] = -int(m.wordsBeatRide(i, len(bounce)) * wordsBounce)
-		}
-	}
+	bounce := m.wordsRiding(len(paints))
 
 	for y := range dotsY {
 		for x := range dotsX {
@@ -972,6 +968,81 @@ func (m *Model) wordsFlow(w, rows int) {
 	if centre, _ := wordsCentre(m.scope.bands); len(m.scope.bands) > 0 {
 		m.wordsFollowCentre(centre)
 	}
+}
+
+// wordsRide is how a line keeps time: not at all, all of it together, or a word
+// at a time.
+type wordsRide int
+
+const (
+	wordsStill wordsRide = iota
+	wordsRideLine
+	wordsRideWords
+	wordsRides
+)
+
+// wordsRideFor decides which a line gets, from the line itself — so a song plays
+// the same way twice, and a record is not either all bobbing or all rigid.
+func wordsRideFor(text string) wordsRide {
+	var h uint64 = 0xcbf29ce484222325
+	for _, r := range text {
+		h = (h ^ uint64(r)) * 0x100000001b3
+	}
+	// Mixed properly before it is divided: the low bits of a rolling hash are
+	// not spread evenly enough to answer a question with three answers, and a
+	// record where nothing ever nods is a record with a bug in it.
+	h ^= h >> 30
+	h *= 0xbf58476d1ce4e5b9
+	h ^= h >> 27
+	return wordsRide(h % uint64(wordsRides))
+}
+
+// wordsRiding is how far each word of the line is lifted this frame.
+//
+// Never a dot at a time: the letters of a word move together or not at all, or
+// the word comes apart and stops being one. And never as far as a note goes —
+// a note is a mark keeping time and a word is something to read, so the words
+// are given a third of the jump and only when their own line drew it.
+func (m Model) wordsRiding(count int) []int {
+	if count <= 0 {
+		return nil
+	}
+
+	if m.words.beats {
+		// The notes: each on its own part of the sound, and further than a word
+		// would go.
+		out := make([]int, count)
+		for i := range out {
+			out[i] = -int(m.wordsBeatRide(i, count) * wordsBounce)
+		}
+		return out
+	}
+
+	switch wordsRideFor(m.words.text) {
+	case wordsRideWords:
+		out := make([]int, count)
+		for i := range out {
+			out[i] = -int(m.wordsBeatRide(i, count) * wordsWordRide)
+		}
+		return out
+
+	case wordsRideLine:
+		// All of it together, on the loudest thing playing: the line nods with
+		// the song rather than rippling through it.
+		var loud float32
+		for _, v := range m.scope.bands {
+			loud = max(loud, v)
+		}
+
+		lift := -int(loud * wordsLineRide)
+		out := make([]int, count)
+		for i := range out {
+			out[i] = lift
+		}
+		return out
+	}
+
+	return nil
 }
 
 // wordsBeatRide is how hard the part of the sound a note answers for is going,

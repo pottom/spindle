@@ -715,9 +715,10 @@ func TestTheLineBeforeLeaves(t *testing.T) {
 	}
 }
 
-// A word stands still, because a word is there to be read. A note is not: it
-// rides the part of the sound it answers for, so the first jumps on the kick and
-// the last on the cymbals.
+// The notes ride the part of the sound they answer for — the first jumps on the
+// kick and the last on the cymbals — and so may a line of words, but less far
+// and only when its own line drew it. Never a dot at a time either way: the
+// letters of a word move together or the word comes apart.
 func TestTheNotesRideTheBeat(t *testing.T) {
 	const w, rows = 70, 16
 
@@ -763,13 +764,39 @@ func TestTheNotesRideTheBeat(t *testing.T) {
 		t.Error("the notes did not move when the music did")
 	}
 
-	// And the words themselves never do.
+	// A line of words keeps time too, but only when its own line drew it, and
+	// never as far: some stand perfectly still.
 	m.words.beats = false
-	m.scope.bands = quiet
-	a := rowsOf()
-	m.scope.bands = loud
-	if b := rowsOf(); !same(a, b) {
-		t.Error("a line of words moved with the music, want it still")
+	kinds := map[wordsRide]int{}
+	for _, line := range []string{
+		"better off alone", "do you think", "never gonna give you up", "so close no matter how far",
+		"hello darkness my old friend", "is this the real life", "sultans of swing", "arra gondolok",
+		"we are the champions", "another one bites the dust", "under pressure", "life on mars",
+	} {
+		kinds[wordsRideFor(line)]++
+	}
+	t.Logf("of twelve lines: %d stand still, %d nod together, %d ride word by word",
+		kinds[wordsStill], kinds[wordsRideLine], kinds[wordsRideWords])
+
+	for kind := wordsStill; kind < wordsRides; kind++ {
+		if kinds[kind] == 0 {
+			t.Errorf("no line of twelve got ride %d", kind)
+		}
+	}
+
+	// And a still one really is still.
+	for _, line := range []string{"better off alone", "do you think", "never gonna give you up"} {
+		if wordsRideFor(line) != wordsStill {
+			continue
+		}
+		m.words.text = line
+		m.scope.bands = quiet
+		a := rowsOf()
+		m.scope.bands = loud
+		if b := rowsOf(); !same(a, b) {
+			t.Errorf("%q was drawn still and moved anyway", line)
+		}
+		break
 	}
 }
 
