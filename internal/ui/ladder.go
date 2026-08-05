@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image/color"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -26,15 +27,17 @@ const (
 	ladderTop    = '▀'
 	ladderBottom = '▄'
 
-	// ladderTall is the height, in rows, at which the ladder can afford the air
-	// under each lamp.
+	// ladderTall is the height, in rows, at which the ladder can afford to leave
+	// the air under each lamp empty.
 	//
-	// The gap is the look — a stack of separate lamps rather than a bar — and
-	// it costs half the resolution to have. On a screen that is a good trade:
+	// The gap is the look — a stack of separate lamps rather than a bar — and an
+	// empty one costs half the resolution. On a screen that is a good trade:
 	// forty rows are forty lamps either way. In the strip under the artwork it
-	// is a ruinous one: four rows become four lamps, which is not a spectrum,
-	// it is four dashes moving about. There the lamps are packed instead, and
-	// the climb of the colour does the work the gaps were doing.
+	// is a ruinous one, four rows becoming four lamps, which is not a spectrum
+	// but four dashes moving about. So below this the gap is drawn rather than
+	// left: every other rung is the same lamp with its light out, which stripes
+	// the bar exactly as the empty gaps do and costs nothing, because an unlit
+	// lamp still says where the lit ones stop.
 	ladderTall = 8
 
 	// ladderPeakLift is how much hotter the falling marker is drawn than the
@@ -57,11 +60,13 @@ func (m Model) ladderLines(w, rows int) []string {
 	}
 	high := rows * perCell
 
-	// The colour of every rung, or -1 where no lamp is lit.
+	// The colour of every rung, or -1 where no lamp is lit, and whether that
+	// rung is one of the ones drawn with its light out.
 	lamp := make([]int8, w*high)
 	for i := range lamp {
 		lamp[i] = -1
 	}
+	out := make([]bool, w*high)
 
 	steps := len(m.styles.Ladder)
 
@@ -85,7 +90,9 @@ func (m Model) ladderLines(w, rows int) []string {
 				// this bar: a quiet band is meant to be a couple of lamps at the
 				// cool end, not a small copy of the whole ladder.
 				step := min(r*steps/max(high-1, 1), steps-1)
-				lamp[(high-1-r)*w+c] = int8(step)
+				at := (high - 1 - r) * w + c
+				lamp[at] = int8(step)
+				out[at] = perCell == 2 && r%2 == 1
 			}
 
 			if peak <= lit || top < barsPeakFloor {
@@ -96,10 +103,11 @@ func (m Model) ladderLines(w, rows int) []string {
 			at := min(max(high-peak, 0), high-1)
 			step := min(peak*steps/max(high-1, 1)+ladderPeakLift, steps-1)
 			lamp[at*w+c] = int8(step)
+			out[at*w+c] = false
 		}
 	}
 
-	return m.ladderDraw(w, rows, perCell, lamp)
+	return m.ladderDraw(w, rows, perCell, lamp, out)
 }
 
 // ladderDraw turns the rungs into rows.
@@ -108,30 +116,37 @@ func (m Model) ladderLines(w, rows int) []string {
 // bottom half is the air under it. With two, the halves are lamps of their own
 // and are drawn in one cell as a foreground over a background — which is the
 // only way a terminal will put two colours in one place.
-func (m Model) ladderDraw(w, rows, perCell int, lamp []int8) []string {
+func (m Model) ladderDraw(w, rows, perCell int, lamp []int8, out []bool) []string {
+	colour := func(at int) color.Color {
+		if out[at] {
+			return m.styles.LadderOff[lamp[at]].GetForeground()
+		}
+		return m.styles.Ladder[lamp[at]].GetForeground()
+	}
+
 	lines := make([]string, rows)
 	for r := range rows {
 		var sb strings.Builder
 		for c := range w {
-			top := lamp[(r*perCell)*w+c]
-			bottom := int8(-1)
+			upper := (r*perCell)*w + c
+			lower := -1
 			if perCell == 2 {
-				bottom = lamp[(r*perCell+1)*w+c]
+				lower = (r*perCell+1)*w + c
 			}
 
 			switch {
-			case top < 0 && bottom < 0:
+			case lamp[upper] < 0 && (lower < 0 || lamp[lower] < 0):
 				sb.WriteByte(' ')
-			case bottom < 0:
-				sb.WriteString(m.styles.Ladder[top].Render(string(ladderTop)))
-			case top < 0:
-				sb.WriteString(m.styles.Ladder[bottom].Render(string(ladderBottom)))
+			case lower < 0 || lamp[lower] < 0:
+				sb.WriteString(lipgloss.NewStyle().Foreground(colour(upper)).Render(string(ladderTop)))
+			case lamp[upper] < 0:
+				sb.WriteString(lipgloss.NewStyle().Foreground(colour(lower)).Render(string(ladderBottom)))
 			default:
-				// Both lit: the upper half in its own colour over the lower
-				// half's, so the two rungs keep their places on the climb.
+				// Both there: the upper half over the lower one, which is the
+				// only way a terminal will put two colours in one cell.
 				style := lipgloss.NewStyle().
-					Foreground(m.styles.Ladder[top].GetForeground()).
-					Background(m.styles.Ladder[bottom].GetForeground())
+					Foreground(colour(upper)).
+					Background(colour(lower))
 				sb.WriteString(style.Render(string(ladderTop)))
 			}
 		}
