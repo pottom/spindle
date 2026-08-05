@@ -27,6 +27,15 @@ type CoverReady struct {
 	Art           cover.Art
 }
 
+// GrainReady carries a cover taken apart into dots, for the picture that moves
+// it. It says what it was ground from and at what size, because by the time it
+// arrives the screen may be showing something else or be a different shape.
+type GrainReady struct {
+	URL            string
+	CellsX, CellsY int
+	Grain          cover.Grain
+}
+
 // CoverFailed reports that artwork could not be produced. A missing cover is not
 // important enough to interrupt use, so it carries no error for display.
 type CoverFailed struct {

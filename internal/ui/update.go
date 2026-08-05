@@ -238,6 +238,15 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.adoptLyrics(message)
 		return m, nil
 
+	case msg.GrainReady:
+		m.grain.asked = ""
+		if message.URL != m.cover.url {
+			return m, nil // the record changed while it was being ground
+		}
+		m.grain.have, m.grain.url = message.Grain, message.URL
+		m.grain.cellsX, m.grain.cellsY = message.CellsX, message.CellsY
+		return m, nil
+
 	case msg.WaveformReady:
 		// The trace stops the moment it leaves the screen: a redraw every 33ms
 		// for something nobody is looking at is the whole cost of the feature.
@@ -266,6 +275,13 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				m.throwSparks(m.scopeWidth(m.layout()), scopeRows)
 			}
 		}
+		if m.stage.on && m.scopeMode().grain() {
+			m.grainFlow(m.width, m.height)
+			if cmd := m.grind(); cmd != nil {
+				return m, tea.Batch(cmd, scopeFrameCmd(m.player, m.frameMode()))
+			}
+		}
+
 		// The water is only stirred where it is being drawn, and the big screen
 		// falls back to it when the strip is switched off.
 		if mirror := m.scopeMode().mirror() || (m.stage.on && m.scopeMode() == scopeOff); mirror {
@@ -539,6 +555,9 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		// Nothing about the geometry changes, so the cover is left alone: the
 		// trace only fills rows that were already blank.
 		m.scope.modes[m.tab] = m.scopeMode().next()
+		for m.scopeMode().big() {
+			m.scope.modes[m.tab] = m.scopeMode().next()
+		}
 		return m, tea.Batch(m.startScope(), m.savePrefs())
 
 	case key.Matches(k, m.keys.Stage):
