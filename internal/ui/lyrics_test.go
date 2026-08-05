@@ -469,3 +469,25 @@ func TestSweepCarriesAcrossWrappedRows(t *testing.T) {
 		t.Errorf("the sweep reached %d, still inside the first row of %d", at, len(rows[0]))
 	}
 }
+
+// Words nobody timed do not follow the music, and the screen has to say so:
+// a first line lit for the whole track reads as a screen that has stopped
+// working rather than as a track nobody timed.
+func TestUntimedWordsSayThatTheyAreUntimed(t *testing.T) {
+	m := lyricsModel(120, 44)
+	m.lyrics.synced = false
+	m.lyrics.lines = []player.Lyric{
+		{At: 0, Words: "A hétvégén majd felmegyünk a hegyekbe"},
+		{At: 0, Words: "Mert érzem mindenféle gond van most a fejemben"},
+	}
+
+	block := strings.Join(m.lyricsBlock(60, 8), "\n")
+	if !strings.Contains(plain(block), "Not timed") {
+		t.Errorf("the words are drawn with no word about their timing:\n%s", plain(block))
+	}
+	for _, line := range m.lyrics.lines {
+		if !strings.Contains(plain(block), line.Words[:12]) {
+			t.Errorf("%q is missing from the block", line.Words)
+		}
+	}
+}

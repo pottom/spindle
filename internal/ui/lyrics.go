@@ -126,6 +126,15 @@ func (m Model) lyricsBlock(w, rows int) []string {
 
 	at := m.lyricsAt()
 
+	// Words with no timings do not follow the music, and a screen that does not
+	// say so reads as a screen that has stopped working. Measured against a
+	// live account: Spotify has the words for plenty of tracks and the timings
+	// for fewer, and which you get is decided per track by whoever supplied
+	// them — there is nothing to fix and nothing to wait for.
+	if !m.lyrics.synced {
+		return m.lyricsPlain(w, rows)
+	}
+
 	// Not clamped at either end: the line being sung keeps its place on screen
 	// from the first line to the last, and the rows beyond simply run out. A
 	// window that stopped scrolling near an end would slide the lit line under
@@ -187,6 +196,43 @@ func (m Model) lyricsBlock(w, rows int) []string {
 	return out[:rows]
 }
 
+// lyricsPlain is the words when nobody timed them: all of them, from the top,
+// in one weight, under a line saying why nothing here is going to move.
+//
+// The alternative was to light the first line and leave it lit, which is what
+// this screen used to do — and it reads as a screen that has stopped working
+// rather than as a track nobody has timed. Measured against a live account:
+// Spotify has the words for plenty of tracks and the timings for fewer, and
+// which of the two arrives is decided per track by whoever supplied them.
+func (m Model) lyricsPlain(w, rows int) []string {
+	out := []string{
+		fit(m.styles.Empty.Render("Not timed — these words will not follow the music."), w),
+		strings.Repeat(" ", w),
+	}
+
+	for _, line := range m.lyrics.lines {
+		words := strings.TrimSpace(line.Words)
+		if words == "" || words == "♪" {
+			out = append(out, strings.Repeat(" ", w))
+			continue
+		}
+		for _, part := range wrapWords(words, w) {
+			if len(out) >= rows {
+				break
+			}
+			out = append(out, fit(m.lyricStyle(1).Render(part), w))
+		}
+		if len(out) >= rows {
+			break
+		}
+	}
+
+	for len(out) < rows {
+		out = append(out, strings.Repeat(" ", w))
+	}
+	return out[:rows]
+}
+
 // lyricStyle is how a line is drawn, given how far it is from the one being
 // sung. The fade is symmetric: a line two ahead reads as faint as one two
 // behind, so nothing but the current line competes for attention.
@@ -201,9 +247,8 @@ func (m Model) lyricStyle(distance int) lipgloss.Style {
 	return fade[min(distance, len(fade)-1)]
 }
 
-// lyricsAt is the line being sung, or -1 before the first one. Unsynced lyrics
-// have no such line, so the first one stands in and the words simply scroll
-// with nothing.
+// lyricsAt is the line being sung, or -1 before the first one. Words that were
+// never timed have no such line at all, and are drawn by lyricsPlain instead.
 func (m Model) lyricsAt() int {
 	if !m.lyrics.synced {
 		return 0
