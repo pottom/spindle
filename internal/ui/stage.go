@@ -181,7 +181,15 @@ func (m Model) stagePicture(w, rows int) []string {
 	case m.scopeMode().grain():
 		art = m.grainLines(w, rows)
 	case m.scopeMode().words():
-		art = m.wordsLines(w, rows)
+		// Between the lines of a song — an opening bar, a solo, the gap a
+		// lyric sheet marks with nothing — there are no words to set. The
+		// picture does not go blank and does not hold the last line up either:
+		// it gives the whole screen to the music until the singer comes back.
+		if m.wordsSilent() {
+			art = m.stageArt(w, rows)
+		} else if art = m.wordsLines(w, rows); art == nil {
+			art = m.stageArt(w, rows)
+		}
 	default:
 		art = m.stageArt(w, rows)
 	}

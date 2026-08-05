@@ -244,7 +244,12 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.words.move = wordsMoveFor(message.Text)
 		m.words.where, m.words.paint, m.words.sung = message.Words, nil, 0
 		m.words.cellsX, m.words.cellsY = message.CellsX, message.CellsY
-		m.words.since = time.Now()
+
+		// Wound back so that the gathering finishes as the line is sung rather
+		// than starting then: whatever is left of the wait is taken off what the
+		// gathering costs.
+		wait := time.Duration(m.words.starts-m.lyricsClock()) * time.Millisecond
+		m.words.since = time.Now().Add(-max(wordsGather-wait, 0))
 		return m, nil
 
 	case msg.GrainReady:
@@ -286,6 +291,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.stage.on && m.scopeMode().words() {
 			m.wordsFlow(m.width, m.height)
+			m.stageFlow(m.width, m.height)
 			if cmd := m.wordsGrind(); cmd != nil {
 				return m, tea.Batch(cmd, scopeFrameCmd(m.player, m.frameMode()))
 			}

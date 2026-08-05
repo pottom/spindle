@@ -291,3 +291,137 @@ func TestWordsKeepTheColourTheyWereSungIn(t *testing.T) {
 		t.Error("nothing was drawn")
 	}
 }
+
+// A lyric rarely fills a screen, and empty is the one thing this picture can
+// least afford: what the words leave over goes to the music.
+func TestWordsGiveWhatIsLeftToTheMusic(t *testing.T) {
+	const w, rows = 90, 30
+
+	m := scopeModel(100, 44)
+	m.width, m.height = w, rows
+	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
+
+	bands := make([]float32, 28)
+	for i := range bands {
+		bands[i] = 0.8
+	}
+	m.scope.bands = bands
+
+	lines := wordsWrap("better off alone", w*dotsPerCellX, rows*dotsPerCellY)
+	img, layout, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
+	if !ok {
+		t.Fatal("the face could not draw the test line")
+	}
+	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	m.words.cellsX, m.words.cellsY, m.words.where = w, rows, layout
+	m.words.since = time.Now().Add(-time.Second)
+
+	from, tall := m.wordsRoom(rows)
+	t.Logf("the words leave rows %d to %d, %d of them", from, rows, tall)
+	if tall < wordsBand {
+		t.Fatalf("only %d rows were left over, so there is nothing to test", tall)
+	}
+
+	drawn := m.wordsLines(w, rows)
+	var band int
+	for _, line := range drawn[from:] {
+		if strings.TrimSpace(ansiOff(line)) != "" {
+			band++
+		}
+	}
+	if band == 0 {
+		t.Error("the rows under the words are empty, want the music in them")
+	}
+
+	// And the words are still above it.
+	var above int
+	for _, line := range drawn[:from] {
+		if strings.TrimSpace(ansiOff(line)) != "" {
+			above++
+		}
+	}
+	if above == 0 {
+		t.Error("the words went missing when the music was put under them")
+	}
+}
+
+// A song between two lines is a song playing: the screen goes to the music
+// rather than holding the last line up or going blank. A song with no lyrics at
+// all is a different case, and keeps its title.
+func TestWordsGiveTheScreenBackBetweenLines(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.width, m.height = 90, 30
+	m.ps.TrackID = "now"
+
+	m.lyrics.synced, m.lyrics.forTrack = true, "now"
+	m.lyrics.lines = []player.Lyric{
+		{At: 20_000, Words: "the first line, long after the start"},
+		{At: 30_000, Words: ""},
+		{At: 40_000, Words: "and after the solo"},
+	}
+
+	// The opening bars, before anything is sung.
+	m.setProgress(time.Second)
+	if !m.wordsSilent() {
+		t.Error("the screen is showing words before the first line is sung")
+	}
+
+	// The line itself.
+	m.setProgress(22 * time.Second)
+	if m.wordsSilent() {
+		t.Error("the screen went to the music while a line was being sung")
+	}
+
+	// The gap the sheet marks with an empty line.
+	m.setProgress(34 * time.Second)
+	if !m.wordsSilent() {
+		t.Error("the screen held a line up through the solo")
+	}
+
+	// A song with no lyrics at all keeps its title instead.
+	m.lyrics.synced = false
+	if m.wordsSilent() {
+		t.Error("a song with no lyrics gave up its title")
+	}
+}
+
+// The words are complete as the line begins, rather than starting to gather
+// then: a picture that arrives half a second late is a picture that is always
+// behind the singer.
+func TestWordsLandOnTheLine(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.width, m.height = 90, 20
+	m.ps.TrackID = "now"
+
+	m.lyrics.synced, m.lyrics.forTrack = true, "now"
+	m.lyrics.lines = []player.Lyric{
+		{At: 10_000, Words: "the line to come"},
+		{At: 20_000, Words: "and the next"},
+	}
+
+	// Well before the line: nothing to set yet.
+	m.setProgress(5 * time.Second)
+	if lines, _ := m.wordsComing(); len(lines) != 0 {
+		t.Errorf("the line was asked for %v early, want it left until its gathering starts", 5*time.Second)
+	}
+
+	// Inside the gathering's length of it: asked for, with its own timestamp so
+	// that the arrival can be wound back to land on it.
+	m.setProgress(10*time.Second - wordsGather/2 - lyricsAhead)
+	lines, starts := m.wordsComing()
+	if len(lines) == 0 {
+		t.Fatal("the line was not asked for as its gathering came due")
+	}
+	if starts != 10_000 {
+		t.Errorf("the line says it starts at %dms, want 10000", starts)
+	}
+
+	// Which is what the arrival uses: half the gathering is already spent, so
+	// the picture is half made when it appears.
+	wait := time.Duration(starts-m.lyricsClock()) * time.Millisecond
+	spent := wordsGather - wait
+	t.Logf("the line arrives %v before it is sung, %v of the gathering already spent", wait, spent)
+	if spent < 0 || spent > wordsGather {
+		t.Errorf("%v of the gathering is spent on arrival, want between 0 and %v", spent, wordsGather)
+	}
+}

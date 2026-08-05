@@ -276,25 +276,51 @@ func grayToImage(g *image.Gray) image.Image {
 // question — what is this, right now — and because a song with no words in the
 // database would otherwise leave the screen empty for its whole three minutes.
 func (m Model) wordsNow() []string {
+	lines, _ := m.wordsComing()
+	return lines
+}
+
+// wordsComing is the line to show and when it is sung, on the playback clock.
+//
+// It looks a little ahead: a line takes a moment to gather, and a picture that
+// starts gathering when the line starts is a picture that is complete half a
+// second after the singer got there. Asked for early and timed against the
+// line's own timestamp, the words finish arriving exactly as it begins.
+func (m Model) wordsComing() ([]string, int64) {
 	if m.lyrics.synced && m.ps != nil && m.lyrics.forTrack == m.ps.TrackID {
-		if at := m.lyricsAt(); at >= 0 && at < len(m.lyrics.lines) {
-			if line := strings.TrimSpace(m.lyrics.lines[at].Words); line != "" {
-				return wordsWrap(line, m.width*dotsPerCellX, m.height*dotsPerCellY)
+		at, clock := m.lyricsAt(), m.lyricsClock()
+
+		// The next line, if it is close enough that its gathering has begun.
+		if next := at + 1; next < len(m.lyrics.lines) {
+			if m.lyrics.lines[next].At-clock <= int64(wordsGather/time.Millisecond) {
+				at = next
 			}
 		}
+
+		if at >= 0 && at < len(m.lyrics.lines) {
+			if line := strings.TrimSpace(m.lyrics.lines[at].Words); line != "" {
+				return wordsWrap(line, m.width*dotsPerCellX, m.height*dotsPerCellY),
+					m.lyrics.lines[at].At
+			}
+		}
+
+		// A song with words that is not singing any: nothing to set, and the
+		// music has the screen until the singer comes back.
+		return nil, 0
 	}
 
 	if m.ps == nil || m.ps.Title == "" {
-		return nil
+		return nil, 0
 	}
 
 	// The record, then: its name over the artist's, which is the order a sleeve
-	// puts them in and the order somebody asks about them.
+	// puts them in and the order somebody asks about them. It is not sung, so it
+	// has no time of its own to arrive at.
 	lines := []string{m.ps.Title}
 	if len(m.ps.Artists) > 0 {
 		lines = append(lines, strings.Join(m.ps.Artists, ", "))
 	}
-	return lines
+	return lines, 0
 }
 
 // wordsMove is how a line comes apart and goes back together.
@@ -342,6 +368,12 @@ type wordsState struct {
 	// the ones that have been and the ones still to come.
 	where msg.WordLayout
 
+	// starts is when the line on screen is sung, on the playback clock. The
+	// gathering is timed against it rather than against the moment the picture
+	// happened to be built, so the words are complete as the line begins rather
+	// than half a second into it.
+	starts int64
+
 	// sung is how many words of the line have been reached, and paint is what
 	// each of them was sung in.
 	//
@@ -383,6 +415,16 @@ const (
 	// at all: the whole line has to be legible before it is sung, or it is a
 	// guessing game rather than a lyric.
 	wordsAhead = 0.28
+
+	// wordsBand is the fewest rows worth giving the music under the words.
+	//
+	// A lyric rarely fills a screen — one line of type in the middle of forty
+	// rows leaves most of them empty — and empty is the one thing this picture
+	// can afford least. What is left under the words goes to the meter, so the
+	// screen shows the words and the sound at once, and neither is squeezed:
+	// under this many rows there is not enough of a picture to be worth the
+	// distraction.
+	wordsBand = 6
 
 	// wordsSungLift is how much of its own strength a word keeps once it has
 	// been sung. Below the word being sung, above the ones still to come, so the
@@ -487,7 +529,54 @@ func (m Model) wordsLines(w, rows int) []string {
 		}
 	}
 
-	return m.drawCells(w, rows, grid, paint, hue)
+	lines := m.drawCells(w, rows, grid, paint, hue)
+
+	// Whatever the words left over goes to the music. The band is measured from
+	// the foot of the lowest line of type, so it grows and shrinks with how much
+	// the lyric needed.
+	if from, tall := m.wordsRoom(rows); tall >= wordsBand {
+		under := m.stageArt(w, tall)
+		for i, line := range under {
+			if from+i < len(lines) {
+				lines[from+i] = line
+			}
+		}
+	}
+	return lines
+}
+
+// wordsSilent reports that the song has words but is not singing any right now:
+// the bar before the first line, or a gap a lyric sheet marks with an empty one.
+//
+// It is not the same as having no lyrics at all. A song with none falls back to
+// its title, which is worth looking at for three minutes; a song between two
+// lines is a song playing, and what belongs on the screen then is the playing.
+func (m Model) wordsSilent() bool {
+	if !m.lyrics.synced || m.ps == nil || m.lyrics.forTrack != m.ps.TrackID {
+		return false
+	}
+
+	// What is coming counts as words: the gathering of the next line begins
+	// before the singer reaches it.
+	lines, _ := m.wordsComing()
+	return len(lines) == 0
+}
+
+// wordsRoom is the band left under the words: where it starts, in rows, and how
+// many there are.
+func (m Model) wordsRoom(rows int) (from, tall int) {
+	if len(m.words.where.Bottoms) == 0 {
+		return 0, 0
+	}
+
+	low := 0
+	for _, b := range m.words.where.Bottoms {
+		low = max(low, b)
+	}
+
+	// A row of clear air under the type, so the meter never touches the letters.
+	from = low/dotsPerCellY + 2
+	return from, max(rows-from, 0)
 }
 
 // wordsStep is one dot's share of the gathering, given how far down the queue
@@ -542,10 +631,11 @@ func wordsDrift(x, y int) (float32, float32) {
 // wordsGrind builds the picture for the line now, if what is held is not it or
 // not the size of this screen.
 func (m *Model) wordsGrind() tea.Cmd {
-	lines := m.wordsNow()
+	lines, starts := m.wordsComing()
 	if len(lines) == 0 {
 		return nil
 	}
+	m.words.starts = starts
 
 	text := strings.Join(lines, "\n")
 	if m.words.text == text && m.words.cellsX == m.width && m.words.cellsY == m.height {
