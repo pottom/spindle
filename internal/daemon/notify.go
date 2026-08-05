@@ -83,6 +83,26 @@ func listenAndNotify(ctx context.Context, events, status string, last *string) e
 	}
 }
 
+// post sends a command to the daemon's own API and drops whatever it answers:
+// the caller is a key press, and there is nothing to tell it.
+func post(url string) {
+	ctx, cancel := context.WithTimeout(context.Background(), postTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return
+	}
+	_ = resp.Body.Close()
+}
+
+// postTimeout bounds one of those. It is a request to a server on this machine.
+const postTimeout = 3 * time.Second
+
 // playing is as much of the daemon's own status as a notification needs.
 type playing struct {
 	Uri     string

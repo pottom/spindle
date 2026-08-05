@@ -139,6 +139,14 @@ func Run(ctx context.Context, opts Options) error {
 		go watchAndNotify(ctx, port)
 	}
 
+	// The keys on the keyboard belong to the daemon for the same reason the
+	// notifications do: it is what goes on playing when the interface is
+	// closed, and pausing from the keyboard is the one thing anybody wants to
+	// do to a player they cannot see.
+	watchMediaKeys(ctx, fmt.Sprintf("http://%s:%d", DefaultHost, port), func(format string, args ...any) {
+		log.Infof("spindle: "+format, args...)
+	})
+
 	if err := app.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("run daemon: %w", err)
 	}

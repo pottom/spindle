@@ -105,6 +105,23 @@ running, `4` the daemon is running but nothing is playing. They read the daemon
 on this machine and nothing else, so music coming out of a phone is silence as
 far as they are concerned — which is what exit `4` means by "on this machine".
 
+### From the keyboard
+
+The hardware play, next and previous keys drive spindle while it is the player
+you are using: the daemon reads them where they pass, because macOS routes them
+to whichever application it thinks is playing, and a program in a terminal is
+not one of those.
+
+They stay spindle's for half an hour after the music stops, so play, pause, play
+reaches one player rather than starting Apple Music halfway through; after that
+they go back to the system. The volume keys are left alone — the music has a
+level of its own, separate from the machine's.
+
+macOS asks for permission the first time: allow the terminal under System
+Settings › Privacy & Security › Input Monitoring, then start the daemon again.
+The keys are answered on macOS only; Linux has MPRIS, which is a different piece
+of work.
+
 ### In a status bar
 
 A bar wants a sentence rather than a field per line, and wants it without
