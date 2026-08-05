@@ -403,23 +403,28 @@ func (s *stageState) roll() float32 {
 }
 
 const (
-	// stageEdgeLevel is how brightly the edge of the screen is drawn, as a share
-	// of the palette. Faint: it is a thing to look for rather than a thing to
-	// look at, and a bright line around a picture is a frame.
-	stageEdgeLevel = 0.3
-
 	// stageEdgeHead is how many dots at the leading end are drawn at full
 	// strength, so where it has got to can be found at a glance.
 	stageEdgeHead = 12
+
+	// stageEdgeTail is how much of the way round the screen the fading part
+	// behind the head is worth. A share rather than a count, so the same comet
+	// goes round a small terminal and a large one.
+	stageEdgeTail = 0.05
 )
 
 // stageEdge draws the record's progress into the outermost dots of the screen:
-// a line that starts at the top left corner and goes round clockwise, as far as
-// the track has played.
+// something small going round the border clockwise from the top left corner,
+// arriving back at it as the track ends.
 //
 // Nothing else is left of the furniture on the big screen, and this costs
 // nothing — the border of a terminal is a row and a column that no picture ever
 // puts anything in. Where the song is is a fact the eye can have for free.
+//
+// Only the head and a short tail behind it are drawn. Keeping the whole path
+// lit would say the same thing — how far round it has got — and would say it by
+// ruling a bright line down the side of the picture, which is a frame around
+// the very thing the big screen exists to show.
 func (m Model) stageEdge(w, rows int, grid []uint8, paint []int8, levels int) {
 	if m.ps == nil || m.ps.Duration <= 0 {
 		return
@@ -428,20 +433,37 @@ func (m Model) stageEdge(w, rows int, grid []uint8, paint []int8, levels int) {
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
 	round := 2 * (dotsX + dotsY)
 
-	gone := float64(m.elapsed()) / float64(m.ps.Duration)
+	// The round closes where the next record starts, not where this one runs
+	// out. With a crossfade set those are different moments: the last seconds
+	// of the track are already the next one coming up underneath it, and a
+	// progress still climbing through them would be counting down to something
+	// that has begun.
+	ends := m.ps.Duration
+	if fade := m.settings.crossfade; fade > 0 && fade < ends {
+		ends -= fade
+	}
+
+	gone := float64(m.elapsed()) / float64(ends)
 	along := int(min(max(gone, 0), 1) * float64(round))
 
-	dim := int8(min(int(stageEdgeLevel*float32(levels)), levels-1))
-	for i := range along {
-		x, y := stageRound(i, dotsX, dotsY)
+	tail := max(int(stageEdgeTail*float64(round)), stageEdgeHead+1)
+	for i := max(along-tail, 0); i < along; i++ {
+		// How far back down the tail this dot is, and so how much of it is
+		// left: full for the head, then falling away to nothing behind it.
+		back := along - i
 
+		step := int8(levels - 1)
+		if back > stageEdgeHead {
+			left := 1 - float64(back-stageEdgeHead)/float64(tail-stageEdgeHead)
+			step = int8(left * float64(levels-1))
+			if step <= 0 {
+				continue // faded out: leaving it dark is the point
+			}
+		}
+
+		x, y := stageRound(i, dotsX, dotsY)
 		cell := (y/dotsPerCellY)*w + x/dotsPerCellX
 		grid[cell] |= 1 << brailleBit[x%dotsPerCellX][y%dotsPerCellY]
-
-		step := dim
-		if along-i <= stageEdgeHead {
-			step = int8(levels - 1)
-		}
 		if step > paint[cell] {
 			paint[cell] = step
 		}
