@@ -589,3 +589,66 @@ func TestWordsWaterFadesAsItClimbs(t *testing.T) {
 		t.Errorf("a drop up in the lyric draws at %d against %d in the band, want it spent", high, low)
 	}
 }
+
+// The meter hangs from the ceiling as well as standing on the floor, so the
+// lyric sits between two of it and the screen reads as one picture rather than
+// as a strip with a heading over it.
+func TestWordsHangTheMeterFromTheCeilingToo(t *testing.T) {
+	const w, rows = 70, 34
+
+	m := scopeModel(100, 44)
+	m.width, m.height = w, rows
+	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
+
+	bands := make([]float32, 28)
+	for i := range bands {
+		bands[i] = 0.7
+	}
+	m.scope.bands = bands
+
+	lines := wordsWrap("better off alone", w*dotsPerCellX, rows*dotsPerCellY)
+	img, layout, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
+	if !ok {
+		t.Fatal("the face could not draw the test line")
+	}
+	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	m.words.cellsX, m.words.cellsY, m.words.where = w, rows, layout
+	m.words.since = time.Now().Add(-time.Second)
+
+	from, tall := m.wordsRoom(rows)
+	if tall < wordsBand {
+		t.Fatalf("only %d rows were left for the meter", tall)
+	}
+
+	drawn := m.wordsLines(w, rows)
+	ink := func(lines []string) int {
+		var n int
+		for _, line := range lines {
+			for _, r := range ansiOff(line) {
+				if r != ' ' {
+					n++
+				}
+			}
+		}
+		return n
+	}
+
+	head := ink(drawn[wordsCeiling : wordsCeiling+tall])
+	foot := ink(drawn[from:])
+	t.Logf("the meter draws %d cells hanging and %d standing", head, foot)
+
+	if head == 0 {
+		t.Error("nothing hangs from the ceiling")
+	}
+	if foot == 0 {
+		t.Error("nothing stands on the floor")
+	}
+	// The same reading drawn twice: the two have to be within a hair of each
+	// other, allowing for the room over the words being the shorter of the two.
+	if head > foot {
+		t.Errorf("%d cells hang and %d stand, want the hanging one no larger", head, foot)
+	}
+	if head*3 < foot {
+		t.Errorf("%d cells hang against %d standing, want them a pair", head, foot)
+	}
+}

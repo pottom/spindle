@@ -471,6 +471,10 @@ const (
 	wordsRangeLeast = 2.5
 	wordsRangeClose = 0.0015
 
+	// wordsCeiling is the row the hanging picture starts at: under the track's
+	// name and the clock, which are set over the top of everything else.
+	wordsCeiling = 2
+
 	// wordsSpray is what a drop keeps of its light the moment it leaves the
 	// band and enters the lyric. Under a half: what crosses the words has to be
 	// visible as movement and invisible as ink, or it is read as part of a
@@ -618,8 +622,12 @@ func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall int) {
 	levels, freqs := len(m.styles.Words[0]), len(m.styles.Words)
 
 	// The floor the columns stand on and the water is thrown from: the foot of
-	// the screen, which is also the foot of the band.
+	// the screen, which is also the foot of the band. The ceiling is where the
+	// same picture hangs from, upside down — the lyric sits between the two, and
+	// the screen reads as one thing rather than as a strip with a heading over
+	// it.
 	floor := dotsY - 1
+	ceiling := wordsCeiling * dotsPerCellY
 
 	light := func(x, y int, step int8) {
 		if x < 0 || y < 0 || x >= dotsX || y >= dotsY {
@@ -633,8 +641,11 @@ func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall int) {
 		}
 	}
 
-	// The columns, standing on the floor, as tall as the band allows.
+	// The columns, standing on the floor and hanging from the ceiling, as tall
+	// as the band allows.
 	reach := stageReach * float32(tall*dotsPerCellY)
+	head := m.wordsHeadroom(rows)
+
 	for x := range dotsX {
 		if x%stagePitch != 0 {
 			continue
@@ -642,7 +653,12 @@ func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall int) {
 		height := int(m.stageLevel(x, dotsX) * reach)
 		for y := range height {
 			up := float32(y) / float32(max(height-1, 1))
-			light(x, floor-y, int8(min(int(up*float32(levels)), levels-1)))
+			step := int8(min(int(up*float32(levels)), levels-1))
+
+			light(x, floor-y, step)
+			if y < head {
+				light(x, ceiling+y, step)
+			}
 		}
 	}
 
@@ -664,7 +680,12 @@ func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall int) {
 			spent = 1 - above/sky
 			spent = max(spent, 0) * max(spent, 0) * wordsSpray
 		}
-		light(d.col, floor-int(d.at), int8(min(int(d.bright*spent*float32(levels)), levels-1)))
+
+		step := int8(min(int(d.bright*spent*float32(levels)), levels-1))
+		light(d.col, floor-int(d.at), step)
+		if head > 0 {
+			light(d.col, ceiling+int(d.at), step)
+		}
 	}
 }
 
@@ -698,6 +719,22 @@ func (m Model) wordsSilent() bool {
 	// before the singer reaches it.
 	lines, _ := m.wordsComing()
 	return len(lines) == 0
+}
+
+// wordsHeadroom is how far the picture hanging from the ceiling may come down
+// before it reaches the words, in dot rows.
+func (m Model) wordsHeadroom(rows int) int {
+	if len(m.words.where.Tops) == 0 {
+		return 0
+	}
+
+	high := m.words.where.Tops[0]
+	for _, t := range m.words.where.Tops {
+		high = min(high, t)
+	}
+
+	// A row of clear air under it, as under the words themselves.
+	return max(high-wordsCeiling*dotsPerCellY-dotsPerCellY, 0)
 }
 
 // wordsRoom is the band left under the words: where it starts, in rows, and how
