@@ -22,7 +22,11 @@ type Player interface {
 	SetShuffle(ctx context.Context, on bool) error
 	SetRepeat(ctx context.Context, mode string) error
 	Devices(ctx context.Context) ([]Device, error)
-	TransferTo(ctx context.Context, deviceID string) error
+	// TransferTo moves playback to another device. playing says what the music
+	// was doing, and is what it goes on doing there: choosing a device is not
+	// the same act as pressing play, and a device picked while nothing is on
+	// must not start a track nobody asked for.
+	TransferTo(ctx context.Context, deviceID string, playing bool) error
 
 	// AddToQueue puts a track at the end of the queue. Rewriting the queue is
 	// not part of this interface: see QueueEditor.

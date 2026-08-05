@@ -505,9 +505,13 @@ func deviceRef(deviceID string) *spotify.ID {
 	return &id
 }
 
-// TransferTo moves playback to another device, keeping whatever was playing
-// playing. Passing false here would silently pause the music the user just asked
-// to hear somewhere else.
-func (s *Spotify) TransferTo(ctx context.Context, deviceID string) error {
-	return classify("transfer playback", s.client.TransferPlayback(ctx, spotify.ID(deviceID), true))
+// TransferTo moves playback to another device.
+//
+// What it does on arrival is what it was doing before: Spotify's own clients
+// pass the current state through, and so does spotify-player, which is the
+// same act — the device list is a list of speakers, not a play button. Asking
+// for play unconditionally is what made a fresh daemon start the track that
+// was on when the machine was last shut down.
+func (s *Spotify) TransferTo(ctx context.Context, deviceID string, playing bool) error {
+	return classify("transfer playback", s.client.TransferPlayback(ctx, spotify.ID(deviceID), playing))
 }

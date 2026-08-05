@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -143,49 +144,36 @@ func TestTheDevicePickerIsDrawnOverEveryTab(t *testing.T) {
 	}
 }
 
-// Choosing a device means play here. The device it moved to may come up paused
-// — a daemon that has only just joined refuses to resume a session Spotify
-// hands it — so the interface asks once more when the transfer has landed.
-func TestMovingPlaybackHerePressesPlay(t *testing.T) {
-	m := New(player.NewMock(), nil, defaultTestCell)
-	m.devices.items = devices("", "spindle")
-	m.devices.open = true
+// Choosing a device moves the music without changing what it is doing: it is a
+// list of speakers, not a play button. Spotify's own clients pass the state
+// through, and so does spotify-player.
+func TestChoosingADeviceKeepsTheState(t *testing.T) {
+	for _, playing := range []bool{true, false} {
+		p := &recordingTransfer{Player: player.NewMock()}
+		m := New(p, nil, defaultTestCell)
+		m.devices.items = devices("", "spindle")
+		m.devices.open = true
+		m.ps = &player.State{TrackID: "t1", Title: "one", Playing: playing}
 
-	if cmd := m.transfer(); cmd == nil {
-		t.Fatal("choosing a device did nothing")
-	}
-	if !m.wantPlaying {
-		t.Fatal("the transfer did not record that the music should follow")
-	}
+		cmd := m.transfer()
+		if cmd == nil {
+			t.Fatal("choosing a device did nothing")
+		}
+		runControls(cmd)
 
-	// A state that arrives paused, with something loaded, is the case.
-	m.ps = &player.State{TrackID: "t1", Title: "one", Playing: false}
-	cmd := m.startWhatWasMovedHere()
-	if cmd == nil {
-		t.Error("nothing pressed play on the device the music was moved to")
-	}
-	if m.wantPlaying {
-		t.Error("the press was not spent")
-	}
-
-	// And it happens once: a pause a minute later is somebody pausing.
-	m.ps.Playing = false
-	if cmd := m.startWhatWasMovedHere(); cmd != nil {
-		t.Error("play was pressed again long after the transfer")
+		if p.asked != playing {
+			t.Errorf("with playing = %v the transfer asked for %v", playing, p.asked)
+		}
 	}
 }
 
-// A transfer to a device with nothing loaded waits: pressing play at a daemon
-// that has no track yet says nothing to anybody.
-func TestMovingPlaybackWaitsForATrack(t *testing.T) {
-	m := New(player.NewMock(), nil, defaultTestCell)
-	m.wantPlaying = true
-	m.ps = &player.State{TrackID: "", Playing: false}
+// recordingTransfer remembers what the transfer asked the music to do.
+type recordingTransfer struct {
+	player.Player
+	asked bool
+}
 
-	if cmd := m.startWhatWasMovedHere(); cmd != nil {
-		t.Error("play was pressed with nothing to play")
-	}
-	if !m.wantPlaying {
-		t.Error("the press was spent on nothing")
-	}
+func (r *recordingTransfer) TransferTo(ctx context.Context, id string, playing bool) error {
+	r.asked = playing
+	return r.Player.TransferTo(ctx, id, playing)
 }

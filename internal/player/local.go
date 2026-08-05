@@ -302,8 +302,8 @@ func (l *Local) deviceID() string {
 // Everything the daemon does not know about.
 
 func (l *Local) Devices(ctx context.Context) ([]Device, error) { return l.web.Devices(ctx) }
-func (l *Local) TransferTo(ctx context.Context, id string) error {
-	return l.web.TransferTo(ctx, id)
+func (l *Local) TransferTo(ctx context.Context, id string, playing bool) error {
+	return l.web.TransferTo(ctx, id, playing)
 }
 func (l *Local) AddToQueue(ctx context.Context, trackID string) error {
 	return l.web.AddToQueue(ctx, trackID)

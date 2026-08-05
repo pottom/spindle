@@ -305,21 +305,33 @@ func TestShortPageStillHasMore(t *testing.T) {
 	}
 }
 
-// Transferring must not pause what it moves: play=false would silence the music
-// the user just asked to hear somewhere else.
-func TestTransferKeepsPlaying(t *testing.T) {
+// A transfer carries the state across rather than deciding one: moving music
+// that is playing must not silence it, and moving to a device while nothing is
+// on must not start the last thing that was loaded.
+func TestTransferCarriesTheStateAcross(t *testing.T) {
 	s, got := newRecorder(t)
 
-	if err := s.TransferTo(context.Background(), "dev2"); err != nil {
+	if err := s.TransferTo(context.Background(), "dev2", true); err != nil {
 		t.Fatal(err)
 	}
 	if got.body["play"] != true {
-		t.Errorf("play = %v, want true", got.body["play"])
+		t.Errorf("play = %v, want true where the music was playing", got.body["play"])
 	}
 
 	ids, ok := got.body["device_ids"].([]any)
 	if !ok || len(ids) != 1 || ids[0] != "dev2" {
 		t.Errorf("device_ids = %v, want [dev2]", got.body["device_ids"])
+	}
+}
+
+func TestTransferOfSilenceStaysSilent(t *testing.T) {
+	s, got := newRecorder(t)
+
+	if err := s.TransferTo(context.Background(), "dev2", false); err != nil {
+		t.Fatal(err)
+	}
+	if got.body["play"] != false {
+		t.Errorf("play = %v, want false where nothing was playing", got.body["play"])
 	}
 }
 

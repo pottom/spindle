@@ -149,7 +149,7 @@ func (m *Mock) Devices(ctx context.Context) ([]Device, error) {
 	return slices.Clone(m.devices), nil
 }
 
-func (m *Mock) TransferTo(ctx context.Context, deviceID string) error {
+func (m *Mock) TransferTo(ctx context.Context, deviceID string, playing bool) error {
 	return m.mutate(ctx, func() error {
 		if !slices.ContainsFunc(m.devices, func(d Device) bool { return d.ID == deviceID }) {
 			return fmt.Errorf("transfer playback: unknown device %q", deviceID)
@@ -158,6 +158,9 @@ func (m *Mock) TransferTo(ctx context.Context, deviceID string) error {
 		for i := range m.devices {
 			m.devices[i].Active = m.devices[i].ID == deviceID
 		}
+		// What it was doing is what it goes on doing, which is the whole point
+		// of the flag.
+		m.playing = playing
 		return nil
 	})
 }

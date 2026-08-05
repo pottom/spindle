@@ -97,11 +97,6 @@ type Model struct {
 	volumeSent   int
 	volumeSentAt time.Time
 
-	// wantPlaying is set when playback was moved here and has not started yet.
-	// The device it moved to may come up paused — see transfer — and one press
-	// of its own is what settles it.
-	wantPlaying bool
-
 	// mutedFrom is the volume to come back to, or zero when nothing is muted.
 	// Muting is not the same as turning the volume down: the level that was
 	// chosen is worth keeping, and the music keeps playing either way.

@@ -59,16 +59,15 @@ func (m *Model) transfer() tea.Cmd {
 	m.devices.open = false
 	m.hold()
 
-	// Choosing a device means play here, and it has to be said again once the
-	// transfer has landed: a device that has only just joined comes up paused
-	// rather than resuming a session Spotify hands back to it, and cannot tell
-	// that hand-back from somebody picking it out of a list. See the daemon's
-	// quiet window.
-	m.wantPlaying = true
+	// The music carries on doing what it was doing, in the new place. Choosing
+	// a device is not the same act as pressing play — Spotify's own clients
+	// pass the state through, and so does spotify-player — and a device picked
+	// while nothing is on must not start whatever was last loaded.
+	playing := m.ps != nil && m.ps.Playing
 
 	return tea.Batch(
 		controlCmd("move playback", func(ctx context.Context) error {
-			return p.TransferTo(ctx, id)
+			return p.TransferTo(ctx, id, playing)
 		}),
 		refetchCmd(confirmFirst),
 		fetchDevicesCmd(m.player),
