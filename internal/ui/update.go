@@ -71,7 +71,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	case msg.DevicesFetched:
 		m.devices.adopt(message.Devices)
-		return m, nil
+		return m, m.takeOwnDevice()
 
 	case msg.QueueFetched:
 		// A move waiting to go out is not in the device's answer yet, and
@@ -806,6 +806,41 @@ func (m *Model) stopLoading() {
 	for i := range m.stack {
 		m.stack[i].pages.loading = false
 	}
+}
+
+// takeOwnDevice claims the playback device spindle started itself.
+//
+// Somebody who opens spindle should not have to pick their own machine out of a
+// list of speakers: the daemon is this program's own, it was started by this
+// program a second ago, and the device list is the only reason it is on screen
+// at all. So the first time it appears with nothing playing anywhere, it is
+// taken.
+//
+// Only with nothing playing anywhere, and that is the whole safety of it: music
+// coming out of a phone stays there, because a transfer carries the state
+// across and taking a playing session would move it here. Only once, too — a
+// device deliberately left for another speaker must stay left.
+func (m *Model) takeOwnDevice() tea.Cmd {
+	owner, ok := m.player.(player.Owner)
+	if !ok || m.tookOwnDevice || !m.noDevice {
+		return nil
+	}
+
+	id := owner.OwnDevice()
+	if id == "" || !m.devices.has(id) {
+		// The daemon has not registered with Spotify yet. It takes a few
+		// seconds, and the next answer will carry it.
+		return nil
+	}
+
+	m.tookOwnDevice = true
+	p := m.player
+	return tea.Batch(
+		controlCmd("use this device", func(ctx context.Context) error {
+			return p.TransferTo(ctx, id, false)
+		}),
+		refetchCmd(confirmFirst),
+	)
 }
 
 // shouldResync decides whether this tick carries a real state fetch. Polling

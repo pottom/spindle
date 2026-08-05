@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"slices"
+
 	"github.com/pottom/spindle/internal/player"
 )
 
@@ -12,6 +14,11 @@ type devicePane struct {
 	items  []player.Device
 	cursor listState
 	open   bool // the picker is showing over the player
+}
+
+// has reports whether a device is in the list Spotify last named.
+func (d devicePane) has(id string) bool {
+	return slices.ContainsFunc(d.items, func(dev player.Device) bool { return dev.ID == id })
 }
 
 // selected returns the device under the cursor.

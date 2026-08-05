@@ -177,3 +177,77 @@ func (r *recordingTransfer) TransferTo(ctx context.Context, id string, playing b
 	r.asked = playing
 	return r.Player.TransferTo(ctx, id, playing)
 }
+
+// ownDaemon is a backend with a playback device of its own, the way the local
+// daemon is.
+type ownDaemon struct {
+	player.Player
+	id       string
+	moved    string
+	askedFor bool
+}
+
+func (o *ownDaemon) OwnDevice() string { return o.id }
+
+func (o *ownDaemon) TransferTo(ctx context.Context, id string, playing bool) error {
+	o.moved, o.askedFor = id, playing
+	return o.Player.TransferTo(ctx, id, playing)
+}
+
+// Nobody should have to pick their own machine out of a list of speakers: the
+// daemon is spindle's own, spindle started it, and the device list is the only
+// reason it is on screen.
+func TestSpindleTakesTheDeviceItStarted(t *testing.T) {
+	p := &ownDaemon{Player: player.NewMock(), id: "own"}
+	m := New(p, nil, defaultTestCell)
+	m.noDevice = true
+	m.devices.adopt([]player.Device{{ID: "own", Name: "spindle"}, {ID: "phone", Name: "phone"}})
+
+	cmd := m.takeOwnDevice()
+	if cmd == nil {
+		t.Fatal("the device spindle started was left for somebody to pick by hand")
+	}
+	runControls(cmd)
+
+	if p.moved != "own" {
+		t.Errorf("moved playback to %q, want spindle's own device", p.moved)
+	}
+	if p.askedFor {
+		t.Error("taking the device asked for playback, want it to stay as it was")
+	}
+
+	// Only once: a device deliberately left for another speaker stays left.
+	if cmd := m.takeOwnDevice(); cmd != nil {
+		t.Error("the device was claimed a second time")
+	}
+}
+
+// Music coming out of a phone stays there. A transfer carries the state across,
+// so taking a playing session would move it here — which is why this only
+// happens with nothing playing anywhere.
+func TestNothingIsTakenWhileSomethingPlays(t *testing.T) {
+	p := &ownDaemon{Player: player.NewMock(), id: "own"}
+	m := New(p, nil, defaultTestCell)
+	m.noDevice = false
+	m.devices.adopt([]player.Device{{ID: "own", Name: "spindle"}})
+
+	if cmd := m.takeOwnDevice(); cmd != nil {
+		t.Error("playback was taken from a device that had it")
+	}
+}
+
+// The daemon takes a few seconds to register with Spotify, and until it does
+// there is nothing to take.
+func TestNothingIsTakenBeforeTheDaemonAppears(t *testing.T) {
+	p := &ownDaemon{Player: player.NewMock(), id: ""}
+	m := New(p, nil, defaultTestCell)
+	m.noDevice = true
+	m.devices.adopt([]player.Device{{ID: "phone", Name: "phone"}})
+
+	if cmd := m.takeOwnDevice(); cmd != nil {
+		t.Error("something was taken before the daemon had registered")
+	}
+	if m.tookOwnDevice {
+		t.Error("the one chance was spent on a device that was not there")
+	}
+}

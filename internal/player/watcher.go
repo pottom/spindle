@@ -13,3 +13,13 @@ type Watcher interface {
 	// by coalescing rather than by holding the backend up.
 	Changes() <-chan struct{}
 }
+
+// Owner is implemented by a backend that has a playback device of its own —
+// the local daemon, and nothing else. The interface uses it to take a device it
+// started itself, rather than making somebody pick their own machine out of a
+// list of speakers.
+type Owner interface {
+	// OwnDevice is the Connect device this backend is, or empty before it has
+	// registered with Spotify. It takes a few seconds after the daemon starts.
+	OwnDevice() string
+}

@@ -299,6 +299,11 @@ func (l *Local) deviceID() string {
 	return l.snapshot.DeviceID
 }
 
+// OwnDevice is the daemon's own Connect device, for the interface to take when
+// nothing else is playing. Empty until the daemon has registered with Spotify,
+// which is a few seconds after it starts.
+func (l *Local) OwnDevice() string { return l.deviceID() }
+
 // Everything the daemon does not know about.
 
 func (l *Local) Devices(ctx context.Context) ([]Device, error) { return l.web.Devices(ctx) }
