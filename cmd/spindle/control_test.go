@@ -337,3 +337,74 @@ func TestArgumentsAreRefused(t *testing.T) {
 		}
 	}
 }
+
+// A status bar wants a sentence, not a field per line: without one it has to
+// spawn jq or head every time it redraws.
+func TestStatusOnOneLine(t *testing.T) {
+	s := newStub(t, playingStatus, sampleQueue)
+
+	code, out, _ := s.run("status", "--line")
+	if code != exitOK {
+		t.Fatalf("exit = %d, want %d", code, exitOK)
+	}
+	if got := strings.TrimSpace(out); got != "▶ Sultans of Swing — Dire Straits" {
+		t.Errorf("status --line printed %q", got)
+	}
+	if strings.Count(out, "\n") != 1 {
+		t.Errorf("status --line printed %d lines, want one", strings.Count(out, "\n"))
+	}
+}
+
+// The template is the bar's own: braces because its configuration file is
+// already full of dollars and percent signs.
+func TestStatusFollowsATemplate(t *testing.T) {
+	s := newStub(t, pausedStatus, sampleQueue)
+
+	code, out, _ := s.run("status", "--format", "{state} {title} {position}/{duration} {volume}%")
+	if code != exitOK {
+		t.Fatalf("exit = %d, want %d", code, exitOK)
+	}
+	if got := strings.TrimSpace(out); got != "paused Sultans of Swing 1:34/5:48 50%" {
+		t.Errorf("status --format printed %q", got)
+	}
+}
+
+// A field nobody knows is left as it was written: a status bar is not where a
+// typo should be discovered, and "{titel}" says where to look.
+func TestAnUnknownFieldIsLeftAlone(t *testing.T) {
+	s := newStub(t, playingStatus, sampleQueue)
+
+	_, out, _ := s.run("status", "--format", "{titel}")
+	if got := strings.TrimSpace(out); got != "{titel}" {
+		t.Errorf("status --format printed %q, want the field as it was written", got)
+	}
+}
+
+// Nothing playing prints nothing and says so in the exit code — and says where
+// it looked, because these commands reach this machine and nowhere else.
+func TestIdleSaysWhereItLooked(t *testing.T) {
+	s := newStub(t, stoppedStatus, emptyQueue)
+
+	code, out, errOut := s.run("status", "--line")
+	if code != exitIdle {
+		t.Errorf("exit = %d, want %d", code, exitIdle)
+	}
+	if out != "" {
+		t.Errorf("status printed %q, want nothing", out)
+	}
+	if !strings.Contains(errOut, "on this machine") {
+		t.Errorf("the explanation reads %q, want it to say where it looked", strings.TrimSpace(errOut))
+	}
+}
+
+// The command is looked for past any leading flags: "spindle --json status" is
+// how everybody writes it the first time.
+func TestTheCommandIsFoundPastTheFlags(t *testing.T) {
+	name, rest, ok := controlCommandIn([]string{"--json", "status", "--line"})
+	if !ok || name != "status" {
+		t.Fatalf("controlCommandIn() = %q, %v, want the status command", name, ok)
+	}
+	if len(rest) != 2 || rest[0] != "--json" || rest[1] != "--line" {
+		t.Errorf("arguments = %v, want both flags kept", rest)
+	}
+}

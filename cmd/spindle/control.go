@@ -23,7 +23,10 @@ const (
 	exitIdle     = 4
 )
 
-// errIdle reports that the daemon is running with nothing loaded.
+// errIdle reports that the daemon here is running with nothing loaded. It says
+// nothing about anywhere else: these commands reach the local daemon only, and
+// asking Spotify what a phone is doing would need a token, a round trip and
+// possibly a browser — which is what the command line was built to avoid.
 var errIdle = errors.New("nothing is playing")
 
 // jsonFlag turns every command's output into the daemon's own JSON.
@@ -68,7 +71,12 @@ func (c *cli) run(ctx context.Context, name string, args []string) int {
 		fmt.Fprintf(c.errOut, "spindle: %v — start one with spindle daemon\n", err)
 		return exitNoDaemon
 	case errors.Is(err, errIdle):
-		fmt.Fprintln(c.errOut, "spindle: nothing is playing")
+		// Where, not just whether: these commands talk to the daemon on this
+		// machine and to nothing else, so music coming out of a phone is
+		// silence as far as they are concerned. Saying "nothing is playing"
+		// while a room can hear otherwise is the kind of answer that gets a
+		// program mistrusted.
+		fmt.Fprintln(c.errOut, "spindle: nothing is playing on this machine")
 		return exitIdle
 	default:
 		fmt.Fprintln(c.errOut, "spindle:", err)

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -40,6 +41,12 @@ type remote struct {
 
 func newRemote(addr string) *remote {
 	return &remote{addr: addr, http: &http.Client{Timeout: remoteTimeout}}
+}
+
+// events is where the daemon pushes to. It is the same address in a different
+// scheme: the API and the stream are one server.
+func (r *remote) events() string {
+	return "ws" + strings.TrimPrefix(r.addr, "http") + "/events"
 }
 
 // get fetches a document from the daemon and returns it raw, so that --json can

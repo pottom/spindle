@@ -54,8 +54,34 @@ func (s *daemonStatus) volumePercent() int {
 // It is one request and no waiting, so a prompt or a status bar can run it as
 // often as it redraws.
 func (c *cli) status(ctx context.Context, args []string) error {
+	args, shape, err := takeLineFlags(args)
+	if err != nil {
+		return err
+	}
 	if err := expectNoArgs("status", args); err != nil {
 		return err
+	}
+
+	// Following never ends and never fails: a bar wants a line when something
+	// changes and silence otherwise, including while the daemon is restarting.
+	if shape.follow {
+		return c.follow(ctx, shape)
+	}
+	if shape.format != "" {
+		raw, st, err := c.readStatus(ctx)
+		if err != nil {
+			return err
+		}
+		if c.json {
+			fmt.Fprintln(c.out, string(raw))
+		}
+		if st.idle() {
+			return errIdle
+		}
+		if !c.json {
+			fmt.Fprintln(c.out, render(shape.format, st))
+		}
+		return nil
 	}
 
 	raw, st, err := c.readStatus(ctx)

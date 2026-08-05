@@ -22,6 +22,20 @@ import (
 // reportFatal prints an error and leaves. A missing client id is not really an
 // error so much as an unfinished setup, so it gets the instructions instead of a
 // one-line complaint.
+// controlCommandIn finds the daemon-driving command in an argument list, and
+// hands back everything else as its arguments — wherever the flags were
+// written.
+func controlCommandIn(args []string) (name string, rest []string, ok bool) {
+	for i, arg := range args {
+		if !controlCommands[arg] {
+			continue
+		}
+		rest = append(rest, args[:i]...)
+		return arg, append(rest, args[i+1:]...), true
+	}
+	return "", nil, false
+}
+
 func reportFatal(err error) {
 	if errors.Is(err, auth.ErrNoClientID) {
 		fmt.Fprintln(os.Stderr, auth.SetupHelp())
@@ -37,8 +51,12 @@ func main() {
 		// The daemon-driving commands leave through os.Exit rather than
 		// reportFatal: they answer with an exit code of their own, so a script
 		// can tell a missing daemon from a silent one.
-		if controlCommands[os.Args[1]] {
-			os.Exit(runControl(context.Background(), os.Args[1], os.Args[2:]))
+		//
+		// The command is looked for past any leading flags, because "spindle
+		// --json status" is how everybody writes it the first time and falling
+		// through to the interface for it is a baffling answer.
+		if name, rest, ok := controlCommandIn(os.Args[1:]); ok {
+			os.Exit(runControl(context.Background(), name, rest))
 		}
 
 		switch os.Args[1] {

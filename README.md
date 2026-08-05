@@ -94,13 +94,32 @@ key binding or a status bar wants:
     spindle queue                        the playing track and what follows
     spindle volume [0-100]               report the level, or set it
     spindle seek 90 | +30 | -15          to a position, or by an offset
+    spindle notify on | off              announce each new track to the desktop
 
 Output is plain text, one thing per line and never coloured; `--json` on any of
 them prints the daemon's own answer instead, for `jq`. Nothing starts a daemon:
 these talk to the one already running, and say so when there is none.
 
 The exit code says which it was: `0` done, `1` refused, `3` no daemon is
-running, `4` the daemon is running but nothing is playing.
+running, `4` the daemon is running but nothing is playing. They read the daemon
+on this machine and nothing else, so music coming out of a phone is silence as
+far as they are concerned — which is what exit `4` means by "on this machine".
+
+### In a status bar
+
+A bar wants a sentence rather than a field per line, and wants it without
+spawning `jq` every second:
+
+    spindle status --line                ▶ Sultans of Swing — Dire Straits
+    spindle status --format '{title}'    the fields, arranged your way
+    spindle status --follow --line       a fresh line whenever something changes
+
+The fields are `{icon}`, `{state}`, `{title}`, `{artist}`, `{album}`,
+`{position}`, `{duration}`, `{volume}` and `{device}`; anything else is left as
+it was written, so a typo says where to look. `--follow` holds the daemon's
+event stream open and prints only when something actually happens, which costs
+nothing while nothing does — and prints an empty line, rather than an error,
+while the daemon is away.
 
 ## What it needs
 
