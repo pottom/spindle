@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -216,9 +217,31 @@ func TestSpindleTakesTheDeviceItStarted(t *testing.T) {
 		t.Error("taking the device asked for playback, want it to stay as it was")
 	}
 
-	// Only once: a device deliberately left for another speaker stays left.
+	// Not again on the next answer: the list arrives every few seconds, and a
+	// claim per answer would be a transfer per answer.
 	if cmd := m.takeOwnDevice(); cmd != nil {
-		t.Error("the device was claimed a second time")
+		t.Error("the device was claimed again on the very next answer")
+	}
+}
+
+// A daemon restarted underneath a running interface comes back as the same
+// device, and the screen should not sit there asking which device to use with
+// one device on it.
+func TestTheDeviceIsTakenAgainWhenItComesBack(t *testing.T) {
+	p := &ownDaemon{Player: player.NewMock(), id: "own"}
+	m := New(p, nil, defaultTestCell)
+	m.noDevice = true
+	m.devices.adopt([]player.Device{{ID: "own", Name: "spindle"}})
+
+	if cmd := m.takeOwnDevice(); cmd == nil {
+		t.Fatal("the device was not claimed the first time")
+	}
+
+	// The daemon goes away and comes back, which takes longer than the pause
+	// between attempts.
+	m.tookOwnDeviceAt = m.tookOwnDeviceAt.Add(-takeAgainAfter - time.Second)
+	if cmd := m.takeOwnDevice(); cmd == nil {
+		t.Error("the device that came back was left for somebody to pick by hand")
 	}
 }
 
@@ -247,7 +270,7 @@ func TestNothingIsTakenBeforeTheDaemonAppears(t *testing.T) {
 	if cmd := m.takeOwnDevice(); cmd != nil {
 		t.Error("something was taken before the daemon had registered")
 	}
-	if m.tookOwnDevice {
-		t.Error("the one chance was spent on a device that was not there")
+	if !m.tookOwnDeviceAt.IsZero() {
+		t.Error("an attempt was recorded against a device that was not there")
 	}
 }

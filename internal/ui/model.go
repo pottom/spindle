@@ -97,9 +97,10 @@ type Model struct {
 	volumeSent   int
 	volumeSentAt time.Time
 
-	// tookOwnDevice records that the device spindle started for itself has been
-	// claimed, so a device left for another speaker stays left.
-	tookOwnDevice bool
+	// tookOwnDeviceAt is when the device spindle started for itself was last
+	// claimed, so a claim that failed is tried again and one that worked is not
+	// repeated every time the list arrives.
+	tookOwnDeviceAt time.Time
 
 	// mutedFrom is the volume to come back to, or zero when nothing is muted.
 	// Muting is not the same as turning the volume down: the level that was

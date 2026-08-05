@@ -818,11 +818,16 @@ func (m *Model) stopLoading() {
 //
 // Only with nothing playing anywhere, and that is the whole safety of it: music
 // coming out of a phone stays there, because a transfer carries the state
-// across and taking a playing session would move it here. Only once, too — a
-// device deliberately left for another speaker must stay left.
+// across and taking a playing session would move it here.
+//
+// Not only once, though. The first version claimed the device a single time and
+// never again, so a daemon that was restarted underneath a running interface
+// came back to a screen asking which device to use — with one device on it, the
+// one spindle had just started. A device that vanishes and returns is not a
+// device somebody left for another speaker.
 func (m *Model) takeOwnDevice() tea.Cmd {
 	owner, ok := m.player.(player.Owner)
-	if !ok || m.tookOwnDevice || !m.noDevice {
+	if !ok || !m.noDevice || time.Since(m.tookOwnDeviceAt) < takeAgainAfter {
 		return nil
 	}
 
@@ -833,7 +838,7 @@ func (m *Model) takeOwnDevice() tea.Cmd {
 		return nil
 	}
 
-	m.tookOwnDevice = true
+	m.tookOwnDeviceAt = time.Now()
 	p := m.player
 	return tea.Batch(
 		controlCmd("use this device", func(ctx context.Context) error {
@@ -842,6 +847,12 @@ func (m *Model) takeOwnDevice() tea.Cmd {
 		refetchCmd(confirmFirst),
 	)
 }
+
+// takeAgainAfter is how long to leave it before claiming the device again. It
+// stops a claim that cannot land — a daemon still coming up, a Spotify that
+// refuses — from being retried on every answer, and is short enough that a
+// restarted daemon is picked up while the reader is still looking at the screen.
+const takeAgainAfter = 10 * time.Second
 
 // shouldResync decides whether this tick carries a real state fetch. Polling
 // through a throttle is how a short one becomes a long one.
