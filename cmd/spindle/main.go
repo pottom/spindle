@@ -124,11 +124,28 @@ func main() {
 	// on it here rather than inside Update keeps the shutdown out of a UI that
 	// is still drawing.
 	if m, ok := final.(ui.Model); ok && m.StopDaemonRequested() {
+		pauseBeforeLeaving(backendPlayer)
 		stopWatching()
 		if err := daemon.Stop(context.Background()); err != nil && !errors.Is(err, daemon.ErrNoDaemon) {
 			fmt.Fprintln(os.Stderr, "spindle:", err)
 		}
 	}
+}
+
+// pauseBeforeLeaving stops the music before the device that was playing it
+// disappears.
+//
+// Measured: a device that vanishes mid-track leaves Spotify with no session at
+// all — it answers "no active playback device" and remembers no position — so
+// coming back starts the track from the top. Pausing first ends the session
+// tidily, and Spotify keeps the place: the next start comes up where the
+// listener left off.
+//
+// A failure here is not worth a word: the device is about to be stopped anyway.
+func pauseBeforeLeaving(p player.Player) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	_ = p.Pause(ctx)
 }
 
 // openBackend picks between the offline mock, the local daemon and the bare
