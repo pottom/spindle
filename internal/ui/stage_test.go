@@ -156,7 +156,7 @@ func TestStageCyclesItsPictures(t *testing.T) {
 	var tm tea.Model = m
 	// The same three the strip cycles, and never "off": a blank full screen is
 	// not one of the pictures.
-	for i, want := range []scopeMode{scopeBars, scopeMirror, scopeWave, scopeBars} {
+	for i, want := range []scopeMode{scopeBars, scopeMirror, scopeLadder, scopeWave, scopeBars} {
 		tm, _ = tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
 		got := tm.(Model)
 		if !got.stage.on {

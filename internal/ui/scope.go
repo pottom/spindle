@@ -48,6 +48,8 @@ const (
 	// scopeMirror is the big screen's picture, in the strip: the spectrum about
 	// a middle line with the water thrown off it. See stage.go.
 	scopeMirror
+	// scopeLadder is the same spectrum as a stack of lamps. See ladder.go.
+	scopeLadder
 	scopeModes // how many there are, for the cycle
 )
 
@@ -58,10 +60,11 @@ func (s scopeMode) next() scopeMode { return (s + 1) % scopeModes }
 func (s scopeMode) wave() bool { return s == scopeWave }
 func (s scopeMode) bars() bool   { return s == scopeBars }
 func (s scopeMode) mirror() bool { return s == scopeMirror }
+func (s scopeMode) ladder() bool { return s == scopeLadder }
 
 // spectrum reports whether a mode is drawn from the bands, whichever way it
 // draws them.
-func (s scopeMode) spectrum() bool { return s.bars() || s.mirror() }
+func (s scopeMode) spectrum() bool { return s.bars() || s.mirror() || s.ladder() }
 
 // scopeState is the visualiser the player screen is drawing, and what it is
 // drawing.
@@ -230,6 +233,8 @@ func (m Model) scopeRender(w int) []string {
 		return m.scopeLines(w)
 	case m.scopeMode().mirror():
 		return m.stageArt(w, scopeRows)
+	case m.scopeMode().ladder():
+		return m.ladderLines(w, scopeRows)
 	default:
 		return m.barsLines(w, scopeRows)
 	}

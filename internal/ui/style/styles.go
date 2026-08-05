@@ -78,6 +78,12 @@ type Styles struct {
 	// strength up the height. Indexed [position][level].
 	Bars [][]lipgloss.Style
 
+	// Ladder is the segmented meter's colours: one for each step of the climb,
+	// coolest at the foot and hottest at the top. Indexed by height alone —
+	// on that picture the colour is what tells you how high a bar has gone,
+	// which is the whole of how a stack of lamps has ever been read.
+	Ladder []lipgloss.Style
+
 	// Status line.
 	DeviceOn  lipgloss.Style
 	DeviceOff lipgloss.Style
@@ -128,7 +134,8 @@ func New(isDark bool, accent color.Color) Styles {
 		ScrollThumb: fg(accent),
 		ScrollTrack: fg(t.Faint),
 
-		Bars: barPalette(t, accent),
+		Bars:   barPalette(t, accent),
+		Ladder: ladderPalette(t, accent),
 
 		Quality: fg(t.Faint),
 
@@ -288,6 +295,16 @@ const (
 	barFreqSteps  = 10
 	barLevelSteps = 6
 
+	// ladderSteps is how many colours the segmented meter climbs through, and
+	// ladderHueArc how far round the wheel that climb travels.
+	//
+	// The arc is wide because on that picture the colour *is* the reading: a
+	// hundred and twenty degrees from the accent's cool side to its warm one is
+	// four or five colours the eye can name, which is what makes a stack of
+	// lamps legible from across a room.
+	ladderSteps  = 24
+	ladderHueArc = 120
+
 	// barHueArc is how far the hue travels from one end of the spectrum to the
 	// other, in degrees.
 	//
@@ -298,6 +315,34 @@ const (
 	// single colour someone had dimmed at one end.
 	barHueArc = 80
 )
+
+// ladderPalette builds the segmented meter's climb.
+//
+// The colour runs up the bar rather than across the picture, because that is
+// what a ladder of lamps is: the eye reads how high the stack has gone from
+// where its colour has got to, and it can do that on one bar alone. The arc is
+// much wider than the spectrum's — a meter that climbed through two shades of
+// the same colour would be a gradient rather than a scale — but it is still cut
+// from the artwork, swinging either side of the cover's own hue, so a warm
+// record keeps a warm meter.
+func ladderPalette(t Theme, accent color.Color) []lipgloss.Style {
+	base, sat, light := toHSL(accent)
+
+	out := make([]lipgloss.Style, ladderSteps)
+	for i := range out {
+		v := float64(i) / float64(ladderSteps-1)
+
+		hue := math.Mod(base+(v-0.5)*ladderHueArc+360, 360)
+		c := fromHSL(hue, min(sat*(0.7+0.45*v), 1), light*(0.62+0.6*v))
+		if v > 0.86 {
+			// The last rungs go toward white, the way the tip of a bar does:
+			// the top of a meter is meant to look like too much.
+			c = blend(c, t.Text, (v-0.86)/0.14*0.45)
+		}
+		out[i] = lipgloss.NewStyle().Foreground(c)
+	}
+	return out
+}
 
 // barPalette builds the spectrum's colours: hue across the frequency range,
 // strength up the height of a bar.

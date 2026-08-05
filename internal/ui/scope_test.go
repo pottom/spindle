@@ -27,8 +27,9 @@ func TestScopeKeyTogglesTheTrace(t *testing.T) {
 		t.Fatal("the trace is not on by default")
 	}
 
-	// The key cycles: waveform, spectrum, the mirrored one, off, and round.
-	want := []scopeMode{scopeBars, scopeMirror, scopeOff, scopeWave}
+	// The key cycles: waveform, spectrum, the mirrored one, the ladder, off,
+	// and round.
+	want := []scopeMode{scopeBars, scopeMirror, scopeLadder, scopeOff, scopeWave}
 	var tm tea.Model = m
 	for i, mode := range want {
 		var cmd tea.Cmd

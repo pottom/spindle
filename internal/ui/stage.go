@@ -176,6 +176,8 @@ func (m Model) stagePicture(w, rows int) []string {
 		art = m.scopeLinesFrom(w, rows, m.scopeTrigger(w*dotsPerCellX))
 	case m.scopeMode().bars():
 		art = m.barsLines(w, rows)
+	case m.scopeMode().ladder():
+		art = m.ladderLines(w, rows)
 	default:
 		art = m.stageArt(w, rows)
 	}
