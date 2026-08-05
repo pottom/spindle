@@ -242,7 +242,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.words.asked = ""
 		m.words.have, m.words.text = message.Grain, message.Text
 		m.words.move = wordsMoveFor(message.Text)
-		m.words.where, m.words.paint, m.words.sung = message.Words, nil, 0
+		m.words.where = message.Words
 		m.words.cellsX, m.words.cellsY = message.CellsX, message.CellsY
 
 		// Wound back so that the gathering finishes as the line is sung rather

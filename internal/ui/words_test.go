@@ -206,90 +206,71 @@ func TestWordsMoveComesFromTheLine(t *testing.T) {
 	}
 }
 
-// The picture's whole idea: a word is coloured by the sound that was in the air
-// as it went by, and keeps that colour for the rest of the line. What has been
-// sung is a record of how it sounded, what is being sung burns, and what is to
-// come waits — and the letters themselves never move.
-func TestWordsKeepTheColourTheyWereSungIn(t *testing.T) {
+// The whole line is lit, and every word answers its own share of the sound: the
+// first beats with the bass and the last with the cymbals. Nothing claims to
+// know where the singer is inside the line, because a lyric sheet cannot say —
+// and a guess that is right most of the time is worse than none, since the times
+// it is wrong are the times you are looking straight at it.
+func TestWordsBeatWithTheirOwnPartOfTheSound(t *testing.T) {
 	const w, rows = 90, 14
 
 	m := scopeModel(100, 44)
 	m.width, m.height = w, rows
 	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
-	m.ps.TrackID = "now"
-
-	m.lyrics.synced, m.lyrics.forTrack = true, "now"
-	m.lyrics.lines = []player.Lyric{
-		{At: 0, Words: "better off alone tonight"},
-		{At: 8_000, Words: "and after"},
-	}
 
 	lines := wordsWrap("better off alone tonight", w*dotsPerCellX, rows*dotsPerCellY)
 	img, layout, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
 	if !ok {
 		t.Fatal("the face could not draw the test line")
 	}
-	if layout.Count != 4 {
-		t.Fatalf("the layout found %d words in a line of four", layout.Count)
-	}
 	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
 	m.words.cellsX, m.words.cellsY, m.words.where = w, rows, layout
 	m.words.since = time.Now().Add(-time.Second)
 
-	shape := func() string {
-		var sb strings.Builder
-		for _, line := range m.wordsLines(w, rows) {
-			sb.WriteString(ansiOff(line))
-		}
-		return sb.String()
+	freqs, levels := len(m.styles.Words), len(m.styles.Words[0])
+	count := layout.Count
+	if count < 3 {
+		t.Fatalf("the line came out in %d words", count)
 	}
-	painted := func() string { return strings.Join(m.wordsLines(w, rows), "") }
 
-	// The first word, sung over a bass note.
+	// A hit in the bass alone: the first word answers it and the last does not.
 	bass := make([]float32, 28)
 	for i := range bass {
-		bass[i] = 0.1
+		bass[i] = 0.05
 	}
-	bass[1] = 1
+	for i := range 4 {
+		bass[i] = 1
+	}
 	m.scope.bands = bass
-	m.setProgress(500 * time.Millisecond)
-	m.wordsFlow(w, rows)
 
-	early := m.words.sung
-	first := m.words.paint[early]
-	if !first.set {
-		t.Fatal("the word being sung was not painted at all")
+	first := m.wordsBeatPaint(0, count, freqs, levels)
+	last := m.wordsBeatPaint(count-1, count, freqs, levels)
+	t.Logf("on a bass hit the first word burns at %d and the last at %d", first.level, last.level)
+	if first.level <= last.level {
+		t.Errorf("the bass lit the first word at %d and the last at %d, want the first brighter", first.level, last.level)
 	}
 
-	// The third word, sung over a cymbal: a different colour entirely.
+	// And a cymbal the other way about.
 	high := make([]float32, 28)
 	for i := range high {
-		high[i] = 0.1
+		high[i] = 0.05
 	}
-	high[26] = 1
+	for i := 24; i < 28; i++ {
+		high[i] = 1
+	}
 	m.scope.bands = high
-	m.setProgress(5 * time.Second)
 
-	was := shape()
-	m.wordsFlow(w, rows)
-	t.Logf("word %d kept hue %d, and the word being sung is now %d", early, first.hue, m.words.sung)
+	first, last = m.wordsBeatPaint(0, count, freqs, levels), m.wordsBeatPaint(count-1, count, freqs, levels)
+	t.Logf("on a cymbal the first word burns at %d and the last at %d", first.level, last.level)
+	if last.level <= first.level {
+		t.Errorf("the cymbal lit the last word at %d and the first at %d, want the last brighter", last.level, first.level)
+	}
 
-	if m.words.sung <= early {
-		t.Fatalf("the singer never got past word %d", early)
-	}
-	if got := m.words.paint[m.words.sung]; !got.set || got.hue == first.hue {
-		t.Errorf("a word sung over a cymbal took hue %d, the same as one sung over a bass note", got.hue)
-	}
-	// The earlier word kept what it was sung in rather than following the music.
-	if m.words.paint[early].hue != first.hue {
-		t.Errorf("the earlier word repainted itself from %d to %d", first.hue, m.words.paint[early].hue)
-	}
-	// And nothing moved.
-	if shape() != was {
-		t.Error("the letters moved when the colour did, want them still")
-	}
-	if painted() == "" {
-		t.Error("nothing was drawn")
+	// Every word is lit, whatever is playing: the line is read as a line.
+	for i := range count {
+		if p := m.wordsBeatPaint(i, count, freqs, levels); p.level <= 0 {
+			t.Errorf("word %d went out at %d", i, p.level)
+		}
 	}
 }
 
@@ -430,51 +411,6 @@ func TestWordsLandOnTheLine(t *testing.T) {
 	t.Logf("the line arrives %v before it is sung, %v of the gathering already spent", wait, spent)
 	if spent < 0 || spent > wordsGather {
 		t.Errorf("%v of the gathering is spent on arrival, want between 0 and %v", spent, wordsGather)
-	}
-}
-
-// A lyric sheet says when a line starts and nothing else, so how far into it the
-// singer has got is a guess. Spreading the words evenly over the gap to the next
-// line is a bad guess — measured over three hundred lines, a line fills about
-// half of its gap — so the length is guessed from the line itself instead, and
-// the guess is made to fail early rather than late.
-func TestWordsGuessTheLineLengthFromTheLine(t *testing.T) {
-	m := scopeModel(100, 44)
-	m.width, m.height = 90, 20
-	m.ps.TrackID = "now"
-
-	m.lyrics.synced, m.lyrics.forTrack = true, "now"
-	// A short line with a long gap after it: the singer is done well before the
-	// next line arrives, and the old arithmetic would have been halfway through
-	// the line when they had finished it.
-	m.lyrics.lines = []player.Lyric{
-		{At: 0, Words: "one two three four"},
-		{At: 30_000, Words: "long after"},
-	}
-	m.words.where.Count = 4
-
-	// Two seconds in, a line of eighteen characters is over at any singing rate.
-	m.setProgress(2 * time.Second)
-	if got := m.wordsSung(); got < 3 {
-		t.Errorf("two seconds into a four word line the picture is on word %d, want it at the end", got)
-	}
-
-	// And it holds there rather than running past it.
-	m.setProgress(20 * time.Second)
-	if got := m.wordsSung(); got != 3 {
-		t.Errorf("twenty seconds in the picture is on word %d, want it held on the last", got)
-	}
-
-	// A line that genuinely fills its gap is still followed through it.
-	m.lyrics.lines = []player.Lyric{
-		{At: 0, Words: "one two three four"},
-		{At: 1_500, Words: "hard after"},
-	}
-	m.setProgress(200 * time.Millisecond)
-	early := m.wordsSung()
-	m.setProgress(900 * time.Millisecond)
-	if late := m.wordsSung(); late <= early {
-		t.Errorf("through a tight line the picture went from word %d to %d", early, late)
 	}
 }
 
@@ -729,41 +665,5 @@ func TestTheNoteLeavesRoomForTheMeter(t *testing.T) {
 	}
 	if head := m.wordsHeadroom(rows); head < wordsBand*dotsPerCellY {
 		t.Errorf("the note leaves %d dots over it, want at least %d", head, wordsBand*dotsPerCellY)
-	}
-}
-
-// A letter has an edge, and a stamped one does not. The type is dithered
-// against a threshold, and how far over it each dot fell is exactly what a
-// threshold throws away — kept and drawn as strength, the strokes soften at
-// their edges instead of ending in a wall of dots.
-func TestLettersHaveSoftEdges(t *testing.T) {
-	const w, rows = 70, 16
-
-	m := scopeModel(100, 44)
-	m.width, m.height = w, rows
-	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
-
-	// One word, so every colour on the screen is a shade of the same word's
-	// rather than a difference between two of them.
-	img, layout, ok := wordsImage([]string{"barát"}, w*dotsPerCellX, rows*dotsPerCellY)
-	if !ok {
-		t.Fatal("the face could not draw the test word")
-	}
-	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
-	m.words.cellsX, m.words.cellsY, m.words.where = w, rows, layout
-	m.words.since = time.Now().Add(-time.Second)
-
-	shades := map[string]bool{}
-	for _, line := range m.wordsLines(w, rows) {
-		for _, part := range strings.Split(line, "\x1b[") {
-			if i := strings.Index(part, "m"); i > 0 && strings.HasPrefix(part, "38;2;") {
-				shades[part[:i]] = true
-			}
-		}
-	}
-	t.Logf("one word is drawn in %d shades", len(shades))
-
-	if len(shades) < 3 {
-		t.Errorf("one word came out in %d shades, want the strokes softer at their edges", len(shades))
 	}
 }

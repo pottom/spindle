@@ -117,7 +117,7 @@ func Grind(img image.Image, cellsX, cellsY, perX, perY int) Grain {
 				continue
 			}
 			g.Cell[cy*cellsX+cx] = color.RGBA{
-				R: round(r/n), G: round(gr/n), B: round(b/n), A: 255,
+				R: round(r / n), G: round(gr / n), B: round(b / n), A: 255,
 			}
 		}
 	}
@@ -178,5 +178,3 @@ func stretch(lum []uint8) {
 		lum[i] = uint8(min(max((float64(v)-float64(lo))/span, 0), 1) * 255)
 	}
 }
-
-

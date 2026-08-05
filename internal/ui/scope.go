@@ -63,7 +63,7 @@ const (
 func (s scopeMode) next() scopeMode { return (s + 1) % scopeModes }
 
 // wants reports whether a mode needs the waveform rather than the bands.
-func (s scopeMode) wave() bool { return s == scopeWave }
+func (s scopeMode) wave() bool   { return s == scopeWave }
 func (s scopeMode) bars() bool   { return s == scopeBars }
 func (s scopeMode) mirror() bool { return s == scopeMirror }
 func (s scopeMode) ladder() bool { return s == scopeLadder }

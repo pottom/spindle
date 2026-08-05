@@ -412,23 +412,9 @@ type wordsState struct {
 	// happened to be built, so the words are complete as the line begins rather
 	// than half a second into it.
 	starts int64
-
-	// sung is how many words of the line have been reached, and paint is what
-	// each of them was sung in.
-	//
-	// This is the picture's whole idea. A word is coloured by the sound that was
-	// in the air as it went by — the hue from where the loudest of the spectrum
-	// sat, the strength from how loud it was — and then it keeps that colour for
-	// the rest of the line. By the end of a line the words are a record of how
-	// they sounded: a growled low word stays dark and red, a word sung over a
-	// cymbal crash stays bright at the other end of the scale. Nothing else here
-	// remembers anything; this is the one picture that does.
-	sung  int
-	paint []wordPaint
 }
 
-// wordPaint is a word's colour: which hue of the palette, at what strength, and
-// whether it has been sung yet at all.
+// wordPaint is a word's colour: which hue of the palette, and at what strength.
 type wordPaint struct {
 	hue, level int8
 	set        bool
@@ -465,51 +451,12 @@ const (
 	// distraction.
 	wordsBand = 6
 
-	// wordsRate is how fast a line is taken to be sung, in characters a second,
-	// and wordsLeast the shortest a line is ever given.
-	//
-	// A lyric sheet says when a line starts and nothing else, so how far into it
-	// the singer has got is a guess whatever we do. Spreading the words evenly
-	// over the gap to the next line — which is the obvious guess, and what this
-	// did — is a bad one: measured over three hundred lines of six records, the
-	// rate that assumption implies runs from two and a half characters a second
-	// to twenty-two, a fivefold spread inside a single song, and a line at a
-	// plausible singing rate fills only about half of its gap. Half the time the
-	// highlight was therefore pointing at a word the singer had left.
-	//
-	// Guessing the length from the line itself is the better guess: it is wrong
-	// in the safe direction. Finishing early leaves the last word lit while it
-	// is still being sung; finishing late points at a word already gone.
-	wordsRate  = 12
-	wordsLeast = 800 * time.Millisecond
-
-	// wordsEdge is how many words the light reaches past the one being sung.
-	//
-	// A hard spotlight on a single word claims a precision the timing does not
-	// have — a lyric sheet says when a line starts and nothing else — and worse,
-	// it gives the eye nothing to hold: one word in a line of ten looks the same
-	// wherever it is. A front of three or four words fading away ahead of it
-	// reads as a place in the line rather than as a claim about a word, and it
-	// is what a hand does when it follows a line of print.
-	wordsEdge = 3
-
-	// wordsBehind is what a word that has been sung keeps of its strength. Well
-	// under the front, so where the light has got to is the brightest thing on
-	// the screen and the rest of the line is plainly either side of it.
-	wordsBehind = 0.5
-
 	// wordsRangeLeast is the narrowest range of sound the colours are spread
 	// over, in bands, and wordsRangeClose how fast the range closes back in when
 	// the sound stops going that far. Slow: a chorus that opens the range should
 	// still be using it a verse later.
 	wordsRangeLeast = 2.5
 	wordsRangeClose = 0.0015
-
-	// wordsCore is what a cell on the very edge of a stroke keeps of its word's
-	// strength; a cell in the middle of one keeps all of it. Low enough that the
-	// edge is visibly softer, high enough that a thin letter does not fade out
-	// altogether.
-	wordsCore = 0.55
 
 	// wordsNotes is what goes up for a bar with no words in it.
 	wordsNotes = "♪ ♫ ♪"
@@ -570,17 +517,6 @@ func (m Model) wordsLines(w, rows int) []string {
 		}
 	}
 
-	// How far into a stroke each cell sits.
-	//
-	// The type is dithered against a threshold, and everything about a letter
-	// that a threshold throws away is the thing that makes it a letter: how far
-	// over the line each dot was. A dot in the middle of a stem clears it by a
-	// mile and one on the edge of a curve by nothing, so keeping the difference
-	// and drawing it as strength gives the letter a soft edge — which is what a
-	// letter has, and what a stamped one does not.
-	deep := make([]float32, w*rows)
-	soft := make([]bool, w*rows)
-
 	// How far along the gathering is. Held at one once it is over, so the
 	// steady picture costs no arithmetic it does not need.
 	gather := float32(1)
@@ -588,43 +524,21 @@ func (m Model) wordsLines(w, rows int) []string {
 		gather = float32(since) / float32(wordsGather)
 	}
 
-	// What each word is burning at, and in what colour. Three states: what has
-	// been sung keeps the colour it was sung in, what is being sung now burns at
-	// the top of the scale in the colour of this moment, and what is still to
-	// come waits, dim.
-	nowHue, nowLevel := m.wordsColourNow()
+	// What each word is burning at, and in what colour.
+	//
+	// The whole line, all of it lit, and every word answering its own share of
+	// the sound: the first word beats with the bass and the last with the
+	// cymbals, so the line moves in time without any of it claiming to know
+	// where the singer has got to.
+	//
+	// It used to claim exactly that — a light travelling along the line, word by
+	// word. The trouble is that a lyric sheet says when a line starts and
+	// nothing else, so where the singer is inside it is a guess; and a guess
+	// that is right most of the time is worse than no guess at all, because the
+	// times it is wrong are the times you are looking straight at it.
 	paints := make([]wordPaint, m.words.where.Count)
 	for i := range paints {
-		waiting := int8(min(int(wordsAhead*float32(levels)), levels-1))
-
-		switch ahead := i - m.words.sung; {
-		case m.words.beats:
-			// The notes: each takes the colour of the part of the sound it
-			// stands over, over and over — the one on the left answers the bass
-			// and the one on the right the cymbals — so they beat with the music
-			// rather than sitting in the colour they happened to arrive in.
-			paints[i] = m.wordsBeatPaint(i, len(paints), freqs, levels)
-
-		case ahead < 0:
-			// Behind the light: what it was sung in, kept, and dimmed so that
-			// the front of the line is the brightest thing on the screen.
-			p := wordPaint{hue: nowHue, level: waiting}
-			if i < len(m.words.paint) && m.words.paint[i].set {
-				p = m.words.paint[i]
-			}
-			paints[i] = wordPaint{hue: p.hue, level: int8(float32(p.level) * wordsBehind), set: true}
-
-		case ahead <= wordsEdge:
-			// The front: the word the singer is taken to be on, and the few
-			// after it fading away — a place in the line rather than a claim
-			// about a word.
-			fade := 1 - float32(ahead)/float32(wordsEdge+1)
-			level := max(int8(float32(nowLevel)*fade), waiting)
-			paints[i] = wordPaint{hue: nowHue, level: level, set: true}
-
-		default:
-			paints[i] = wordPaint{level: waiting}
-		}
+		paints[i] = m.wordsBeatPaint(i, len(paints), freqs, levels)
 		if gather < 1 {
 			paints[i].level = int8(float32(paints[i].level) * gather)
 		}
@@ -664,10 +578,6 @@ func (m Model) wordsLines(w, rows int) []string {
 			cell := (to/dotsPerCellY)*w + at/dotsPerCellX
 			grid[cell] |= 1 << brailleBit[at%dotsPerCellX][to%dotsPerCellY]
 
-			if over := float32(int(g.Lum[y*dotsX+x])-grainLit) / float32(255-grainLit); over > deep[cell] {
-				deep[cell] = over
-			}
-
 			// The colour comes from the word this dot belongs to, wherever the
 			// dot has been thrown to: a letter keeps its word's colour while it
 			// is still in the air.
@@ -678,20 +588,7 @@ func (m Model) wordsLines(w, rows int) []string {
 			} else if paint[cell] < 0 {
 				paint[cell] = int8(min(int(wordsAhead*float32(levels)), levels-1))
 			}
-			soft[cell] = true
 		}
-	}
-
-	// The soft edge, applied once the words have had their say: a cell at the
-	// edge of a stroke is drawn down the palette from one in the middle of it,
-	// and never further down than the dimmest a letter is allowed to go.
-	floor := int8(min(int(wordsAhead*float32(levels)), levels-1))
-	for i, s := range soft {
-		if !s || paint[i] < 0 {
-			continue
-		}
-		v := wordsCore + (1-wordsCore)*deep[i]
-		paint[i] = max(int8(float32(paint[i])*v), floor)
 	}
 
 	// Whatever the words left over goes to the music, drawn into the same grid
@@ -923,63 +820,19 @@ func (m *Model) wordsGrind() tea.Cmd {
 	return wordsCmd(lines, m.width, m.height)
 }
 
-// wordsFlow follows the singer along the line, and paints each word with the
-// sound that was in the air as it went by.
+// wordsFlow keeps the range of sound the colours are spread over.
+//
+// It is the only thing the line needs following now: where the singer has got
+// to inside it is not asked, because a lyric sheet cannot answer it, and every
+// word answers a part of the sound instead.
 func (m *Model) wordsFlow(w, rows int) {
-
 	if m.words.where.Count == 0 {
 		return
-	}
-	if len(m.words.paint) != m.words.where.Count {
-		m.words.paint = make([]wordPaint, m.words.where.Count)
 	}
 
 	if centre, _ := wordsCentre(m.scope.bands); len(m.scope.bands) > 0 {
 		m.wordsFollowCentre(centre)
 	}
-
-	m.words.sung = m.wordsSung()
-
-	// The word being sung takes the colour of this moment, over and over, so
-	// what it keeps is how it sounded as it ended rather than how the line
-	// happened to start.
-	if at := m.words.sung; at >= 0 && at < len(m.words.paint) {
-		hue, level := m.wordsColourNow()
-		m.words.paint[at] = wordPaint{hue: hue, level: level, set: true}
-	}
-}
-
-// wordsSung is how many words of the line have been reached.
-func (m Model) wordsSung() int {
-	if !m.lyrics.synced || m.ps == nil || m.lyrics.forTrack != m.ps.TrackID {
-		return m.words.where.Count // a title is not sung: it is all there at once
-	}
-
-	at := m.lyricsAt()
-	if at < 0 || at >= len(m.lyrics.lines) {
-		return 0
-	}
-
-	line := m.lyrics.lines[at].Words
-
-	// How long the line is taken to last: what it would take to sing it, rather
-	// than the whole gap before the next one. See wordsRate.
-	slot := lyricsDefaultLine
-	if at+1 < len(m.lyrics.lines) {
-		slot = time.Duration(m.lyrics.lines[at+1].At-m.lyrics.lines[at].At) * time.Millisecond
-	}
-	sung := time.Duration(float64(len([]rune(line))) / wordsRate * float64(time.Second))
-	sung = min(max(sung, wordsLeast), slot)
-	if sung <= 0 {
-		return 0
-	}
-
-	along := float64(m.lyricsClock()-m.lyrics.lines[at].At) / float64(sung/time.Millisecond)
-	along = min(max(along, 0), 1)
-
-	// Which word that lands on: the line's own words, so a line broken over
-	// three display lines still counts as one sentence.
-	return min(int(along*float64(len(strings.Fields(line)))), m.words.where.Count-1)
 }
 
 // wordsBeatPaint is what one of the notes burns at: its own share of the

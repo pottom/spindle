@@ -204,7 +204,6 @@ type Model struct {
 	// words is the line being sung, in dots. See words.go.
 	words wordsState
 
-
 	// lyrics is the words of the track playing, and whether they are on screen.
 	lyrics lyricsState
 
