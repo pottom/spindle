@@ -14,11 +14,10 @@ import (
 // record to one picture and leave it there. Three minutes of the same meter.
 //
 // So it takes turns instead. The record is cut into spells; something is set at
-// the top of each one for as long as a title was ever worth, and the music has
-// the rest of it — drawn as the mirrored meter one spell and as the sleeve
-// itself the next. What goes up is dealt from the track, never the same card
-// twice running, so a record plays the same way twice and still does not repeat
-// itself.
+// the top of each one for a few seconds and the music has the rest of it, drawn
+// as the mirrored meter one spell and as the stack of lamps the next. What goes
+// up is dealt from the track, never the same card twice running, so a record
+// plays the same way twice and still does not repeat itself.
 
 // wordsSpell is how long one turn lasts. Long enough that a card is an event
 // rather than a caption, short enough that a record of any length gets several.
@@ -28,12 +27,17 @@ const wordsSpell = 30 * time.Second
 type wordsCard int
 
 const (
-	wordsCardTitle  wordsCard = iota // the record saying its own name
+	wordsCardNone   wordsCard = iota // the music, and nothing over it
+	wordsCardTitle                   // the record saying its own name
 	wordsCardArtist                  // and whose it is
 	wordsCardAlbum                   // and what it came out on
-	wordsCardNotes                   // and, when it has said all that, three notes
-	wordsCards
+	wordsCardNotes                   // and three notes, for a bar with nothing to say
 )
+
+// wordsCardPool is what a turn can be dealt after the record has said its name.
+// The title is not in it: a record says what it is once. See soloCard for the
+// same rule where there are words to get out of the way of.
+var wordsCardPool = []wordsCard{wordsCardArtist, wordsCardAlbum, wordsCardNotes}
 
 // wordsWordless reports that the lyric database has nothing for what is
 // playing — or has not answered about it yet, which at the top of a record
@@ -71,6 +75,8 @@ func (m Model) wordsIdle() ([]string, int64) {
 
 	var lines []string
 	switch m.wordsCardFor(spell) {
+	case wordsCardNone:
+		return nil, 0
 	case wordsCardTitle:
 		lines = []string{m.ps.Title}
 		if len(m.ps.Artists) > 0 {
@@ -98,17 +104,25 @@ func (m Model) wordsIdle() ([]string, int64) {
 
 // wordsCardFor is the card a turn gets.
 //
-// The first is always the record announcing itself, the way a sleeve is worth a
-// look as it goes on the turntable. After that they are dealt from the track,
-// each one stepping on from the last by at least one, so the same card never
-// comes up twice running.
+// The first turn gets nothing: the top of a record is where it changed, and a
+// caption there is a caption on something nobody has started listening to. The
+// second is the record saying its own name, once and never again. After that
+// they are dealt from what is left, each stepping on from the last by at least
+// one, so the same card never comes up twice running.
 func (m Model) wordsCardFor(spell int) wordsCard {
-	card := wordsCardTitle
-	for turn := 1; turn <= spell; turn++ {
-		h := wordsDeal(m.ps.TrackID, turn)
-		card = (card + 1 + wordsCard(h%uint64(wordsCards-1))) % wordsCards
+	switch spell {
+	case 0:
+		return wordsCardNone
+	case 1:
+		return wordsCardTitle
 	}
-	return card
+
+	var at int
+	for turn := 2; turn <= spell; turn++ {
+		h := wordsDeal(m.ps.TrackID, turn)
+		at = (at + 1 + int(h%uint64(len(wordsCardPool)-1))) % len(wordsCardPool)
+	}
+	return wordsCardPool[at]
 }
 
 // wordsDeal is the number a track's nth turn is dealt from.

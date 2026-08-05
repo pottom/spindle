@@ -28,12 +28,24 @@ func wordless(t *testing.T) Model {
 func TestAWordlessRecordTakesTurns(t *testing.T) {
 	m := wordless(t)
 
+	// The top of a record is where it changed, so nothing is put over it; the
+	// turn after that is the one time it says its own name.
+	if got := m.wordsCardFor(0); got != wordsCardNone {
+		t.Errorf("the record opens on card %d, want the music alone", got)
+	}
+	if got := m.wordsCardFor(1); got != wordsCardTitle {
+		t.Errorf("the second turn deals %d, want the record's own name", got)
+	}
+
 	seen := map[wordsCard]int{}
-	was := wordsCards
-	for spell := range 12 {
+	was := wordsCardTitle
+	for spell := 2; spell < 14; spell++ {
 		card := m.wordsCardFor(spell)
 		if card == was {
 			t.Errorf("turn %d deals %d again, want a card it did not just show", spell, card)
+		}
+		if card == wordsCardTitle {
+			t.Errorf("turn %d says the record's name again, want it said once", spell)
 		}
 		seen[card]++
 		was = card
@@ -47,16 +59,10 @@ func TestAWordlessRecordTakesTurns(t *testing.T) {
 	// And the same record deals the same way twice, so a song looked at again
 	// is the song that was looked at.
 	again := wordless(t)
-	for spell := range 12 {
+	for spell := range 14 {
 		if a, b := m.wordsCardFor(spell), again.wordsCardFor(spell); a != b {
 			t.Fatalf("turn %d dealt %d one time and %d the next", spell, a, b)
 		}
-	}
-
-	// The first is the record announcing itself, the way a sleeve is worth a
-	// look as it goes on.
-	if got := m.wordsCardFor(0); got != wordsCardTitle {
-		t.Errorf("the record opens on card %d, want its own name", got)
 	}
 }
 
@@ -65,18 +71,19 @@ func TestAWordlessRecordTakesTurns(t *testing.T) {
 func TestTheMusicHasMostOfEachTurn(t *testing.T) {
 	m := wordless(t)
 
-	m.setProgress(0)
+	m.setProgress(wordsSpell)
 	if lines, _ := m.wordsIdle(); len(lines) == 0 {
-		t.Fatal("the record opens on nothing")
+		t.Fatal("the turn that says the record's name says nothing")
 	}
 
-	m.setProgress(wordsTitle + time.Second)
+	m.setProgress(wordsSpell + wordsTitle + time.Second)
 	if lines, _ := m.wordsIdle(); len(lines) != 0 {
-		t.Errorf("the card is still up at %s, want the music to have the turn: %q", wordsTitle+time.Second, lines)
+		t.Errorf("the card is still up %s into the turn, want the music to have it: %q",
+			wordsTitle+time.Second, lines)
 	}
 
-	// And the next turn brings one back.
-	m.setProgress(wordsSpell + time.Second)
+	// And the turn after that brings one back.
+	m.setProgress(2*wordsSpell + time.Second)
 	if lines, _ := m.wordsIdle(); len(lines) == 0 {
 		t.Error("the next turn deals nothing")
 	}

@@ -63,6 +63,9 @@ func TestWordsShowTheLineOrTheRecord(t *testing.T) {
 	m.width, m.height = 100, 40
 	m.ps.TrackID = "now"
 
+	// Not at the very top of it, where the record has only just changed: the
+	// turn after that is where a wordless record says its name. See idle.go.
+	m.setProgress(wordsSpell)
 	if got := m.wordsNow(); len(got) == 0 || !strings.Contains(got[0], "playing") {
 		t.Errorf("with no lyrics the picture shows %q, want the record", got)
 	}
@@ -328,25 +331,28 @@ func TestWordsGiveWhatIsLeftToTheMusic(t *testing.T) {
 	}
 }
 
-// A song between two lines is a song playing: the screen goes to the music
-// rather than holding the last line up or going blank. A song with no lyrics at
-// all is a different case, and keeps its title.
+// A song between two lines is a song playing. A short gap goes to the music; a
+// long one goes to the marks, which keep time with it. Either way the last line
+// sung is not left standing over the whole of a solo.
 func TestWordsGiveTheScreenBackBetweenLines(t *testing.T) {
 	m := scopeModel(100, 44)
 	m.width, m.height = 90, 30
 	m.ps.TrackID = "now"
+	m.ps.Duration = 3 * time.Minute
 
 	m.lyrics.synced, m.lyrics.forTrack = true, "now"
 	m.lyrics.lines = []player.Lyric{
 		{At: 20_000, Words: "the first line, long after the start"},
-		{At: 30_000, Words: ""},
-		{At: 40_000, Words: "and after the solo"},
+		{At: 26_000, Words: "and the second"},
+		{At: 45_000, Words: "and after the solo"},
 	}
 
-	// The opening bars, before anything is sung.
+	// The opening bars: twenty seconds of nothing sung, which is a bar of its
+	// own and gets the marks.
 	m.setProgress(time.Second)
-	if !m.wordsSilent() {
-		t.Error("the screen is showing words before the first line is sung")
+	lines, _ := m.wordsComing()
+	if len(lines) != 1 || lines[0] != wordsNotes {
+		t.Errorf("before the first line the screen has %q, want the marks", lines)
 	}
 
 	// The line itself.
@@ -355,22 +361,35 @@ func TestWordsGiveTheScreenBackBetweenLines(t *testing.T) {
 		t.Error("the screen went to the music while a line was being sung")
 	}
 
-	// The gap the sheet marks with an empty line.
+	// Nineteen seconds with nothing in them: the line goes once it has had its
+	// time, and the marks have the rest. Not the middle of it, which is where
+	// the record says its own name — see solo.go.
 	m.setProgress(34 * time.Second)
-	if !m.wordsSilent() {
-		t.Error("the screen held a line up through the solo")
+	lines, _ = m.wordsComing()
+	if len(lines) != 1 || lines[0] != wordsNotes {
+		t.Errorf("through the solo the screen has %q, want the marks", lines)
 	}
 
-	// A song with no lyrics at all shows its name as it starts, and then gives
-	// the screen over as well: a title is worth reading once.
-	m.lyrics.synced = false
-	m.setProgress(2 * time.Second)
-	if m.wordsSilent() {
-		t.Error("a song with no lyrics gave up its title as it started")
+	// A gap too short to be worth anything goes to the music instead.
+	m.lyrics.lines = []player.Lyric{
+		{At: 20_000, Words: "one"},
+		{At: 30_000, Words: ""},
+		{At: 31_000, Words: "two"},
 	}
-	m.setProgress(wordsTitle + time.Second)
+	m.setProgress(30 * time.Second)
 	if !m.wordsSilent() {
-		t.Error("a song with no lyrics held its title up long after it started")
+		t.Error("a one second gap was given something to look at")
+	}
+
+	// A song with no lyrics at all takes its turns instead. See idle.go.
+	m.lyrics.synced = false
+	m.setProgress(wordsSpell)
+	if m.wordsSilent() {
+		t.Error("a song with no lyrics never says what it is")
+	}
+	m.setProgress(wordsSpell + wordsTitle + time.Second)
+	if !m.wordsSilent() {
+		t.Error("a song with no lyrics held its title up long after it went up")
 	}
 }
 

@@ -248,6 +248,13 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.words.have, m.words.text = message.Grain, message.Text
 		m.words.move = wordsMoveFor(message.Text)
+		if m.words.telling {
+			// The one picture that is not dealt its arrival: the record's name
+			// comes in from outside every time, and the marks it took the bar
+			// from go out the way it came. A ceremony has to be the same twice
+			// or it is just another transition.
+			m.words.move = wordsBursting
+		}
 		m.words.where = message.Words
 		m.words.cellsX, m.words.cellsY = message.CellsX, message.CellsY
 

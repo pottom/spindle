@@ -384,6 +384,17 @@ func (m Model) wordsComing() ([]string, int64) {
 	if m.lyrics.synced && m.ps != nil && m.lyrics.forTrack == m.ps.TrackID {
 		at, clock := m.wordsAt(), m.wordsClock()
 
+		// A bar nobody sings, and long enough to be worth something of its own:
+		// the marks keep it, and once in a record the name of what is playing
+		// takes it off them for a moment. See solo.go.
+		if gap, in := m.soloNow(); in {
+			if m.soloTelling() {
+				card, _ := m.soloCard()
+				return m.soloName(), card.from
+			}
+			return []string{wordsNotes}, gap.from
+		}
+
 		// The next line, if it is close enough that its gathering has begun.
 		if next := at + 1; next < len(m.lyrics.lines) {
 			if m.lyrics.lines[next].At-clock <= int64(wordsGather/time.Millisecond) {
@@ -490,6 +501,12 @@ type wordsState struct {
 	// keep a colour: nobody is singing it, so there is no moment to paint it
 	// with and it follows the music instead.
 	beats bool
+
+	// telling says what is on screen is the record's own name, put up once in
+	// the middle of a solo. It arrives the same way every time and it holds
+	// still while it is there: everything around it is already moving, and a
+	// title card that jumps about with the rest is not a card, it is noise.
+	telling bool
 
 	// starts is when the line on screen is sung, on the playback clock. The
 	// gathering is timed against it rather than against the moment the picture
@@ -1066,6 +1083,7 @@ func (m *Model) wordsGrind() tea.Cmd {
 	was := m.words.starts
 	m.words.starts, m.words.ends = starts, m.wordsEnds(starts)
 	m.words.beats = len(lines) == 1 && wordsBeats(lines[0])
+	m.words.telling = m.soloTelling()
 
 	text := strings.Join(lines, "\n")
 	if m.words.text == text && m.words.cellsX == m.width && m.words.cellsY == m.height {
@@ -1135,7 +1153,7 @@ func wordsRideFor(text string) wordsRide {
 // a note is a mark keeping time and a word is something to read, so the words
 // are given a third of the jump and only when their own line drew it.
 func (m Model) wordsRiding(count int) []int {
-	if count <= 0 {
+	if count <= 0 || m.words.telling {
 		return nil
 	}
 
@@ -1200,7 +1218,7 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 	}
 
 	seed := m.wordsLeanSeed()
-	if count <= 0 || seed%every != 0 {
+	if count <= 0 || m.words.telling || seed%every != 0 {
 		return nil, nil
 	}
 
