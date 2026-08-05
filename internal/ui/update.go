@@ -203,6 +203,14 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case msg.Error:
+		// Whatever was in flight is not in flight any more. Every list marks
+		// itself as reading so a run of cursor keys cannot ask for the same
+		// page a dozen times; without clearing that here, one failed request —
+		// a moment offline, a refused call — would leave the mark set for good
+		// and the list would never ask for anything again. It looks like a list
+		// that simply ends, which is the worst kind of failure: a silent one.
+		m.stopLoading()
+
 		if errors.Is(message.Err, player.ErrPremiumRequired) {
 			m.noPremium = true
 			return m, nil
@@ -763,6 +771,21 @@ func (m *Model) stillWaitingForTrackChange(st *player.State) bool {
 		return false
 	}
 	return true
+}
+
+// stopLoading takes the reading mark off every list. It says nothing about
+// whether the page arrived — only that nothing is waiting for it any more, so
+// scrolling to the end will ask again.
+func (m *Model) stopLoading() {
+	for i := range m.library.pages {
+		m.library.pages[i].loading = false
+	}
+	for _, found := range m.search.found {
+		found.pages.loading = false
+	}
+	for i := range m.stack {
+		m.stack[i].pages.loading = false
+	}
 }
 
 // shouldResync decides whether this tick carries a real state fetch. Polling

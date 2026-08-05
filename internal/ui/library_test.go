@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -144,5 +145,27 @@ func TestTheHistoryIsNotPaged(t *testing.T) {
 
 	if got := tm.(Model).library.countOf(libraryRecent); got != len(recent) {
 		t.Errorf("the history holds %d rows after two answers, want %d", got, len(recent))
+	}
+}
+
+// A request that failed is not a request still in flight. Every list marks
+// itself as reading so a run of cursor keys cannot ask for the same page a
+// dozen times; a failure that left the mark set would end the list there for
+// good, and it would read as a list that simply stops.
+func TestAFailedPageDoesNotEndTheList(t *testing.T) {
+	m := likedModel(t)
+	m.library.pages[libraryPlaylists].loading = true
+	m.library.pages[libraryPlaylists].more = true
+	m.library.cursors[libraryPlaylists].cursor = len(m.library.playlists) - 1
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(msg.Error{Err: errors.New("network is down")})
+	got := tm.(Model)
+
+	if got.library.pages[libraryPlaylists].loading {
+		t.Error("the list is still waiting for a page that failed")
+	}
+	if got.readAhead() == nil {
+		t.Error("the list will not ask again after a failure")
 	}
 }
