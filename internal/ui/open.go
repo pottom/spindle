@@ -150,7 +150,7 @@ func (m *Model) push(page openPage) tea.Cmd {
 	page.pages = paging{loading: true}
 
 	m.stack = append(m.stack, page)
-	return tea.Batch(fetchOpenCmd(m.player, page.kind, page.id, 0), m.syncCover())
+	return tea.Batch(fetchOpenCmd(m.player, page.kind, page.id, 0), m.syncCover(), m.spinner.Tick)
 }
 
 // pop goes back one page, and reports whether there was one to go back from.

@@ -88,6 +88,22 @@ func (m Model) visibleListRows() int {
 	return listBodyRows(max(l.bodyHeight, 1), l.artHeight)
 }
 
+// listLoading reports whether the list on screen is waiting for a page. It is
+// what the spinner beside the heading turns for, and what stops a list that has
+// not arrived yet from claiming to be empty.
+func (m Model) listLoading() bool {
+	switch {
+	case m.open() != nil:
+		return m.open().pages.loading
+	case m.tab == tabLibrary:
+		return m.library.pages[m.library.kind].loading
+	case m.tab == tabSearch:
+		return m.search.current().pages.loading
+	default:
+		return false
+	}
+}
+
 // listKey applies the movement every list shares: a row, a page, or all the way
 // to an end. It reports whether the key was one of those, so each screen can go
 // on to its own keys.

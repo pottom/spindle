@@ -250,9 +250,10 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
-		// The other spinner only exists to cover an artwork download. Letting it
-		// run otherwise would mean a redraw every 100 ms for nothing.
-		if !m.cover.loading() {
+		// The other spinner covers a wait: an artwork download, or a page of a
+		// list that has not arrived. Letting it run otherwise would mean a
+		// redraw every 100 ms for nothing.
+		if !m.cover.loading() && !m.listLoading() {
 			return m, nil
 		}
 		var cmd tea.Cmd

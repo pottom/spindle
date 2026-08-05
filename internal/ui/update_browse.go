@@ -38,7 +38,11 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 		// elsewhere would otherwise never appear until spindle was restarted,
 		// and one page of a library is a cheap answer.
 		m.library.paging().loading = true
-		cmds = append(cmds, fetchLibraryCmd(m.player, m.library.kind, 0), fetchOpenCmd(m.player, openPlaylist, likedID, 0))
+		cmds = append(cmds,
+			fetchLibraryCmd(m.player, m.library.kind, 0),
+			fetchOpenCmd(m.player, openPlaylist, likedID, 0),
+			m.spinner.Tick,
+		)
 	case t == tabQueue:
 		// The queue is kept for the sake of instant skipping, which only needs
 		// the first entry to be right. Looking at the whole list is a different
@@ -208,7 +212,7 @@ func (m *Model) turnLibraryKind(delta int) tea.Cmd {
 	cmds := []tea.Cmd{m.syncCover()}
 	if m.library.countOf(next) == 0 && !m.library.pages[next].loading {
 		m.library.pages[next].loading = true
-		cmds = append(cmds, fetchLibraryCmd(m.player, next, 0))
+		cmds = append(cmds, fetchLibraryCmd(m.player, next, 0), m.spinner.Tick)
 	}
 	return tea.Batch(cmds...)
 }
@@ -321,7 +325,7 @@ func (m *Model) searchTypingKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	m.search.seq++
 	m.search.found = nil
 	m.search.current().pages.loading = true
-	return tea.Batch(cmd, searchCmd(m.player, m.search.input.Value(), "", m.search.seq, 0)), true
+	return tea.Batch(cmd, searchCmd(m.player, m.search.input.Value(), "", m.search.seq, 0), m.spinner.Tick), true
 }
 
 // startTyping hands the keyboard to the query, from whichever tab asked.
@@ -505,14 +509,17 @@ func (m *Model) sendPlay(req playRequest) tea.Cmd {
 func (m *Model) readAhead() tea.Cmd {
 	switch {
 	case m.open() != nil:
-		return m.openMut().readAhead(m.player)
+		if cmd := m.openMut().readAhead(m.player); cmd != nil {
+			return tea.Batch(cmd, m.spinner.Tick)
+		}
+		return nil
 
 	case m.tab == tabLibrary:
 		if !m.library.paging().wants(m.library.cursor().cursor, m.library.count()) {
 			return nil
 		}
 		m.library.paging().loading = true
-		return fetchLibraryCmd(m.player, m.library.kind, m.library.paging().next)
+		return tea.Batch(fetchLibraryCmd(m.player, m.library.kind, m.library.paging().next), m.spinner.Tick)
 
 	case m.tab == tabSearch:
 		found := m.search.current()
@@ -520,7 +527,10 @@ func (m *Model) readAhead() tea.Cmd {
 			return nil
 		}
 		found.pages.loading = true
-		return searchCmd(m.player, m.search.input.Value(), m.search.kind, m.search.seq, found.pages.next)
+		return tea.Batch(
+			searchCmd(m.player, m.search.input.Value(), m.search.kind, m.search.seq, found.pages.next),
+			m.spinner.Tick,
+		)
 
 	default:
 		return nil

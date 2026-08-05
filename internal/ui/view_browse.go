@@ -134,9 +134,15 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	}
 
 	// The heading carries the count on the right, where a subtitle line would
-	// otherwise cost a row the list could use.
+	// otherwise cost a row the list could use. A page on its way turns the
+	// spinner beside it: the rows already on screen are not all of them, and
+	// nothing else on the screen would say so.
 	if len(out) < rows {
-		out = append(out, spread(opts.heading(w), opts.subtitle(), w))
+		subtitle := opts.subtitle()
+		if m.listLoading() && opts.count > 0 {
+			subtitle += " " + m.spinner.View()
+		}
+		out = append(out, spread(opts.heading(w), subtitle, w))
 	}
 	if len(out) < rows {
 		out = append(out, strings.Repeat(" ", w))
@@ -159,7 +165,15 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	}
 
 	if opts.count == 0 && body > 0 {
-		out = append(out, fit(m.styles.Empty.Render(opts.empty), w))
+		// A list that has not arrived is not an empty list, and saying so is
+		// the difference between a slow answer and a wrong one. The pages are
+		// small — the search's limit is ten, and Spotify refuses eleven — so
+		// this is on screen often enough to be worth being exact about.
+		empty := m.styles.Empty.Render(opts.empty)
+		if m.listLoading() {
+			empty = m.spinner.View() + " " + m.styles.Empty.Render(opts.waiting)
+		}
+		out = append(out, fit(empty, w))
 	}
 
 	from, to := opts.state.window(opts.count, body)
@@ -191,8 +205,14 @@ type listScreen struct {
 
 	count int
 	state *listState
-	empty string
-	row   func(i, w int, selected bool) string
+
+	// empty is what to say when the list is empty, and waiting what to say
+	// while it might not be — a list still arriving looks exactly like one with
+	// nothing in it, and only one of the two is worth waiting for.
+	empty   string
+	waiting string
+
+	row func(i, w int, selected bool) string
 }
 
 // queueBlock is the queue screen. The playing track heads the list and is not
@@ -209,6 +229,7 @@ func (m Model) queueBlock(l layout, rows int) []string {
 		count:    len(rowsOf),
 		state:    &m.queuePane.cursor,
 		empty:    "Nothing is queued.",
+		waiting:  "Reading the queue…",
 		row: func(i, w int, selected bool) string {
 			number := i + 1
 			if playing {
@@ -495,22 +516,23 @@ func (m Model) libraryPaneView(l layout, rows int) []string {
 		count:    m.library.count(),
 		state:    &m.library.cursors[m.library.kind],
 		empty:    "Nothing saved yet.",
+		waiting:  "Reading your library…",
 	}
 
 	switch m.library.kind {
 	case libraryAlbums:
-		screen.empty = "No saved albums."
+		screen.empty, screen.waiting = "No saved albums.", "Reading your albums…"
 		screen.row = func(i, w int, selected bool) string {
 			return m.albumRow(blankMark, m.library.albums[i], w, selected)
 		}
 	case libraryArtists:
-		screen.empty = "Nobody followed yet."
+		screen.empty, screen.waiting = "Nobody followed yet.", "Reading who you follow…"
 		screen.row = func(i, w int, selected bool) string {
 			return m.artistRow(blankMark, m.library.artists[i], w, selected)
 		}
 	case libraryRecent:
 		screen.detail = m.trackDetail
-		screen.empty = "Nothing played yet."
+		screen.empty, screen.waiting = "Nothing played yet.", "Reading what you played…"
 		screen.row = func(i, w int, selected bool) string {
 			// Numbered by how far back it was, which is what the list is: the
 			// first row is the last thing heard.
@@ -579,6 +601,7 @@ func (m Model) openPageView(l layout, rows int) []string {
 		count:    page.count(),
 		state:    &m.stack[len(m.stack)-1].cursor,
 		empty:    "Nothing here.",
+		waiting:  "Reading it…",
 		row: func(i, w int, selected bool) string {
 			// An album's tracks are numbered by the record; a playlist's by
 			// where they sit in it. The two happen to be written the same way.
@@ -588,7 +611,7 @@ func (m Model) openPageView(l layout, rows int) []string {
 
 	if page.holdsAlbums() {
 		screen.detail = m.openAlbumDetail
-		screen.empty = "No records here."
+		screen.empty, screen.waiting = "No records here.", "Reading their records…"
 		screen.row = func(i, w int, selected bool) string {
 			return m.albumRow("", page.albums[i], w, selected)
 		}
@@ -682,10 +705,19 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 	// halfway down behind a wall of blank rows.
 	if found.count() == 0 {
 		w := queueBlockWidth(l)
+
+		// A query still in flight looks exactly like one that matched nothing,
+		// and the difference is worth a line: Spotify answers ten results at a
+		// time, so this screen is waiting more often than any other.
+		line := m.styles.Empty.Render(empty)
+		if m.listLoading() {
+			line = m.spinner.View() + " " + m.styles.Empty.Render("Asking Spotify…")
+		}
+
 		out := []string{
 			fit(m.searchField(max(w/3, 8)), w),
 			strings.Repeat(" ", w),
-			fit(m.styles.Empty.Render(empty), w),
+			fit(line, w),
 		}
 		for len(out) < rows {
 			out = append(out, strings.Repeat(" ", w))
@@ -702,6 +734,7 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 		count:    found.count(),
 		state:    &found.cursor,
 		empty:    empty,
+		waiting:  "Asking Spotify…",
 		row:      m.searchRow,
 	})
 }
