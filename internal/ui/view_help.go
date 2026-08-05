@@ -75,7 +75,7 @@ func helpGroups() []helpGroup {
 		title: "On the player",
 		keys: [][2]string{
 			{"v", "waveform, spectrum, water, off"},
-			{"V", "the visualiser, full screen"},
+			{"f", "full screen, and v switches it there"},
 			{"l", "the words, as they are sung"},
 			{"u", "what is coming next"},
 		},

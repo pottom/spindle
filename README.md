@@ -49,7 +49,7 @@ bottom. The ones worth knowing:
 | `m` | mute, remembering the level |
 | `s` `r` | shuffle, cycle repeat |
 | `v` | waveform → spectrum → mirrored, with water → off |
-| `V` | the visualiser, full screen — `v` switches it there, any other key comes back |
+| `f` | the visualiser, full screen — `v` switches it there, any other key comes back |
 | `l` | lyrics |
 | `u` | a glance at what is next |
 | `d` | devices |

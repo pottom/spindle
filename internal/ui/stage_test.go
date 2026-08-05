@@ -26,7 +26,7 @@ func TestStageTakesTheScreenAndGivesItBack(t *testing.T) {
 	m := scopeModel(100, 40)
 
 	var tm tea.Model = m
-	tm, cmd := tm.Update(tea.KeyPressMsg{Code: 'V', Text: "V"})
+	tm, cmd := tm.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 	got := tm.(Model)
 	if !got.stage.on {
 		t.Fatal("f did not open the big screen")
