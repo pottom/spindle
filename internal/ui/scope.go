@@ -45,6 +45,9 @@ const (
 	// them was built alongside it and dropped: the markers are what give the
 	// meter its character, and without them it is only a row of blocks.
 	scopeBars
+	// scopeFall is the waterfall: the same spectrum, but the last few seconds
+	// of it at once. See fall.go.
+	scopeFall
 	scopeModes // how many there are, for the cycle
 )
 
@@ -54,6 +57,11 @@ func (s scopeMode) next() scopeMode { return (s + 1) % scopeModes }
 // wants reports whether a mode needs the waveform rather than the bands.
 func (s scopeMode) wave() bool { return s == scopeWave }
 func (s scopeMode) bars() bool { return s == scopeBars }
+func (s scopeMode) fall() bool { return s == scopeFall }
+
+// spectrum reports whether a mode is drawn from the bands, whichever way round
+// it draws them.
+func (s scopeMode) spectrum() bool { return s.bars() || s.fall() }
 
 // scopeState is the visualiser the player screen is drawing, and what it is
 // drawing.
@@ -77,6 +85,10 @@ type scopeState struct {
 	// what gives a meter its hi-fi character.
 	bands []float32
 	peaks []float32
+
+	// fall is what the waterfall has kept: one slice of the spectrum per frame,
+	// newest last. See fall.go.
+	fall [][]float32
 
 	// trail is what the last few frames drew, newest last. A cathode ray tube
 	// leaves a glow behind the beam; without it a terminal trace looks redrawn
@@ -182,10 +194,14 @@ func (m Model) scopeWidth(l layout) int {
 
 // scopeRender draws whichever visualiser is on, across w cells.
 func (m Model) scopeRender(w int) []string {
-	if m.scopeMode().wave() {
+	switch {
+	case m.scopeMode().wave():
 		return m.scopeLines(w)
+	case m.scopeMode().fall():
+		return m.fallLines(w)
+	default:
+		return m.barsLines(w)
 	}
-	return m.barsLines(w)
 }
 
 // scopeRoom is how many blank rows sit below the artwork, which is what the

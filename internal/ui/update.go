@@ -251,6 +251,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if m.scopeMode().wave() {
 			m.rememberScope()
 		}
+		if m.scopeMode().fall() {
+			m.scope.rememberFall(message.Bands)
+		}
 		return m, scopeFrameCmd(m.player, m.scopeMode())
 
 	case spinner.TickMsg:

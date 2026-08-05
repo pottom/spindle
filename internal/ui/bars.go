@@ -183,6 +183,22 @@ func (m Model) bandsAt(bar, count int) (band, peak float32) {
 func (m Model) barsDraw(w int, grid []uint8, paint []int8) []string {
 	freqs := len(m.styles.Bars)
 
+	// On a spectrum the frequency runs across the screen, so the hue is chosen
+	// by the column. The waterfall runs it up the screen instead and chooses by
+	// the row, which is why the two are told rather than assumed.
+	hue := make([]int8, len(grid))
+	for r := range scopeRows {
+		for c := range w {
+			hue[r*w+c] = int8(min(c*freqs/w, freqs-1))
+		}
+	}
+	return m.drawCells(w, grid, paint, hue)
+}
+
+// drawCells turns a dot grid into rows of braille. Each cell is drawn in the
+// palette's hue for where it sits and the step in paint for how strong it is;
+// a cell with no dots, or none the caller painted, is left blank.
+func (m Model) drawCells(w int, grid []uint8, paint, hue []int8) []string {
 	lines := make([]string, scopeRows)
 	for r := range scopeRows {
 		var sb strings.Builder
@@ -206,8 +222,7 @@ func (m Model) barsDraw(w int, grid []uint8, paint []int8) []string {
 				continue
 			}
 
-			f := min(c*freqs/w, freqs-1)
-			want := m.styles.Bars[f][paint[at]]
+			want := m.styles.Bars[hue[at]][paint[at]]
 			if !lit || want.GetForeground() != style.GetForeground() {
 				flush()
 				style, lit = want, true
