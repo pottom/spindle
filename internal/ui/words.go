@@ -329,20 +329,9 @@ func (m Model) wordsComing() ([]string, int64) {
 		return nil, 0
 	}
 
-	// The record, then — but only at the top of it. A title is worth reading
-	// once, as the record starts, the way a sleeve is worth a look as it goes
-	// on the turntable; held up for the whole of a song with no words in the
-	// database it is a caption on a picture nobody is looking at any more. After
-	// its few seconds the screen goes to the music.
-	if m.elapsed() > wordsTitle {
-		return nil, 0
-	}
-
-	lines := []string{m.ps.Title}
-	if len(m.ps.Artists) > 0 {
-		lines = append(lines, strings.Join(m.ps.Artists, ", "))
-	}
-	return lines, 0
+	// A record the database has nothing for. It is not given one thing for the
+	// whole of its length: see idle.go.
+	return m.wordsIdle()
 }
 
 // wordsMove is how a line comes apart and goes back together.
@@ -975,11 +964,19 @@ func (m *Model) wordsGrind() tea.Cmd {
 	if len(lines) == 0 {
 		return nil
 	}
+	was := m.words.starts
 	m.words.starts, m.words.ends = starts, m.wordsEnds(starts)
 	m.words.beats = len(lines) == 1 && wordsBeats(lines[0])
 
 	text := strings.Join(lines, "\n")
 	if m.words.text == text && m.words.cellsX == m.width && m.words.cellsY == m.height {
+		// The same words over again, a turn or a line later: nothing to draw
+		// that is not already held, but it does have to arrive rather than
+		// simply be there — a chorus that repeats a line, and a wordless record
+		// dealt the same card twice, both come through here.
+		if starts != was {
+			m.words.since = time.Now()
+		}
 		return nil
 	}
 	if m.words.asked == text {

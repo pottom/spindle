@@ -374,7 +374,14 @@ func (m Model) infoWithLyrics(l layout, rows int) []string {
 // when there is nothing to ask for, when the answer is already held, or when a
 // request for the same track is already in the air.
 func (m *Model) fetchLyrics() tea.Cmd {
-	if !m.lyrics.on || m.ps == nil || m.ps.TrackID == "" {
+	if m.ps == nil || m.ps.TrackID == "" {
+		return nil
+	}
+	// The pane on the player is one place the words are wanted. The big
+	// screen's lyric picture is the other, and it is reached by its own key —
+	// without this it would wait for words nobody had sent for, and quietly
+	// show every record as if it had none.
+	if !m.lyrics.on && !(m.stage.on && m.scopeMode().words()) {
 		return nil
 	}
 	if m.lyrics.forTrack == m.ps.TrackID || m.lyrics.fetching == m.ps.TrackID {

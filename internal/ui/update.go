@@ -309,7 +309,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Batch(cmd, scopeFrameCmd(m.player, m.frameMode()))
 			}
 		}
-		if m.stage.on && m.scopeMode().grain() {
+		// The sleeve is ground for the picture that is made of it, and for the
+		// turns a wordless record gives it on the lyric screen.
+		if m.stage.on && (m.scopeMode().grain() || (m.scopeMode().words() && m.wordsIdleCover())) {
 			m.grainFlow(m.width, m.height)
 			if cmd := m.grind(); cmd != nil {
 				return m, tea.Batch(cmd, scopeFrameCmd(m.player, m.frameMode()))

@@ -1,0 +1,149 @@
+package ui
+
+import (
+	"strings"
+	"time"
+)
+
+// A record with no words of its own.
+//
+// Most of what gets played is not in any lyric database — instrumentals, live
+// takes, half of everything electronic, and anything the sheet was never
+// written for. On those the lyric screen has nothing to set, and what it used
+// to do was put the title up for five seconds and then hand the rest of the
+// record to one picture and leave it there. Three minutes of the same meter.
+//
+// So it takes turns instead. The record is cut into spells; something is set at
+// the top of each one for as long as a title was ever worth, and the music has
+// the rest of it — drawn as the mirrored meter one spell and as the sleeve
+// itself the next. What goes up is dealt from the track, never the same card
+// twice running, so a record plays the same way twice and still does not repeat
+// itself.
+
+// wordsSpell is how long one turn lasts. Long enough that a card is an event
+// rather than a caption, short enough that a record of any length gets several.
+const wordsSpell = 30 * time.Second
+
+// The cards a wordless record is dealt.
+type wordsCard int
+
+const (
+	wordsCardTitle  wordsCard = iota // the record saying its own name
+	wordsCardArtist                  // and whose it is
+	wordsCardAlbum                   // and what it came out on
+	wordsCardNotes                   // and, when it has said all that, three notes
+	wordsCards
+)
+
+// wordsWordless reports that the lyric database has nothing for what is
+// playing — or has not answered about it yet, which at the top of a record
+// looks the same from here and is exactly when the title card is due.
+func (m Model) wordsWordless() bool {
+	if m.ps == nil {
+		return false
+	}
+	if m.lyrics.forTrack != m.ps.TrackID {
+		return true
+	}
+	return m.lyrics.missing || !m.lyrics.synced
+}
+
+// wordsSpells is which turn the record is in and how far into it, so the two
+// halves of a spell — the card and the music — are worked out from one clock.
+func (m Model) wordsSpells() (int, time.Duration) {
+	gone := max(m.elapsed(), 0)
+	return int(gone / wordsSpell), gone % wordsSpell
+}
+
+// wordsIdle is what a wordless record puts up where a sung line would go, and
+// when that turn began — which is what the picture takes for the line's
+// identity, and so what decides how it gathers, whether it keeps time and
+// whether it leans.
+func (m Model) wordsIdle() ([]string, int64) {
+	if !m.wordsWordless() {
+		return nil, 0
+	}
+
+	spell, into := m.wordsSpells()
+	if into > wordsTitle {
+		return nil, 0 // the music has the rest of the turn
+	}
+
+	var lines []string
+	switch m.wordsCardFor(spell) {
+	case wordsCardTitle:
+		lines = []string{m.ps.Title}
+		if len(m.ps.Artists) > 0 {
+			lines = append(lines, strings.Join(m.ps.Artists, ", "))
+		}
+	case wordsCardArtist:
+		if len(m.ps.Artists) > 0 {
+			lines = []string{strings.Join(m.ps.Artists, ", ")}
+		}
+	case wordsCardAlbum:
+		// A single is its own record, and setting the same name twice in a row
+		// under two different headings is a screen with a bug in it.
+		if m.ps.Album != "" && m.ps.Album != m.ps.Title {
+			lines = []string{m.ps.Album}
+		}
+	case wordsCardNotes:
+		lines = []string{wordsNotes}
+	}
+
+	if len(lines) == 0 || lines[0] == "" {
+		return nil, 0 // nothing to say: the whole turn is the music's
+	}
+	return lines, int64(spell) * wordsSpell.Milliseconds()
+}
+
+// wordsCardFor is the card a turn gets.
+//
+// The first is always the record announcing itself, the way a sleeve is worth a
+// look as it goes on the turntable. After that they are dealt from the track,
+// each one stepping on from the last by at least one, so the same card never
+// comes up twice running.
+func (m Model) wordsCardFor(spell int) wordsCard {
+	card := wordsCardTitle
+	for turn := 1; turn <= spell; turn++ {
+		h := wordsDeal(m.ps.TrackID, turn)
+		card = (card + 1 + wordsCard(h%uint64(wordsCards-1))) % wordsCards
+	}
+	return card
+}
+
+// wordsDeal is the number a track's nth turn is dealt from.
+func wordsDeal(track string, turn int) uint64 {
+	var h uint64 = 0xcbf29ce484222325
+	for _, r := range track {
+		h = (h ^ uint64(r)) * 0x100000001b3
+	}
+	h ^= uint64(turn) * 0x9e3779b97f4a7c15
+
+	h ^= h >> 33
+	h *= 0xff51afd7ed558ccd
+	h ^= h >> 29
+	return h
+}
+
+// wordsIdleCover reports that the music has this turn drawn as the sleeve
+// rather than as the meter. Turn and turn about: the record, then the reading,
+// then the record again.
+func (m Model) wordsIdleCover() bool {
+	if !m.wordsWordless() {
+		return false
+	}
+	spell, _ := m.wordsSpells()
+	return spell%2 == 1
+}
+
+// wordsIdleArt is the picture a wordless record gets while nothing is set on
+// it. A cover that has not been ground yet falls back to the meter rather than
+// to an empty screen.
+func (m Model) wordsIdleArt(w, rows int) []string {
+	if m.wordsIdleCover() {
+		if art := m.grainLines(w, rows); art != nil {
+			return art
+		}
+	}
+	return m.stageArt(w, rows)
+}
