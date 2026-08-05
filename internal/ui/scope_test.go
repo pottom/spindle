@@ -296,7 +296,7 @@ func TestTriggerSteadiesThePicture(t *testing.T) {
 			m.scope.frame = frameAt(float64(k) * 1.7)
 			m.scope.follow(m.scope.frame)
 
-			lines := m.scopeLinesFrom(w, 0)
+			lines := m.scopeLinesFrom(w, scopeRows, 0)
 			if triggered {
 				lines = m.scopeLines(w)
 			}
@@ -341,16 +341,16 @@ func TestGlowTrailsTheBeam(t *testing.T) {
 
 	m.scope.frame = wave(0)
 	m.scope.follow(m.scope.frame)
-	bare := lit(m.scopeLinesFrom(w, 0))
+	bare := lit(m.scopeLinesFrom(w, scopeRows, 0))
 
 	// A few frames at shifting phases, each remembered.
 	for k := range scopeTrail {
 		m.scope.frame = wave(float64(k) * 0.6)
 		m.scope.follow(m.scope.frame)
-		grid, _ := m.scopeGrid(w, 0)
+		grid, _ := m.scopeGrid(w, scopeRows, 0)
 		m.scope.remember(grid)
 	}
-	withGlow := lit(m.scopeLinesFrom(w, 0))
+	withGlow := lit(m.scopeLinesFrom(w, scopeRows, 0))
 
 	if withGlow <= bare {
 		t.Errorf("glow lit %d cells against %d without it, want more", withGlow, bare)
@@ -358,7 +358,7 @@ func TestGlowTrailsTheBeam(t *testing.T) {
 
 	// A resize leaves grids of the wrong size behind; they have to be ignored
 	// rather than drawn at the wrong offset.
-	if got := m.scopeLinesFrom(w+7, 0); len(got) != scopeRows {
+	if got := m.scopeLinesFrom(w+7, scopeRows, 0); len(got) != scopeRows {
 		t.Errorf("scopeLinesFrom at a new width = %d rows, want %d", len(got), scopeRows)
 	}
 }
@@ -424,7 +424,7 @@ func TestScopeShadesTowardsItsCore(t *testing.T) {
 	m.scope.frame = f
 	m.scope.follow(f)
 
-	lines := m.scopeLinesFrom(40, 0)
+	lines := m.scopeLinesFrom(40, scopeRows, 0)
 	if len(lines) != scopeRows {
 		t.Fatalf("scopeLinesFrom = %d rows, want %d", len(lines), scopeRows)
 	}
@@ -543,7 +543,7 @@ func TestBarsPutBassOnTheLeft(t *testing.T) {
 	bands[1] = 1 // a low band, loud
 	m.scope.adoptBands(bands)
 
-	lines := m.barsLines(w)
+	lines := m.barsLines(w, scopeRows)
 	if len(lines) != scopeRows {
 		t.Fatalf("barsLines = %d rows, want %d", len(lines), scopeRows)
 	}
@@ -622,7 +622,7 @@ func TestBarsCarryNoWaveformTrail(t *testing.T) {
 	m.scope.frame = make([]float32, 2*player.WaveformWindow)
 	m.scope.follow(m.scope.frame)
 	for range scopeTrail {
-		grid, _ := m.scopeGrid(w, 0)
+		grid, _ := m.scopeGrid(w, scopeRows, 0)
 		m.scope.remember(grid)
 	}
 
@@ -630,7 +630,7 @@ func TestBarsCarryNoWaveformTrail(t *testing.T) {
 	bands[2] = 0.9
 	m.scope.adoptBands(bands)
 
-	rows := m.barsLines(w)
+	rows := m.barsLines(w, scopeRows)
 	if len(rows) != scopeRows {
 		t.Fatalf("barsLines = %d rows, want %d", len(rows), scopeRows)
 	}
@@ -664,7 +664,7 @@ func TestBarsAreAllTheSameWidth(t *testing.T) {
 	// A width that divides evenly and one that does not.
 	for _, w := range []int{bands * 3, bands*3 + 17} {
 		widths := map[int]int{}
-		for _, line := range m.barsLines(w) {
+		for _, line := range m.barsLines(w, scopeRows) {
 			run := 0
 			for _, r := range plain(line) {
 				if r == ' ' {
@@ -699,7 +699,7 @@ func TestBarsFillTheWidth(t *testing.T) {
 		m := scopeModel(w+leftMargin+rightMargin+2, 44)
 		m.scope.adoptBands(bands)
 
-		row := plain(m.barsLines(w)[0])
+		row := plain(m.barsLines(w, scopeRows)[0])
 		first := strings.IndexFunc(row, func(r rune) bool { return r != ' ' })
 		last := strings.LastIndexFunc(row, func(r rune) bool { return r != ' ' })
 		if first < 0 {
@@ -758,7 +758,7 @@ func TestBeamDwellsOnTheFlatAndFadesOnTheEdge(t *testing.T) {
 		m.scope.frame = f
 		m.scope.follow(f)
 
-		_, _, dwell := m.scopeBeam(w, 0)
+		_, _, dwell := m.scopeBeam(w, scopeRows, 0)
 		var sum float32
 		for _, v := range dwell {
 			sum += v

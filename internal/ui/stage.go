@@ -72,12 +72,29 @@ type stageDrop struct {
 	bright    float32
 }
 
+// stageMode is which picture the big screen is showing. The same key cycles
+// them as cycles the strip on the player, because it is the same question asked
+// of a bigger canvas.
+type stageMode int
+
+const (
+	// stageMirror is the spectrum about the middle line, with the water. It is
+	// first because it is the one built for this size.
+	stageMirror stageMode = iota
+	stageWave
+	stageBars
+	stageModes
+)
+
+func (s stageMode) next() stageMode { return (s + 1) % stageModes }
+
 // stageState is what the big screen carries between frames.
 type stageState struct {
 	// on is whether the screen is up. It is not a tab: it is something you fall
 	// into and leave with the next key, the way turning the lights down is.
 	on bool
 
+	mode  stageMode
 	drops []stageDrop
 
 	// was is how high every column stood last frame, which is what a jump is
@@ -100,6 +117,13 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	switch {
+	case key.Matches(k, m.keys.Scope):
+		// The one key that changes the picture rather than putting it away: the
+		// three of them are the same three the strip offers, at this size.
+		m.stage.mode = m.stage.mode.next()
+		m.stage.drops = nil
+		return m.startScope(), true
+
 	case key.Matches(k, m.keys.PlayPause),
 		key.Matches(k, m.keys.VolUp), key.Matches(k, m.keys.VolDown),
 		key.Matches(k, m.keys.Mute),
@@ -121,7 +145,7 @@ func (m Model) stageView() string {
 		return ""
 	}
 
-	art := m.stageArt(m.width, rows)
+	art := m.stagePicture(m.width, rows)
 
 	clock := m.styles.Time.Render(formatDuration(m.elapsed()) + " / " + formatDuration(m.ps.Duration))
 	art[0] = spread(m.styles.Title.Render(m.ps.Title), clock, m.width)
@@ -129,6 +153,27 @@ func (m Model) stageView() string {
 	art[rows-1] = m.progressLine(m.width)
 
 	return strings.Join(art, "\n")
+}
+
+// stagePicture draws whichever of the three the big screen is set to, at the
+// size of the whole terminal.
+func (m Model) stagePicture(w, rows int) []string {
+	var art []string
+	switch m.stage.mode {
+	case stageWave:
+		art = m.scopeLinesFrom(w, rows, m.scopeTrigger(w*dotsPerCellX))
+	case stageBars:
+		art = m.barsLines(w, rows)
+	default:
+		art = m.stageArt(w, rows)
+	}
+
+	// Whatever it drew, the screen is that many rows: a picture waiting for its
+	// first frame draws nothing, and nothing still has to fill the terminal.
+	for len(art) < rows {
+		art = append(art, strings.Repeat(" ", w))
+	}
+	return art[:rows]
 }
 
 // stageArt draws the mirrored spectrum with its drops, w cells by rows rows.

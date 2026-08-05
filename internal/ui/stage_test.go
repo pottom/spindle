@@ -26,7 +26,7 @@ func TestStageTakesTheScreenAndGivesItBack(t *testing.T) {
 	m := scopeModel(100, 40)
 
 	var tm tea.Model = m
-	tm, cmd := tm.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+	tm, cmd := tm.Update(tea.KeyPressMsg{Code: 'V', Text: "V"})
 	got := tm.(Model)
 	if !got.stage.on {
 		t.Fatal("f did not open the big screen")
@@ -139,5 +139,54 @@ func TestStageThrowsWaterAndTakesItBack(t *testing.T) {
 	}
 	if len(m.stage.drops) != 0 {
 		t.Errorf("%d drops are still in the air after the music stopped jumping", len(m.stage.drops))
+	}
+}
+
+// The same key that cycles the strip cycles the big screen, and it is the one
+// key up there that does not put the picture away.
+func TestStageCyclesItsPictures(t *testing.T) {
+	m := stageModel(100, 40)
+	m.scope.frame = make([]float32, 2*256)
+	for i := range m.scope.frame {
+		m.scope.frame[i] = 0.5
+	}
+
+	var tm tea.Model = m
+	for i, want := range []stageMode{stageWave, stageBars, stageMirror} {
+		tm, _ = tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
+		got := tm.(Model)
+		if !got.stage.on {
+			t.Fatalf("press %d put the big screen away instead of changing the picture", i+1)
+		}
+		if got.stage.mode != want {
+			t.Fatalf("press %d showed picture %d, want %d", i+1, got.stage.mode, want)
+		}
+	}
+}
+
+// Every one of the three fills the terminal, whichever is showing and whether
+// or not anything has arrived to draw yet.
+func TestStageFillsTheScreenInEveryPicture(t *testing.T) {
+	for mode := stageMirror; mode < stageModes; mode++ {
+		for _, ready := range []bool{false, true} {
+			m := stageModel(100, 40)
+			m.stage.mode = mode
+			if ready {
+				m.scope.frame = make([]float32, 2*256)
+				m.scope.follow(m.scope.frame)
+			} else {
+				m.scope.bands, m.scope.frame = nil, nil
+			}
+
+			art := m.stagePicture(100, 40)
+			if len(art) != 40 {
+				t.Fatalf("picture %d (ready=%v) drew %d rows, want 40", mode, ready, len(art))
+			}
+			for i, line := range art {
+				if got := len([]rune(ansiOff(line))); got != 100 {
+					t.Errorf("picture %d (ready=%v): row %d is %d cells wide", mode, ready, i, got)
+				}
+			}
+		}
 	}
 }

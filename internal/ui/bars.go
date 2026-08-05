@@ -54,17 +54,17 @@ func (s *scopeState) adoptBands(bands []float32) {
 //
 // The bands arrive spaced by octave and scaled in decibels, so what is drawn is
 // already what the ear hears as even; the drawing only has to place it.
-func (m Model) barsLines(w int) []string {
-	if w <= 0 || len(m.scope.bands) == 0 || len(m.styles.Bars) == 0 {
+func (m Model) barsLines(w, rows int) []string {
+	if w <= 0 || rows <= 0 || len(m.scope.bands) == 0 || len(m.styles.Bars) == 0 {
 		return nil
 	}
 
-	dotsY := scopeRows * dotsPerCellY
-	grid := make([]uint8, w*scopeRows)
+	dotsY := rows * dotsPerCellY
+	grid := make([]uint8, w*rows)
 
 	// The colour of every cell, chosen from where it sits: which part of the
 	// frequency range the column covers, and how high up the bar the row is.
-	paint := make([]int8, w*scopeRows)
+	paint := make([]int8, w*rows)
 	for i := range paint {
 		paint[i] = -1
 	}
@@ -116,7 +116,7 @@ func (m Model) barsLines(w int) []string {
 			paint[cell] = int8(levels - 1)
 		}
 	}
-	return m.barsDraw(w, grid, paint)
+	return m.barsDraw(w, rows, grid, paint)
 }
 
 // barsFit chooses how the bars tile the width: how many cells one takes, and
@@ -180,19 +180,19 @@ func (m Model) bandsAt(bar, count int) (band, peak float32) {
 // barsDraw turns the dot grid into rows, colouring each cell from the palette:
 // hue by where the column sits in the frequency range, strength by how high up
 // its bar the row is.
-func (m Model) barsDraw(w int, grid []uint8, paint []int8) []string {
+func (m Model) barsDraw(w, rows int, grid []uint8, paint []int8) []string {
 	freqs := len(m.styles.Bars)
 
-	// On a spectrum the frequency runs across the screen, so the hue is chosen
-	// by the column. The waterfall runs it up the screen instead and chooses by
-	// the row, which is why the two are told rather than assumed.
+	// The frequency runs across the screen, so the hue is chosen by the column.
+	// It is passed rather than assumed because the same drawing serves pictures
+	// that are laid out the other way about.
 	hue := make([]int8, len(grid))
-	for r := range scopeRows {
+	for r := range rows {
 		for c := range w {
 			hue[r*w+c] = int8(min(c*freqs/w, freqs-1))
 		}
 	}
-	return m.drawCells(w, scopeRows, grid, paint, hue)
+	return m.drawCells(w, rows, grid, paint, hue)
 }
 
 // drawCells turns a dot grid into rows of braille. Each cell is drawn in the

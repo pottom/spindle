@@ -193,8 +193,8 @@ func newKeyMap() keyMap {
 			key.WithHelp("v", "waveform"),
 		),
 		Stage: key.NewBinding(
-			key.WithKeys("f"),
-			key.WithHelp("f", "full screen"),
+			key.WithKeys("V"),
+			key.WithHelp("V", "full screen"),
 		),
 		Lyrics: key.NewBinding(
 			key.WithKeys("l"),

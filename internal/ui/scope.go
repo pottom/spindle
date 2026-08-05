@@ -185,7 +185,7 @@ func (m Model) scopeRender(w int) []string {
 	if m.scopeMode().wave() {
 		return m.scopeLines(w)
 	}
-	return m.barsLines(w)
+	return m.barsLines(w, scopeRows)
 }
 
 // scopeRoom is how many blank rows sit below the artwork, which is what the
@@ -214,6 +214,9 @@ func (m Model) scopeVisible() bool {
 // drawn from the bands whatever the strip underneath it was set to.
 func (m Model) frameMode() scopeMode {
 	if m.stage.on {
+		if m.stage.mode == stageWave {
+			return scopeWave
+		}
 		return scopeBars
 	}
 	return m.scopeMode()
@@ -228,23 +231,23 @@ func (m Model) frameMode() scopeMode {
 // Each cell is coloured by how loud that moment is, not by where it sits, so
 // the trace flares on a hit and recedes between them.
 func (m Model) scopeLines(w int) []string {
-	return m.scopeLinesFrom(w, m.scopeTrigger(w*dotsPerCellX))
+	return m.scopeLinesFrom(w, scopeRows, m.scopeTrigger(w*dotsPerCellX))
 }
 
 // scopeLinesFrom draws the frame beginning at a given sample. Where that sample
 // is decided is scopeTrigger's business; this only draws.
-func (m Model) scopeLinesFrom(w, start int) []string {
-	if w <= 0 || len(m.styles.Bars) == 0 {
+func (m Model) scopeLinesFrom(w, rows, start int) []string {
+	if w <= 0 || rows <= 0 || len(m.styles.Bars) == 0 {
 		return nil
 	}
-	grid, loud, dwell := m.scopeBeam(w, start)
-	return m.scopeDraw(w, grid, loud, dwell)
+	grid, loud, dwell := m.scopeBeam(w, rows, start)
+	return m.scopeDraw(w, rows, grid, loud, dwell)
 }
 
 // scopeGrid plots the frame: which braille dots the trace lights, and how far
 // the wave swings under each cell.
-func (m Model) scopeGrid(w, start int) ([]uint8, []float32) {
-	grid, loud, _ := m.scopeBeam(w, start)
+func (m Model) scopeGrid(w, rows, start int) ([]uint8, []float32) {
+	grid, loud, _ := m.scopeBeam(w, rows, start)
 	return grid, loud
 }
 
@@ -255,9 +258,9 @@ func (m Model) scopeGrid(w, start int) ([]uint8, []float32) {
 // dots that took: a flat stretch is one dot per column and lights brightly, a
 // steep edge is a dozen and fades. It is what makes a tube's trace read as a
 // beam rather than as a plot.
-func (m Model) scopeBeam(w, start int) ([]uint8, []float32, []float32) {
-	dotsX, dotsY := w*dotsPerCellX, scopeRows*dotsPerCellY
-	grid := make([]uint8, w*scopeRows)
+func (m Model) scopeBeam(w, rows, start int) ([]uint8, []float32, []float32) {
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+	grid := make([]uint8, w*rows)
 	loud := make([]float32, w)
 	dwell := make([]float32, w)
 
@@ -303,15 +306,15 @@ func (m Model) scopeBeam(w, start int) ([]uint8, []float32, []float32) {
 // A cell the beam is on now is coloured by how loud that moment is; a cell only
 // the afterglow reaches is drawn at the quiet end of the palette, so the glow
 // reads as behind the trace rather than as part of it.
-func (m Model) scopeDraw(w int, grid []uint8, loud, dwell []float32) []string {
+func (m Model) scopeDraw(w, rows int, grid []uint8, loud, dwell []float32) []string {
 	freqs := len(m.styles.Bars)
 	if freqs == 0 {
-		return make([]string, scopeRows)
+		return make([]string, rows)
 	}
 	levels := len(m.styles.Bars[0])
 
-	lines := make([]string, scopeRows)
-	for r := range scopeRows {
+	lines := make([]string, rows)
+	for r := range rows {
 		var sb strings.Builder
 
 		var run strings.Builder
@@ -472,9 +475,16 @@ func (m Model) drawScope(body []string, l layout) []string {
 // pure function of the model, and a trail is state.
 func (m *Model) rememberScope() {
 	w := m.scopeWidth(m.layout())
+	if m.stage.on {
+		w = m.width
+	}
 	if w <= 0 {
 		return
 	}
-	grid, _ := m.scopeGrid(w, m.scopeTrigger(w*dotsPerCellX))
+	rows := scopeRows
+	if m.stage.on {
+		w, rows = m.width, m.height
+	}
+	grid, _ := m.scopeGrid(w, rows, m.scopeTrigger(w*dotsPerCellX))
 	m.scope.remember(grid)
 }

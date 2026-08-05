@@ -251,7 +251,10 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if m.scopeMode().wave() {
 			m.rememberScope()
 		}
-		if m.stage.on {
+		if m.stage.on && m.stage.mode == stageWave {
+			m.rememberScope()
+		}
+		if m.stage.on && m.stage.mode == stageMirror {
 			m.stageFlow()
 		}
 		return m, scopeFrameCmd(m.player, m.frameMode())
