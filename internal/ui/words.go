@@ -1173,7 +1173,7 @@ func (m Model) wordsRiding(count int) []int {
 		for i := range out {
 			out[i] = -int(m.wordsBeatRide(i, count) * wordsWordRide)
 		}
-		return out
+		return m.wordsSettleMarks(out)
 
 	case wordsRideLine:
 		// All of it together, on the loudest thing playing: the line nods with
@@ -1192,6 +1192,60 @@ func (m Model) wordsRiding(count int) []int {
 	}
 
 	return nil
+}
+
+// wordsSettleMarks stops a mark being carried higher than the word it hangs off.
+//
+// A full stop halfway up the line reads as a mistake however lively it is. And
+// it was not even lively: the last piece of a line answers the top of the range,
+// which is where the cymbals are, and a hi-hat is going nearly all the time — so
+// the mark at the end of a line sat up there rather than bouncing. Below the
+// word is left alone, because a comma dipping is what a comma does.
+func (m Model) wordsSettleMarks(out []int) []int {
+	marks := m.wordsMarksNow()
+	for i := range out {
+		if i >= len(marks) || !marks[i] {
+			continue
+		}
+		if by, ok := wordsBesideMark(marks, i); ok && by < len(out) {
+			// Up is a smaller number, so the lower of the two is the one to
+			// keep: the mark may sit with its word or under it, never over it.
+			out[i] = max(out[i], out[by])
+		}
+	}
+	return out
+}
+
+// wordsMarksNow says, piece by piece, which of what is on screen is punctuation
+// rather than a word.
+//
+// Worked out from the text again rather than carried on the layout: it is a
+// handful of short strings once a frame, against another field on the message
+// that would have to be kept in step with the picture it describes.
+func (m Model) wordsMarksNow() []bool {
+	var out []bool
+	for _, line := range strings.Split(m.words.text, "\n") {
+		for _, piece := range wordsPieces(line) {
+			out = append(out, wordsBeats(line[piece.from:piece.to]))
+		}
+	}
+	return out
+}
+
+// wordsBesideMark is the word a mark belongs to: the one in front of it where
+// there is one, and the one after it for a mark that opens something.
+func wordsBesideMark(marks []bool, at int) (int, bool) {
+	for i := at - 1; i >= 0; i-- {
+		if !marks[i] {
+			return i, true
+		}
+	}
+	for i := at + 1; i < len(marks); i++ {
+		if !marks[i] {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 // wordsTilting is how far each word of the line leans, and the column it leans

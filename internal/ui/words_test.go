@@ -1056,3 +1056,66 @@ func TestAMarkOwnsItsOwnDots(t *testing.T) {
 	t.Logf("the comma has %d columns of its own, the exclamation mark %d",
 		last[1]-first[1]+1, last[3]-first[3]+1)
 }
+
+// A mark keeps its own time, but it is not carried over the word it hangs off.
+// The end of a line answers the top of the range, where a hi-hat is going all
+// the time, so without this the full stop at the end of a lyric floated halfway
+// up the screen and stayed there.
+func TestAMarkIsNeverCarriedAboveItsWord(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.words.text = "and then it stops."
+
+	// Loud at the top of the range, quiet at the bottom: the arrangement that
+	// lifted the mark and left the words where they were.
+	bands := make([]float32, 28)
+	for i := range bands {
+		bands[i] = float32(i) / float32(len(bands)-1)
+	}
+	m.scope.bands = bands
+
+	marks := m.wordsMarksNow()
+	want := []bool{false, false, false, false, true}
+	if len(marks) != len(want) {
+		t.Fatalf("%q reads as %v, want five pieces", m.words.text, marks)
+	}
+	for i := range want {
+		if marks[i] != want[i] {
+			t.Fatalf("%q reads as %v, want %v", m.words.text, marks, want)
+		}
+	}
+
+	ride := make([]int, len(marks))
+	for i := range ride {
+		ride[i] = -int(m.wordsBeatRide(i, len(marks)) * wordsWordRide)
+	}
+	t.Logf("left to itself the line rides %v", ride)
+
+	settled := m.wordsSettleMarks(append([]int(nil), ride...))
+	t.Logf("settled it rides %v", settled)
+
+	if settled[4] < settled[3] {
+		t.Errorf("the full stop rides %d against the word's %d, want it no higher",
+			settled[4], settled[3])
+	}
+	for i := range 4 {
+		if settled[i] != ride[i] {
+			t.Errorf("word %d was moved from %d to %d, want the words left alone",
+				i, ride[i], settled[i])
+		}
+	}
+}
+
+// A mark that opens something takes its place from the word after it, there
+// being nothing in front of it to hang off.
+func TestAnOpeningMarkFollowsTheWordAfterIt(t *testing.T) {
+	marks := []bool{true, false, false, true}
+	if by, ok := wordsBesideMark(marks, 0); !ok || by != 1 {
+		t.Errorf("the opening mark follows piece %d (%v), want the word after it", by, ok)
+	}
+	if by, ok := wordsBesideMark(marks, 3); !ok || by != 2 {
+		t.Errorf("the closing mark follows piece %d (%v), want the word before it", by, ok)
+	}
+	if _, ok := wordsBesideMark([]bool{true, true}, 0); ok {
+		t.Error("a bar of nothing but marks found a word to follow")
+	}
+}
