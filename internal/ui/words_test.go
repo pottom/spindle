@@ -973,6 +973,8 @@ func TestPunctuationIsItsOwnWord(t *testing.T) {
 			[]string{"(", "this", "is", "a", "whisper", ")", "...", "and", "then", "it", "stops", "."}},
 		{"don't stop me now — I'm having a good time;",
 			[]string{"don't", "stop", "me", "now", "—", "I'm", "having", "a", "good", "time", ";"}},
+		{`"stop", she said — 'cause we were singin'`,
+			[]string{`"`, "stop", `",`, "she", "said", "—", "'", "cause", "we", "were", "singin", "'"}},
 		{"no marks here at all", []string{"no", "marks", "here", "at", "all"}},
 		{wordsNotes, []string{"♪", "♫", "♪"}},
 	} {

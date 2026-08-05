@@ -226,13 +226,11 @@ func wordsCut(line string, from, to int) []wordsPiece {
 
 // wordsPunct reports that a rune is a mark that lives its own life.
 //
-// Not the apostrophe, straight or curly: "don't" and "singin'" are one word
-// each wherever it falls in them, and cutting it off leaves a tick bouncing
-// about on its own with nothing to do with the line.
+// Every mark there is, quotes and apostrophes with the rest. Only the ends of a
+// word are ever cut, which is what keeps "don't" and "you're" whole while a
+// dropped g's tick in "singin'" and the one that opens "'cause" come away — and
+// those are marks doing a mark's job, hanging off the end of a word.
 func wordsPunct(r rune) bool {
-	if r == '\'' || r == '’' {
-		return false
-	}
 	return unicode.IsPunct(r) || unicode.IsSymbol(r)
 }
 
