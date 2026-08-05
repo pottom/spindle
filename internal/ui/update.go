@@ -240,6 +240,12 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	case msg.WordsReady:
 		m.words.asked = ""
+		// What is on screen is given notice, and goes out the way the line
+		// before it came in.
+		if m.words.have.DotsX == message.Grain.DotsX {
+			m.words.was, m.words.went, m.words.leave = m.words.have, time.Now(), m.words.move
+		}
+
 		m.words.have, m.words.text = message.Grain, message.Text
 		m.words.move = wordsMoveFor(message.Text)
 		m.words.where = message.Words

@@ -354,10 +354,14 @@ func (m Model) wordsComing() ([]string, int64) {
 type wordsMove int
 
 const (
-	wordsDrifting wordsMove = iota // in from wherever, on its own line
-	wordsRising                    // up from below, a row at a time
-	wordsBursting                  // in from outside, along the line to the middle
-	wordsWiping                    // left to right, like something being written
+	wordsDrifting   wordsMove = iota // in from wherever, on its own line
+	wordsRising                      // up from below, a row at a time
+	wordsFalling                     // down from above, a row at a time
+	wordsBursting                    // in from outside, along the line to the middle
+	wordsSpreading                   // out from the middle, as if it were pushed
+	wordsWiping                      // left to right, like something being written
+	wordsWipingBack                  // right to left
+	wordsBlurring                    // barely anywhere: a picture coming into focus
 	wordsMoves
 )
 
@@ -373,8 +377,15 @@ func wordsMoveFor(text string) wordsMove {
 // wordsState is the picture the words are drawn from, and how far it has
 // gathered since the line changed.
 type wordsState struct {
-	// move is how this line is coming together.
-	move wordsMove
+	// move is how this line is coming together, and leave how the one before it
+	// is going: a line that is simply replaced looks like a slide changing, and
+	// a line that leaves the way it came looks like it was pushed.
+	move, leave wordsMove
+
+	// was is the line before this one, still on its way out, and went is when it
+	// was given notice.
+	was  cover.Grain
+	went time.Time
 
 	have           cover.Grain
 	text           string
@@ -429,6 +440,11 @@ const (
 	// wordsScatter is how far a dot starts from where it belongs, in dot rows
 	// and columns.
 	wordsScatter = 26
+
+	// wordsLeaving is how long the line before this one takes to go. Shorter
+	// than the gathering: what is arriving is what the eye should be on, and the
+	// two overlap.
+	wordsLeaving = 300 * time.Millisecond
 
 	// wordsStagger is the share of the gathering that is spent waiting, for the
 	// moves that arrive a row or a column at a time: at nothing they all land
@@ -524,6 +540,12 @@ func (m Model) wordsLines(w, rows int) []string {
 		gather = float32(since) / float32(wordsGather)
 	}
 
+	// The line before this one, on its way out: the same arithmetic run
+	// backwards, and fading as it goes.
+	if since := time.Since(m.words.went); since < wordsLeaving && m.words.was.DotsX == dotsX {
+		m.drawLeaving(grid, paint, hue, w, rows, float32(since)/float32(wordsLeaving), levels)
+	}
+
 	// What each word is burning at, and in what colour.
 	//
 	// The whole line, all of it lit, and every word answering its own share of
@@ -558,13 +580,7 @@ func (m Model) wordsLines(w, rows int) []string {
 			// How far along this particular dot is. Some of the moves arrive a
 			// row or a column at a time, so each dot has its own share of the
 			// gathering rather than all of them having the whole of it.
-			p := gather
-			switch m.words.move {
-			case wordsWiping:
-				p = wordsStep(gather, float32(x)/float32(dotsX))
-			case wordsRising:
-				p = wordsStep(gather, 1-float32(y)/float32(dotsY))
-			}
+			p := wordsAlong(m.words.move, gather, x, y, dotsX, dotsY)
 
 			if p < 1 {
 				dx, dy := wordsFrom(m.words.move, x, y, dotsX, dotsY)
@@ -777,6 +793,39 @@ func (m Model) wordsRoom(rows int) (from, tall int) {
 	return from, max(rows-from, 0)
 }
 
+// drawLeaving puts the line before this one back on its way out: where each dot
+// came in from is where it goes, and it fades as it gets there.
+func (m Model) drawLeaving(grid []uint8, paint, hue []int8, w, rows int, gone float32, levels int) {
+	g := m.words.was
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+
+	step := int8(min(int((1-gone)*wordsAhead*float32(levels)), levels-1))
+	if step < 0 {
+		return
+	}
+
+	for y := range dotsY {
+		for x := range dotsX {
+			if g.Lum[y*dotsX+x] < grainLit {
+				continue
+			}
+
+			p := 1 - wordsAlong(m.words.leave, gone, x, y, dotsX, dotsY)
+			dx, dy := wordsFrom(m.words.leave, x, y, dotsX, dotsY)
+			at, to := x+int(dx*(1-p)), y+int(dy*(1-p))
+			if at < 0 || to < 0 || at >= dotsX || to >= dotsY {
+				continue
+			}
+
+			cell := (to/dotsPerCellY)*w + at/dotsPerCellX
+			grid[cell] |= 1 << brailleBit[at%dotsPerCellX][to%dotsPerCellY]
+			if step > paint[cell] {
+				paint[cell] = step
+			}
+		}
+	}
+}
+
 // wordsStep is one dot's share of the gathering, given how far down the queue
 // it is: the ones at the front are done before the ones at the back start.
 func wordsStep(gather, behind float32) float32 {
@@ -784,8 +833,33 @@ func wordsStep(gather, behind float32) float32 {
 	return min(max(p, 0), 1)
 }
 
+// wordsAlong is how far along one dot is, which for the moves that arrive a row
+// or a column at a time is its own share rather than the whole of it.
+func wordsAlong(move wordsMove, gather float32, x, y, dotsX, dotsY int) float32 {
+	switch move {
+	case wordsWiping:
+		return wordsStep(gather, float32(x)/float32(dotsX))
+	case wordsWipingBack:
+		return wordsStep(gather, 1-float32(x)/float32(dotsX))
+	case wordsRising:
+		return wordsStep(gather, 1-float32(y)/float32(dotsY))
+	case wordsFalling:
+		return wordsStep(gather, float32(y)/float32(dotsY))
+	}
+	return gather
+}
+
 // wordsFrom is where a dot comes in from, given the move and where it lands.
 func wordsFrom(move wordsMove, x, y, dotsX, dotsY int) (float32, float32) {
+	out := func(by float32) (float32, float32) {
+		dx, dy := float32(x-dotsX/2), float32(y-dotsY/2)
+		d := float32(math.Hypot(float64(dx), float64(dy)))
+		if d == 0 {
+			return 0, 0
+		}
+		return dx / d * by, dy / d * by
+	}
+
 	switch move {
 	case wordsRising:
 		// Up from under the line, with enough of a wobble that it is a crowd
@@ -793,19 +867,32 @@ func wordsFrom(move wordsMove, x, y, dotsX, dotsY int) (float32, float32) {
 		dx, _ := wordsDrift(x, y)
 		return dx * 0.15, float32(dotsY-y) * 0.9
 
+	case wordsFalling:
+		dx, _ := wordsDrift(x, y)
+		return dx * 0.15, -float32(y) * 0.9
+
 	case wordsBursting:
 		// In from outside, along the line out from the middle — the picture
 		// implodes onto the words.
-		dx, dy := float32(x-dotsX/2), float32(y-dotsY/2)
-		d := float32(math.Hypot(float64(dx), float64(dy)))
-		if d == 0 {
-			return 0, 0
-		}
-		return dx / d * wordsScatter * 2.2, dy / d * wordsScatter * 2.2
+		return out(wordsScatter * 2.2)
+
+	case wordsSpreading:
+		// The other way about: everything starts in the middle and is pushed
+		// out into its place.
+		return out(-wordsScatter * 0.9)
 
 	case wordsWiping:
 		// From the left, as if the line were being written.
 		return -float32(wordsScatter) * 1.4, 0
+
+	case wordsWipingBack:
+		return float32(wordsScatter) * 1.4, 0
+
+	case wordsBlurring:
+		// Hardly anywhere at all: every dot a hair out of place, so the line
+		// arrives the way a lens comes into focus rather than by travelling.
+		dx, dy := wordsDrift(x, y)
+		return dx * 0.16, dy * 0.16
 	}
 
 	return wordsDrift(x, y)

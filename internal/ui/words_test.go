@@ -129,9 +129,9 @@ func TestWordsGatherAfterALineChanges(t *testing.T) {
 }
 
 // A change that happens the same way every time stops being a change: each line
-// comes apart and goes back together in one of four ways, and which one is its
-// own business rather than a coin toss, so a song plays the same way twice.
-func TestWordsGatherFourWays(t *testing.T) {
+// comes together in one of eight ways, and which one is its own business rather
+// than a coin toss, so a song plays the same way twice.
+func TestWordsGatherEveryWay(t *testing.T) {
 	const w, rows = 90, 14
 
 	m := scopeModel(100, 44)
@@ -178,6 +178,7 @@ func TestWordsGatherFourWays(t *testing.T) {
 	if len(half) != int(wordsMoves) {
 		t.Errorf("%d of the %d moves look alike halfway through", int(wordsMoves)-len(half), wordsMoves)
 	}
+	t.Logf("all %d moves look different halfway through, and land in the same place", wordsMoves)
 }
 
 // Which move a line gets is worked out from the line, so it is the same every
@@ -665,5 +666,51 @@ func TestTheNoteLeavesRoomForTheMeter(t *testing.T) {
 	}
 	if head := m.wordsHeadroom(rows); head < wordsBand*dotsPerCellY {
 		t.Errorf("the note leaves %d dots over it, want at least %d", head, wordsBand*dotsPerCellY)
+	}
+}
+
+// A line that is simply replaced looks like a slide changing. The one before
+// goes out the way it came in — the same arithmetic run backwards, fading as it
+// gets there — so the two lines are one movement rather than two pictures.
+func TestTheLineBeforeLeaves(t *testing.T) {
+	const w, rows = 90, 14
+
+	m := scopeModel(100, 44)
+	m.width, m.height = w, rows
+	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
+
+	set := func(line string) cover.Grain {
+		img, _, ok := wordsImage([]string{line}, w*dotsPerCellX, rows*dotsPerCellY)
+		if !ok {
+			t.Fatalf("%q could not be drawn", line)
+		}
+		return cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	}
+
+	m.words.have = set("second")
+	m.words.cellsX, m.words.cellsY = w, rows
+	m.words.since = time.Now().Add(-time.Second)
+	_, layout, _ := wordsImage([]string{"second"}, w*dotsPerCellX, rows*dotsPerCellY)
+	m.words.where = layout
+
+	alone := strings.Join(m.wordsLines(w, rows), "")
+
+	// With one on its way out there is more on the screen than the new line
+	// alone, and once it has gone there is not.
+	m.words.was, m.words.went, m.words.leave = set("first"), time.Now(), wordsRising
+	both := strings.Join(m.wordsLines(w, rows), "")
+
+	m.words.went = time.Now().Add(-wordsLeaving * 2)
+	after := strings.Join(m.wordsLines(w, rows), "")
+
+	ink := func(s string) int { return len(ansiOff(s)) - strings.Count(ansiOff(s), " ") }
+	t.Logf("the new line alone is %d cells, with the old one leaving %d, once it is gone %d",
+		ink(alone), ink(both), ink(after))
+
+	if ink(both) <= ink(alone) {
+		t.Error("the line before it left nothing on the screen on its way out")
+	}
+	if ink(after) != ink(alone) {
+		t.Error("the line before it never finished leaving")
 	}
 }
