@@ -45,8 +45,11 @@ func TestTurningASettingSaysItNeedsARestart(t *testing.T) {
 	}
 
 	page := plain(strings.Join(m.settingsPanel(m.layout(), m.layout().bodyHeight), "\n"))
-	if !strings.Contains(page, "Restart the device") {
+	if !strings.Contains(page, "has not heard this yet") {
 		t.Error("nothing on the screen says the device has not heard the change")
+	}
+	if !strings.Contains(page, "press R") {
+		t.Error("the screen does not say how to make the device hear it")
 	}
 }
 

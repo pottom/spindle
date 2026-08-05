@@ -78,6 +78,10 @@ type keyMap struct {
 	HalfDown key.Binding
 	HalfUp   key.Binding
 
+	// Restart puts the playback device through a stop and a start, for the
+	// settings it only reads when it begins.
+	Restart key.Binding
+
 	// FindNext and FindPrev walk the rows a search inside the list matched.
 	// They took n and N from the transport, which moved to ctrl+n and ctrl+p:
 	// a list you are reading is what those keys are for in every program that
@@ -150,6 +154,10 @@ func newKeyMap() keyMap {
 		HalfDown: key.NewBinding(key.WithKeys("ctrl+d")),
 		HalfUp:   key.NewBinding(key.WithKeys("ctrl+u")),
 
+		Restart: key.NewBinding(
+			key.WithKeys("R"),
+			key.WithHelp("R", "restart the device"),
+		),
 		FindNext: key.NewBinding(
 			key.WithKeys("n"),
 			key.WithHelp("n / N", "next / previous match"),
@@ -455,6 +463,7 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 			short: []key.Binding{
 				selectHint,
 				hint("← / →", "change it"),
+				hint("R", "restart the device"),
 				hint("?", "help"),
 			},
 			full: [][]key.Binding{

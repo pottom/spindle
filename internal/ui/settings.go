@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -33,6 +34,10 @@ type settingsPane struct {
 	// takes its audio settings when it starts, so this is the difference
 	// between what is written down and what can be heard.
 	changed bool
+
+	// restarting is a device on its way back, so the key cannot be pressed
+	// twice into two daemons.
+	restarting bool
 
 	// loaded says the file has been read. Until it has, the screen shows what
 	// it has rather than defaults it would then correct.
@@ -93,9 +98,43 @@ func (m *Model) settingsKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		return m.turnSetting(1), true
 	case key.Matches(k, m.keys.SeekBack):
 		return m.turnSetting(-1), true
+
+	case key.Matches(k, m.keys.Restart):
+		return m.restartDevice(), true
 	}
 	return nil, false
 }
+
+// restartDevice stops the daemon and starts it again, so a setting it only
+// reads at start-up can be heard without leaving for a shell.
+//
+// The music stops for a moment, which is the honest cost and is why it is a key
+// of its own rather than something a change does by itself: changing three
+// settings would otherwise restart the device three times.
+func (m *Model) restartDevice() tea.Cmd {
+	if m.settings.restarting {
+		return nil
+	}
+
+	m.settings.restarting = true
+	m.said, m.saidAt = "Restarting the device…", time.Now()
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), restartTimeout)
+		defer cancel()
+
+		if err := daemon.Restart(ctx); err != nil {
+			return msg.Error{Err: fmt.Errorf("restart the device: %w", err)}
+		}
+		return deviceRestarted{}
+	}
+}
+
+// deviceRestarted says the device is back.
+type deviceRestarted struct{}
+
+// restartTimeout bounds the wait. Starting a daemon means authorising with
+// Spotify and registering a device, which is seconds rather than moments.
+const restartTimeout = 30 * time.Second
 
 // turnSetting moves the setting under the cursor one step, and writes it down.
 func (m *Model) turnSetting(delta int) tea.Cmd {
@@ -264,10 +303,11 @@ func (m Model) settingsPanel(l layout, rows int) []string {
 	}
 
 	if m.settings.changed {
-		lines = append(lines,
-			strings.Repeat(" ", w),
-			fit(s.Warning.Render(warnGlyph+" Restart the device to hear the change — spindle daemon restart"), w),
-		)
+		what := warnGlyph + " The device has not heard this yet — press R to restart it"
+		if m.settings.restarting {
+			what = warnGlyph + " Restarting the device…"
+		}
+		lines = append(lines, strings.Repeat(" ", w), fit(s.Warning.Render(what), w))
 	}
 
 	for len(lines) < rows {

@@ -115,6 +115,12 @@ func helpGroups() []helpGroup {
 			{"a", "add the whole of it to the queue"},
 		},
 	}, {
+		title: "On the settings",
+		keys: [][2]string{
+			{"← / →", "change what the cursor is on"},
+			{"R", "restart the device, to hear it"},
+		},
+	}, {
 		title: "From the shell",
 		keys: [][2]string{
 			{"spindle", "--help lists every command"},

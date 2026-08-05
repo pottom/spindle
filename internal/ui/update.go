@@ -28,6 +28,12 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		return m.handleKey(message)
 
+	case deviceRestarted:
+		m.settings.restarting = false
+		m.settings.changed = false
+		m.said, m.saidAt = "The device is back", time.Now()
+		return m, tea.Batch(fetchStateCmd(m.player), fetchDevicesCmd(m.player))
+
 	case settingsMsg:
 		m.settings.quality = message.quality
 		m.settings.crossfade = message.crossfade
@@ -210,6 +216,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case msg.Error:
+		// A restart that failed is a restart that is over.
+		m.settings.restarting = false
+
 		// Whatever was in flight is not in flight any more. Every list marks
 		// itself as reading so a run of cursor keys cannot ask for the same
 		// page a dozen times; without clearing that here, one failed request —
