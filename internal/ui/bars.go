@@ -192,15 +192,15 @@ func (m Model) barsDraw(w int, grid []uint8, paint []int8) []string {
 			hue[r*w+c] = int8(min(c*freqs/w, freqs-1))
 		}
 	}
-	return m.drawCells(w, grid, paint, hue)
+	return m.drawCells(w, scopeRows, grid, paint, hue)
 }
 
 // drawCells turns a dot grid into rows of braille. Each cell is drawn in the
 // palette's hue for where it sits and the step in paint for how strong it is;
 // a cell with no dots, or none the caller painted, is left blank.
-func (m Model) drawCells(w int, grid []uint8, paint, hue []int8) []string {
-	lines := make([]string, scopeRows)
-	for r := range scopeRows {
+func (m Model) drawCells(w, rows int, grid []uint8, paint, hue []int8) []string {
+	lines := make([]string, rows)
+	for r := range rows {
 		var sb strings.Builder
 
 		var run strings.Builder

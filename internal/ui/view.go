@@ -56,6 +56,13 @@ func (m Model) render() string {
 	if !fitsMinimum(m.width, m.height) {
 		return m.renderTooSmall()
 	}
+	// The big screen answers before anything else is laid out: it is not a
+	// panel inside the player, it is instead of it.
+	if m.stage.on {
+		if art := m.stageView(); art != "" {
+			return art
+		}
+	}
 	return m.renderPlayer()
 }
 

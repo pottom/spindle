@@ -42,6 +42,8 @@ type keyMap struct {
 	Devices  key.Binding
 	Refresh  key.Binding
 	Scope    key.Binding
+	// Stage gives the whole terminal to the visualiser.
+	Stage    key.Binding
 	Lyrics   key.Binding
 	Peek     key.Binding
 	Mute     key.Binding
@@ -189,6 +191,10 @@ func newKeyMap() keyMap {
 		Scope: key.NewBinding(
 			key.WithKeys("v"),
 			key.WithHelp("v", "waveform"),
+		),
+		Stage: key.NewBinding(
+			key.WithKeys("f"),
+			key.WithHelp("f", "full screen"),
 		),
 		Lyrics: key.NewBinding(
 			key.WithKeys("l"),

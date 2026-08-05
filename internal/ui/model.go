@@ -194,6 +194,9 @@ type Model struct {
 	// scope is the waveform under the artwork, and whether it is being drawn.
 	scope scopeState
 
+	// stage is the visualiser with the whole terminal to itself. See stage.go.
+	stage stageState
+
 	// lyrics is the words of the track playing, and whether they are on screen.
 	lyrics lyricsState
 

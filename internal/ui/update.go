@@ -251,10 +251,10 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if m.scopeMode().wave() {
 			m.rememberScope()
 		}
-		if m.scopeMode().fall() {
-			m.scope.rememberFall(message.Bands)
+		if m.stage.on {
+			m.stageFlow()
 		}
-		return m, scopeFrameCmd(m.player, m.scopeMode())
+		return m, scopeFrameCmd(m.player, m.frameMode())
 
 	case spinner.TickMsg:
 		if message.ID == m.device.ID() {
@@ -462,6 +462,12 @@ func (m *Model) fillFromQueue() {
 }
 
 func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	// The big screen outranks even the tabs: it is watched rather than worked
+	// on, so the next key is the way out of it whatever that key was.
+	if cmd, handled := m.stageKey(k); handled {
+		return m, cmd
+	}
+
 	// Tab switching outranks everything, including the search field: it is the
 	// one key that has to work wherever you are.
 	switch {
@@ -513,6 +519,13 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		// trace only fills rows that were already blank.
 		m.scope.modes[m.tab] = m.scopeMode().next()
 		return m, tea.Batch(m.startScope(), m.savePrefs())
+
+	case key.Matches(k, m.keys.Stage):
+		if m.tab != tabPlayer || m.ps == nil {
+			return m, nil
+		}
+		m.stage.on = true
+		return m, m.startScope()
 
 	case key.Matches(k, m.keys.Lyrics):
 		if !m.lyricsAvailable() {
@@ -988,5 +1001,5 @@ func (m *Model) startScope() tea.Cmd {
 		return nil
 	}
 	m.scope.running = true
-	return scopeFrameCmd(m.player, m.scopeMode())
+	return scopeFrameCmd(m.player, m.frameMode())
 }
