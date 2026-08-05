@@ -700,3 +700,57 @@ func TestWordsPullFacesThroughTheSolos(t *testing.T) {
 		t.Errorf("an instrumental bar shows %q, want a face", lines)
 	}
 }
+
+// The cheering face goes up through a solo with its arms in the air, and it
+// would be a waste to let it simply vanish when the singer comes back: the hands
+// throw on the beat, and let go of everything a moment before the words return.
+func TestCheerThrowsFromItsHands(t *testing.T) {
+	const w, rows = 80, 20
+
+	m := scopeModel(100, 44)
+	m.width, m.height = w, rows
+	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
+	m.ps.TrackID = "now"
+
+	img, layout, ok := wordsImage([]string{wordsCheer}, w*dotsPerCellX, rows*dotsPerCellY)
+	if !ok {
+		t.Fatal("the cheering face could not be drawn")
+	}
+	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	m.words.cellsX, m.words.cellsY, m.words.where = w, rows, layout
+	m.words.text = wordsCheer
+
+	left, right, high := m.wordsHands(w)
+	t.Logf("its hands are at %d and %d, %d dots down", left, right, high)
+	if high < 0 || right <= left {
+		t.Fatalf("the hands came out at %d and %d", left, right)
+	}
+
+	// A beat: a spark or two from each hand.
+	m.scope.envelope, m.words.wasLoud = 0.9, 0.2
+	m.wordsCheerFlow(w, rows)
+	if len(m.stage.drops) == 0 {
+		t.Error("the hands threw nothing on the beat")
+	}
+	onBeat := len(m.stage.drops)
+
+	// And everything they had, just before the words come back.
+	m.lyrics.synced, m.lyrics.forTrack = true, "now"
+	m.lyrics.lines = []player.Lyric{{At: 0, Words: "♪"}, {At: 10_000, Words: "words"}}
+	m.words.ends = 10_000
+	m.setProgress(10*time.Second - wordsCheerBurst/2 - lyricsAhead)
+
+	m.wordsCheerFlow(w, rows)
+	t.Logf("%d sparks on a beat, %d once it let go", onBeat, len(m.stage.drops))
+
+	if len(m.stage.drops) < onBeat+wordsCheerMost/2 {
+		t.Errorf("the burst threw %d sparks, want at least %d", len(m.stage.drops)-onBeat, wordsCheerMost/2)
+	}
+
+	// Only once, though.
+	before := len(m.stage.drops)
+	m.wordsCheerFlow(w, rows)
+	if len(m.stage.drops) > before+4 {
+		t.Error("it let go twice")
+	}
+}

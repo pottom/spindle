@@ -300,8 +300,12 @@ func (m Model) wordsComing() ([]string, int64) {
 		if at >= 0 && at < len(m.lyrics.lines) {
 			if line := strings.TrimSpace(m.lyrics.lines[at].Words); line != "" {
 				// A bar with no words for it: a face rather than the note the
-				// sheet wrote there.
+				// sheet wrote there, or the chase, which is not type at all and
+				// so asks for nothing to be set.
 				if wordsBeats(line) {
+					if chase, _ := chaseFor(m.lyrics.lines[at].At); chase {
+						return nil, m.lyrics.lines[at].At
+					}
 					return []string{wordsFace(m.lyrics.lines[at].At)}, m.lyrics.lines[at].At
 				}
 				return wordsWrap(line, m.width*dotsPerCellX, m.height*dotsPerCellY),
@@ -383,6 +387,15 @@ type wordsState struct {
 	// through lately, which is what the colours are spread over. See
 	// wordsColourNow.
 	low, high float32
+
+	// ends is when the line on screen gives way to the next, and burst says the
+	// cheering face has already thrown everything it had.
+	ends  int64
+	burst bool
+
+	// wasLoud is what the envelope stood at last frame, for telling a beat from
+	// the music simply moving.
+	wasLoud float32
 
 	// starts is when the line on screen is sung, on the playback clock. The
 	// gathering is timed against it rather than against the moment the picture
@@ -476,6 +489,16 @@ const (
 	wordsRangeLeast = 2.5
 	wordsRangeClose = 0.0015
 
+	// wordsCheer is the face that has arms, and wordsCheerBurst is how long
+	// before its bar ends the hands let go.
+	wordsCheer      = "\\o/"
+	wordsCheerBurst = 900 * time.Millisecond
+
+	// wordsCheerThrow is how hard a hand throws, and wordsCheerMost how many
+	// sparks a burst is worth.
+	wordsCheerThrow = 3.4
+	wordsCheerMost  = 40
+
 	// wordsCeiling is the row the hanging picture starts at: under the track's
 	// name and the clock, which are set over the top of everything else.
 	wordsCeiling = 2
@@ -504,6 +527,11 @@ const (
 
 // wordsLines draws the words, w cells across and rows deep.
 func (m Model) wordsLines(w, rows int) []string {
+	// Some bars are not words at all.
+	if m.chase.on {
+		return m.chaseLines(w, rows)
+	}
+
 	g := m.words.have
 	if g.DotsX == 0 || g.CellsX != w || g.CellsY != rows {
 		return nil
@@ -730,6 +758,16 @@ func wordsBeats(text string) bool {
 	return marks > 0
 }
 
+// wordsEnds is when the line that starts at a given moment gives way.
+func (m Model) wordsEnds(starts int64) int64 {
+	for i, line := range m.lyrics.lines {
+		if line.At == starts && i+1 < len(m.lyrics.lines) {
+			return m.lyrics.lines[i+1].At
+		}
+	}
+	return 0
+}
+
 // isFace reports whether a line is one of the faces rather than a lyric.
 func isFace(line string) bool {
 	for _, face := range wordsFaces {
@@ -738,6 +776,99 @@ func isFace(line string) bool {
 		}
 	}
 	return false
+}
+
+// chaseNow says whether this bar is one of the chases, and starts it walking
+// when it is.
+func (m *Model) chaseNow() bool {
+	on, back := false, false
+	if m.lyrics.synced && m.ps != nil && m.lyrics.forTrack == m.ps.TrackID {
+		if at := m.lyricsAt(); at >= 0 && at < len(m.lyrics.lines) {
+			if wordsBeats(strings.TrimSpace(m.lyrics.lines[at].Words)) {
+				on, back = chaseFor(m.lyrics.lines[at].At)
+			}
+		}
+	}
+
+	if on && !m.chase.on {
+		m.chase = chaseState{on: true, back: back}
+	}
+	if !on {
+		m.chase.on = false
+	}
+	return m.chase.on
+}
+
+// wordsCheerFlow throws sparks out of the cheering face's hands.
+//
+// It goes up through a solo with its arms in the air, and it would be a waste to
+// let it simply vanish when the singer comes back: the hands let go a moment
+// before it does. Between times they throw on the beat, so it is cheering along
+// rather than waiting to.
+func (m *Model) wordsCheerFlow(w, rows int) {
+	if m.words.text != wordsCheer || m.words.where.Count == 0 {
+		return
+	}
+
+	left, right, high := m.wordsHands(w)
+	if high < 0 {
+		return
+	}
+
+	floor := rows*dotsPerCellY - 1
+	throw := func(col int, n int, hard float32) {
+		for range n {
+			if len(m.stage.drops) >= stageDrops {
+				return
+			}
+			m.stage.drops = append(m.stage.drops, stageDrop{
+				col:    col + int((m.stage.roll()-0.5)*6),
+				at:     float32(floor - high),
+				speed:  hard * (0.6 + m.stage.roll()),
+				bright: 0.7 + 0.3*m.stage.roll(),
+			})
+		}
+	}
+
+	// On the beat, a spark or two from each hand.
+	rise := max(m.scope.envelope-m.words.wasLoud, 0) / max(m.scope.envelope, scopeFloor)
+	m.words.wasLoud = m.scope.envelope
+	if rise > grainHit {
+		throw(left, 2, wordsCheerThrow)
+		throw(right, 2, wordsCheerThrow)
+	}
+
+	// And everything it has left, just before the words come back.
+	left_ := time.Duration(m.words.ends-m.lyricsClock()) * time.Millisecond
+	if !m.words.burst && m.words.ends > 0 && left_ > 0 && left_ < wordsCheerBurst {
+		m.words.burst = true
+		throw(left, wordsCheerMost/2, wordsCheerThrow*1.4)
+		throw(right, wordsCheerMost/2, wordsCheerThrow*1.4)
+	}
+}
+
+// wordsHands is where the cheering face's hands are: the outer top corners of
+// what was drawn, in dots, and how high up they are.
+func (m Model) wordsHands(w int) (left, right, high int) {
+	where := m.words.where
+	if len(where.Tops) == 0 || where.DotsX == 0 {
+		return 0, 0, -1
+	}
+
+	left, right = -1, -1
+	for x := range where.DotsX {
+		if where.At[x] < 0 {
+			continue
+		}
+		if left < 0 {
+			left = x
+		}
+		right = x
+	}
+	if left < 0 {
+		return 0, 0, -1
+	}
+	return left, right, where.Tops[0]
 }
 
 // wordsSilent reports that the song has words but is not singing any right now:
@@ -752,7 +883,11 @@ func (m Model) wordsSilent() bool {
 	}
 
 	// What is coming counts as words: the gathering of the next line begins
-	// before the singer reaches it.
+	// before the singer reaches it. So does a chase, which has no words in it
+	// but is very much something to look at.
+	if m.chase.on {
+		return false
+	}
 	lines, _ := m.wordsComing()
 	return len(lines) == 0
 }
@@ -846,7 +981,7 @@ func (m *Model) wordsGrind() tea.Cmd {
 	if len(lines) == 0 {
 		return nil
 	}
-	m.words.starts = starts
+	m.words.starts, m.words.ends = starts, m.wordsEnds(starts)
 	m.words.beats = len(lines) == 1 && isFace(lines[0])
 
 	text := strings.Join(lines, "\n")
@@ -864,6 +999,11 @@ func (m *Model) wordsGrind() tea.Cmd {
 // wordsFlow follows the singer along the line, and paints each word with the
 // sound that was in the air as it went by.
 func (m *Model) wordsFlow(w, rows int) {
+	if m.chaseNow() {
+		m.chaseFlow(w, rows)
+		return
+	}
+
 	if m.words.where.Count == 0 {
 		return
 	}
@@ -874,6 +1014,8 @@ func (m *Model) wordsFlow(w, rows int) {
 	if centre, _ := wordsCentre(m.scope.bands); len(m.scope.bands) > 0 {
 		m.wordsFollowCentre(centre)
 	}
+
+	m.wordsCheerFlow(w, rows)
 
 	m.words.sung = m.wordsSung()
 
