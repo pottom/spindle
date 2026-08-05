@@ -50,10 +50,7 @@ const (
 	scopeMirror
 	// scopeLadder is the same spectrum as a stack of lamps. See ladder.go.
 	scopeLadder
-	// scopeGrain is the record itself in dots, moved by the music. It is only
-	// offered on the whole screen. See grain.go.
-	scopeGrain
-	// scopeWords is the line being sung, in dots. Also the whole screen only.
+	// scopeWords is the line being sung, in dots. The whole screen only.
 	// See words.go.
 	scopeWords
 	scopeModes // how many there are, for the cycle
@@ -67,18 +64,17 @@ func (s scopeMode) wave() bool   { return s == scopeWave }
 func (s scopeMode) bars() bool   { return s == scopeBars }
 func (s scopeMode) mirror() bool { return s == scopeMirror }
 func (s scopeMode) ladder() bool { return s == scopeLadder }
-func (s scopeMode) grain() bool  { return s == scopeGrain }
 func (s scopeMode) words() bool  { return s == scopeWords }
 
 // big reports whether a mode is only worth drawing on the whole screen. In the
 // strip the key steps over it, the way the big screen steps over "off".
-func (s scopeMode) big() bool { return s.grain() || s.words() }
+func (s scopeMode) big() bool { return s.words() }
 
 // spectrum reports whether a mode is drawn from the bands, whichever way it
 // draws them.
 // The words take the bands too, though only to breathe with them.
 func (s scopeMode) spectrum() bool {
-	return s.bars() || s.mirror() || s.ladder() || s.grain() || s.words()
+	return s.bars() || s.mirror() || s.ladder() || s.words()
 }
 
 // scopeState is the visualiser the player screen is drawing, and what it is

@@ -125,10 +125,11 @@ func wordsDeal(track string, turn int) uint64 {
 	return h
 }
 
-// wordsIdleCover reports that the music has this turn drawn as the sleeve
-// rather than as the meter. Turn and turn about: the record, then the reading,
-// then the record again.
-func (m Model) wordsIdleCover() bool {
+// wordsIdleLadder reports that the music has this turn drawn as the stack of
+// lamps rather than as the mirrored meter. Turn and turn about: the two are the
+// same reading and they do not look anything like each other, which is the
+// whole point of alternating them.
+func (m Model) wordsIdleLadder() bool {
 	if !m.wordsWordless() {
 		return false
 	}
@@ -136,12 +137,10 @@ func (m Model) wordsIdleCover() bool {
 	return spell%2 == 1
 }
 
-// wordsIdleArt is the picture a wordless record gets while nothing is set on
-// it. A cover that has not been ground yet falls back to the meter rather than
-// to an empty screen.
+// wordsIdleArt is the picture a wordless record gets while nothing is set on it.
 func (m Model) wordsIdleArt(w, rows int) []string {
-	if m.wordsIdleCover() {
-		if art := m.grainLines(w, rows); art != nil {
+	if m.wordsIdleLadder() {
+		if art := m.ladderLines(w, rows); art != nil {
 			return art
 		}
 	}

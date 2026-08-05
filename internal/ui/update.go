@@ -258,15 +258,6 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.words.since = time.Now().Add(-max(wordsGather-wait, 0))
 		return m, nil
 
-	case msg.GrainReady:
-		m.grain.asked = ""
-		if message.URL != m.cover.url {
-			return m, nil // the record changed while it was being ground
-		}
-		m.grain.have, m.grain.url = message.Grain, message.URL
-		m.grain.cellsX, m.grain.cellsY = message.CellsX, message.CellsY
-		return m, nil
-
 	case msg.WaveformReady:
 		// The trace stops the moment it leaves the screen: a redraw every 33ms
 		// for something nobody is looking at is the whole cost of the feature.
@@ -309,15 +300,6 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Batch(cmd, scopeFrameCmd(m.player, m.frameMode()))
 			}
 		}
-		// The sleeve is ground for the picture that is made of it, and for the
-		// turns a wordless record gives it on the lyric screen.
-		if m.stage.on && (m.scopeMode().grain() || (m.scopeMode().words() && m.wordsIdleCover())) {
-			m.grainFlow(m.width, m.height)
-			if cmd := m.grind(); cmd != nil {
-				return m, tea.Batch(cmd, scopeFrameCmd(m.player, m.frameMode()))
-			}
-		}
-
 		// The water is only stirred where it is being drawn, and the big screen
 		// falls back to it when the strip is switched off.
 		if mirror := m.scopeMode().mirror() || (m.stage.on && m.scopeMode() == scopeOff); mirror {

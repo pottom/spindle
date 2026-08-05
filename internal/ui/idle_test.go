@@ -83,19 +83,19 @@ func TestTheMusicHasMostOfEachTurn(t *testing.T) {
 }
 
 // While the music has the screen it is not drawn the same way every time: the
-// meter one turn, the sleeve itself the next.
-func TestTheSleeveTakesEveryOtherTurn(t *testing.T) {
+// mirrored meter one turn, the stack of lamps the next.
+func TestTheLampsTakeEveryOtherTurn(t *testing.T) {
 	m := wordless(t)
 
-	var covers int
+	var lamps int
 	for spell := range 6 {
 		m.setProgress(time.Duration(spell)*wordsSpell + wordsTitle + time.Second)
-		if m.wordsIdleCover() {
-			covers++
+		if m.wordsIdleLadder() {
+			lamps++
 		}
 	}
-	if covers == 0 || covers == 6 {
-		t.Errorf("the sleeve took %d of six turns, want it to take turns", covers)
+	if lamps == 0 || lamps == 6 {
+		t.Errorf("the lamps took %d of six turns, want them to take turns", lamps)
 	}
 
 	// A record with words of its own has no turns to take: the gap between two
@@ -103,8 +103,8 @@ func TestTheSleeveTakesEveryOtherTurn(t *testing.T) {
 	m.lyrics.forTrack, m.lyrics.missing, m.lyrics.synced = m.ps.TrackID, false, true
 	for spell := range 6 {
 		m.setProgress(time.Duration(spell)*wordsSpell + wordsTitle + time.Second)
-		if m.wordsIdleCover() {
-			t.Fatal("a song with words was given the sleeve between two lines")
+		if m.wordsIdleLadder() {
+			t.Fatal("a song with words was given the lamps between two lines")
 		}
 	}
 	if lines, _ := m.wordsIdle(); len(lines) != 0 {

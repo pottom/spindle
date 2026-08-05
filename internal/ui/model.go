@@ -197,10 +197,6 @@ type Model struct {
 	// stage is the visualiser with the whole terminal to itself. See stage.go.
 	stage stageState
 
-	// grain is the cover taken apart into dots, for the picture that moves it.
-	// See grain.go.
-	grain grainState
-
 	// words is the line being sung, in dots. See words.go.
 	words wordsState
 

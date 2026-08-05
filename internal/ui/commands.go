@@ -142,23 +142,6 @@ func scopeFrameCmd(p player.Player, mode scopeMode) tea.Cmd {
 	}
 }
 
-// grindCmd takes a cover apart into dots, off the update loop: it decodes and
-// scales an image, which is not work for the loop that draws.
-func grindCmd(loader *cover.Loader, url string, cellsX, cellsY int) tea.Cmd {
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), coverTimeout)
-		defer cancel()
-
-		grain, err := loader.Grind(ctx, url, cellsX, cellsY, dotsPerCellX, dotsPerCellY)
-		if err != nil {
-			// A cover that cannot be ground is a picture that stays empty. It
-			// is not worth a complaint: the artwork itself will have said so.
-			return nil
-		}
-		return msg.GrainReady{URL: url, CellsX: cellsX, CellsY: cellsY, Grain: grain}
-	}
-}
-
 // wordsCmd sets a line in dots, off the update loop: it rasterises type and
 // scales an image, which is not work for the loop that draws.
 func wordsCmd(lines []string, cellsX, cellsY int) tea.Cmd {

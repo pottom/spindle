@@ -487,6 +487,11 @@ const (
 	// three of them do not turn into a fairground.
 	wordsBounce = 6
 
+	// wordsLit is how bright a dot of the rasterised type has to be to be set.
+	// Half: type is drawn white on black and anti-aliased, so this is the edge
+	// of the letter — above it the stroke, below it the air around it.
+	wordsLit = 128
+
 	// wordsNotes is what goes up for a bar with no words in it.
 	wordsNotes = "♪ ♫ ♪"
 
@@ -596,7 +601,7 @@ func (m Model) wordsLines(w, rows int) []string {
 
 	for y := range dotsY {
 		for x := range dotsX {
-			if g.Lum[y*dotsX+x] < grainLit {
+			if g.Lum[y*dotsX+x] < wordsLit {
 				continue
 			}
 
@@ -850,7 +855,7 @@ func (m Model) drawLeaving(grid []uint8, paint, hue []int8, w, rows int, gone fl
 
 	for y := range dotsY {
 		for x := range dotsX {
-			if g.Lum[y*dotsX+x] < grainLit {
+			if g.Lum[y*dotsX+x] < wordsLit {
 				continue
 			}
 

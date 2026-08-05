@@ -1,54 +1,33 @@
 package cover
 
 import (
-	"context"
 	"image"
-	"image/color"
 
 	"golang.org/x/image/draw"
 )
 
-// Grain is a cover taken apart into what a visualiser can move: how bright
-// every dot of it is, and what colour every cell of it is.
+// Grain is a picture taken apart into what a visualiser can move: how bright
+// every dot of it is, at the resolution a braille cell gives.
 //
-// The two are at different resolutions on purpose. A braille cell holds eight
-// dots and one colour, so the shape of the picture has to live in the dots —
-// which are only ever on or off — and its colour in the cell underneath them.
-// That is also why this is worth doing at all: at eight dots to a cell a full
-// screen is a few hundred thousand of them, which is enough of a picture to
-// recognise a record by.
+// A cell holds eight dots and one colour, so the shape of the picture has to
+// live in the dots — which are only ever on or off — and any colour belongs to
+// the cell underneath them. That is also why this is worth doing at all: at
+// eight dots to a cell a full screen is a few hundred thousand of them, which
+// is enough of a picture to read a line of type off.
+//
+// It is in this package because it began as a way of drawing a sleeve. What it
+// grinds now is the lyric screen's type, set as an image and taken apart the
+// same way.
 type Grain struct {
 	DotsX, DotsY   int
 	CellsX, CellsY int
 
 	// Lum is how bright each dot is, 0..255, stretched so that the picture uses
-	// the whole range whatever the cover was like.
+	// the whole range whatever it was like to begin with.
 	Lum []uint8
-
-	// Cell is the colour of each cell, quantised: a photograph has a different
-	// colour in every cell, and a different colour in every cell is a colour
-	// code in every cell — which is what a terminal chokes on. Rounding them
-	// together is what puts the runs back.
-	Cell []color.RGBA
 }
 
-// grainLevels is how many steps each colour channel is rounded to. Four is
-// sixty-four colours, which is few enough for whole rows of a sky or a wall to
-// come out as one run and many enough that a cover still looks like itself.
-const grainLevels = 4
-
-// Grind samples a cover for the dot visualiser. It blocks on I/O the first time
-// a cover is asked for and must never be called from Update.
-func (l *Loader) Grind(ctx context.Context, url string, cellsX, cellsY, dotsPerCellX, dotsPerCellY int) (Grain, error) {
-	img, err := l.image(ctx, url)
-	if err != nil {
-		return Grain{}, err
-	}
-	return Grind(img, cellsX, cellsY, dotsPerCellX, dotsPerCellY), nil
-}
-
-// Grind is the same, for a cover already decoded — which is what the tests
-// have and what the drawn artwork is.
+// Grind takes a decoded picture apart.
 func Grind(img image.Image, cellsX, cellsY, perX, perY int) Grain {
 	if cellsX <= 0 || cellsY <= 0 || perX <= 0 || perY <= 0 {
 		return Grain{}
@@ -99,28 +78,6 @@ func Grind(img image.Image, cellsX, cellsY, perX, perY int) Grain {
 		copy(g.Lum[(y+offY)*g.DotsX+offX:], lum[y*pw:(y+1)*pw])
 	}
 
-	g.Cell = make([]color.RGBA, cellsX*cellsY)
-	for cy := range cellsY {
-		for cx := range cellsX {
-			var r, gr, b, n int
-			for y := cy * perY; y < (cy+1)*perY; y++ {
-				for x := cx * perX; x < (cx+1)*perX; x++ {
-					px, py := x-offX, y-offY
-					if px < 0 || py < 0 || px >= pw || py >= ph {
-						continue
-					}
-					c := scaled.RGBAAt(px, py)
-					r, gr, b, n = r+int(c.R), gr+int(c.G), b+int(c.B), n+1
-				}
-			}
-			if n == 0 {
-				continue
-			}
-			g.Cell[cy*cellsX+cx] = color.RGBA{
-				R: round(r / n), G: round(gr / n), B: round(b / n), A: 255,
-			}
-		}
-	}
 	return g
 }
 
@@ -134,12 +91,6 @@ func inside(imgW, imgH, w, h int) (int, int) {
 		return w, max(w*imgH/imgW, 1) // the width runs out first
 	}
 	return max(h*imgW/imgH, 1), h
-}
-
-// round takes a channel to one of grainLevels steps.
-func round(v int) uint8 {
-	step := 255 / (grainLevels - 1)
-	return uint8(min((v+step/2)/step, grainLevels-1) * step)
 }
 
 // stretch pulls the picture's brightness out to the full range.

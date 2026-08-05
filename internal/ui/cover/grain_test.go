@@ -80,31 +80,6 @@ func TestGrindStretchesADarkCover(t *testing.T) {
 
 // Every cell carries a colour code when it differs from its neighbour, and a
 // photograph differs in every cell. Rounding the colours together is what keeps
-// a screenful drawable thirty times a second.
-func TestGrindQuantisesTheColours(t *testing.T) {
-	g := Grind(disc(), 80, 20, 2, 4)
-
-	seen := map[color.RGBA]bool{}
-	for _, c := range g.Cell {
-		seen[c] = true
-	}
-	t.Logf("%d colours in %d cells", len(seen), len(g.Cell))
-
-	if len(seen) > grainLevels*grainLevels*grainLevels {
-		t.Errorf("%d different colours, want at most %d", len(seen), grainLevels*grainLevels*grainLevels)
-	}
-
-	// And they are on the grid, not near it.
-	step := 255 / (grainLevels - 1)
-	for c := range seen {
-		for _, v := range []uint8{c.R, c.G, c.B} {
-			if int(v)%step != 0 {
-				t.Fatalf("a cell is %v, which is not on the %d-step grid", c, step)
-			}
-		}
-	}
-}
-
 // The whole sleeve, not a piece of it: a cover is square and a terminal is not,
 // so the picture keeps its own shape and the screen is left dark either side of
 // it. Cropping to the window would fill it and throw away the corners, which on

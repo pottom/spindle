@@ -178,8 +178,6 @@ func (m Model) stagePicture(w, rows int) []string {
 		art = m.barsLines(w, rows)
 	case m.scopeMode().ladder():
 		art = m.ladderLines(w, rows)
-	case m.scopeMode().grain():
-		art = m.grainLines(w, rows)
 	case m.scopeMode().words():
 		// Between the lines of a song — an opening bar, a solo, the gap a
 		// lyric sheet marks with nothing — there are no words to set. The

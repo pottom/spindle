@@ -27,15 +27,6 @@ type CoverReady struct {
 	Art           cover.Art
 }
 
-// GrainReady carries a cover taken apart into dots, for the picture that moves
-// it. It says what it was ground from and at what size, because by the time it
-// arrives the screen may be showing something else or be a different shape.
-type GrainReady struct {
-	URL            string
-	CellsX, CellsY int
-	Grain          cover.Grain
-}
-
 // WordsReady carries a line of the song set in dots, with what it was set from
 // so that a picture for a line the song has already left can be dropped.
 type WordsReady struct {
