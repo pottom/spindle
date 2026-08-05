@@ -505,6 +505,12 @@ const (
 	wordsRangeLeast = 2.5
 	wordsRangeClose = 0.0015
 
+	// wordsCore is what a cell on the very edge of a stroke keeps of its word's
+	// strength; a cell in the middle of one keeps all of it. Low enough that the
+	// edge is visibly softer, high enough that a thin letter does not fade out
+	// altogether.
+	wordsCore = 0.55
+
 	// wordsNotes is what goes up for a bar with no words in it.
 	wordsNotes = "♪ ♫ ♪"
 
@@ -563,6 +569,17 @@ func (m Model) wordsLines(w, rows int) []string {
 			hue[r*w+c] = int8(min(c*freqs/w, freqs-1))
 		}
 	}
+
+	// How far into a stroke each cell sits.
+	//
+	// The type is dithered against a threshold, and everything about a letter
+	// that a threshold throws away is the thing that makes it a letter: how far
+	// over the line each dot was. A dot in the middle of a stem clears it by a
+	// mile and one on the edge of a curve by nothing, so keeping the difference
+	// and drawing it as strength gives the letter a soft edge — which is what a
+	// letter has, and what a stamped one does not.
+	deep := make([]float32, w*rows)
+	soft := make([]bool, w*rows)
 
 	// How far along the gathering is. Held at one once it is over, so the
 	// steady picture costs no arithmetic it does not need.
@@ -647,6 +664,10 @@ func (m Model) wordsLines(w, rows int) []string {
 			cell := (to/dotsPerCellY)*w + at/dotsPerCellX
 			grid[cell] |= 1 << brailleBit[at%dotsPerCellX][to%dotsPerCellY]
 
+			if over := float32(int(g.Lum[y*dotsX+x])-grainLit) / float32(255-grainLit); over > deep[cell] {
+				deep[cell] = over
+			}
+
 			// The colour comes from the word this dot belongs to, wherever the
 			// dot has been thrown to: a letter keeps its word's colour while it
 			// is still in the air.
@@ -657,7 +678,20 @@ func (m Model) wordsLines(w, rows int) []string {
 			} else if paint[cell] < 0 {
 				paint[cell] = int8(min(int(wordsAhead*float32(levels)), levels-1))
 			}
+			soft[cell] = true
 		}
+	}
+
+	// The soft edge, applied once the words have had their say: a cell at the
+	// edge of a stroke is drawn down the palette from one in the middle of it,
+	// and never further down than the dimmest a letter is allowed to go.
+	floor := int8(min(int(wordsAhead*float32(levels)), levels-1))
+	for i, s := range soft {
+		if !s || paint[i] < 0 {
+			continue
+		}
+		v := wordsCore + (1-wordsCore)*deep[i]
+		paint[i] = max(int8(float32(paint[i])*v), floor)
 	}
 
 	// Whatever the words left over goes to the music, drawn into the same grid

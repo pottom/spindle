@@ -731,3 +731,39 @@ func TestTheNoteLeavesRoomForTheMeter(t *testing.T) {
 		t.Errorf("the note leaves %d dots over it, want at least %d", head, wordsBand*dotsPerCellY)
 	}
 }
+
+// A letter has an edge, and a stamped one does not. The type is dithered
+// against a threshold, and how far over it each dot fell is exactly what a
+// threshold throws away — kept and drawn as strength, the strokes soften at
+// their edges instead of ending in a wall of dots.
+func TestLettersHaveSoftEdges(t *testing.T) {
+	const w, rows = 70, 16
+
+	m := scopeModel(100, 44)
+	m.width, m.height = w, rows
+	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
+
+	// One word, so every colour on the screen is a shade of the same word's
+	// rather than a difference between two of them.
+	img, layout, ok := wordsImage([]string{"barát"}, w*dotsPerCellX, rows*dotsPerCellY)
+	if !ok {
+		t.Fatal("the face could not draw the test word")
+	}
+	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	m.words.cellsX, m.words.cellsY, m.words.where = w, rows, layout
+	m.words.since = time.Now().Add(-time.Second)
+
+	shades := map[string]bool{}
+	for _, line := range m.wordsLines(w, rows) {
+		for _, part := range strings.Split(line, "\x1b[") {
+			if i := strings.Index(part, "m"); i > 0 && strings.HasPrefix(part, "38;2;") {
+				shades[part[:i]] = true
+			}
+		}
+	}
+	t.Logf("one word is drawn in %d shades", len(shades))
+
+	if len(shades) < 3 {
+		t.Errorf("one word came out in %d shades, want the strokes softer at their edges", len(shades))
+	}
+}
