@@ -577,6 +577,15 @@ func TestWordsHangTheMeterFromTheCeilingToo(t *testing.T) {
 	}
 
 	head := ink(drawn[wordsCeiling : wordsCeiling+tall])
+
+	// The meter hangs from the very first row: the two that were held back for
+	// the track's name went with it.
+	if strings.TrimSpace(ansiOff(drawn[0])) == "" {
+		t.Error("the top row of the screen is empty, want the meter starting there")
+	}
+	if strings.TrimSpace(ansiOff(drawn[rows-1])) == "" {
+		t.Error("the bottom row of the screen is empty, want the meter standing on it")
+	}
 	foot := ink(drawn[from:])
 	t.Logf("the meter draws %d cells hanging and %d standing", head, foot)
 

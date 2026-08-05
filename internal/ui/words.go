@@ -495,9 +495,21 @@ const (
 	// wordsTitle is how long the record's name is worth at the top of it.
 	wordsTitle = 5 * time.Second
 
-	// wordsCeiling is the row the hanging picture starts at: under the track's
-	// name and the clock, which are set over the top of everything else.
-	wordsCeiling = 2
+	// wordsCeiling is the row the hanging picture starts at.
+	//
+	// It used to be the third, because the track's name and the clock were set
+	// over the top of everything else. They are gone, and the two rows they were
+	// keeping are the top of the screen — so the meter hangs from the very edge,
+	// where the picture starts.
+	wordsCeiling = 0
+
+	// wordsReach is how much of its band a column of the meter takes on this
+	// screen, as against the 0.72 the other pictures leave. Here the water is
+	// thrown from the tips and given the whole terminal to cross, so the room
+	// held back over the columns bought nothing — it was a strip of empty screen
+	// at the top and the bottom, which is what a picture like this can least
+	// afford.
+	wordsReach = 0.94
 
 	// wordsSpray is what a drop keeps of its light the moment it leaves the band
 	// and enters the lyric, and wordsSpent how sharply what is left falls away
@@ -667,7 +679,7 @@ func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall int) {
 
 	// The columns, standing on the floor and hanging from the ceiling, as tall
 	// as the band allows.
-	reach := stageReach * float32(tall*dotsPerCellY)
+	reach := wordsReach * float32(tall*dotsPerCellY)
 	head := m.wordsHeadroom(rows)
 
 	for x := range dotsX {
