@@ -42,6 +42,41 @@ type WordsReady struct {
 	Text           string
 	CellsX, CellsY int
 	Grain          cover.Grain
+
+	// Words says which word each dot belongs to, so that the one being sung can
+	// be told from the ones that have been and the ones still to come.
+	Words WordLayout
+}
+
+// WordLayout is where the words of a line landed once they were set.
+//
+// It is worked out while the type is being drawn, because that is the only
+// moment the widths are known: a proportional face gives no formula for how
+// wide a word is, only a measurement.
+type WordLayout struct {
+	Count int
+
+	// DotsX is the width the layout was made for, and At maps a dot to the word
+	// under it — one row of DotsX entries for each line of type, holding the
+	// index of the word there or -1 for the space between two of them.
+	DotsX int
+	At    []int16
+
+	// Tops and Bottoms are the dot rows each line of type covers.
+	Tops, Bottoms []int
+}
+
+// WordAt is the word under a dot, or -1 where there is none.
+func (l WordLayout) WordAt(x, y int) int {
+	for i, top := range l.Tops {
+		if y < top || y > l.Bottoms[i] || x < 0 || x >= l.DotsX {
+			continue
+		}
+		if at := i*l.DotsX + x; at < len(l.At) {
+			return int(l.At[at])
+		}
+	}
+	return -1
 }
 
 // CoverFailed reports that artwork could not be produced. A missing cover is not

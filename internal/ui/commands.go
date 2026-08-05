@@ -163,7 +163,7 @@ func grindCmd(loader *cover.Loader, url string, cellsX, cellsY int) tea.Cmd {
 // scales an image, which is not work for the loop that draws.
 func wordsCmd(lines []string, cellsX, cellsY int) tea.Cmd {
 	return func() tea.Msg {
-		img, ok := wordsImage(lines, cellsX*dotsPerCellX, cellsY*dotsPerCellY)
+		img, layout, ok := wordsImage(lines, cellsX*dotsPerCellX, cellsY*dotsPerCellY)
 		if !ok {
 			return nil
 		}
@@ -171,6 +171,7 @@ func wordsCmd(lines []string, cellsX, cellsY int) tea.Cmd {
 			Text:   strings.Join(lines, "\n"),
 			CellsX: cellsX, CellsY: cellsY,
 			Grain: cover.Grind(grayToImage(img), cellsX, cellsY, dotsPerCellX, dotsPerCellY),
+			Words: layout,
 		}
 	}
 }

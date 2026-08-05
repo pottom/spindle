@@ -7,6 +7,7 @@ import (
 	"math"
 	"strings"
 	"time"
+	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -17,6 +18,7 @@ import (
 	"golang.org/x/image/math/fixed"
 
 	"github.com/pottom/spindle/internal/ui/cover"
+	"github.com/pottom/spindle/internal/ui/msg"
 )
 
 // The words, in dots: what is being sung, big enough to read across a room.
@@ -72,24 +74,24 @@ const (
 // type will go. It reports false when the face has no glyph for something in
 // them — a Japanese lyric on a Latin font is a row of empty boxes, and an empty
 // box is worse than not offering the picture.
-func wordsImage(lines []string, w, h int) (*image.Gray, bool) {
+func wordsImage(lines []string, w, h int) (*image.Gray, msg.WordLayout, bool) {
 	if wordsFont == nil || w <= 0 || h <= 0 || len(lines) == 0 {
-		return nil, false
+		return nil, msg.WordLayout{}, false
 	}
 	if !wordsDrawable(lines) {
-		return nil, false
+		return nil, msg.WordLayout{}, false
 	}
 
 	size := wordsSize(lines, w, h)
 	if size < 4 {
-		return nil, false
+		return nil, msg.WordLayout{}, false
 	}
 
 	face, err := opentype.NewFace(wordsFont, &opentype.FaceOptions{
 		Size: float64(size), DPI: 72, Hinting: font.HintingFull,
 	})
 	if err != nil {
-		return nil, false
+		return nil, msg.WordLayout{}, false
 	}
 	defer face.Close() //nolint:errcheck // nothing to do about a face that will not close
 
@@ -101,12 +103,41 @@ func wordsImage(lines []string, w, h int) (*image.Gray, bool) {
 	block := lead * (len(lines) - 1)
 	top := (h-block)/2 + metrics.Ascent.Round()/2
 
+	// Where every word lands is worked out here rather than afterwards: this is
+	// the only place the widths are known, because a proportional face gives no
+	// formula for how wide a word is, only a measurement.
+	layout := msg.WordLayout{DotsX: w, At: make([]int16, w*len(lines))}
+	for i := range layout.At {
+		layout.At[i] = -1
+	}
+
 	for i, line := range lines {
 		width := d.MeasureString(line).Round()
-		d.Dot = fixed.P((w-width)/2, top+i*lead)
+		left := (w - width) / 2
+		baseline := top + i*lead
+
+		d.Dot = fixed.P(left, baseline)
 		d.DrawString(line)
+
+		// The line of type covers from the top of its tallest letter to the
+		// bottom of its lowest, with a little either side so that a dot on the
+		// edge of a stroke still counts as part of the word it belongs to.
+		layout.Tops = append(layout.Tops, max(baseline-metrics.Ascent.Round(), 0))
+		layout.Bottoms = append(layout.Bottoms, min(baseline+metrics.Descent.Round(), h-1))
+
+		at := left
+		for _, word := range strings.Fields(line) {
+			wide := d.MeasureString(word).Round()
+			for x := at; x < at+wide && x < w; x++ {
+				if x >= 0 {
+					layout.At[i*w+x] = int16(layout.Count)
+				}
+			}
+			at += wide + d.MeasureString(" ").Round()
+			layout.Count++
+		}
 	}
-	return img, true
+	return img, layout, true
 }
 
 // wordsDrawable reports whether the face has every glyph the lines need.
@@ -307,16 +338,29 @@ type wordsState struct {
 	// something you notice has happened.
 	since time.Time
 
-	// glow is how hot each column of the line is burning, following the band of
-	// the spectrum that sits under it.
+	// where each word of the line landed, so the one being sung can be told from
+	// the ones that have been and the ones still to come.
+	where msg.WordLayout
+
+	// sung is how many words of the line have been reached, and paint is what
+	// each of them was sung in.
 	//
-	// This is what moves once a line has settled, rather than the letters
-	// themselves: they are here to be read, and a letter that wanders is a
-	// letter that has to be worked out. The colour can carry the music without
-	// costing the words anything — the bass lights the left of the line and the
-	// cymbals the right, so a beat runs through the words the way it runs
-	// through the spectrum.
-	glow []float32
+	// This is the picture's whole idea. A word is coloured by the sound that was
+	// in the air as it went by — the hue from where the loudest of the spectrum
+	// sat, the strength from how loud it was — and then it keeps that colour for
+	// the rest of the line. By the end of a line the words are a record of how
+	// they sounded: a growled low word stays dark and red, a word sung over a
+	// cymbal crash stays bright at the other end of the scale. Nothing else here
+	// remembers anything; this is the one picture that does.
+	sung  int
+	paint []wordPaint
+}
+
+// wordPaint is a word's colour: which hue of the palette, at what strength, and
+// whether it has been sung yet at all.
+type wordPaint struct {
+	hue, level int8
+	set        bool
 }
 
 const (
@@ -334,15 +378,16 @@ const (
 	// together, at one the last dot only starts as the first one finishes.
 	wordsStagger = 0.55
 
-	// wordsGlowFloor is the dimmest a letter is ever drawn, as a share of the
-	// palette. A line whose quiet end goes out is a line with holes in it, and
-	// the words have to survive the silence between two beats.
-	wordsGlowFloor = 0.3
+	// wordsAhead is how bright a word that has not been sung yet is drawn, as a
+	// share of the palette. Dim enough to read as waiting, bright enough to read
+	// at all: the whole line has to be legible before it is sung, or it is a
+	// guessing game rather than a lyric.
+	wordsAhead = 0.28
 
-	// How fast the colour follows the music: quick to light and slower to fall,
-	// the way a meter is, so a hit shows and then recedes rather than flickering.
-	wordsGlowRise = 0.55
-	wordsGlowFall = 0.12
+	// wordsSungLift is how much of its own strength a word keeps once it has
+	// been sung. Below the word being sung, above the ones still to come, so the
+	// line reads as three states at a glance.
+	wordsSungLift = 0.75
 )
 
 // wordsLines draws the words, w cells across and rows deep.
@@ -374,16 +419,25 @@ func (m Model) wordsLines(w, rows int) []string {
 		gather = float32(since) / float32(wordsGather)
 	}
 
-	// What each column is burning at: the music, dimmed by however much of the
-	// gathering is still to come.
-	heat := make([]int8, w)
-	for c := range heat {
-		var glow float32
-		if len(m.words.glow) == dotsX {
-			glow = m.words.glow[min(c*dotsPerCellX, dotsX-1)]
+	// What each word is burning at, and in what colour. Three states: what has
+	// been sung keeps the colour it was sung in, what is being sung now burns at
+	// the top of the scale in the colour of this moment, and what is still to
+	// come waits, dim.
+	nowHue, nowLevel := m.wordsColourNow()
+	paints := make([]wordPaint, m.words.where.Count)
+	for i := range paints {
+		switch {
+		case i < m.words.sung && i < len(m.words.paint) && m.words.paint[i].set:
+			p := m.words.paint[i]
+			paints[i] = wordPaint{hue: p.hue, level: int8(float32(p.level) * wordsSungLift), set: true}
+		case i == m.words.sung:
+			paints[i] = wordPaint{hue: nowHue, level: nowLevel, set: true}
+		default:
+			paints[i] = wordPaint{level: int8(min(int(wordsAhead*float32(levels)), levels-1))}
 		}
-		v := (wordsGlowFloor + (1-wordsGlowFloor)*glow) * gather
-		heat[c] = int8(min(int(v*float32(levels)), levels-1))
+		if gather < 1 {
+			paints[i].level = int8(float32(paints[i].level) * gather)
+		}
 	}
 
 	for y := range dotsY {
@@ -419,8 +473,16 @@ func (m Model) wordsLines(w, rows int) []string {
 
 			cell := (to/dotsPerCellY)*w + at/dotsPerCellX
 			grid[cell] |= 1 << brailleBit[at%dotsPerCellX][to%dotsPerCellY]
-			if step := heat[at/dotsPerCellX]; step > paint[cell] {
-				paint[cell] = step
+
+			// The colour comes from the word this dot belongs to, wherever the
+			// dot has been thrown to: a letter keeps its word's colour while it
+			// is still in the air.
+			if word := m.words.where.WordAt(x, y); word >= 0 && word < len(paints) {
+				if p := paints[word]; p.level > paint[cell] {
+					paint[cell], hue[cell] = p.level, p.hue
+				}
+			} else if paint[cell] < 0 {
+				paint[cell] = int8(min(int(wordsAhead*float32(levels)), levels-1))
 			}
 		}
 	}
@@ -497,29 +559,77 @@ func (m *Model) wordsGrind() tea.Cmd {
 	return wordsCmd(lines, m.width, m.height)
 }
 
-// wordsFlow carries the colour along by a frame: every column follows the band
-// of the spectrum beneath it.
+// wordsFlow follows the singer along the line, and paints each word with the
+// sound that was in the air as it went by.
 func (m *Model) wordsFlow(w, rows int) {
-	dotsX := w * dotsPerCellX
-	if dotsX <= 0 {
+	if m.words.where.Count == 0 {
 		return
 	}
-
-	if len(m.words.glow) != dotsX {
-		m.words.glow = make([]float32, dotsX)
+	if len(m.words.paint) != m.words.where.Count {
+		m.words.paint = make([]wordPaint, m.words.where.Count)
 	}
+
+	m.words.sung = m.wordsSung()
+
+	// The word being sung takes the colour of this moment, over and over, so
+	// what it keeps is how it sounded as it ended rather than how the line
+	// happened to start.
+	if at := m.words.sung; at >= 0 && at < len(m.words.paint) {
+		hue, level := m.wordsColourNow()
+		m.words.paint[at] = wordPaint{hue: hue, level: level, set: true}
+	}
+}
+
+// wordsSung is how many words of the line have been reached.
+func (m Model) wordsSung() int {
+	if !m.lyrics.synced || m.ps == nil || m.lyrics.forTrack != m.ps.TrackID {
+		return m.words.where.Count // a title is not sung: it is all there at once
+	}
+
+	at := m.lyricsAt()
+	if at < 0 || at >= len(m.lyrics.lines) {
+		return 0
+	}
+
+	line := m.lyrics.lines[at].Words
+	reached := m.lyricsSweep(at, line)
+
+	// The sweep is a place in the line; the picture counts in words.
+	var words int
+	for i, r := range []rune(line) {
+		if i >= reached {
+			break
+		}
+		if unicode.IsSpace(r) {
+			words++
+		}
+	}
+	return min(words, m.words.where.Count-1)
+}
+
+// wordsColourNow is the colour of the sound in the air: the hue from where the
+// loudest of the spectrum sits, the strength from how loud it is.
+//
+// This is what a word is painted with as it goes by. It is the same mapping the
+// spectrum itself uses — low on one side of the palette's arc, high on the other
+// — so a word sung over a bass note and the bass note itself are the same
+// colour on two different pictures.
+func (m Model) wordsColourNow() (hue, level int8) {
+	freqs, levels := len(m.styles.Bars), len(m.styles.Bars[0])
 
 	bands := m.scope.bands
-	for x := range dotsX {
-		var want float32
-		if len(bands) > 0 {
-			want = bands[min(x*len(bands)/dotsX, len(bands)-1)]
-		}
-
-		rate := float32(wordsGlowFall)
-		if want > m.words.glow[x] {
-			rate = wordsGlowRise
-		}
-		m.words.glow[x] += (want - m.words.glow[x]) * rate
+	if len(bands) == 0 {
+		return int8(freqs / 2), int8(levels - 1)
 	}
+
+	loudest, at := bands[0], 0
+	for i, v := range bands {
+		if v > loudest {
+			loudest, at = v, i
+		}
+	}
+
+	hue = int8(min(at*freqs/len(bands), freqs-1))
+	level = int8(min(int((0.45+0.55*loudest)*float32(levels)), levels-1))
+	return hue, level
 }

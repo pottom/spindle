@@ -44,12 +44,12 @@ func TestWordsRefuseWhatTheyCannotDraw(t *testing.T) {
 	const w, h = 100 * dotsPerCellX, 20 * dotsPerCellY
 
 	for _, line := range []string{"Árvíztűrő tükörfúrógép", "Привет мир", "Über alles"} {
-		if _, ok := wordsImage([]string{line}, w, h); !ok {
+		if _, _, ok := wordsImage([]string{line}, w, h); !ok {
 			t.Errorf("refused to draw %q, which the face has every letter of", line)
 		}
 	}
 	for _, line := range []string{"こんにちは", "안녕하세요"} {
-		if _, ok := wordsImage([]string{line}, w, h); ok {
+		if _, _, ok := wordsImage([]string{line}, w, h); ok {
 			t.Errorf("drew %q, which the face has no letters of", line)
 		}
 	}
@@ -92,12 +92,13 @@ func TestWordsGatherAfterALineChanges(t *testing.T) {
 	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
 
 	lines := wordsWrap("better off alone", w*dotsPerCellX, rows*dotsPerCellY)
-	img, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
+	img, layout, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
 	if !ok {
 		t.Fatal("the face could not draw the test line")
 	}
 	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
 	m.words.cellsX, m.words.cellsY, m.words.text = w, rows, "x"
+	m.words.where = layout
 
 	filled := func(at time.Duration) (lit int, cells int) {
 		m.words.since = time.Now().Add(-at)
@@ -138,12 +139,12 @@ func TestWordsGatherFourWays(t *testing.T) {
 	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
 
 	lines := wordsWrap("better off alone", w*dotsPerCellX, rows*dotsPerCellY)
-	img, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
+	img, layout, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
 	if !ok {
 		t.Fatal("the face could not draw the test line")
 	}
 	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
-	m.words.cellsX, m.words.cellsY = w, rows
+	m.words.cellsX, m.words.cellsY, m.words.where = w, rows, layout
 
 	picture := func(at time.Duration) string {
 		m.words.since = time.Now().Add(-at)
@@ -205,28 +206,36 @@ func TestWordsMoveComesFromTheLine(t *testing.T) {
 	}
 }
 
-// A settled line stands still and its colour moves: the letters are here to be
-// read, and the music is carried by how they burn rather than by where they are.
-// The bass lights the left of the line and the cymbals the right, so a beat runs
-// through the words the way it runs through the spectrum.
-func TestWordsColourFollowsTheMusic(t *testing.T) {
+// The picture's whole idea: a word is coloured by the sound that was in the air
+// as it went by, and keeps that colour for the rest of the line. What has been
+// sung is a record of how it sounded, what is being sung burns, and what is to
+// come waits — and the letters themselves never move.
+func TestWordsKeepTheColourTheyWereSungIn(t *testing.T) {
 	const w, rows = 90, 14
 
 	m := scopeModel(100, 44)
 	m.width, m.height = w, rows
 	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
+	m.ps.TrackID = "now"
 
-	lines := wordsWrap("better off alone", w*dotsPerCellX, rows*dotsPerCellY)
-	img, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
+	m.lyrics.synced, m.lyrics.forTrack = true, "now"
+	m.lyrics.lines = []player.Lyric{
+		{At: 0, Words: "better off alone tonight"},
+		{At: 8_000, Words: "and after"},
+	}
+
+	lines := wordsWrap("better off alone tonight", w*dotsPerCellX, rows*dotsPerCellY)
+	img, layout, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
 	if !ok {
 		t.Fatal("the face could not draw the test line")
 	}
+	if layout.Count != 4 {
+		t.Fatalf("the layout found %d words in a line of four", layout.Count)
+	}
 	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
-	m.words.cellsX, m.words.cellsY = w, rows
+	m.words.cellsX, m.words.cellsY, m.words.where = w, rows, layout
 	m.words.since = time.Now().Add(-time.Second)
 
-	// The shape of the line, with the colours taken off, and the whole of it
-	// with them left on.
 	shape := func() string {
 		var sb strings.Builder
 		for _, line := range m.wordsLines(w, rows) {
@@ -234,54 +243,51 @@ func TestWordsColourFollowsTheMusic(t *testing.T) {
 		}
 		return sb.String()
 	}
-	painted := func() string {
-		return strings.Join(m.wordsLines(w, rows), "")
+	painted := func() string { return strings.Join(m.wordsLines(w, rows), "") }
+
+	// The first word, sung over a bass note.
+	bass := make([]float32, 28)
+	for i := range bass {
+		bass[i] = 0.1
+	}
+	bass[1] = 1
+	m.scope.bands = bass
+	m.setProgress(500 * time.Millisecond)
+	m.wordsFlow(w, rows)
+
+	first := m.words.paint[0]
+	if !first.set {
+		t.Fatal("the word being sung was not painted at all")
 	}
 
-	quiet := make([]float32, 28)
-	for i := range quiet {
-		quiet[i] = 0.1
+	// The third word, sung over a cymbal: a different colour entirely.
+	high := make([]float32, 28)
+	for i := range high {
+		high[i] = 0.1
 	}
-	m.scope.bands = quiet
-	for range 40 {
-		m.wordsFlow(w, rows)
-	}
-	wasShape, wasPaint := shape(), painted()
+	high[26] = 1
+	m.scope.bands = high
+	m.setProgress(5 * time.Second)
 
-	// A hit in the bass alone: the left of the line has to light and the right
-	// stay where it was.
-	loud := make([]float32, 28)
-	copy(loud, quiet)
-	for i := range 6 {
-		loud[i] = 1
-	}
-	m.scope.bands = loud
-	for range 10 {
-		m.wordsFlow(w, rows)
-	}
+	was := shape()
+	m.wordsFlow(w, rows)
+	t.Logf("word 0 kept hue %d, and the word being sung is %d", first.hue, m.words.sung)
 
-	if shape() != wasShape {
-		t.Error("the letters moved when the music did, want them still")
+	if m.words.sung == 0 {
+		t.Fatal("the singer never reached the second word")
 	}
-	if painted() == wasPaint {
-		t.Error("the colour did not change with the music")
+	if got := m.words.paint[m.words.sung]; !got.set || got.hue == first.hue {
+		t.Errorf("a word sung over a cymbal took hue %d, the same as one sung over a bass note", got.hue)
 	}
-
-	// Left louder than right: the glow under the first columns has to have
-	// risen further than the glow under the last.
-	left, right := m.words.glow[2], m.words.glow[len(m.words.glow)-3]
-	t.Logf("after a bass hit the line burns %.2f on the left and %.2f on the right", left, right)
-	if left <= right {
-		t.Errorf("the bass lit the line at %.2f on the left and %.2f on the right, want the left hotter", left, right)
+	// The earlier word kept what it was sung in rather than following the music.
+	if m.words.paint[0].hue != first.hue {
+		t.Errorf("the first word repainted itself from %d to %d", first.hue, m.words.paint[0].hue)
 	}
-
-	// And it never goes out: a line whose quiet end is dark is a line with holes
-	// in it.
-	m.scope.bands = quiet
-	for range 200 {
-		m.wordsFlow(w, rows)
+	// And nothing moved.
+	if shape() != was {
+		t.Error("the letters moved when the colour did, want them still")
 	}
-	if shape() != wasShape {
-		t.Error("the line lost letters once the music went quiet")
+	if painted() == "" {
+		t.Error("nothing was drawn")
 	}
 }
