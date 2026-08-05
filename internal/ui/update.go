@@ -260,6 +260,11 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.scopeMode().wave() {
 			m.rememberScope()
+			if m.stage.on {
+				m.throwSparks(m.width, m.height)
+			} else {
+				m.throwSparks(m.scopeWidth(m.layout()), scopeRows)
+			}
 		}
 		// The water is only stirred where it is being drawn, and the big screen
 		// falls back to it when the strip is switched off.

@@ -289,9 +289,14 @@ const (
 	barLevelSteps = 6
 
 	// barHueArc is how far the hue travels from one end of the spectrum to the
-	// other, in degrees. Wide enough to see the sweep, narrow enough that the
-	// far end still belongs to the artwork's colour.
-	barHueArc = 46
+	// other, in degrees.
+	//
+	// Wide enough for the sweep to be a colour rather than a shade of one, and
+	// narrow enough that both ends still belong to the artwork: at eighty a
+	// warm cover runs from red through orange to yellow across the width, which
+	// reads as the record's own light spread out, where half of that read as a
+	// single colour someone had dimmed at one end.
+	barHueArc = 80
 )
 
 // barPalette builds the spectrum's colours: hue across the frequency range,

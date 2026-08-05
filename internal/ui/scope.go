@@ -92,6 +92,16 @@ type scopeState struct {
 	// rather than smear: the older frames sit almost on top of the newest.
 	trail [][]uint8
 
+	// sparks is what the trace has thrown off and not yet taken back, and crest
+	// is how far each column swung last frame — which is what a throw is
+	// measured against. See spark.go.
+	sparks []spark
+
+	// wasLoud is what the envelope stood at last frame, which is how a hit is
+	// told from the wave simply moving. See spark.go.
+	wasLoud float32
+	seed    uint32
+
 	// envelope follows the recent loudness so the trace can be scaled to it.
 	// Measured against a live stream, peaks ran from 0.06 to 0.87 within one
 	// track: at a fixed scale the quiet passages are a flat line and the loud
@@ -145,6 +155,9 @@ const (
 // The envelope is deliberately left where it is: the trace is drawn against it,
 // so bringing both down together would leave the picture exactly as it was.
 func (s *scopeState) settle() {
+	for i := range s.sparks {
+		s.sparks[i].bright *= scopeSettle
+	}
 	for i := range s.bands {
 		s.bands[i] *= scopeSettle
 	}
@@ -347,6 +360,11 @@ func (m Model) scopeDraw(w, rows int, grid []uint8, loud, dwell []float32) []str
 	}
 	levels := len(m.styles.Bars[0])
 
+	// What the trace has thrown off is drawn with it rather than after it: a
+	// bead sharing a cell with the beam has to add its light to it, not sit in
+	// a second layer over the top.
+	sparks, sparkPaint := m.sparkGrid(w, rows, levels)
+
 	lines := make([]string, rows)
 	for r := range rows {
 		var sb strings.Builder
@@ -372,6 +390,11 @@ func (m Model) scopeDraw(w, rows int, grid []uint8, loud, dwell []float32) []str
 			bright := scopeDwell*float64(dwell[c]) +
 				(1-scopeDwell)*math.Sqrt(float64(min(loud[c], 1)))
 			level := min(int(bright*float64(levels)), levels-1)
+
+			if s := sparks[at]; s != 0 {
+				bits |= s
+				level = max(level, int(sparkPaint[at]))
+			}
 			for age, old := range m.scope.trail {
 				if len(old) != len(grid) || old[at] == 0 {
 					continue

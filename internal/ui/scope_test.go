@@ -814,3 +814,58 @@ func TestTriggerIgnoresTheHissOnTheNote(t *testing.T) {
 		t.Errorf("the trigger moved from %d to %d when hiss was added, want it on the same crossing", clean, hissy)
 	}
 }
+
+// The trace throws sparks: a hit sheds beads off its crests, which arc away
+// from the line and are pulled back to it.
+func TestTraceThrowsSparks(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.scope.modes[tabPlayer] = scopeWave
+	w := m.scopeWidth(m.layout())
+
+	wave := func(amp float64) []float32 {
+		f := make([]float32, 2*player.WaveformWindow)
+		for i := range f {
+			f[i] = float32(amp * math.Sin(float64(i)*0.22))
+		}
+		return f
+	}
+
+	// A quiet passage, then something twice as loud: the trace is scaled to the
+	// recent loudness, so what marks the hit is the level underneath it.
+	for range 30 {
+		m.scope.frame = wave(0.3)
+		m.scope.follow(m.scope.frame)
+		m.throwSparks(w, scopeRows)
+	}
+	m.scope.frame = wave(0.95)
+	m.scope.follow(m.scope.frame)
+	m.throwSparks(w, scopeRows)
+
+	if len(m.scope.sparks) == 0 {
+		t.Fatal("the hit threw nothing off the trace")
+	}
+	t.Logf("the hit threw %d sparks", len(m.scope.sparks))
+
+	// They are drawn with the trace rather than in a layer of their own.
+	off := m.scopeLines(w)
+	m.scope.sparks = nil
+	bare := m.scopeLines(w)
+	if strings.Join(off, "\n") == strings.Join(bare, "\n") {
+		t.Error("the sparks changed nothing on screen")
+	}
+
+	// And left alone, every one of them comes back to the line.
+	m.scope.frame = wave(0.95)
+	for range 300 {
+		m.scope.follow(m.scope.frame)
+		m.throwSparks(w, scopeRows)
+	}
+	m.scope.frame = make([]float32, 2*player.WaveformWindow)
+	for range 300 {
+		m.scope.follow(m.scope.frame)
+		m.throwSparks(w, scopeRows)
+	}
+	if len(m.scope.sparks) != 0 {
+		t.Errorf("%d sparks are still in the air over a silent trace", len(m.scope.sparks))
+	}
+}
