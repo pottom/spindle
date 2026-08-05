@@ -403,9 +403,15 @@ func (s *stageState) roll() float32 {
 }
 
 const (
-	// stageEdgeHead is how many dots at the leading end are drawn at full
-	// strength, so where it has got to can be found at a glance.
+	// stageEdgeHead is how many dots at the leading end are drawn at the same
+	// strength, so where it has got to can be found at a glance, and
+	// stageEdgeHeat how bright that is as a share of the palette.
+	//
+	// Well short of the top of it: this is the one thing on the big screen that
+	// is not the music, and it has no business being the brightest thing there.
+	// It is for glancing at, not for reading.
 	stageEdgeHead = 12
+	stageEdgeHeat = 0.6
 
 	// stageEdgeTail is how much of the way round the screen the fading part
 	// behind the head is worth. A share rather than a count, so the same comet
@@ -447,15 +453,17 @@ func (m Model) stageEdge(w, rows int, grid []uint8, paint []int8, levels int) {
 	along := int(min(max(gone, 0), 1) * float64(round))
 
 	tail := max(int(stageEdgeTail*float64(round)), stageEdgeHead+1)
+	heat := max(int(stageEdgeHeat*float64(levels-1)), 1)
+
 	for i := max(along-tail, 0); i < along; i++ {
 		// How far back down the tail this dot is, and so how much of it is
-		// left: full for the head, then falling away to nothing behind it.
+		// left: the head's own strength, then falling away to nothing behind it.
 		back := along - i
 
-		step := int8(levels - 1)
+		step := int8(heat)
 		if back > stageEdgeHead {
 			left := 1 - float64(back-stageEdgeHead)/float64(tail-stageEdgeHead)
-			step = int8(left * float64(levels-1))
+			step = int8(left * float64(heat))
 			if step <= 0 {
 				continue // faded out: leaving it dark is the point
 			}
