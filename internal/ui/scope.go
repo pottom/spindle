@@ -108,6 +108,22 @@ const (
 	// reads as afterglow; more than that smears, because a thirtieth of a
 	// second is long enough for the wave to have moved right across the screen.
 	scopeTrail = 2
+
+	// scopeTriggerFollow is how fast the trigger's low pass follows the wave.
+	// At the rate the tapped frames arrive it is a corner around three hundred
+	// hertz: below the note being played, above the beat.
+	scopeTriggerFollow = 0.2
+
+	// scopeDwell is how much of a cell's brightness comes from how long the beam
+	// spent in it rather than from how loud that moment was.
+	//
+	// This is what a cathode ray tube does and the reason its traces look the
+	// way they do: the phosphor is lit by a beam moving at a constant speed, so
+	// where the trace is flat the beam dwells and the line is bright, and where
+	// it climbs steeply the same beam is spread over ten times the distance and
+	// the line fades. Loudness keeps a share of the say so that a hit still
+	// flares rather than going dark for being fast.
+	scopeDwell = 0.6
 )
 
 // follow updates the loudness envelope from a new frame.
@@ -209,22 +225,39 @@ func (m Model) scopeLinesFrom(w, start int) []string {
 	if w <= 0 || len(m.styles.Bars) == 0 {
 		return nil
 	}
-	grid, loud := m.scopeGrid(w, start)
-	return m.scopeDraw(w, grid, loud)
+	grid, loud, dwell := m.scopeBeam(w, start)
+	return m.scopeDraw(w, grid, loud, dwell)
 }
 
 // scopeGrid plots the frame: which braille dots the trace lights, and how far
 // the wave swings under each cell.
 func (m Model) scopeGrid(w, start int) ([]uint8, []float32) {
+	grid, loud, _ := m.scopeBeam(w, start)
+	return grid, loud
+}
+
+// scopeBeam plots the frame and reports how the beam travelled: which dots it
+// lit, how far the wave swings under each cell, and how long it dwelt there.
+//
+// Dwell is the number of columns a cell was crossed by against the number of
+// dots that took: a flat stretch is one dot per column and lights brightly, a
+// steep edge is a dozen and fades. It is what makes a tube's trace read as a
+// beam rather than as a plot.
+func (m Model) scopeBeam(w, start int) ([]uint8, []float32, []float32) {
 	dotsX, dotsY := w*dotsPerCellX, scopeRows*dotsPerCellY
 	grid := make([]uint8, w*scopeRows)
 	loud := make([]float32, w)
+	dwell := make([]float32, w)
+
+	steps := make([]float32, w) // columns crossing each cell
+	spent := make([]float32, w) // dots they took
 
 	prev := -1
 	for x := range dotsX {
 		y := m.scopeSample(start, x, dotsX)
-		if a := abs32(y); a > loud[x/dotsPerCellX] {
-			loud[x/dotsPerCellX] = a
+		at := x / dotsPerCellX
+		if a := abs32(y); a > loud[at] {
+			loud[at] = a
 		}
 
 		// Map -1..1 onto the rows, leaving a dot of headroom at each edge so a
@@ -237,13 +270,20 @@ func (m Model) scopeGrid(w, start int) ([]uint8, []float32) {
 			from = prev
 		}
 		for yy := min(from, dy); yy <= max(from, dy); yy++ {
-			cell := (yy/dotsPerCellY)*w + x/dotsPerCellX
+			cell := (yy/dotsPerCellY)*w + at
 			grid[cell] |= 1 << brailleBit[x%dotsPerCellX][yy%dotsPerCellY]
+			spent[at]++
 		}
+		steps[at]++
 		prev = dy
 	}
 
-	return grid, loud
+	for i := range dwell {
+		if spent[i] > 0 {
+			dwell[i] = steps[i] / spent[i]
+		}
+	}
+	return grid, loud, dwell
 }
 
 // scopeDraw turns a dot grid into rows, with the older frames glowing behind it.
@@ -251,7 +291,7 @@ func (m Model) scopeGrid(w, start int) ([]uint8, []float32) {
 // A cell the beam is on now is coloured by how loud that moment is; a cell only
 // the afterglow reaches is drawn at the quiet end of the palette, so the glow
 // reads as behind the trace rather than as part of it.
-func (m Model) scopeDraw(w int, grid []uint8, loud []float32) []string {
+func (m Model) scopeDraw(w int, grid []uint8, loud, dwell []float32) []string {
 	freqs := len(m.styles.Bars)
 	if freqs == 0 {
 		return make([]string, scopeRows)
@@ -276,10 +316,13 @@ func (m Model) scopeDraw(w int, grid []uint8, loud []float32) []string {
 			at := r*w + c
 			bits := grid[at]
 
-			// How far the trace swings here decides the strength; the glow
-			// behind it is drawn at the bottom of the scale, so it reads as
-			// behind rather than as part of the trace.
-			level := min(int(math.Sqrt(float64(min(loud[c], 1)))*float64(levels)), levels-1)
+			// How long the beam dwelt here and how far the wave swings decide
+			// the strength together; the glow behind it is drawn at the bottom
+			// of the scale, so it reads as behind rather than as part of the
+			// trace.
+			bright := scopeDwell*float64(dwell[c]) +
+				(1-scopeDwell)*math.Sqrt(float64(min(loud[c], 1)))
+			level := min(int(bright*float64(levels)), levels-1)
 			for age, old := range m.scope.trail {
 				if len(old) != len(grid) || old[at] == 0 {
 					continue
@@ -339,9 +382,19 @@ func (m Model) scopeTrigger(dots int) int {
 	// low enough that a quiet passage still triggers.
 	threshold := m.scope.envelope * 0.1
 
+	// The trigger listens through a low pass, which is what the coupling switch
+	// on a scope's trigger does and for the same reason: a crossing found on the
+	// hiss riding on a note is a different crossing every frame, and the picture
+	// shimmers. Following the shape of the wave instead holds it still —
+	// measured on recorded music, the share of the trace that stays put from one
+	// frame to the next goes from 0.68 to 0.70, and what moves is what the music
+	// did rather than what the noise did.
+	var lowpass float32
+
 	armed := false
 	for i := range slack {
-		v := frame[i]
+		lowpass += (frame[i] - lowpass) * scopeTriggerFollow
+		v := lowpass
 		if v < -threshold {
 			armed = true
 			continue

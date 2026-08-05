@@ -740,3 +740,77 @@ func TestNarrowBarsKeepTheirBands(t *testing.T) {
 		t.Errorf("at 68 cells the spectrum came out in %d bars, want one for each of the %d bands", count, bands)
 	}
 }
+
+// A tube's beam is bright where it dwells and faint where it races: the same
+// beam drawing a steep edge is spread over ten times the distance, so it lights
+// each dot for a tenth as long. Drawn without that, a waveform is a plot; drawn
+// with it, it is a trace.
+func TestBeamDwellsOnTheFlatAndFadesOnTheEdge(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.scope.modes[tabPlayer] = scopeWave
+	w := m.layout().interior - leftMargin - rightMargin
+
+	dwellOf := func(step float64) float32 {
+		f := make([]float32, 2*player.WaveformWindow)
+		for i := range f {
+			f[i] = float32(0.8 * math.Sin(float64(i)*step))
+		}
+		m.scope.frame = f
+		m.scope.follow(f)
+
+		_, _, dwell := m.scopeBeam(w, 0)
+		var sum float32
+		for _, v := range dwell {
+			sum += v
+		}
+		return sum / float32(len(dwell))
+	}
+
+	// A slow wave is nearly flat across a cell; a fast one climbs through it.
+	slow, fast := dwellOf(0.02), dwellOf(0.9)
+	t.Logf("dwell: slow %.2f, fast %.2f", slow, fast)
+
+	if slow <= fast {
+		t.Errorf("the beam dwells %.2f on a slow wave and %.2f on a fast one, want the slow one brighter", slow, fast)
+	}
+}
+
+// The trigger listens through a low pass, the way the coupling switch on a
+// scope does: a zero crossing found on the hiss riding on a note is somewhere
+// else every frame, and the picture shimmers for it.
+func TestTriggerIgnoresTheHissOnTheNote(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.scope.modes[tabPlayer] = scopeWave
+	w := m.layout().interior - leftMargin - rightMargin
+	dots := w * dotsPerCellX
+
+	note := func(noise float64) []float32 {
+		f := make([]float32, 2*player.WaveformWindow)
+		for i := range f {
+			v := 0.7 * math.Sin(float64(i)*0.05)
+			if i%2 == 0 {
+				v += noise
+			} else {
+				v -= noise
+			}
+			f[i] = float32(v)
+		}
+		return f
+	}
+
+	m.scope.frame = note(0)
+	m.scope.follow(m.scope.frame)
+	clean := m.scopeTrigger(dots)
+
+	m.scope.frame = note(0.25)
+	m.scope.follow(m.scope.frame)
+	hissy := m.scopeTrigger(dots)
+
+	t.Logf("trigger: clean at %d, with hiss at %d", clean, hissy)
+
+	// Within a few samples is the same place on the wave; the noise is not
+	// allowed to pick a different crossing altogether.
+	if hissy-clean > 6 || clean-hissy > 6 {
+		t.Errorf("the trigger moved from %d to %d when hiss was added, want it on the same crossing", clean, hissy)
+	}
+}
