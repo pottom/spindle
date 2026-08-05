@@ -142,3 +142,50 @@ func TestTheDevicePickerIsDrawnOverEveryTab(t *testing.T) {
 		}
 	}
 }
+
+// Choosing a device means play here. The device it moved to may come up paused
+// — a daemon that has only just joined refuses to resume a session Spotify
+// hands it — so the interface asks once more when the transfer has landed.
+func TestMovingPlaybackHerePressesPlay(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.devices.items = devices("", "spindle")
+	m.devices.open = true
+
+	if cmd := m.transfer(); cmd == nil {
+		t.Fatal("choosing a device did nothing")
+	}
+	if !m.wantPlaying {
+		t.Fatal("the transfer did not record that the music should follow")
+	}
+
+	// A state that arrives paused, with something loaded, is the case.
+	m.ps = &player.State{TrackID: "t1", Title: "one", Playing: false}
+	cmd := m.startWhatWasMovedHere()
+	if cmd == nil {
+		t.Error("nothing pressed play on the device the music was moved to")
+	}
+	if m.wantPlaying {
+		t.Error("the press was not spent")
+	}
+
+	// And it happens once: a pause a minute later is somebody pausing.
+	m.ps.Playing = false
+	if cmd := m.startWhatWasMovedHere(); cmd != nil {
+		t.Error("play was pressed again long after the transfer")
+	}
+}
+
+// A transfer to a device with nothing loaded waits: pressing play at a daemon
+// that has no track yet says nothing to anybody.
+func TestMovingPlaybackWaitsForATrack(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.wantPlaying = true
+	m.ps = &player.State{TrackID: "", Playing: false}
+
+	if cmd := m.startWhatWasMovedHere(); cmd != nil {
+		t.Error("play was pressed with nothing to play")
+	}
+	if !m.wantPlaying {
+		t.Error("the press was spent on nothing")
+	}
+}

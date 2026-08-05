@@ -47,6 +47,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = nil
 
 		cmds := []tea.Cmd{m.syncCover()}
+		if cmd := m.startWhatWasMovedHere(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 		if m.stillWaitingForTrackChange(message.State) {
 			cmds = append(cmds, refetchCmd(confirmRetry))
 		}
@@ -806,6 +809,27 @@ func (m *Model) stopLoading() {
 	for i := range m.stack {
 		m.stack[i].pages.loading = false
 	}
+}
+
+// startWhatWasMovedHere presses play once, for a transfer that landed paused.
+//
+// Only once, and only where there is something to play: a device that came up
+// paused because Spotify handed it a session nobody asked for is exactly the
+// case the daemon's quiet window is there to catch, and this is what tells the
+// two apart — somebody chose this device, so the music follows them to it.
+func (m *Model) startWhatWasMovedHere() tea.Cmd {
+	if !m.wantPlaying || m.ps == nil || m.ps.TrackID == "" {
+		return nil
+	}
+	m.wantPlaying = false
+	if m.ps.Playing {
+		return nil
+	}
+
+	p := m.player
+	m.ps.Playing = true
+	m.hold()
+	return controlCmd("play", p.Play)
 }
 
 // shouldResync decides whether this tick carries a real state fetch. Polling
