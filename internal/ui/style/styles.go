@@ -84,11 +84,6 @@ type Styles struct {
 	// which is the whole of how a stack of lamps has ever been read.
 	Ladder []lipgloss.Style
 
-	// LadderOff is the same climb with the lamps out: what a rung looks like
-	// when it is there but not lit. It is what draws the gaps where the picture
-	// is too shallow to leave them empty.
-	LadderOff []lipgloss.Style
-
 	// Status line.
 	DeviceOn  lipgloss.Style
 	DeviceOff lipgloss.Style
@@ -140,8 +135,7 @@ func New(isDark bool, accent color.Color) Styles {
 		ScrollTrack: fg(t.Faint),
 
 		Bars:   barPalette(t, accent),
-		Ladder:    ladderPalette(t, accent),
-		LadderOff: ladderOff(t, ladderPalette(t, accent)),
+		Ladder: ladderPalette(t, accent),
 
 		Quality: fg(t.Faint),
 
@@ -311,11 +305,6 @@ const (
 	ladderSteps  = 24
 	ladderHueArc = 120
 
-	// ladderOffMix is how far an unlit rung is taken towards the furniture.
-	// Far enough that the lit ones are unmistakably the reading, near enough
-	// that the ladder still looks like a ladder between them.
-	ladderOffMix = 0.82
-
 	// barHueArc is how far the hue travels from one end of the spectrum to the
 	// other, in degrees.
 	//
@@ -351,18 +340,6 @@ func ladderPalette(t Theme, accent color.Color) []lipgloss.Style {
 			c = blend(c, t.Text, (v-0.86)/0.14*0.45)
 		}
 		out[i] = lipgloss.NewStyle().Foreground(c)
-	}
-	return out
-}
-
-// ladderOff dims a climb to what an unlit lamp looks like: its own colour,
-// almost all the way down to the furniture. Almost, rather than all the way,
-// because a lamp that is out is still a lamp — a meter with holes in it reads
-// as a meter that is broken.
-func ladderOff(t Theme, lit []lipgloss.Style) []lipgloss.Style {
-	out := make([]lipgloss.Style, len(lit))
-	for i, s := range lit {
-		out[i] = lipgloss.NewStyle().Foreground(blend(s.GetForeground(), t.Border, ladderOffMix))
 	}
 	return out
 }

@@ -28,7 +28,7 @@ func TestLadderIsLampsWithAirBetween(t *testing.T) {
 	for r, line := range m.ladderLines(96, 20) {
 		for _, ch := range ansiOff(line) {
 			switch ch {
-			case ladderTop, ladderBottom:
+			case ladderSegment:
 				lamps++
 			case ' ':
 			default:
@@ -105,91 +105,6 @@ func TestLadderFillsWhatItIsGiven(t *testing.T) {
 			if got := len([]rune(ansiOff(line))); got != size[0] {
 				t.Errorf("%dx%d: row %d is %d cells wide", size[0], size[1], i, got)
 			}
-		}
-	}
-}
-
-// In the strip under the artwork there are four rows, and a lamp with air under
-// it would leave four rungs to show a whole spectrum in — four dashes moving
-// about rather than a meter. There the rungs are packed two to a cell instead,
-// each half of it a lamp of its own colour, which is twice the reading in the
-// same space.
-func TestLadderPacksTheRungsWhenItIsShallow(t *testing.T) {
-	m := ladderModel(100, 44)
-
-	rungs := func(rows int) int {
-		quiet := make([]float32, 28)
-		for i := range quiet {
-			quiet[i] = 0.5
-		}
-		m.scope.adoptBands(quiet)
-
-		// How many distinct heights the picture can tell apart: step the level
-		// up and count how many different pictures come out.
-		seen := map[string]bool{}
-		for level := 0.0; level < 1; level += 0.02 {
-			for i := range quiet {
-				quiet[i] = float32(level)
-			}
-			m.scope.bands = quiet
-			seen[strings.Join(m.ladderLines(96, rows), "\n")] = true
-		}
-		return len(seen)
-	}
-
-	shallow, tall := rungs(4), rungs(20)
-	t.Logf("the strip tells %d heights apart, the screen %d", shallow, tall)
-
-	if shallow < 8 {
-		t.Errorf("the strip can only draw %d different heights, want the rungs packed", shallow)
-	}
-	if tall <= shallow {
-		t.Errorf("a screen of 20 rows draws %d heights and a strip of 4 draws %d", tall, shallow)
-	}
-}
-
-// The gaps are the look, and they survive the strip: where there is no room to
-// leave them empty they are drawn dark instead, so the bar is still a stack of
-// lamps rather than a stripe of colour.
-func TestLadderKeepsItsGapsWhenItIsShallow(t *testing.T) {
-	m := ladderModel(100, 44)
-
-	bands := make([]float32, 28)
-	for i := range bands {
-		bands[i] = 0.95
-	}
-	m.scope.adoptBands(bands)
-
-	// A tall bar in the strip: every cell of it has to carry two different
-	// colours, the lit rung and the one with its light out.
-	var pairs int
-	for _, line := range m.ladderLines(96, 4) {
-		for _, run := range strings.Split(line, "\x1b[m") {
-			// A cell drawn with both a foreground and a background is a lit
-			// rung over an unlit one, or the other way about.
-			if strings.Contains(run, "38;2;") && strings.Contains(run, "48;2;") {
-				pairs++
-			}
-		}
-	}
-	if pairs == 0 {
-		t.Error("no cell in the strip carries a lamp and a gap, so the bars are one flat colour")
-	}
-
-	// And on a screen the gaps are left empty, as they were.
-	var rows int
-	for _, line := range m.ladderLines(96, 20) {
-		if strings.TrimSpace(ansiOff(line)) == "" {
-			rows++
-		}
-	}
-	if rows > 0 {
-		t.Logf("%d rows are empty on the tall picture", rows)
-	}
-	for _, line := range m.ladderLines(96, 20) {
-		if strings.Contains(line, "48;2;") {
-			t.Error("the tall ladder painted a background, so its gaps are no longer empty")
-			break
 		}
 	}
 }
