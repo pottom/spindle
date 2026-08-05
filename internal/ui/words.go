@@ -474,6 +474,11 @@ const (
 	wordsRangeLeast = 2.5
 	wordsRangeClose = 0.0015
 
+	// wordsTilt is how far a word leans, as a rise over a run: a couple of
+	// degrees. Any more and the line stops being a line of type and starts
+	// being a ransom note.
+	wordsTilt = 0.045
+
 	// wordsWordRide is how far a word rides its own part of the sound, and
 	// wordsLineRide how far a whole line nods with the loudest of it. Both well
 	// under what a note is given: these have to be read while they move.
@@ -590,6 +595,7 @@ func (m Model) wordsLines(w, rows int) []string {
 	}
 
 	bounce := m.wordsRiding(len(paints))
+	tilt, middle := m.wordsTilting(len(paints))
 
 	for y := range dotsY {
 		for x := range dotsX {
@@ -605,8 +611,17 @@ func (m Model) wordsLines(w, rows int) []string {
 			// How far along this particular dot is. Some of the moves arrive a
 			// row or a column at a time, so each dot has its own share of the
 			// gathering rather than all of them having the whole of it.
-			if word := m.words.where.WordAt(x, y); word >= 0 && word < len(bounce) {
-				to += bounce[word]
+			if word := m.words.where.WordAt(x, y); word >= 0 {
+				if word < len(bounce) {
+					to += bounce[word]
+				}
+				if word < len(tilt) && tilt[word] != 0 {
+					// A shear rather than a turn. At these angles the two look
+					// the same, and a shear moves whole columns of a word
+					// together — a real rotation would open holes between them
+					// and the letter would come apart at the seams.
+					to += int(float32(x-middle[word]) * tilt[word])
+				}
 				if to < 0 || to >= dotsY {
 					continue
 				}
@@ -1055,6 +1070,89 @@ func (m Model) wordsRiding(count int) []int {
 	}
 
 	return nil
+}
+
+// wordsTilting is how far each word of the line leans, and the column it leans
+// about.
+//
+// Most lines do not lean at all, and the ones that do lean by a couple of
+// degrees — enough that the line looks hand-set rather than typeset, little
+// enough that nobody has to tip their head. Which lines and which way is the
+// line's own business, so a song reads the same twice.
+func (m Model) wordsTilting(count int) ([]float32, []int) {
+	seed := m.wordsLeanSeed()
+	if count <= 0 || seed%3 != 0 {
+		return nil, nil
+	}
+
+	tilt, middle := make([]float32, count), make([]int, count)
+
+	// Where each word sits, so it leans about its own middle rather than about
+	// the middle of the screen — which would fling the ends of the line about.
+	where := m.words.where
+	first, last := make([]int, count), make([]int, count)
+	for i := range first {
+		first[i], last[i] = -1, -1
+	}
+	for i, at := range where.At {
+		if at < 0 || int(at) >= count {
+			continue
+		}
+		x := i % max(where.DotsX, 1)
+		if first[at] < 0 {
+			first[at] = x
+		}
+		last[at] = x
+	}
+
+	for i := range tilt {
+		middle[i] = (max(first[i], 0) + max(last[i], 0)) / 2
+
+		// Three ways for a word: this way, that way, or flat.
+		h := seed ^ uint64(i+1)*0x9e3779b97f4a7c15
+		h ^= h >> 29
+		h *= 0xbf58476d1ce4e5b9
+		h ^= h >> 32
+
+		switch h % 3 {
+		case 0:
+			tilt[i] = wordsTilt
+		case 1:
+			tilt[i] = -wordsTilt
+		}
+	}
+	return tilt, middle
+}
+
+// wordsLeanSeed is what decides whether the thing on screen leans and which way
+// each of its parts goes.
+//
+// A line of words is asked of its own text. The notes are not: they are always
+// the same three marks, so asked the same way they would either lean in every
+// solo of every record or in none of them. Theirs comes from when the bar is,
+// which is the same thing the moves are drawn from — so one solo leans and the
+// next does not.
+func (m Model) wordsLeanSeed() uint64 {
+	var h uint64 = 0xcbf29ce484222325
+	for _, r := range m.words.text {
+		h = (h ^ uint64(r)) * 0x100000001b3
+	}
+	if m.words.beats {
+		h ^= uint64(m.words.starts) * 0x9e3779b97f4a7c15
+	}
+
+	h ^= h >> 33
+	h *= 0xff51afd7ed558ccd
+	h ^= h >> 29
+	return h
+}
+
+// wordsLeans is the same question for a line of words alone, which is what a
+// test can ask without a model.
+func wordsLeans(text string) bool {
+	m := Model{}
+	m.words.text = text
+	return m.wordsLeanSeed()%3 == 0
 }
 
 // wordsBeatRide is how hard the part of the sound a note answers for is going,

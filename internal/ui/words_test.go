@@ -828,3 +828,104 @@ func same(a, b map[int]bool) bool {
 	}
 	return true
 }
+
+// Some lines lean. Not many, and not far: a couple of degrees, so the line looks
+// hand-set rather than typeset, and nobody has to tip their head.
+func TestSomeLinesLean(t *testing.T) {
+	lines := []string{
+		"better off alone", "do you think", "never gonna give you up", "so close no matter how far",
+		"hello darkness my old friend", "is this the real life", "sultans of swing", "arra gondolok",
+		"we are the champions", "another one bites the dust", "under pressure", "life on mars",
+	}
+
+	var leaning int
+	for _, line := range lines {
+		if wordsLeans(line) {
+			leaning++
+		}
+	}
+	t.Logf("%d of %d lines lean", leaning, len(lines))
+	if leaning == 0 || leaning == len(lines) {
+		t.Errorf("%d of %d lines lean, want some of them", leaning, len(lines))
+	}
+
+	// A line that leans leans by a word, some one way and some the other, and
+	// each about its own middle rather than about the screen's.
+	const w, rows = 74, 20
+	m := scopeModel(100, 44)
+	m.width, m.height = w, rows
+
+	var leaned bool
+	for _, line := range lines {
+		if !wordsLeans(line) {
+			continue
+		}
+
+		_, layout, ok := wordsImage([]string{line}, w*dotsPerCellX, rows*dotsPerCellY)
+		if !ok {
+			continue
+		}
+		m.words.where, m.words.text = layout, line
+
+		tilt, middle := m.wordsTilting(layout.Count)
+		if len(tilt) != layout.Count {
+			t.Fatalf("%q leans but gave %d tilts for %d words", line, len(tilt), layout.Count)
+		}
+
+		var last int
+		for i := range tilt {
+			if abs32(tilt[i]) > wordsTilt {
+				t.Errorf("a word leans by %.3f, want no more than %.3f", tilt[i], wordsTilt)
+			}
+			if middle[i] < last {
+				t.Error("the words lean about middles that are not in reading order")
+			}
+			last = middle[i]
+		}
+		leaned = true
+		t.Logf("%q leans its words by %v", line, tilt)
+		break
+	}
+	if !leaned {
+		t.Error("no line of the twelve could be drawn leaning")
+	}
+
+	// And one that does not lean is given nothing to lean by.
+	for _, line := range lines {
+		if wordsLeans(line) {
+			continue
+		}
+		m.words.text = line
+		if tilt, _ := m.wordsTilting(4); tilt != nil {
+			t.Errorf("%q does not lean but was given %v", line, tilt)
+		}
+		break
+	}
+}
+
+// The notes are always the same three marks, so asked of their text they would
+// lean in every solo of every record or in none of them. Theirs comes from when
+// the bar is, the way their moves do.
+func TestTheNotesLeanBySolo(t *testing.T) {
+	var leaning int
+	for at := range int64(30) {
+		m := Model{}
+		m.words.text, m.words.beats, m.words.starts = wordsNotes, true, at*7_000
+		if m.wordsLeanSeed()%3 == 0 {
+			leaning++
+		}
+	}
+	t.Logf("%d of thirty solos lean", leaning)
+
+	if leaning == 0 || leaning == 30 {
+		t.Errorf("%d of thirty solos lean, want some of them", leaning)
+	}
+
+	// And the same bar answers the same way twice.
+	one := Model{}
+	one.words.text, one.words.beats, one.words.starts = wordsNotes, true, 12_345
+	two := one
+	if one.wordsLeanSeed() != two.wordsLeanSeed() {
+		t.Error("one bar answered differently twice")
+	}
+}
