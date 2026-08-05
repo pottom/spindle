@@ -42,11 +42,13 @@ type keyMap struct {
 	Devices  key.Binding
 	Refresh  key.Binding
 	Scope    key.Binding
-	// Stage gives the whole terminal to the visualiser.
-	Stage    key.Binding
-	Lyrics   key.Binding
-	Peek     key.Binding
-	Mute     key.Binding
+	// Stage gives the whole terminal to the visualiser, and Gag puts one of the
+	// things that fill a solo up without waiting for one.
+	Stage  key.Binding
+	Gag    key.Binding
+	Lyrics key.Binding
+	Peek   key.Binding
+	Mute   key.Binding
 
 	// Queue editing. Only the tracks put there by hand can be moved or dropped,
 	// so these do nothing on the rest of the list.
@@ -195,6 +197,10 @@ func newKeyMap() keyMap {
 		Stage: key.NewBinding(
 			key.WithKeys("f"),
 			key.WithHelp("f", "full screen"),
+		),
+		Gag: key.NewBinding(
+			key.WithKeys("F"),
+			key.WithHelp("F", "one of the solo's faces, now"),
 		),
 		Lyrics: key.NewBinding(
 			key.WithKeys("l"),

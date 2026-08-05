@@ -204,8 +204,10 @@ type Model struct {
 	// words is the line being sung, in dots. See words.go.
 	words wordsState
 
-	// chase is what walks across the screen through a solo. See chase.go.
+	// chase is what walks across the screen through a solo, and face what looks
+	// out of it. See chase.go and face.go.
 	chase chaseState
+	face  faceState
 
 	// lyrics is the words of the track playing, and whether they are on screen.
 	lyrics lyricsState

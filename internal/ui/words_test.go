@@ -498,7 +498,7 @@ func TestWordsBeatWhenThereIsNothingToSing(t *testing.T) {
 	m.width, m.height = w, rows
 	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
 
-	lines := []string{wordsFaces[0]}
+	lines := []string{"x"}
 	img, layout, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
 	if !ok {
 		t.Fatal("the face could not be drawn")
@@ -660,37 +660,10 @@ func TestWordsHangTheMeterFromTheCeilingToo(t *testing.T) {
 }
 
 // A lyric sheet marks the bars it has no words for with a note, and a note two
-// hundred dots tall is a dull thing to look at for the length of a solo. A face
-// goes up instead — a different one each time, so the next instrumental is not
-// the last one.
-func TestWordsPullFacesThroughTheSolos(t *testing.T) {
-	const w, h = 60 * dotsPerCellX, 16 * dotsPerCellY
-
-	for _, face := range wordsFaces {
-		if _, _, ok := wordsImage([]string{face}, w, h); !ok {
-			t.Errorf("%q cannot be drawn, so it must not be in the set", face)
-		}
-		if !isFace(face) {
-			t.Errorf("%q is in the set but not recognised as one", face)
-		}
-	}
-
-	// The same bar pulls the same face, so a song looks the same twice.
-	if a, b := wordsFace(12_345), wordsFace(12_345); a != b {
-		t.Errorf("one bar pulled %q and then %q", a, b)
-	}
-
-	// And forty of them are not all the same joke.
-	seen := map[string]bool{}
-	for at := range int64(40) {
-		seen[wordsFace(at*7_000)] = true
-	}
-	t.Logf("forty instrumental bars pulled %d of the %d faces", len(seen), len(wordsFaces))
-	if len(seen) < len(wordsFaces)/2 {
-		t.Errorf("forty bars only pulled %d faces of %d", len(seen), len(wordsFaces))
-	}
-
-	// A line the sheet wrote a note on comes back as a face rather than a note.
+// hundred dots tall is a dull thing to look at for the length of a solo. Those
+// bars are drawn instead — a face or the chase — so nothing is set in type for
+// them at all.
+func TestWordsDrawRatherThanSetTheSolos(t *testing.T) {
 	m := scopeModel(100, 44)
 	m.width, m.height = 60, 16
 	m.ps.TrackID = "now"
@@ -701,9 +674,32 @@ func TestWordsPullFacesThroughTheSolos(t *testing.T) {
 	}
 	m.setProgress(2 * time.Second)
 
-	lines, _ := m.wordsComing()
-	if len(lines) != 1 || !isFace(lines[0]) {
-		t.Errorf("an instrumental bar shows %q, want a face", lines)
+	if lines, _ := m.wordsComing(); len(lines) != 0 {
+		t.Errorf("an instrumental bar asked for %q to be set, want it drawn", lines)
+	}
+
+	// And the screen is not blank for it: the bar is one of the drawn ones.
+	m.chaseNow()
+	if !m.chase.on && !m.words.drawn {
+		t.Error("an instrumental bar drew neither a face nor the chase")
+	}
+	if m.wordsSilent() {
+		t.Error("a bar with a face on it was taken for silence")
+	}
+
+	// Forty of them are not all the same face.
+	seen := map[faceKind]bool{}
+	for at := range int64(40) {
+		seen[faceFor(at*7_000)] = true
+	}
+	t.Logf("forty instrumental bars pulled %d of the %d faces", len(seen), faceKinds)
+	if len(seen) < int(faceKinds)-1 {
+		t.Errorf("forty bars only pulled %d faces of %d", len(seen), faceKinds)
+	}
+
+	// And the same bar always pulls the same one.
+	if a, b := faceFor(12_345), faceFor(12_345); a != b {
+		t.Errorf("one bar pulled face %d and then %d", a, b)
 	}
 }
 
@@ -718,19 +714,8 @@ func TestCheerThrowsFromItsHands(t *testing.T) {
 	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
 	m.ps.TrackID = "now"
 
-	img, layout, ok := wordsImage([]string{wordsCheer}, w*dotsPerCellX, rows*dotsPerCellY)
-	if !ok {
-		t.Fatal("the cheering face could not be drawn")
-	}
-	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
-	m.words.cellsX, m.words.cellsY, m.words.where = w, rows, layout
-	m.words.text = wordsCheer
-
-	left, right, high := m.wordsHands(w)
-	t.Logf("its hands are at %d and %d, %d dots down", left, right, high)
-	if high < 0 || right <= left {
-		t.Fatalf("the hands came out at %d and %d", left, right)
-	}
+	m.words.drawn = true
+	m.face = faceState{kind: faceCheer}
 
 	// A beat: a spark or two from each hand.
 	m.scope.envelope, m.words.wasLoud = 0.9, 0.2

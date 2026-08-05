@@ -299,14 +299,11 @@ func (m Model) wordsComing() ([]string, int64) {
 
 		if at >= 0 && at < len(m.lyrics.lines) {
 			if line := strings.TrimSpace(m.lyrics.lines[at].Words); line != "" {
-				// A bar with no words for it: a face rather than the note the
-				// sheet wrote there, or the chase, which is not type at all and
-				// so asks for nothing to be set.
+				// A bar with no words for it. Nothing is set: what goes up there
+				// is drawn — a face, or the chase — so there is no type to ask
+				// for and the picture is put together as it is shown.
 				if wordsBeats(line) {
-					if chase, _ := chaseFor(m.lyrics.lines[at].At); chase {
-						return nil, m.lyrics.lines[at].At
-					}
-					return []string{wordsFace(m.lyrics.lines[at].At)}, m.lyrics.lines[at].At
+					return nil, m.lyrics.lines[at].At
 				}
 				return wordsWrap(line, m.width*dotsPerCellX, m.height*dotsPerCellY),
 					m.lyrics.lines[at].At
@@ -382,6 +379,15 @@ type wordsState struct {
 	// where each word of the line landed, so the one being sung can be told from
 	// the ones that have been and the ones still to come.
 	where msg.WordLayout
+
+	// drawn says what is up is one of the drawn faces rather than type.
+	drawn bool
+
+	// forced is a face or a chase asked for by hand rather than by the song, and
+	// until is when it gives the screen back. A solo is where these belong, but
+	// a solo can be four minutes away and they are worth looking at.
+	forced bool
+	until  time.Time
 
 	// beats says the line is not words at all — the note a lyric sheet puts in
 	// place of a line it has none for. Those follow the music rather than being
@@ -479,14 +485,20 @@ const (
 	wordsRate  = 12
 	wordsLeast = 800 * time.Millisecond
 
-	// wordsNext is how brightly the word after the one being sung is drawn,
-	// between what is waiting and what is burning.
+	// wordsEdge is how many words the light reaches past the one being sung.
 	//
-	// The edge is soft on purpose. Where the line is sung is a guess, and a hard
-	// spotlight on one word claims a precision the timing does not have: with
-	// the next word already half lit, being a word out reads as "about here"
-	// rather than as pointing at the wrong word.
-	wordsNext = 0.6
+	// A hard spotlight on a single word claims a precision the timing does not
+	// have — a lyric sheet says when a line starts and nothing else — and worse,
+	// it gives the eye nothing to hold: one word in a line of ten looks the same
+	// wherever it is. A front of three or four words fading away ahead of it
+	// reads as a place in the line rather than as a claim about a word, and it
+	// is what a hand does when it follows a line of print.
+	wordsEdge = 3
+
+	// wordsBehind is what a word that has been sung keeps of its strength. Well
+	// under the front, so where the light has got to is the brightest thing on
+	// the screen and the rest of the line is plainly either side of it.
+	wordsBehind = 0.5
 
 	// wordsRangeLeast is the narrowest range of sound the colours are spread
 	// over, in bands, and wordsRangeClose how fast the range closes back in when
@@ -494,6 +506,9 @@ const (
 	// still be using it a verse later.
 	wordsRangeLeast = 2.5
 	wordsRangeClose = 0.0015
+
+	// wordsForced is how long one asked for by hand stays up.
+	wordsForced = 12 * time.Second
 
 	// wordsTitle is how long the record's name is worth at the top of it.
 	wordsTitle = 5 * time.Second
@@ -512,11 +527,17 @@ const (
 	// name and the clock, which are set over the top of everything else.
 	wordsCeiling = 2
 
-	// wordsSpray is what a drop keeps of its light the moment it leaves the
-	// band and enters the lyric. Under a half: what crosses the words has to be
-	// visible as movement and invisible as ink, or it is read as part of a
-	// letter rather than as something passing behind one.
-	wordsSpray = 0.45
+	// wordsSpray is what a drop keeps of its light the moment it leaves the band
+	// and enters the lyric, and wordsSpent how sharply what is left falls away
+	// with height.
+	//
+	// Both are set low. What crosses the words has to be visible as movement and
+	// invisible as ink: a spark at the same strength as a letter is read as part
+	// of the letter, and a screenful of them turns a lyric into a texture. Cubed
+	// rather than squared, the fall is quick enough that the air around the type
+	// is nearly clear while the band underneath still throws hard.
+	wordsSpray = 0.28
+	wordsSpent = 3
 
 	// wordsLift is what the water's throw is multiplied by on this screen.
 	//
@@ -528,10 +549,6 @@ const (
 	// crosses everything else on it.
 	wordsLift = 2
 
-	// wordsSungLift is how much of its own strength a word keeps once it has
-	// been sung. Below the word being sung, above the ones still to come, so the
-	// line reads as three states at a glance.
-	wordsSungLift = 0.75
 )
 
 // wordsLines draws the words, w cells across and rows deep.
@@ -539,6 +556,9 @@ func (m Model) wordsLines(w, rows int) []string {
 	// Some bars are not words at all.
 	if m.chase.on {
 		return m.chaseLines(w, rows)
+	}
+	if m.words.drawn {
+		return m.faceLines(w, rows)
 	}
 
 	g := m.words.have
@@ -575,23 +595,28 @@ func (m Model) wordsLines(w, rows int) []string {
 	nowHue, nowLevel := m.wordsColourNow()
 	paints := make([]wordPaint, m.words.where.Count)
 	for i := range paints {
-		switch {
-		case m.words.beats:
-			// Not words: a mark standing in for a line nobody sings. It takes
-			// the colour of the moment, over and over, so it beats with the
-			// music instead of sitting there in the colour it arrived in.
-			paints[i] = wordPaint{hue: nowHue, level: nowLevel, set: true}
-		case i < m.words.sung && i < len(m.words.paint) && m.words.paint[i].set:
-			p := m.words.paint[i]
-			paints[i] = wordPaint{hue: p.hue, level: int8(float32(p.level) * wordsSungLift), set: true}
-		case i == m.words.sung:
-			paints[i] = wordPaint{hue: nowHue, level: nowLevel, set: true}
-		case i == m.words.sung+1:
-			// The soft edge: the next word is already partly lit, so a guess a
-			// word out reads as roughly here rather than as plainly wrong.
-			paints[i] = wordPaint{hue: nowHue, level: int8(float32(nowLevel) * wordsNext), set: true}
+		waiting := int8(min(int(wordsAhead*float32(levels)), levels-1))
+
+		switch ahead := i - m.words.sung; {
+		case ahead < 0:
+			// Behind the light: what it was sung in, kept, and dimmed so that
+			// the front of the line is the brightest thing on the screen.
+			p := wordPaint{hue: nowHue, level: waiting}
+			if i < len(m.words.paint) && m.words.paint[i].set {
+				p = m.words.paint[i]
+			}
+			paints[i] = wordPaint{hue: p.hue, level: int8(float32(p.level) * wordsBehind), set: true}
+
+		case ahead <= wordsEdge:
+			// The front: the word the singer is taken to be on, and the few
+			// after it fading away — a place in the line rather than a claim
+			// about a word.
+			fade := 1 - float32(ahead)/float32(wordsEdge+1)
+			level := max(int8(float32(nowLevel)*fade), waiting)
+			paints[i] = wordPaint{hue: nowHue, level: level, set: true}
+
 		default:
-			paints[i] = wordPaint{level: int8(min(int(wordsAhead*float32(levels)), levels-1))}
+			paints[i] = wordPaint{level: waiting}
 		}
 		if gather < 1 {
 			paints[i].level = int8(float32(paints[i].level) * gather)
@@ -719,8 +744,8 @@ func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall int) {
 	for _, d := range m.stage.drops {
 		spent := float32(1)
 		if above := d.at - band; above > 0 {
-			spent = 1 - above/sky
-			spent = max(spent, 0) * max(spent, 0) * wordsSpray
+			spent = max(1-above/sky, 0)
+			spent = float32(math.Pow(float64(spent), wordsSpent)) * wordsSpray
 		}
 
 		step := int8(min(int(d.bright*spent*float32(levels)), levels-1))
@@ -729,27 +754,6 @@ func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall int) {
 			light(d.col, ceiling+int(d.at), step)
 		}
 	}
-}
-
-// wordsFaces are what goes up while nobody is singing.
-//
-// A lyric sheet marks the bars it has no words for with a note, and a note two
-// hundred dots tall is a dull thing to look at for the length of a solo. A face
-// is not: it is the same joke a chat window has been making since before either
-// of us, it is drawn in the same dots as everything else here, and there are
-// enough of them that the next instrumental is not the last one.
-var wordsFaces = []string{
-	":)", ";)", ":*", ":D", ":P", "8)", "^_^", ":]", "=)", ";D", ":3", "\\o/",
-}
-
-// wordsFace picks one, from when the line it stands for is sung — so it is the
-// same face every time that bar comes round, and a different one for the next.
-func wordsFace(at int64) string {
-	h := uint64(at)*2654435761 + 2246822519
-	h ^= h >> 29
-	h *= 0xbf58476d1ce4e5b9
-	h ^= h >> 32
-	return wordsFaces[h%uint64(len(wordsFaces))]
 }
 
 // wordsBeats reports that a line is a mark rather than words: the note a lyric
@@ -777,28 +781,52 @@ func (m Model) wordsEnds(starts int64) int64 {
 	return 0
 }
 
-// isFace reports whether a line is one of the faces rather than a lyric.
-func isFace(line string) bool {
-	for _, face := range wordsFaces {
-		if line == face {
-			return true
-		}
+// pullFace puts one of them up now, chosen by a coin rather than by the song.
+func (m *Model) pullFace() {
+	m.words.forced, m.words.until = true, time.Now().Add(wordsForced)
+	m.words.drawn, m.chase.on = false, false
+
+	// One in five is the chase, which is about the share of a record's solos it
+	// gets when the song is choosing.
+	if m.stage.roll() < 0.2 {
+		m.chase = chaseState{on: true, back: m.stage.roll() < 0.5}
+		return
 	}
-	return false
+	m.words.drawn = true
+	m.face = faceState{kind: faceKind(min(int(m.stage.roll()*float32(faceKinds)), int(faceKinds)-1))}
 }
 
 // chaseNow says whether this bar is one of the chases, and starts it walking
-// when it is.
+// when it is. It also settles which face is looking out of the ones that are
+// not, because both are the same question: what goes up while nobody sings.
 func (m *Model) chaseNow() bool {
-	on, back := false, false
+	// One asked for by hand holds the screen for its few seconds, whatever the
+	// song is doing underneath it.
+	if m.words.forced {
+		if time.Now().Before(m.words.until) {
+			return m.chase.on
+		}
+		m.words.forced, m.words.drawn, m.chase.on = false, false, false
+	}
+
+	on, back, drawn := false, false, false
 	if m.lyrics.synced && m.ps != nil && m.lyrics.forTrack == m.ps.TrackID {
 		if at := m.lyricsAt(); at >= 0 && at < len(m.lyrics.lines) {
 			if wordsBeats(strings.TrimSpace(m.lyrics.lines[at].Words)) {
-				on, back = chaseFor(m.lyrics.lines[at].At)
+				when := m.lyrics.lines[at].At
+				on, back = chaseFor(when)
+				drawn = !on
+
+				if drawn && (!m.words.drawn || m.words.starts != when) {
+					m.face = faceState{kind: faceFor(when)}
+					m.words.starts, m.words.ends = when, m.wordsEnds(when)
+					m.words.burst = false
+				}
 			}
 		}
 	}
 
+	m.words.drawn = drawn
 	if on && !m.chase.on {
 		m.chase = chaseState{on: true, back: back}
 	}
@@ -815,12 +843,19 @@ func (m *Model) chaseNow() bool {
 // before it does. Between times they throw on the beat, so it is cheering along
 // rather than waiting to.
 func (m *Model) wordsCheerFlow(w, rows int) {
-	if m.words.text != wordsCheer || m.words.where.Count == 0 {
+	if !m.words.drawn || m.face.kind != faceCheer {
 		return
 	}
 
-	left, right, high := m.wordsHands(w)
-	if high < 0 {
+	// The hands of the drawn figure: the ends of its arms, which are set out in
+	// faceDraw and worked out again here rather than remembered.
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+	r := float64(dotsY) * faceSize * 0.62
+	cx, cy := float64(dotsX)/2, float64(dotsY)*0.34
+
+	left, right := int(cx-r*1.5), int(cx+r*1.5)
+	high := int(cy - r*0.4)
+	if high < 0 || right >= dotsX {
 		return
 	}
 
@@ -856,30 +891,6 @@ func (m *Model) wordsCheerFlow(w, rows int) {
 	}
 }
 
-// wordsHands is where the cheering face's hands are: the outer top corners of
-// what was drawn, in dots, and how high up they are.
-func (m Model) wordsHands(w int) (left, right, high int) {
-	where := m.words.where
-	if len(where.Tops) == 0 || where.DotsX == 0 {
-		return 0, 0, -1
-	}
-
-	left, right = -1, -1
-	for x := range where.DotsX {
-		if where.At[x] < 0 {
-			continue
-		}
-		if left < 0 {
-			left = x
-		}
-		right = x
-	}
-	if left < 0 {
-		return 0, 0, -1
-	}
-	return left, right, where.Tops[0]
-}
-
 // wordsSilent reports that the song has words but is not singing any right now:
 // the bar before the first line, or a gap a lyric sheet marks with an empty one.
 //
@@ -890,7 +901,7 @@ func (m Model) wordsSilent() bool {
 	// What is coming counts as words: the gathering of the next line begins
 	// before the singer reaches it. So does a chase, which has no words in it
 	// but is very much something to look at.
-	if m.chase.on {
+	if m.chase.on || m.words.drawn || m.words.forced {
 		return false
 	}
 	lines, _ := m.wordsComing()
@@ -987,7 +998,6 @@ func (m *Model) wordsGrind() tea.Cmd {
 		return nil
 	}
 	m.words.starts, m.words.ends = starts, m.wordsEnds(starts)
-	m.words.beats = len(lines) == 1 && isFace(lines[0])
 
 	text := strings.Join(lines, "\n")
 	if m.words.text == text && m.words.cellsX == m.width && m.words.cellsY == m.height {
@@ -1006,6 +1016,11 @@ func (m *Model) wordsGrind() tea.Cmd {
 func (m *Model) wordsFlow(w, rows int) {
 	if m.chaseNow() {
 		m.chaseFlow(w, rows)
+		return
+	}
+	if m.words.drawn {
+		m.faceFlow()
+		m.wordsCheerFlow(w, rows)
 		return
 	}
 
