@@ -266,9 +266,37 @@ func (m Model) wordsNow() []string {
 	return lines
 }
 
+// wordsMove is how a line comes apart and goes back together.
+//
+// Four of them rather than one, chosen by the line itself, because a change
+// that happens the same way every time stops being a change after the third
+// chorus. Which one a line gets is worked out from its own text, so a song
+// plays the same way twice and a test can watch it do so.
+type wordsMove int
+
+const (
+	wordsDrifting wordsMove = iota // in from wherever, on its own line
+	wordsRising                    // up from below, a row at a time
+	wordsBursting                  // in from outside, along the line to the middle
+	wordsWiping                    // left to right, like something being written
+	wordsMoves
+)
+
+// wordsMoveFor picks one from the line.
+func wordsMoveFor(text string) wordsMove {
+	var h uint32 = 2166136261
+	for _, r := range text {
+		h = (h ^ uint32(r)) * 16777619
+	}
+	return wordsMove(h % uint32(wordsMoves))
+}
+
 // wordsState is the picture the words are drawn from, and how far it has
 // gathered since the line changed.
 type wordsState struct {
+	// move is how this line is coming together.
+	move wordsMove
+
 	have           cover.Grain
 	text           string
 	cellsX, cellsY int
@@ -278,6 +306,13 @@ type wordsState struct {
 	// it, which is what makes a line change something you see rather than
 	// something you notice has happened.
 	since time.Time
+
+	// sway is where the slow wave through the letters has got to, and lift is
+	// how far each column of dots is being raised by the band under it. A line
+	// that has settled and then stands perfectly still stops looking like it is
+	// made of anything; these keep it breathing without smearing it.
+	sway float32
+	lift []float32
 }
 
 const (
@@ -289,6 +324,30 @@ const (
 	// wordsScatter is how far a dot starts from where it belongs, in dot rows
 	// and columns.
 	wordsScatter = 26
+
+	// wordsStagger is the share of the gathering that is spent waiting, for the
+	// moves that arrive a row or a column at a time: at nothing they all land
+	// together, at one the last dot only starts as the first one finishes.
+	wordsStagger = 0.55
+
+	// The idle motion of a settled line. It is deliberately tiny: this is the
+	// one picture here whose job is to be read, and a letter that wanders by
+	// more than a dot or two is a letter that has to be worked out.
+	//
+	// wordsSwayHigh is how far the slow wave lifts a column, in dots;
+	// wordsSwayStep how far the wave travels each frame — a whole cycle takes
+	// about four seconds — and wordsSwayWave how many dots it takes to come
+	// round, which is what makes it a wave through the words rather than the
+	// whole line bobbing.
+	wordsSwayHigh = 1.6
+	wordsSwayStep = 0.05
+	wordsSwayWave = 0.035
+
+	// wordsLiftHigh is how far the loudest band raises the columns it covers,
+	// and wordsLiftEase how fast that follows. Between them the words move with
+	// the music without ever being thrown about by it.
+	wordsLiftHigh = 2.2
+	wordsLiftEase = 0.18
 )
 
 // wordsLines draws the words, w cells across and rows deep.
@@ -331,10 +390,30 @@ func (m Model) wordsLines(w, rows int) []string {
 			// where the dot belongs rather than stored, so a screenful of them
 			// costs nothing to remember and comes apart the same way twice.
 			at, to := x, y
-			if gather < 1 {
-				dx, dy := wordsDrift(x, y)
-				at += int(dx * (1 - gather))
-				to += int(dy * (1 - gather))
+
+			// The settled line still breathes: a slow wave along it, and a lift
+			// from whatever band is sounding under this column.
+			sway := wordsSwayHigh * float32(math.Sin(float64(m.words.sway+float32(x)*wordsSwayWave)))
+			if len(m.words.lift) == dotsX {
+				sway -= m.words.lift[x]
+			}
+			to += int(sway)
+
+			// How far along this particular dot is. Some of the moves arrive a
+			// row or a column at a time, so each dot has its own share of the
+			// gathering rather than all of them having the whole of it.
+			p := gather
+			switch m.words.move {
+			case wordsWiping:
+				p = wordsStep(gather, float32(x)/float32(dotsX))
+			case wordsRising:
+				p = wordsStep(gather, 1-float32(y)/float32(dotsY))
+			}
+
+			if p < 1 {
+				dx, dy := wordsFrom(m.words.move, x, y, dotsX, dotsY)
+				at += int(dx * (1 - p))
+				to += int(dy * (1 - p))
 				if at < 0 || to < 0 || at >= dotsX || to >= dotsY {
 					continue
 				}
@@ -351,9 +430,43 @@ func (m Model) wordsLines(w, rows int) []string {
 	return m.drawCells(w, rows, grid, paint, hue)
 }
 
-// wordsDrift is where a dot comes in from, from where it lands: a fixed swirl
-// rather than a random walk, so the same line always gathers the same way and a
-// test can watch it do so.
+// wordsStep is one dot's share of the gathering, given how far down the queue
+// it is: the ones at the front are done before the ones at the back start.
+func wordsStep(gather, behind float32) float32 {
+	p := (gather - behind*wordsStagger) / (1 - wordsStagger)
+	return min(max(p, 0), 1)
+}
+
+// wordsFrom is where a dot comes in from, given the move and where it lands.
+func wordsFrom(move wordsMove, x, y, dotsX, dotsY int) (float32, float32) {
+	switch move {
+	case wordsRising:
+		// Up from under the line, with enough of a wobble that it is a crowd
+		// arriving rather than a blind coming up.
+		dx, _ := wordsDrift(x, y)
+		return dx * 0.15, float32(dotsY-y) * 0.9
+
+	case wordsBursting:
+		// In from outside, along the line out from the middle — the picture
+		// implodes onto the words.
+		dx, dy := float32(x-dotsX/2), float32(y-dotsY/2)
+		d := float32(math.Hypot(float64(dx), float64(dy)))
+		if d == 0 {
+			return 0, 0
+		}
+		return dx / d * wordsScatter * 2.2, dy / d * wordsScatter * 2.2
+
+	case wordsWiping:
+		// From the left, as if the line were being written.
+		return -float32(wordsScatter) * 1.4, 0
+	}
+
+	return wordsDrift(x, y)
+}
+
+// wordsDrift is where a dot comes in from when it comes in on its own line: a
+// fixed swirl rather than a random walk, so the same line always gathers the
+// same way and a test can watch it do so.
 func wordsDrift(x, y int) (float32, float32) {
 	h := uint32(x)*2654435761 + uint32(y)*2246822519
 	h ^= h >> 13
@@ -384,4 +497,30 @@ func (m *Model) wordsGrind() tea.Cmd {
 
 	m.words.asked = text
 	return wordsCmd(lines, m.width, m.height)
+}
+
+// wordsFlow moves the settled line on by a frame: the wave travels along it and
+// the lift follows the spectrum.
+func (m *Model) wordsFlow(w, rows int) {
+	dotsX := w * dotsPerCellX
+	if dotsX <= 0 {
+		return
+	}
+
+	m.words.sway += wordsSwayStep
+	if m.words.sway > 2*math.Pi {
+		m.words.sway -= 2 * math.Pi
+	}
+
+	if len(m.words.lift) != dotsX {
+		m.words.lift = make([]float32, dotsX)
+	}
+	bands := m.scope.bands
+	for x := range dotsX {
+		var want float32
+		if len(bands) > 0 {
+			want = bands[min(x*len(bands)/dotsX, len(bands)-1)] * wordsLiftHigh
+		}
+		m.words.lift[x] += (want - m.words.lift[x]) * wordsLiftEase
+	}
 }

@@ -241,6 +241,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case msg.WordsReady:
 		m.words.asked = ""
 		m.words.have, m.words.text = message.Grain, message.Text
+		m.words.move = wordsMoveFor(message.Text)
 		m.words.cellsX, m.words.cellsY = message.CellsX, message.CellsY
 		m.words.since = time.Now()
 		return m, nil
@@ -283,6 +284,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if m.stage.on && m.scopeMode().words() {
+			m.wordsFlow(m.width, m.height)
 			if cmd := m.wordsGrind(); cmd != nil {
 				return m, tea.Batch(cmd, scopeFrameCmd(m.player, m.frameMode()))
 			}

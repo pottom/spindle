@@ -76,10 +76,9 @@ func (s scopeMode) big() bool { return s.grain() || s.words() }
 
 // spectrum reports whether a mode is drawn from the bands, whichever way it
 // draws them.
-// The words are the one picture drawn from neither measurement: it needs the
-// frames only for their pace, not for anything in them.
+// The words take the bands too, though only to breathe with them.
 func (s scopeMode) spectrum() bool {
-	return s.bars() || s.mirror() || s.ladder() || s.grain()
+	return s.bars() || s.mirror() || s.ladder() || s.grain() || s.words()
 }
 
 // scopeState is the visualiser the player screen is drawing, and what it is
