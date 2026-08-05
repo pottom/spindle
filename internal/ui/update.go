@@ -238,6 +238,13 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.adoptLyrics(message)
 		return m, nil
 
+	case msg.WordsReady:
+		m.words.asked = ""
+		m.words.have, m.words.text = message.Grain, message.Text
+		m.words.cellsX, m.words.cellsY = message.CellsX, message.CellsY
+		m.words.since = time.Now()
+		return m, nil
+
 	case msg.GrainReady:
 		m.grain.asked = ""
 		if message.URL != m.cover.url {
@@ -273,6 +280,11 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				m.throwSparks(m.width, m.height)
 			} else {
 				m.throwSparks(m.scopeWidth(m.layout()), scopeRows)
+			}
+		}
+		if m.stage.on && m.scopeMode().words() {
+			if cmd := m.wordsGrind(); cmd != nil {
+				return m, tea.Batch(cmd, scopeFrameCmd(m.player, m.frameMode()))
 			}
 		}
 		if m.stage.on && m.scopeMode().grain() {

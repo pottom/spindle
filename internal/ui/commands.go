@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -155,6 +156,22 @@ func grindCmd(loader *cover.Loader, url string, cellsX, cellsY int) tea.Cmd {
 			return nil
 		}
 		return msg.GrainReady{URL: url, CellsX: cellsX, CellsY: cellsY, Grain: grain}
+	}
+}
+
+// wordsCmd sets a line in dots, off the update loop: it rasterises type and
+// scales an image, which is not work for the loop that draws.
+func wordsCmd(lines []string, cellsX, cellsY int) tea.Cmd {
+	return func() tea.Msg {
+		img, ok := wordsImage(lines, cellsX*dotsPerCellX, cellsY*dotsPerCellY)
+		if !ok {
+			return nil
+		}
+		return msg.WordsReady{
+			Text:   strings.Join(lines, "\n"),
+			CellsX: cellsX, CellsY: cellsY,
+			Grain: cover.Grind(grayToImage(img), cellsX, cellsY, dotsPerCellX, dotsPerCellY),
+		}
 	}
 }
 

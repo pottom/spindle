@@ -53,6 +53,9 @@ const (
 	// scopeGrain is the record itself in dots, moved by the music. It is only
 	// offered on the whole screen. See grain.go.
 	scopeGrain
+	// scopeWords is the line being sung, in dots. Also the whole screen only.
+	// See words.go.
+	scopeWords
 	scopeModes // how many there are, for the cycle
 )
 
@@ -65,14 +68,19 @@ func (s scopeMode) bars() bool   { return s == scopeBars }
 func (s scopeMode) mirror() bool { return s == scopeMirror }
 func (s scopeMode) ladder() bool { return s == scopeLadder }
 func (s scopeMode) grain() bool  { return s == scopeGrain }
+func (s scopeMode) words() bool  { return s == scopeWords }
 
 // big reports whether a mode is only worth drawing on the whole screen. In the
 // strip the key steps over it, the way the big screen steps over "off".
-func (s scopeMode) big() bool { return s.grain() }
+func (s scopeMode) big() bool { return s.grain() || s.words() }
 
 // spectrum reports whether a mode is drawn from the bands, whichever way it
 // draws them.
-func (s scopeMode) spectrum() bool { return s.bars() || s.mirror() || s.ladder() || s.grain() }
+// The words are the one picture drawn from neither measurement: it needs the
+// frames only for their pace, not for anything in them.
+func (s scopeMode) spectrum() bool {
+	return s.bars() || s.mirror() || s.ladder() || s.grain()
+}
 
 // scopeState is the visualiser the player screen is drawing, and what it is
 // drawing.

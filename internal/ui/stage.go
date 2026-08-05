@@ -180,6 +180,8 @@ func (m Model) stagePicture(w, rows int) []string {
 		art = m.ladderLines(w, rows)
 	case m.scopeMode().grain():
 		art = m.grainLines(w, rows)
+	case m.scopeMode().words():
+		art = m.wordsLines(w, rows)
 	default:
 		art = m.stageArt(w, rows)
 	}

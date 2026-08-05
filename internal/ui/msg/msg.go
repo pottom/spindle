@@ -36,6 +36,14 @@ type GrainReady struct {
 	Grain          cover.Grain
 }
 
+// WordsReady carries a line of the song set in dots, with what it was set from
+// so that a picture for a line the song has already left can be dropped.
+type WordsReady struct {
+	Text           string
+	CellsX, CellsY int
+	Grain          cover.Grain
+}
+
 // CoverFailed reports that artwork could not be produced. A missing cover is not
 // important enough to interrupt use, so it carries no error for display.
 type CoverFailed struct {

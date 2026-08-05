@@ -120,10 +120,18 @@ func TestGrainIsNotOfferedInTheStrip(t *testing.T) {
 		}
 		seen[mode] = true
 	}
-	if seen[scopeGrain] {
-		t.Error("the strip's cycle stopped on a picture meant for the whole screen")
+	for mode := range seen {
+		if mode.big() {
+			t.Errorf("the strip's cycle stopped on picture %d, which is meant for the whole screen", mode)
+		}
 	}
-	if len(seen) != int(scopeModes)-1 {
-		t.Errorf("the strip cycles %d pictures, want %d", len(seen), int(scopeModes)-1)
+	var big int
+	for mode := scopeOff; mode < scopeModes; mode++ {
+		if mode.big() {
+			big++
+		}
+	}
+	if len(seen) != int(scopeModes)-big {
+		t.Errorf("the strip cycles %d pictures, want %d", len(seen), int(scopeModes)-big)
 	}
 }
