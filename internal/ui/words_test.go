@@ -529,3 +529,63 @@ func TestWordsBeatWhenThereIsNothingToSing(t *testing.T) {
 		t.Error("the mark kept its colour while the music moved under it")
 	}
 }
+
+// The water crosses the lyric, and has to be seen through it rather than
+// against it: a drop is spent by the time it is up among the letters, or it
+// reads as part of one.
+func TestWordsWaterFadesAsItClimbs(t *testing.T) {
+	const w, rows = 90, 30
+
+	m := scopeModel(100, 44)
+	m.width, m.height = w, rows
+	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
+
+	// Silent, so the only ink in the picture is the water itself.
+	m.scope.bands = make([]float32, 28)
+
+	lines := wordsWrap("better off alone", w*dotsPerCellX, rows*dotsPerCellY)
+	img, layout, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
+	if !ok {
+		t.Fatal("the face could not draw the test line")
+	}
+	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	m.words.cellsX, m.words.cellsY, m.words.where = w, rows, layout
+	m.words.since = time.Now().Add(-time.Second)
+
+	_, tall := m.wordsRoom(rows)
+	band := float32(tall * dotsPerCellY)
+
+	// One drop in the band, one well up in the lyric, both thrown as brightly.
+	m.stage.drops = []stageDrop{
+		{col: 10, at: band / 2, bright: 1},
+		{col: 30, at: band + (float32(rows*dotsPerCellY)-band)/2, bright: 1},
+	}
+
+	grid := make([]uint8, w*rows)
+	paint := make([]int8, w*rows)
+	hue := make([]int8, w*rows)
+	for i := range paint {
+		paint[i] = -1
+	}
+	m.wordsUnder(grid, paint, hue, w, rows, tall)
+
+	level := func(col int) int8 {
+		best := int8(-1)
+		for r := range rows {
+			if grid[r*w+col] != 0 {
+				best = max(best, paint[r*w+col])
+			}
+		}
+		return best
+	}
+
+	low, high := level(10/dotsPerCellX), level(30/dotsPerCellX)
+	t.Logf("a drop in the band draws at %d, one up among the words at %d", low, high)
+
+	if low < 0 || high < 0 {
+		t.Fatalf("a drop went missing: band %d, sky %d", low, high)
+	}
+	if high >= low {
+		t.Errorf("a drop up in the lyric draws at %d against %d in the band, want it spent", high, low)
+	}
+}

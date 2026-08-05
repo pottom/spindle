@@ -471,6 +471,12 @@ const (
 	wordsRangeLeast = 2.5
 	wordsRangeClose = 0.0015
 
+	// wordsSpray is what a drop keeps of its light the moment it leaves the
+	// band and enters the lyric. Under a half: what crosses the words has to be
+	// visible as movement and invisible as ink, or it is read as part of a
+	// letter rather than as something passing behind one.
+	wordsSpray = 0.45
+
 	// wordsLift is what the water's throw is multiplied by on this screen.
 	//
 	// Set so that a hard hit carries a drop the height of the terminal: a drop
@@ -643,8 +649,22 @@ func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall int) {
 	// The water, which belongs to the whole screen. A drop thrown hard enough
 	// rises past the words and falls back through them, which is the one thing
 	// on this picture that crosses everything else on it.
+	//
+	// It fades as it climbs. Inside the band it burns as it would on any of the
+	// other screens; above it, where the lyric is, it is spent — by the top of
+	// the terminal there is almost nothing left of it. The drops are meant to be
+	// seen through the words rather than against them, and a bright speck beside
+	// a letter is read as part of the letter.
+	band := float32(tall * dotsPerCellY)
+	sky := max(float32(dotsY)-band, 1)
+
 	for _, d := range m.stage.drops {
-		light(d.col, floor-int(d.at), int8(min(int(d.bright*float32(levels)), levels-1)))
+		spent := float32(1)
+		if above := d.at - band; above > 0 {
+			spent = 1 - above/sky
+			spent = max(spent, 0) * max(spent, 0) * wordsSpray
+		}
+		light(d.col, floor-int(d.at), int8(min(int(d.bright*spent*float32(levels)), levels-1)))
 	}
 }
 
