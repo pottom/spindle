@@ -198,10 +198,6 @@ func newKeyMap() keyMap {
 			key.WithKeys("f"),
 			key.WithHelp("f", "full screen"),
 		),
-		Gag: key.NewBinding(
-			key.WithKeys("F"),
-			key.WithHelp("F", "put the record on"),
-		),
 		Lyrics: key.NewBinding(
 			key.WithKeys("l"),
 			key.WithHelp("l", "lyrics"),

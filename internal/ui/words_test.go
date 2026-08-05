@@ -659,32 +659,29 @@ func TestWordsHangTheMeterFromTheCeilingToo(t *testing.T) {
 	}
 }
 
-// A lyric sheet marks the bars it has no words for with a note. Nothing is set
-// in type for those: the screen puts the record on instead.
-func TestWordsPutTheRecordOnThroughASolo(t *testing.T) {
+// A lyric sheet marks the bars it has no words for with a note, and a note is
+// not a line: nothing is set for those bars, and the screen goes to the music
+// until the singer comes back.
+func TestWordsGiveASoloToTheMusic(t *testing.T) {
 	m := scopeModel(100, 44)
 	m.width, m.height = 60, 16
 	m.ps.TrackID = "now"
 	m.lyrics.synced, m.lyrics.forTrack = true, "now"
 	m.lyrics.lines = []player.Lyric{
 		{At: 0, Words: "♪"},
-		{At: 60_000, Words: "and then the words"},
+		{At: 30_000, Words: "and then the words"},
 	}
+
 	m.setProgress(2 * time.Second)
-
 	if lines, _ := m.wordsComing(); len(lines) != 0 {
-		t.Errorf("an instrumental bar asked for %q to be set, want the record on", lines)
+		t.Errorf("an instrumental bar asked for %q to be set, want the music", lines)
 	}
-	if !m.recordNow() {
-		t.Fatal("an instrumental bar left the screen empty")
-	}
-	if m.wordsSilent() {
-		t.Error("a bar with the record on it was taken for silence")
+	if !m.wordsSilent() {
+		t.Error("an instrumental bar kept the screen from the music")
 	}
 
-	// And it comes off again when the words come back.
-	m.setProgress(61 * time.Second)
-	if m.recordNow() {
-		t.Error("the record stayed on through the words")
+	m.setProgress(31 * time.Second)
+	if m.wordsSilent() {
+		t.Error("the words came back and the screen did not")
 	}
 }

@@ -380,15 +380,6 @@ type wordsState struct {
 	// the ones that have been and the ones still to come.
 	where msg.WordLayout
 
-	// drawn says what is up is one of the drawn faces rather than type.
-	drawn bool
-
-	// forced is a face or a chase asked for by hand rather than by the song, and
-	// until is when it gives the screen back. A solo is where these belong, but
-	// a solo can be four minutes away and they are worth looking at.
-	forced bool
-	until  time.Time
-
 	// beats says the line is not words at all — the note a lyric sheet puts in
 	// place of a line it has none for. Those follow the music rather than being
 	// painted once and kept: there is no singer to follow, so the sound itself
@@ -501,9 +492,6 @@ const (
 	wordsRangeLeast = 2.5
 	wordsRangeClose = 0.0015
 
-	// wordsForced is how long one asked for by hand stays up.
-	wordsForced = 12 * time.Second
-
 	// wordsTitle is how long the record's name is worth at the top of it.
 	wordsTitle = 5 * time.Second
 
@@ -536,11 +524,6 @@ const (
 
 // wordsLines draws the words, w cells across and rows deep.
 func (m Model) wordsLines(w, rows int) []string {
-	// Some bars have no words in them at all.
-	if m.words.drawn {
-		return m.recordLines(w, rows)
-	}
-
 	g := m.words.have
 	if g.DotsX == 0 || g.CellsX != w || g.CellsY != rows {
 		return nil
@@ -771,9 +754,6 @@ func (m Model) wordsSilent() bool {
 	// What is coming counts as words: the gathering of the next line begins
 	// before the singer reaches it. So does a chase, which has no words in it
 	// but is very much something to look at.
-	if m.words.drawn || m.words.forced {
-		return false
-	}
 	lines, _ := m.wordsComing()
 	return len(lines) == 0
 }
@@ -884,10 +864,6 @@ func (m *Model) wordsGrind() tea.Cmd {
 // wordsFlow follows the singer along the line, and paints each word with the
 // sound that was in the air as it went by.
 func (m *Model) wordsFlow(w, rows int) {
-	if m.recordNow() {
-		m.recordFlow()
-		return
-	}
 
 	if m.words.where.Count == 0 {
 		return

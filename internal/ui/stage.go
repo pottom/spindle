@@ -124,11 +124,6 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	switch {
-	case key.Matches(k, m.keys.Gag):
-		// The record, put on without waiting for a solo to ask for it.
-		m.putOnTheRecord()
-		return nil, true
-
 	case key.Matches(k, m.keys.Scope):
 		// The one key that changes the picture rather than putting it away, and
 		// it changes the same setting the strip uses — with the difference that

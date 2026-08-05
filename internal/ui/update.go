@@ -291,13 +291,6 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.stage.on && m.scopeMode().words() {
 			m.wordsFlow(m.width, m.height)
-			// The turning record wears the sleeve as its label, so the cover has
-			// to have been taken apart before it can be put on.
-			if m.words.drawn {
-				if cmd := m.grind(); cmd != nil {
-					return m, tea.Batch(cmd, scopeFrameCmd(m.player, m.frameMode()))
-				}
-			}
 			// Thrown from the tips of the band along the foot, and given the
 			// whole terminal to cross rather than the band it came from.
 			_, tall := m.wordsRoom(m.height)

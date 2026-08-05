@@ -204,8 +204,6 @@ type Model struct {
 	// words is the line being sung, in dots. See words.go.
 	words wordsState
 
-	// record is the sleeve turning, which is what a solo gets. See record.go.
-	record recordState
 
 	// lyrics is the words of the track playing, and whether they are on screen.
 	lyrics lyricsState
