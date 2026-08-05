@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -303,5 +304,77 @@ func TestPlayingPictureIsNotSettled(t *testing.T) {
 	}
 	if got := tm.(Model).scope.bands[0]; got < 0.5 {
 		t.Errorf("the spectrum reads %.2f while the music plays, want what arrived", got)
+	}
+}
+
+// Nothing is left on the big screen but the picture — no name, no clock, no bar
+// along the foot. Where the record has got to is drawn into the very edge of it
+// instead: a line from the top left corner, clockwise, as far as the track has
+// played.
+func TestTheEdgeIsTheProgress(t *testing.T) {
+	const w, rows = 60, 20
+
+	m := scopeModel(100, 44)
+	m.width, m.height = w, rows
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeBars
+
+	bands := make([]float32, 28)
+	m.scope.bands = bands // silent, so the only ink is the edge
+	m.ps.Duration = 100 * time.Second
+
+	ink := func(at time.Duration) int {
+		m.setProgress(at)
+		var n int
+		for _, line := range m.stagePicture(w, rows) {
+			for _, r := range ansiOff(line) {
+				if r != ' ' {
+					n++
+				}
+			}
+		}
+		return n
+	}
+
+	start, half, end := ink(0), ink(50*time.Second), ink(100*time.Second)
+	t.Logf("the edge draws %d cells at the start, %d halfway, %d at the end", start, half, end)
+
+	if !(start < half && half < end) {
+		t.Errorf("the edge went %d → %d → %d, want it filling as the record plays", start, half, end)
+	}
+
+	// It goes round: at the halfway mark the top and the right are drawn and
+	// the left is not.
+	m.setProgress(50 * time.Second)
+	lines := m.stagePicture(w, rows)
+	if strings.TrimSpace(ansiOff(lines[0])) == "" {
+		t.Error("halfway through, the top edge is empty")
+	}
+
+	// The left edge is the last quarter of the way round, so at the halfway
+	// mark it is still to come. Counted in runes: a braille cell is three bytes
+	// and slicing a string through the middle of one proves nothing.
+	var left []rune
+	for _, line := range lines[1 : len(lines)-1] {
+		left = append(left, []rune(ansiOff(line))[0])
+	}
+	if strings.TrimSpace(string(left)) != "" {
+		t.Errorf("halfway through, the left edge already reads %q", string(left))
+	}
+}
+
+// And the screen really is nothing but the picture.
+func TestTheBigScreenIsAllPicture(t *testing.T) {
+	m := scopeModel(100, 40)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeBars
+	m.ps.Title, m.ps.Artists = "A Title Nobody Wants Up There", []string{"An Artist"}
+
+	drawn := m.stageView()
+	if strings.Contains(ansiOff(drawn), m.ps.Title) {
+		t.Error("the track's name is still on the big screen")
+	}
+	if strings.Contains(ansiOff(drawn), "/") {
+		t.Error("the clock is still on the big screen")
 	}
 }

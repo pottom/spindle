@@ -203,6 +203,13 @@ func (m Model) barsDraw(w, rows int, grid []uint8, paint []int8) []string {
 // wide as the spectrum's, because there the colour is what separates one word
 // from the next rather than a gradient across one shape.
 func (m Model) drawCells(w, rows int, grid []uint8, paint, hue []int8, palette [][]lipgloss.Style) []string {
+	// On the big screen the outermost dots are the record's progress. It is the
+	// only thing left of the furniture up there, and it is drawn here so that
+	// every picture gets it without knowing about it.
+	if m.stage.on && w == m.width && rows == m.height {
+		m.stageEdge(w, rows, grid, paint, len(palette[0]))
+	}
+
 	lines := make([]string, rows)
 	for r := range rows {
 		var sb strings.Builder

@@ -157,14 +157,14 @@ func (m Model) stageView() string {
 		return ""
 	}
 
-	art := m.stagePicture(m.width, rows)
-
-	clock := m.styles.Time.Render(formatDuration(m.elapsed()) + " / " + formatDuration(m.ps.Duration))
-	art[0] = spread(m.styles.Title.Render(m.ps.Title), clock, m.width)
-	art[1] = fit(m.styles.Artist.Render(strings.Join(m.ps.Artists, ", ")), m.width)
-	art[rows-1] = m.progressLine(m.width)
-
-	return strings.Join(art, "\n")
+	// Nothing but the picture. What was here — the track's name, the clock, the
+	// progress bar along the foot — is what the player screen is for; up here it
+	// was a caption on something that does not need one, and it cost three rows
+	// of the only screen that wants all of them.
+	//
+	// Where the record has got to is still on screen, drawn into the very edge
+	// of it. See stageEdge.
+	return strings.Join(m.stagePicture(m.width, rows), "\n")
 }
 
 // stagePicture draws whichever of the three the big screen is set to, at the
@@ -400,4 +400,65 @@ func (s *stageState) roll() float32 {
 	s.seed ^= s.seed >> 17
 	s.seed ^= s.seed << 5
 	return float32(s.seed>>8) / float32(1<<24)
+}
+
+const (
+	// stageEdgeLevel is how brightly the edge of the screen is drawn, as a share
+	// of the palette. Faint: it is a thing to look for rather than a thing to
+	// look at, and a bright line around a picture is a frame.
+	stageEdgeLevel = 0.3
+
+	// stageEdgeHead is how many dots at the leading end are drawn at full
+	// strength, so where it has got to can be found at a glance.
+	stageEdgeHead = 12
+)
+
+// stageEdge draws the record's progress into the outermost dots of the screen:
+// a line that starts at the top left corner and goes round clockwise, as far as
+// the track has played.
+//
+// Nothing else is left of the furniture on the big screen, and this costs
+// nothing — the border of a terminal is a row and a column that no picture ever
+// puts anything in. Where the song is is a fact the eye can have for free.
+func (m Model) stageEdge(w, rows int, grid []uint8, paint []int8, levels int) {
+	if m.ps == nil || m.ps.Duration <= 0 {
+		return
+	}
+
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+	round := 2 * (dotsX + dotsY)
+
+	gone := float64(m.elapsed()) / float64(m.ps.Duration)
+	along := int(min(max(gone, 0), 1) * float64(round))
+
+	dim := int8(min(int(stageEdgeLevel*float32(levels)), levels-1))
+	for i := range along {
+		x, y := stageRound(i, dotsX, dotsY)
+
+		cell := (y/dotsPerCellY)*w + x/dotsPerCellX
+		grid[cell] |= 1 << brailleBit[x%dotsPerCellX][y%dotsPerCellY]
+
+		step := dim
+		if along-i <= stageEdgeHead {
+			step = int8(levels - 1)
+		}
+		if step > paint[cell] {
+			paint[cell] = step
+		}
+	}
+}
+
+// stageRound is the nth dot of the way round the edge, clockwise from the top
+// left corner.
+func stageRound(at, dotsX, dotsY int) (x, y int) {
+	switch {
+	case at < dotsX:
+		return at, 0
+	case at < dotsX+dotsY:
+		return dotsX - 1, at - dotsX
+	case at < 2*dotsX+dotsY:
+		return dotsX - 1 - (at - dotsX - dotsY), dotsY - 1
+	default:
+		return 0, dotsY - 1 - (at - 2*dotsX - dotsY)
+	}
 }
