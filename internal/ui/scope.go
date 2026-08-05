@@ -225,10 +225,10 @@ func (m Model) scopeVisible() bool {
 // frameMode is what the next frame should be fetched for. The big screen is
 // drawn from the bands whatever the strip underneath it was set to.
 func (m Model) frameMode() scopeMode {
-	if m.stage.on {
-		if m.stage.mode == stageWave {
-			return scopeWave
-		}
+	// The big screen always draws something, so it always needs something: with
+	// the strip switched off it shows the mirrored picture, which is drawn from
+	// the bands.
+	if m.stage.on && m.scopeMode() == scopeOff {
 		return scopeBars
 	}
 	return m.scopeMode()

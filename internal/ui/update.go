@@ -251,14 +251,17 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if m.scopeMode().wave() {
 			m.rememberScope()
 		}
-		if m.stage.on && m.stage.mode == stageWave {
+		if m.stage.on && m.scopeMode().wave() {
 			m.rememberScope()
 		}
-		switch {
-		case m.stage.on && m.stage.mode == stageMirror:
-			m.stageFlow(m.width, m.height)
-		case !m.stage.on && m.scopeMode().mirror():
-			m.stageFlow(m.scopeWidth(m.layout()), scopeRows)
+		// The water is only stirred where it is being drawn, and the big screen
+		// falls back to it when the strip is switched off.
+		if mirror := m.scopeMode().mirror() || (m.stage.on && m.scopeMode() == scopeOff); mirror {
+			if m.stage.on {
+				m.stageFlow(m.width, m.height)
+			} else {
+				m.stageFlow(m.scopeWidth(m.layout()), scopeRows)
+			}
 		}
 		return m, scopeFrameCmd(m.player, m.frameMode())
 

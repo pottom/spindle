@@ -28,13 +28,15 @@ const (
 	// takes, leaving somewhere for the drops to go.
 	stageReach = 0.72
 
-	// stageReachTight is the same on a canvas too shallow for that to make
-	// sense. In the strip under the artwork a half-height is seven dot rows: a
-	// quarter of that held back for water is two rows nobody can see anything
-	// in, and the columns want them more than the drops do.
-	stageReachTight = 0.92
-
-	// stageTight is the half-height below which that applies.
+	// stageTight is the half-height below which the picture is not mirrored at
+	// all, and stands on the floor instead.
+	//
+	// A reflection costs half the height, which is a fair price on a screen and
+	// an impossible one in the strip under the artwork: mirrored there, a
+	// column has seven dot rows to rise through and the water has two, and what
+	// comes out is two dotted lines rather than a picture. Standing on the
+	// floor it has all sixteen. The choice is the canvas's, not the viewer's —
+	// it is the same picture either way, drawn at the size there is.
 	stageTight = 16
 
 	// stageGap is how many dot rows are left clear along the middle, so the two
@@ -90,29 +92,16 @@ type stageDrop struct {
 	bright    float32
 }
 
-// stageMode is which picture the big screen is showing. The same key cycles
-// them as cycles the strip on the player, because it is the same question asked
-// of a bigger canvas.
-type stageMode int
-
-const (
-	// stageMirror is the spectrum about the middle line, with the water. It is
-	// first because it is the one built for this size.
-	stageMirror stageMode = iota
-	stageWave
-	stageBars
-	stageModes
-)
-
-func (s stageMode) next() stageMode { return (s + 1) % stageModes }
-
 // stageState is what the big screen carries between frames.
+//
+// Which picture it shows is not one of them: the big screen and the strip under
+// the artwork are the same choice at two sizes, so they share it. Pressing the
+// key on either moves both.
 type stageState struct {
 	// on is whether the screen is up. It is not a tab: it is something you fall
 	// into and leave with the next key, the way turning the lights down is.
 	on bool
 
-	mode  stageMode
 	drops []stageDrop
 
 	// was is how high every column stood last frame, which is what a jump is
@@ -136,11 +125,16 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 
 	switch {
 	case key.Matches(k, m.keys.Scope):
-		// The one key that changes the picture rather than putting it away: the
-		// three of them are the same three the strip offers, at this size.
-		m.stage.mode = m.stage.mode.next()
+		// The one key that changes the picture rather than putting it away, and
+		// it changes the same setting the strip uses — with the difference that
+		// there is no "off" up here: a blank full screen is not a picture,
+		// it is a mistake.
+		m.scope.modes[m.tab] = m.scopeMode().next()
+		if m.scopeMode() == scopeOff {
+			m.scope.modes[m.tab] = scopeOff.next()
+		}
 		m.stage.drops = nil
-		return m.startScope(), true
+		return tea.Batch(m.startScope(), m.savePrefs()), true
 
 	case key.Matches(k, m.keys.PlayPause),
 		key.Matches(k, m.keys.VolUp), key.Matches(k, m.keys.VolDown),
@@ -177,10 +171,10 @@ func (m Model) stageView() string {
 // size of the whole terminal.
 func (m Model) stagePicture(w, rows int) []string {
 	var art []string
-	switch m.stage.mode {
-	case stageWave:
+	switch {
+	case m.scopeMode().wave():
 		art = m.scopeLinesFrom(w, rows, m.scopeTrigger(w*dotsPerCellX))
-	case stageBars:
+	case m.scopeMode().bars():
 		art = m.barsLines(w, rows)
 	default:
 		art = m.stageArt(w, rows)
@@ -227,8 +221,21 @@ func (m Model) stageArt(w, rows int) []string {
 		}
 	}
 
-	// The columns, and their reflections.
-	reach := stageReachAt(float32(middle - stageGap))
+	span, mirrored := stageSpan(dotsY)
+
+	// place puts a dot y rows up the picture, and its reflection where there is
+	// room for one.
+	place := func(x, y int, step int8) {
+		if !mirrored {
+			light(x, dotsY-1-y, step)
+			return
+		}
+		light(x, middle-stageGap-y, step)
+		light(x, middle+stageGap+y, step)
+	}
+
+	// The columns.
+	reach := stageReach * span
 	for x := range dotsX {
 		if x%stagePitch != 0 {
 			continue
@@ -238,31 +245,25 @@ func (m Model) stageArt(w, rows int) []string {
 			// Brightest at the tip, the way the bars are drawn: a short column
 			// still burns at its own top.
 			up := float32(y) / float32(max(height-1, 1))
-			step := int8(min(int(up*float32(levels)), levels-1))
-
-			light(x, middle-stageGap-y, step)
-			light(x, middle+stageGap+y, step)
+			place(x, y, int8(min(int(up*float32(levels)), levels-1)))
 		}
 	}
 
-	// The water, and its reflection.
+	// The water.
 	for _, d := range m.stage.drops {
-		step := int8(min(int(d.bright*float32(levels)), levels-1))
-		y := int(d.at)
-		light(d.col, middle-stageGap-y, step)
-		light(d.col, middle+stageGap+y, step)
+		place(d.col, int(d.at), int8(min(int(d.bright*float32(levels)), levels-1)))
 	}
 
 	return m.drawCells(w, rows, grid, paint, hue)
 }
 
-// stageReachAt is how far up its half of the picture a band at the top of the
-// scale reaches, given how much half there is.
-func stageReachAt(half float32) float32 {
-	if half < stageTight {
-		return stageReachTight * half
+// stageSpan is how many dot rows a column has to rise through, and whether the
+// picture is mirrored about the middle. See stageTight.
+func stageSpan(dotsY int) (span float32, mirrored bool) {
+	if half := dotsY/2 - stageGap; half >= stageTight {
+		return float32(half), true
 	}
-	return stageReach * half
+	return float32(dotsY), false
 }
 
 // stageLevel is how loud the column at x is, 0..1.
@@ -301,6 +302,8 @@ func (m *Model) stageFlow(w, rows int) {
 		return
 	}
 
+	span, _ := stageSpan(dotsY)
+
 	kept := m.stage.drops[:0]
 	for _, d := range m.stage.drops {
 		d.speed -= stageGravity
@@ -309,7 +312,7 @@ func (m *Model) stageFlow(w, rows int) {
 
 		// It is gone when it falls back into the middle, leaves the frame, or
 		// has nothing left to see.
-		if d.at > 0 && d.at < float32(dotsY/2) && d.bright > 0.05 && d.col < dotsX {
+		if d.at > 0 && d.at < span && d.bright > 0.05 && d.col < dotsX {
 			kept = append(kept, d)
 		}
 	}
@@ -319,9 +322,8 @@ func (m *Model) stageFlow(w, rows int) {
 		m.stage.was = make([]float32, dotsX)
 	}
 
-	half := float32(dotsY/2 - stageGap)
-	reach := stageReachAt(half)
-	throw := stageThrow * float32(math.Sqrt(float64(half)))
+	reach := stageReach * span
+	throw := stageThrow * float32(math.Sqrt(float64(span)))
 	for x := 0; x < dotsX; x += stagePitch {
 		now := m.stageLevel(x, dotsX)
 		jump := now - m.stage.was[x]

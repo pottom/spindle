@@ -152,14 +152,16 @@ func TestStageCyclesItsPictures(t *testing.T) {
 	}
 
 	var tm tea.Model = m
-	for i, want := range []stageMode{stageWave, stageBars, stageMirror} {
+	// The same three the strip cycles, and never "off": a blank full screen is
+	// not one of the pictures.
+	for i, want := range []scopeMode{scopeBars, scopeMirror, scopeWave, scopeBars} {
 		tm, _ = tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
 		got := tm.(Model)
 		if !got.stage.on {
 			t.Fatalf("press %d put the big screen away instead of changing the picture", i+1)
 		}
-		if got.stage.mode != want {
-			t.Fatalf("press %d showed picture %d, want %d", i+1, got.stage.mode, want)
+		if got.scopeMode() != want {
+			t.Fatalf("press %d showed picture %d, want %d", i+1, got.scopeMode(), want)
 		}
 	}
 }
@@ -167,10 +169,10 @@ func TestStageCyclesItsPictures(t *testing.T) {
 // Every one of the three fills the terminal, whichever is showing and whether
 // or not anything has arrived to draw yet.
 func TestStageFillsTheScreenInEveryPicture(t *testing.T) {
-	for mode := stageMirror; mode < stageModes; mode++ {
+	for mode := scopeWave; mode < scopeModes; mode++ {
 		for _, ready := range []bool{false, true} {
 			m := stageModel(100, 40)
-			m.stage.mode = mode
+			m.scope.modes[m.tab] = mode
 			if ready {
 				m.scope.frame = make([]float32, 2*256)
 				m.scope.follow(m.scope.frame)
@@ -188,5 +190,51 @@ func TestStageFillsTheScreenInEveryPicture(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// The same picture, drawn at the size there is: given the whole screen it is
+// mirrored about the middle, and in the strip under the artwork — where a
+// reflection would cost the half of the height that makes it a picture at all —
+// it stands on the floor.
+func TestStageStandsOnTheFloorWhenItIsShallow(t *testing.T) {
+	m := stageModel(100, 44)
+	m.scope.modes[tabPlayer] = scopeMirror
+	w := m.scopeWidth(m.layout())
+
+	strip := m.stageArt(w, scopeRows)
+	if len(strip) != scopeRows {
+		t.Fatalf("the strip drew %d rows, want %d", len(strip), scopeRows)
+	}
+	if strings.TrimSpace(ansiOff(strip[scopeRows-1])) == "" {
+		t.Error("the bottom row of the strip is empty, so the picture is not standing on it")
+	}
+
+	// And on a screen there is room, so it is mirrored: the top row and the
+	// bottom row are both drawn.
+	full := m.stageArt(100, 40)
+	if strings.TrimSpace(ansiOff(full[20])) == "" {
+		t.Error("nothing was drawn along the middle of the big picture")
+	}
+}
+
+// The strip and the big screen are one choice: what is showing under the
+// artwork is what fills the screen when it is asked to.
+func TestStageAndStripAgree(t *testing.T) {
+	m := scopeModel(100, 40)
+	m.scope.modes[tabPlayer] = scopeBars
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+	if got := tm.(Model); got.scopeMode() != scopeBars {
+		t.Errorf("the big screen opened showing %d, want the strip's %d", got.scopeMode(), scopeBars)
+	}
+
+	// And changing it up there is the same change down here.
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
+	after := tm.(Model)
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	if got := tm.(Model); got.scopeMode() != after.scopeMode() {
+		t.Errorf("the strip came back as %d after the big screen was left at %d", got.scopeMode(), after.scopeMode())
 	}
 }
