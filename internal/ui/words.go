@@ -474,10 +474,18 @@ const (
 	wordsRangeLeast = 2.5
 	wordsRangeClose = 0.0015
 
-	// wordsTilt is how far a word leans, as a rise over a run: a couple of
-	// degrees. Any more and the line stops being a line of type and starts
-	// being a ransom note.
-	wordsTilt = 0.045
+	// wordsLeanRise is how far the far end of a leaning word stands above its
+	// near one, as a share of the height of the type it is set in, and
+	// wordsTiltMost the steepest it is ever allowed to get there.
+	//
+	// The rise is measured against the type rather than fixed as an angle
+	// because a word can be anything from three dots wide to a hundred: at one
+	// angle for all of them the short words would not move at all and the long
+	// ones would stand on end. Against the type, every word leans by the same
+	// amount of what is on screen — and the cap keeps a three-letter word from
+	// getting there by going vertical.
+	wordsLeanRise = 0.35
+	wordsTiltMost = 0.16
 
 	// wordsWordRide is how far a word rides its own part of the sound, and
 	// wordsLineRide how far a whole line nods with the loudest of it. Both well
@@ -620,7 +628,7 @@ func (m Model) wordsLines(w, rows int) []string {
 					// the same, and a shear moves whole columns of a word
 					// together — a real rotation would open holes between them
 					// and the letter would come apart at the seams.
-					to += int(float32(x-middle[word]) * tilt[word])
+					to += int(math.Round(float64(x-middle[word]) * float64(tilt[word])))
 				}
 				if to < 0 || to >= dotsY {
 					continue
@@ -1075,8 +1083,8 @@ func (m Model) wordsRiding(count int) []int {
 // wordsTilting is how far each word of the line leans, and the column it leans
 // about.
 //
-// Most lines do not lean at all, and the ones that do lean by a couple of
-// degrees — enough that the line looks hand-set rather than typeset, little
+// Most lines do not lean at all, and the ones that do lean by a third of their
+// own height — enough that the line looks hand-set rather than typeset, little
 // enough that nobody has to tip their head. Which lines and which way is the
 // line's own business, so a song reads the same twice.
 func (m Model) wordsTilting(count int) ([]float32, []int) {
@@ -1088,9 +1096,10 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 	tilt, middle := make([]float32, count), make([]int, count)
 
 	// Where each word sits, so it leans about its own middle rather than about
-	// the middle of the screen — which would fling the ends of the line about.
+	// the middle of the screen — which would fling the ends of the line about,
+	// and how tall the line it belongs to is set, which is what it leans by.
 	where := m.words.where
-	first, last := make([]int, count), make([]int, count)
+	first, last, tall := make([]int, count), make([]int, count), make([]int, count)
 	for i := range first {
 		first[i], last[i] = -1, -1
 	}
@@ -1098,15 +1107,21 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 		if at < 0 || int(at) >= count {
 			continue
 		}
-		x := i % max(where.DotsX, 1)
+		x, line := i%max(where.DotsX, 1), i/max(where.DotsX, 1)
 		if first[at] < 0 {
 			first[at] = x
 		}
 		last[at] = x
+		if line < len(where.Tops) && line < len(where.Bottoms) {
+			tall[at] = where.Bottoms[line] - where.Tops[line] + 1
+		}
 	}
 
 	for i := range tilt {
 		middle[i] = (max(first[i], 0) + max(last[i], 0)) / 2
+
+		wide := max(last[i]-first[i]+1, 1)
+		lean := min(wordsLeanRise*float32(tall[i])/float32(wide), wordsTiltMost)
 
 		// Three ways for a word: this way, that way, or flat.
 		h := seed ^ uint64(i+1)*0x9e3779b97f4a7c15
@@ -1116,9 +1131,9 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 
 		switch h % 3 {
 		case 0:
-			tilt[i] = wordsTilt
+			tilt[i] = lean
 		case 1:
-			tilt[i] = -wordsTilt
+			tilt[i] = -lean
 		}
 	}
 	return tilt, middle

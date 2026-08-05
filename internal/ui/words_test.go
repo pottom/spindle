@@ -874,8 +874,8 @@ func TestSomeLinesLean(t *testing.T) {
 
 		var last int
 		for i := range tilt {
-			if abs32(tilt[i]) > wordsTilt {
-				t.Errorf("a word leans by %.3f, want no more than %.3f", tilt[i], wordsTilt)
+			if abs32(tilt[i]) > wordsTiltMost {
+				t.Errorf("a word leans by %.3f, want no more than %.3f", tilt[i], wordsTiltMost)
 			}
 			if middle[i] < last {
 				t.Error("the words lean about middles that are not in reading order")
