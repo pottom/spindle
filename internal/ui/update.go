@@ -248,7 +248,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		// Wound back so that the gathering finishes as the line is sung rather
 		// than starting then: whatever is left of the wait is taken off what the
 		// gathering costs.
-		wait := time.Duration(m.words.starts-m.lyricsClock()) * time.Millisecond
+		wait := time.Duration(m.words.starts-m.wordsClock()) * time.Millisecond
 		m.words.since = time.Now().Add(-max(wordsGather-wait, 0))
 		return m, nil
 

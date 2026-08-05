@@ -395,7 +395,7 @@ func TestWordsLandOnTheLine(t *testing.T) {
 
 	// Inside the gathering's length of it: asked for, with its own timestamp so
 	// that the arrival can be wound back to land on it.
-	m.setProgress(10*time.Second - wordsGather/2 - lyricsAhead)
+	m.setProgress(10*time.Second - wordsGather/2)
 	lines, starts := m.wordsComing()
 	if len(lines) == 0 {
 		t.Fatal("the line was not asked for as its gathering came due")
@@ -406,7 +406,7 @@ func TestWordsLandOnTheLine(t *testing.T) {
 
 	// Which is what the arrival uses: half the gathering is already spent, so
 	// the picture is half made when it appears.
-	wait := time.Duration(starts-m.lyricsClock()) * time.Millisecond
+	wait := time.Duration(starts-m.wordsClock()) * time.Millisecond
 	spent := wordsGather - wait
 	t.Logf("the line arrives %v before it is sung, %v of the gathering already spent", wait, spent)
 	if spent < 0 || spent > wordsGather {

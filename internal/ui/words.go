@@ -298,7 +298,7 @@ func (m Model) wordsNow() []string {
 // line's own timestamp, the words finish arriving exactly as it begins.
 func (m Model) wordsComing() ([]string, int64) {
 	if m.lyrics.synced && m.ps != nil && m.lyrics.forTrack == m.ps.TrackID {
-		at, clock := m.lyricsAt(), m.lyricsClock()
+		at, clock := m.wordsAt(), m.wordsClock()
 
 		// The next line, if it is close enough that its gathering has begun.
 		if next := at + 1; next < len(m.lyrics.lines) {
@@ -700,6 +700,34 @@ func (m Model) wordsEnds(starts int64) int64 {
 		}
 	}
 	return 0
+}
+
+// wordsClock is the playhead the big screen reads the words against: the one the
+// music is actually at, with nothing added to it.
+//
+// The window on the player screen reads half a second ahead, because a line lit
+// as its first syllable sounds has already been passed by the time the eye gets
+// to it. Up here that lead is wrong twice over: the line is the size of the
+// screen and takes no finding, and the gathering — which is nearly half a second
+// of dots flying into place — is itself the warning that a line is coming. Read
+// ahead as well, the finished line stands there for half a second before anybody
+// sings it, and the picture appears to be rushing the song.
+func (m Model) wordsClock() int64 { return m.elapsed().Milliseconds() }
+
+// wordsAt is which line that clock is on.
+func (m Model) wordsAt() int {
+	if !m.lyrics.synced {
+		return 0
+	}
+
+	pos, at := m.wordsClock(), -1
+	for i, line := range m.lyrics.lines {
+		if line.At > pos {
+			break
+		}
+		at = i
+	}
+	return at
 }
 
 // wordsSilent reports that the song has words but is not singing any right now:
