@@ -23,6 +23,16 @@ func (l *listState) move(delta, count int) {
 	l.cursor = min(max(l.cursor+delta, 0), count-1)
 }
 
+// moveTo puts the cursor on one row, which is what a search through the list
+// hands back: a place rather than a direction.
+func (l *listState) moveTo(row, count int) {
+	if count == 0 {
+		l.cursor, l.top = 0, 0
+		return
+	}
+	l.cursor = min(max(row, 0), count-1)
+}
+
 // reset returns to the top, for when the underlying items are replaced.
 func (l *listState) reset() {
 	l.cursor, l.top = 0, 0
@@ -97,6 +107,10 @@ func (m *Model) listKey(k tea.KeyPressMsg, state *listState, count int, vim bool
 		state.move(page, count)
 	case key.Matches(k, m.keys.PageUp):
 		state.move(-page, count)
+	case key.Matches(k, m.keys.HalfDown):
+		state.move(max(page/2, 1), count)
+	case key.Matches(k, m.keys.HalfUp):
+		state.move(-max(page/2, 1), count)
 	// The ends are asked for as a move the length of the list, which clamps to
 	// them however long it is.
 	case key.Matches(k, m.keys.First), vim && key.Matches(k, m.keys.FirstVim):

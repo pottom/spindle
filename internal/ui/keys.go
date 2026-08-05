@@ -72,6 +72,18 @@ type keyMap struct {
 	Drop         key.Binding
 	MoveUp       key.Binding
 	MoveDn       key.Binding
+
+	// HalfDown and HalfUp move by half a screen, which is how vim reads a long
+	// list: far enough to make progress, near enough to keep your place.
+	HalfDown key.Binding
+	HalfUp   key.Binding
+
+	// FindNext and FindPrev walk the rows a search inside the list matched.
+	// They took n and N from the transport, which moved to ctrl+n and ctrl+p:
+	// a list you are reading is what those keys are for in every program that
+	// has both, and the transport has the space bar and the arrows besides.
+	FindNext key.Binding
+	FindPrev key.Binding
 }
 
 func newKeyMap() keyMap {
@@ -81,10 +93,10 @@ func newKeyMap() keyMap {
 			key.WithHelp("space", "play / pause"),
 		),
 		Next: key.NewBinding(
-			key.WithKeys("n"),
-			key.WithHelp("n / p", "next / previous"),
+			key.WithKeys("ctrl+n"),
+			key.WithHelp("ctrl+n / ctrl+p", "next / previous"),
 		),
-		Prev: key.NewBinding(key.WithKeys("p")),
+		Prev: key.NewBinding(key.WithKeys("ctrl+p")),
 		SeekFwd: key.NewBinding(
 			key.WithKeys("right"),
 			key.WithHelp("← / →", "seek ∓5s"),
@@ -125,16 +137,24 @@ func newKeyMap() keyMap {
 			key.WithKeys("1", "2", "3", "4"),
 			key.WithHelp("1–4", "go to tab"),
 		),
-		Up: key.NewBinding(key.WithKeys("up", "ctrl+p")),
-		Down: key.NewBinding(
-			key.WithKeys("down", "ctrl+n"),
-			key.WithHelp("↑↓", "select"),
-		),
+		Up:   key.NewBinding(key.WithKeys("up")),
+		Down: key.NewBinding(key.WithKeys("down"), key.WithHelp("↑↓", "select")),
 		PageDown: key.NewBinding(
 			key.WithKeys("pgdown", "ctrl+f"),
 			key.WithHelp("pgdn / pgup", "page down / up"),
 		),
 		PageUp: key.NewBinding(key.WithKeys("pgup", "ctrl+b")),
+
+		// Half a screen at a time, as vim moves. The whole-screen keys keep
+		// theirs: ctrl+f and ctrl+b are the same pair in the same place.
+		HalfDown: key.NewBinding(key.WithKeys("ctrl+d")),
+		HalfUp:   key.NewBinding(key.WithKeys("ctrl+u")),
+
+		FindNext: key.NewBinding(
+			key.WithKeys("n"),
+			key.WithHelp("n / N", "next / previous match"),
+		),
+		FindPrev: key.NewBinding(key.WithKeys("N")),
 		First: key.NewBinding(
 			key.WithKeys("home"),
 			key.WithHelp("home / end", "first / last"),
@@ -177,7 +197,7 @@ func newKeyMap() keyMap {
 
 		SearchType: key.NewBinding(
 			key.WithKeys("/"),
-			key.WithHelp("/", "search"),
+			key.WithHelp("/", "find"),
 		),
 		SearchKind: key.NewBinding(
 			key.WithKeys("ctrl+right", "ctrl+t"),
@@ -249,7 +269,7 @@ var selectHint = hint("↑↓ ⇞⇟", "select")
 // vim says whether g and G are read on this screen. They are not offered where
 // they do nothing.
 func (k keyMap) moveKeys(vim bool) []key.Binding {
-	out := []key.Binding{k.PageDown, k.First}
+	out := []key.Binding{k.PageDown, hint("^d / ^u", "half a page"), k.First}
 	if vim {
 		out = append(out, hint("g / G", "first / last"))
 	}
@@ -313,7 +333,7 @@ func (k keyMap) forReadOnlyQueue() tabKeys {
 func (k keyMap) forPlayer(scope, lyrics, peek bool) tabKeys {
 	short := []key.Binding{
 		hint("space", "play/pause"),
-		hint("n/p", "track"),
+		hint("^n/^p", "track"),
 		hint("←→", "seek"),
 	}
 	switch {
@@ -361,6 +381,7 @@ func (k keyMap) forOpen(albums, scope bool) tabKeys {
 	short := []key.Binding{
 		selectHint,
 		enter,
+		hint("/", "find"),
 		hint(".", "actions"),
 		hint("a", "queue"),
 		hint("esc", "back"),
@@ -386,6 +407,7 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 		short := []key.Binding{
 			selectHint,
 			hint("enter", "play"),
+			hint("/", "find"),
 			hint(".", "actions"),
 			hint("x", "remove"),
 			hint("j/k", "move"),
@@ -408,6 +430,7 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 		short := []key.Binding{
 			selectHint,
 			hint("enter", "open"),
+			hint("/", "find"),
 			hint("ctrl+t", "kind"),
 			hint(".", "actions"),
 			hint("a", "queue"),
@@ -421,6 +444,7 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 			short: append(short, hint("?", "help")),
 			full: [][]key.Binding{
 				{k.Down, k.Enter, k.SearchKind, k.Enqueue, k.NextTab},
+				{k.SearchType, k.FindNext, k.PageDown, k.FirstVim},
 				second,
 				k.moveKeys(true),
 			},

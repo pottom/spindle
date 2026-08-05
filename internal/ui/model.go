@@ -62,6 +62,11 @@ type Model struct {
 	library   libraryPane
 	search    searchPane
 
+	// find is a search through the list on screen, which is a different act
+	// from the search tab: nothing is asked of Spotify, and what it walks is
+	// already in front of you.
+	find find
+
 	// stack is what has been opened on top of a tab's own list: a playlist, an
 	// album, an artist, and whatever was opened from those. It belongs to the
 	// model rather than to a pane because the same page can be reached from the

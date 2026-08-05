@@ -23,7 +23,7 @@ func TestSkipShowsTheQueuedTrackAtOnce(t *testing.T) {
 	m.queue = []player.Track{trackAt("b", "second"), trackAt("c", "third")}
 
 	var tm tea.Model = m
-	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
 
 	got := tm.(Model)
 	if got.ps.Title != "second" {
@@ -48,7 +48,7 @@ func TestStaleSnapshotDoesNotUndoASkip(t *testing.T) {
 	m.queue = []player.Track{trackAt("b", "second")}
 
 	var tm tea.Model = m
-	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
 
 	// The confirming fetch comes back still showing the track we left.
 	tm, _ = tm.Update(msg.StateFetched{State: &player.State{TrackID: "a", Title: "first", Playing: true}})
@@ -70,7 +70,7 @@ func TestSkipWithoutAQueueKeepsTheCurrentTrack(t *testing.T) {
 	m.ps = &player.State{TrackID: "a", Title: "first", Playing: true}
 
 	var tm tea.Model = m
-	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
 
 	got := tm.(Model)
 	if got.ps.Title != "first" {

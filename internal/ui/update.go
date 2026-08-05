@@ -423,12 +423,18 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.switchTab(m.tab.next(1))
 	case key.Matches(k, m.keys.PrevTab):
 		return m, m.switchTab(m.tab.next(-1))
-	case key.Matches(k, m.keys.GoTab) && !m.search.typing:
+	case key.Matches(k, m.keys.GoTab) && !m.search.typing && !m.find.typing:
 		// Not on the search tab: there the digits belong to the query, and a
 		// key that types on one screen must not navigate on it.
 		if t, ok := tabAt(k.String()); ok {
 			return m, m.switchTab(t)
 		}
+	}
+
+	// A query being written answers everything, the way the menu does: every
+	// printable key belongs to it while it is open.
+	if cmd, handled := m.findKey(k); handled {
+		return m, cmd
 	}
 
 	// The menu answers everything while it is up: nothing underneath may act on
@@ -477,9 +483,22 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.savePrefs()
 
 	case key.Matches(k, m.keys.SearchType):
-		// From anywhere: the shortest way to a search is one key, not a tab
-		// switch and then a key.
+		// / looks for something where you are. On a list that means the list —
+		// no request, no waiting, the rows are already here. Where there is no
+		// list to look through it means the other thing: go and ask Spotify.
+		if m.findable() {
+			m.startFind()
+			return m, nil
+		}
 		return m, m.startTyping()
+
+	case key.Matches(k, m.keys.FindNext):
+		m.findStep(1)
+		return m, tea.Batch(m.previewCover(), m.readAhead())
+
+	case key.Matches(k, m.keys.FindPrev):
+		m.findStep(-1)
+		return m, tea.Batch(m.previewCover(), m.readAhead())
 
 	case key.Matches(k, m.keys.Help):
 		// Expanding the help shortens the body, which shrinks the artwork, so

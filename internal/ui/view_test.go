@@ -219,7 +219,9 @@ func TestDigitsSwitchTabs(t *testing.T) {
 		t.Errorf("tab = %v, want the digit to still switch tabs", got)
 	}
 
-	// Once / has asked for the query, the digit is what is being typed.
+	// Once / has asked for the query, the digit is what is being typed. It is
+	// asked for on the search tab itself: on a list, / looks through the list.
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: '4', Text: "4"})
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
 	got := tm.(Model)

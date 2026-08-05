@@ -19,6 +19,13 @@ const (
 // track and a throttle are both news about this moment; the explanations behind
 // them are true either way and will still be there.
 func (m Model) notice() (string, lipgloss.Style, bool) {
+	// A query being written outranks everything: it is the only line on the
+	// screen that answers the keyboard, and a notice covering it would leave
+	// the letters going somewhere invisible.
+	if line := m.findLine(); line != "" {
+		return line, m.styles.Detail, true
+	}
+
 	if m.said != "" && time.Since(m.saidAt) < saidWindow {
 		return m.said, m.styles.Detail, true
 	}
