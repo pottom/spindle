@@ -299,6 +299,11 @@ func (m Model) wordsComing() ([]string, int64) {
 
 		if at >= 0 && at < len(m.lyrics.lines) {
 			if line := strings.TrimSpace(m.lyrics.lines[at].Words); line != "" {
+				// A bar with no words for it: a face rather than the note the
+				// sheet wrote there.
+				if wordsBeats(line) {
+					return []string{wordsFace(m.lyrics.lines[at].At)}, m.lyrics.lines[at].At
+				}
 				return wordsWrap(line, m.width*dotsPerCellX, m.height*dotsPerCellY),
 					m.lyrics.lines[at].At
 			}
@@ -689,6 +694,27 @@ func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall int) {
 	}
 }
 
+// wordsFaces are what goes up while nobody is singing.
+//
+// A lyric sheet marks the bars it has no words for with a note, and a note two
+// hundred dots tall is a dull thing to look at for the length of a solo. A face
+// is not: it is the same joke a chat window has been making since before either
+// of us, it is drawn in the same dots as everything else here, and there are
+// enough of them that the next instrumental is not the last one.
+var wordsFaces = []string{
+	":)", ";)", ":*", ":D", ":P", "8)", "^_^", ":]", "=)", ";D", ":3", "\\o/",
+}
+
+// wordsFace picks one, from when the line it stands for is sung — so it is the
+// same face every time that bar comes round, and a different one for the next.
+func wordsFace(at int64) string {
+	h := uint64(at)*2654435761 + 2246822519
+	h ^= h >> 29
+	h *= 0xbf58476d1ce4e5b9
+	h ^= h >> 32
+	return wordsFaces[h%uint64(len(wordsFaces))]
+}
+
 // wordsBeats reports that a line is a mark rather than words: the note a lyric
 // sheet puts where a line would be if anyone were singing one.
 func wordsBeats(text string) bool {
@@ -702,6 +728,16 @@ func wordsBeats(text string) bool {
 		}
 	}
 	return marks > 0
+}
+
+// isFace reports whether a line is one of the faces rather than a lyric.
+func isFace(line string) bool {
+	for _, face := range wordsFaces {
+		if line == face {
+			return true
+		}
+	}
+	return false
 }
 
 // wordsSilent reports that the song has words but is not singing any right now:
@@ -811,6 +847,7 @@ func (m *Model) wordsGrind() tea.Cmd {
 		return nil
 	}
 	m.words.starts = starts
+	m.words.beats = len(lines) == 1 && isFace(lines[0])
 
 	text := strings.Join(lines, "\n")
 	if m.words.text == text && m.words.cellsX == m.width && m.words.cellsY == m.height {

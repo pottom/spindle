@@ -492,10 +492,10 @@ func TestWordsBeatWhenThereIsNothingToSing(t *testing.T) {
 	m.width, m.height = w, rows
 	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
 
-	lines := []string{"♪"}
+	lines := []string{wordsFaces[0]}
 	img, layout, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
 	if !ok {
-		t.Skip("the face has no note to draw")
+		t.Fatal("the face could not be drawn")
 	}
 	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
 	m.words.cellsX, m.words.cellsY, m.words.where = w, rows, layout
@@ -650,5 +650,53 @@ func TestWordsHangTheMeterFromTheCeilingToo(t *testing.T) {
 	}
 	if head*3 < foot {
 		t.Errorf("%d cells hang against %d standing, want them a pair", head, foot)
+	}
+}
+
+// A lyric sheet marks the bars it has no words for with a note, and a note two
+// hundred dots tall is a dull thing to look at for the length of a solo. A face
+// goes up instead — a different one each time, so the next instrumental is not
+// the last one.
+func TestWordsPullFacesThroughTheSolos(t *testing.T) {
+	const w, h = 60 * dotsPerCellX, 16 * dotsPerCellY
+
+	for _, face := range wordsFaces {
+		if _, _, ok := wordsImage([]string{face}, w, h); !ok {
+			t.Errorf("%q cannot be drawn, so it must not be in the set", face)
+		}
+		if !isFace(face) {
+			t.Errorf("%q is in the set but not recognised as one", face)
+		}
+	}
+
+	// The same bar pulls the same face, so a song looks the same twice.
+	if a, b := wordsFace(12_345), wordsFace(12_345); a != b {
+		t.Errorf("one bar pulled %q and then %q", a, b)
+	}
+
+	// And forty of them are not all the same joke.
+	seen := map[string]bool{}
+	for at := range int64(40) {
+		seen[wordsFace(at*7_000)] = true
+	}
+	t.Logf("forty instrumental bars pulled %d of the %d faces", len(seen), len(wordsFaces))
+	if len(seen) < len(wordsFaces)/2 {
+		t.Errorf("forty bars only pulled %d faces of %d", len(seen), len(wordsFaces))
+	}
+
+	// A line the sheet wrote a note on comes back as a face rather than a note.
+	m := scopeModel(100, 44)
+	m.width, m.height = 60, 16
+	m.ps.TrackID = "now"
+	m.lyrics.synced, m.lyrics.forTrack = true, "now"
+	m.lyrics.lines = []player.Lyric{
+		{At: 0, Words: "♪"},
+		{At: 60_000, Words: "and then the words"},
+	}
+	m.setProgress(2 * time.Second)
+
+	lines, _ := m.wordsComing()
+	if len(lines) != 1 || !isFace(lines[0]) {
+		t.Errorf("an instrumental bar shows %q, want a face", lines)
 	}
 }
