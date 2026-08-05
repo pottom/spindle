@@ -82,13 +82,13 @@ func TestOvertakenTransmissionIsDropped(t *testing.T) {
 	k := NewKitty(&out, CellSize{Width: 9, Height: 18, Measured: true})
 	img := solid(640, 640, color.RGBA{R: 10, G: 20, B: 30, A: 255})
 
-	if _, err := k.Render(img, 14, 7, 2); err != nil {
+	if _, err := k.Render(img, 14, 7, 2, 0); err != nil {
 		t.Fatalf("Render(seq 2): %v", err)
 	}
 	newest := out.Len()
 
 	// The older load finishes last and must be refused.
-	if _, err := k.Render(img, 40, 20, 1); !IsStale(err) {
+	if _, err := k.Render(img, 40, 20, 1, 0); !IsStale(err) {
 		t.Errorf("Render(seq 1) = %v, want it reported as overtaken", err)
 	}
 	if out.Len() != newest {
@@ -96,7 +96,7 @@ func TestOvertakenTransmissionIsDropped(t *testing.T) {
 	}
 
 	// A newer one still gets through.
-	if _, err := k.Render(img, 20, 10, 3); err != nil {
+	if _, err := k.Render(img, 20, 10, 3, 0); err != nil {
 		t.Fatalf("Render(seq 3): %v", err)
 	}
 	if out.Len() == newest {
@@ -113,11 +113,11 @@ func TestNewGeometryClearsTheOldPlacement(t *testing.T) {
 	k := NewKitty(&out, CellSize{Width: 14, Height: 29, Measured: true})
 	img := solid(640, 640, color.RGBA{R: 10, G: 20, B: 30, A: 255})
 
-	if _, err := k.Render(img, 49, 23, 1); err != nil {
+	if _, err := k.Render(img, 49, 23, 1, 0); err != nil {
 		t.Fatal(err)
 	}
 	out.Reset()
-	if _, err := k.Render(img, 24, 11, 2); err != nil {
+	if _, err := k.Render(img, 24, 11, 2, 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -137,19 +137,42 @@ func TestNewGeometryClearsTheOldPlacement(t *testing.T) {
 // testImageID stands in for the per-process id, which the grid only carries.
 const testImageID = 1
 
-// Two spindles on one machine must not share an image id. The id belongs to the
-// terminal, and every cover is preceded by a delete of that id's placements: a
-// shared number would take the other one's picture off the screen with every
-// track change.
+// Two spindles on one machine must not share an image id, and neither may the
+// two pictures one spindle draws at once. The id belongs to the terminal, and
+// every cover is preceded by a delete of that id's placements: a shared number
+// would take the other picture off the screen with every track change.
 func TestEachRendererHasItsOwnImageID(t *testing.T) {
 	k := NewKitty(io.Discard, CellSize{Width: 10, Height: 20, Measured: true})
-	if k.imageID == 0 {
-		t.Error("image id 0 is not one the protocol accepts")
+
+	seen := map[int]bool{}
+	for slot, id := range k.imageID {
+		if id == 0 {
+			t.Errorf("slot %d has image id 0, which the protocol does not accept", slot)
+		}
+		if id > 0xFFFFFF {
+			t.Errorf("slot %d has image id %d, which does not fit the 24 bits a placeholder carries", slot, id)
+		}
+		if seen[id] {
+			t.Errorf("slot %d shares image id %d with another slot", slot, id)
+		}
+		seen[id] = true
 	}
-	if k.imageID > 0xFFFFFF {
-		t.Errorf("image id %d does not fit the 24 bits a placeholder carries", k.imageID)
+	if k.imageID[0] != (os.Getpid()*slots)&0xFFFFFF|1 {
+		t.Errorf("image id = %d, want it derived from the process", k.imageID[0])
 	}
-	if k.imageID != os.Getpid()&0xFFFFFF|1 {
-		t.Errorf("image id = %d, want it derived from the process", k.imageID)
+}
+
+// The two pictures do not overtake each other: a load in one slot must not
+// discard a newer load in the other.
+func TestSlotsKeepTheirOwnSequence(t *testing.T) {
+	var out strings.Builder
+	k := NewKitty(&out, CellSize{Width: 10, Height: 20, Measured: true})
+	img := solid(640, 640, color.White)
+
+	if _, err := k.Render(img, 20, 10, 5, 0); err != nil {
+		t.Fatalf("Render(slot 0, seq 5): %v", err)
+	}
+	if _, err := k.Render(img, 12, 6, 1, 1); err != nil {
+		t.Errorf("Render(slot 1, seq 1) = %v, want the other slot's sequence to be its own", err)
 	}
 }

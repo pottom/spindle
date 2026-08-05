@@ -49,22 +49,36 @@ type Kitty struct {
 	// delete of the id's placements: a second spindle sharing the number would
 	// take the first one's picture off the screen with every track change. The
 	// process id is what the two of them cannot both have.
-	imageID int
+	//
+	// One id per slot, so a screen drawing two pictures at once is drawing two
+	// images and not one image twice.
+	imageID [slots]int
 
 	mu  sync.Mutex
 	out io.Writer // the tty; written to from the pipeline, never from View
 
-	// sent is the newest load that reached the terminal. Every cover goes out
-	// under the same image id, so a load that was overtaken must not be written
-	// after the one that replaced it: the terminal would keep a picture of a
-	// size the screen has stopped drawing, and show a corner of it.
-	sent uint64
+	// sent is the newest load that reached the terminal, per slot. Every cover
+	// in a slot goes out under the same image id, so a load that was overtaken
+	// must not be written after the one that replaced it: the terminal would
+	// keep a picture of a size the screen has stopped drawing, and show a
+	// corner of it.
+	sent [slots]uint64
 }
 
+// slots is how many pictures may be on screen at once: what the cursor is
+// resting on, and what is playing.
+const slots = 2
+
 func NewKitty(out io.Writer, cell CellSize) *Kitty {
-	// Zero is not an id the protocol accepts, and a pid can be anything.
-	id := os.Getpid()&imageIDMask | 1
-	return &Kitty{Cell: cell, out: out, imageID: id}
+	// Zero is not an id the protocol accepts, and a pid can be anything. The
+	// slots take consecutive ids from there; two spindles a single number apart
+	// would collide, which is why the first id is shifted rather than masked.
+	base := (os.Getpid()*slots)&imageIDMask | 1
+	k := &Kitty{Cell: cell, out: out}
+	for i := range k.imageID {
+		k.imageID[i] = (base + i) & imageIDMask
+	}
+	return k
 }
 
 func (k *Kitty) Name() string { return "kitty" }
@@ -77,7 +91,11 @@ var errStale = errors.New("cover load overtaken by a newer one")
 // should drop rather than complain about.
 func IsStale(err error) bool { return errors.Is(err, errStale) }
 
-func (k *Kitty) Render(img image.Image, wCells, hCells int, seq uint64) (string, error) {
+func (k *Kitty) Render(img image.Image, wCells, hCells int, seq uint64, slot int) (string, error) {
+	if slot < 0 || slot >= slots {
+		return "", fmt.Errorf("render kitty: no such picture slot %d", slot)
+	}
+
 	cols, rows, pxW, pxH := fitCells(img, wCells, hCells, k.Cell)
 	if cols == 0 || rows == 0 {
 		return "", fmt.Errorf("render kitty: image does not fit %dx%d cells", wCells, hCells)
@@ -98,16 +116,18 @@ func (k *Kitty) Render(img image.Image, wCells, hCells int, seq uint64) (string,
 	if err := png.Encode(&buf, scaled); err != nil {
 		return "", fmt.Errorf("encode cover as png: %w", err)
 	}
-	if err := k.transmit(buf.Bytes(), cols, rows, seq); err != nil {
+	if err := k.transmit(buf.Bytes(), cols, rows, seq, slot); err != nil {
 		return "", err
 	}
-	return placeholderGrid(k.imageID, cols, rows), nil
+	return placeholderGrid(k.imageID[slot], cols, rows), nil
 }
 
 // transmit uploads the image and creates a virtual placement under imageID.
 // Responses are suppressed with q=2: anything the terminal echoed back would be
 // read by Bubble Tea as keyboard input.
-func (k *Kitty) transmit(data []byte, cols, rows int, seq uint64) error {
+func (k *Kitty) transmit(data []byte, cols, rows int, seq uint64, slot int) error {
+	id := k.imageID[slot]
+
 	encoded := base64.StdEncoding.EncodeToString(data)
 
 	var sb strings.Builder
@@ -116,7 +136,7 @@ func (k *Kitty) transmit(data []byte, cols, rows int, seq uint64) error {
 	// the same id replaces the picture but not the placement it already has, so
 	// without this the terminal keeps drawing into the old rectangle and only
 	// the corner of the new cover that fits inside it is ever seen.
-	fmt.Fprintf(&sb, "\x1b_Ga=d,d=I,i=%d,q=2\x1b\\", k.imageID)
+	fmt.Fprintf(&sb, "\x1b_Ga=d,d=I,i=%d,q=2\x1b\\", id)
 
 	first := true
 	for len(encoded) > 0 {
@@ -133,7 +153,7 @@ func (k *Kitty) transmit(data []byte, cols, rows int, seq uint64) error {
 
 		if first {
 			fmt.Fprintf(&sb, "\x1b_Ga=T,q=2,f=100,t=d,i=%d,U=1,c=%d,r=%d,m=%d;%s\x1b\\",
-				k.imageID, cols, rows, more, chunk)
+				id, cols, rows, more, chunk)
 			first = false
 			continue
 		}
@@ -142,7 +162,7 @@ func (k *Kitty) transmit(data []byte, cols, rows int, seq uint64) error {
 
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	if seq < k.sent {
+	if seq < k.sent[slot] {
 		// Overtaken while it was being prepared. The screen is already drawing
 		// the newer cover, and this one has nowhere to go.
 		return errStale
@@ -150,7 +170,7 @@ func (k *Kitty) transmit(data []byte, cols, rows int, seq uint64) error {
 	if _, err := io.WriteString(k.out, sb.String()); err != nil {
 		return fmt.Errorf("transmit cover: %w", err)
 	}
-	k.sent = seq
+	k.sent[slot] = seq
 	return nil
 }
 

@@ -80,7 +80,7 @@ func (l *Loader) Renderer() Renderer { return l.renderer }
 
 // Load returns artwork ready to embed in a view. It blocks on I/O and must never
 // be called from Update.
-func (l *Loader) Load(ctx context.Context, url string, wCells, hCells int) (Art, error) {
+func (l *Loader) Load(ctx context.Context, url string, wCells, hCells, slot int) (Art, error) {
 	if url == "" {
 		return Art{}, fmt.Errorf("load cover: no artwork url")
 	}
@@ -93,7 +93,7 @@ func (l *Loader) Load(ctx context.Context, url string, wCells, hCells int) (Art,
 	if err != nil {
 		return Art{}, err
 	}
-	cells, err := l.renderer.Render(img, wCells, hCells, seq)
+	cells, err := l.renderer.Render(img, wCells, hCells, seq, slot)
 	if err != nil {
 		return Art{}, fmt.Errorf("load cover: %w", err)
 	}

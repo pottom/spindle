@@ -11,7 +11,12 @@ type Renderer interface {
 	// itself needs it: two loads can be in flight at once, and if the older one
 	// finishes last the terminal is left holding a picture of a size the screen
 	// is no longer drawing.
-	Render(img image.Image, wCells, hCells int, seq uint64) (string, error)
+	//
+	// slot says which picture on the screen this is. A screen showing two at
+	// once — what the cursor is on beside what is playing — needs them kept
+	// apart: a renderer that holds one image in the terminal would have the two
+	// replacing each other.
+	Render(img image.Image, wCells, hCells int, seq uint64, slot int) (string, error)
 	Name() string
 }
 

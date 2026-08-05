@@ -183,21 +183,21 @@ func fetchDevicesCmd(p player.Player) tea.Cmd {
 // coverCmd runs the artwork pipeline off the update loop: cache lookup, download,
 // decode, resize and render. A failure is reported as a missing cover, not as an
 // error banner.
-func coverCmd(loader *cover.Loader, url string, wCells, hCells int) tea.Cmd {
+func coverCmd(loader *cover.Loader, url string, wCells, hCells, slot int) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), coverTimeout)
 		defer cancel()
 
-		art, err := loader.Load(ctx, url, wCells, hCells)
+		art, err := loader.Load(ctx, url, wCells, hCells, slot)
 		if cover.IsStale(err) {
 			// A newer cover is already on screen. Reporting this one would only
 			// give the model something to discard.
 			return nil
 		}
 		if err != nil {
-			return msg.CoverFailed{URL: url, Width: wCells, Height: hCells}
+			return msg.CoverFailed{URL: url, Width: wCells, Height: hCells, Slot: slot}
 		}
-		return msg.CoverReady{URL: url, Width: wCells, Height: hCells, Art: art}
+		return msg.CoverReady{URL: url, Width: wCells, Height: hCells, Slot: slot, Art: art}
 	}
 }
 

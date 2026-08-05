@@ -91,6 +91,12 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case msg.CoverReady:
+		if message.Slot == nowSlot {
+			if m.nowCover.matches(message.URL, message.Width, message.Height) {
+				m.nowCover.art = message.Art.Cells
+			}
+			return m, nil
+		}
 		if m.cover.matches(message.URL, message.Width, message.Height) {
 			m.cover.art = message.Art.Cells
 			m.cover.accent, m.cover.hasAccent = message.Art.Accent, message.Art.HasAccent
@@ -99,6 +105,12 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case msg.CoverFailed:
+		if message.Slot == nowSlot {
+			if m.nowCover.matches(message.URL, message.Width, message.Height) {
+				m.nowCover.failed = true
+			}
+			return m, nil
+		}
 		if m.cover.matches(message.URL, message.Width, message.Height) {
 			m.cover.failed = true
 		}
@@ -546,7 +558,17 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // syncCover starts an artwork load whenever the cover or the area it has to fill
 // has changed. The artwork now scales with the window, so a resize invalidates
 // what was rendered just as a track change does.
+// syncCover keeps both pictures in step with what the screen is showing. The
+// second one is asked for from here rather than from its own call sites: it
+// changes when the track does, and the track changes in a dozen places that
+// have no reason to know a second picture exists.
 func (m *Model) syncCover() tea.Cmd {
+	return tea.Batch(m.syncCursorCover(), m.syncNowCover())
+}
+
+// syncCursorCover is the picture of whatever the screen is about: the track
+// playing, or the row under the cursor.
+func (m *Model) syncCursorCover() tea.Cmd {
 	if m.covers == nil || !fitsMinimum(m.width, m.height) {
 		return nil
 	}
@@ -571,9 +593,36 @@ func (m *Model) syncCover() tea.Cmd {
 		return nil
 	}
 	return tea.Batch(
-		coverCmd(m.covers, m.cover.url, l.artWidth, l.artHeight),
+		coverCmd(m.covers, m.cover.url, l.artWidth, l.artHeight, cursorSlot),
 		m.spinner.Tick,
 	)
+}
+
+// syncNowCover is the same for the second picture, the one of what is playing.
+// It is only asked for on the screens that show it: everywhere else the field
+// is left as it is, so coming back to such a screen does not start from a blank
+// square.
+func (m *Model) syncNowCover() tea.Cmd {
+	if m.covers == nil || !fitsMinimum(m.width, m.height) || !m.showsNowPanel() {
+		return nil
+	}
+
+	l := m.layout()
+	w, h := nowCoverBox(l)
+	url := ""
+	if m.ps != nil && !m.noDevice {
+		url = m.ps.CoverURL
+	}
+	if m.nowCover.matches(url, w, h) {
+		return nil
+	}
+
+	m.nowCover = coverState{url: url, width: w, height: h}
+	if url == "" {
+		m.nowCover.failed = true
+		return nil
+	}
+	return coverCmd(m.covers, url, w, h, nowSlot)
 }
 
 // setProgress records a position and when it was true, which is what elapsed

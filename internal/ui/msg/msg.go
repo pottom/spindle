@@ -23,6 +23,7 @@ type StateFetched struct {
 type CoverReady struct {
 	URL           string
 	Width, Height int
+	Slot          int
 	Art           cover.Art
 }
 
@@ -31,6 +32,7 @@ type CoverReady struct {
 type CoverFailed struct {
 	URL           string
 	Width, Height int
+	Slot          int
 }
 
 // NoActiveDevice reports that nothing is playing anywhere. It is a normal

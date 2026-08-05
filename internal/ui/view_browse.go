@@ -97,14 +97,23 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	// it, and a fact hanging below the picture's foot reads as a mistake.
 	foot := min(l.artRows, top)
 
-	// The trace hangs from the same column the artists below start at, so the
-	// screen reads as two halves. Nothing under it moves when it appears: the
-	// list starts where the artwork ends either way.
+	// The right-hand half of the band, hanging from the same column the artists
+	// below start at, so the screen reads as two halves. Nothing under it moves
+	// when it appears: the list starts where the artwork ends either way.
+	//
+	// The queue puts the trace there; the library, which has no trace, puts
+	// what is playing there instead — otherwise half of that band is a blank
+	// rectangle on the widest screens, which is where a player should look its
+	// best.
 	detailWidth := l.infoWidth
-	var trace []string
-	if m.scopeVisible() {
+	var right []string
+	switch {
+	case m.scopeVisible():
 		detailWidth = queueDetailWidth(l)
-		trace = stack(m.scopeRender(queueScopeWidth(l)), queueScopeWidth(l), top)
+		right = stack(m.scopeRender(queueScopeWidth(l)), queueScopeWidth(l), top)
+	case m.showsNowPanel():
+		detailWidth = queueDetailWidth(l)
+		right = m.nowPanel(l, nowPanelWidth(l), top, foot)
 	}
 	detail := stack(opts.detail(detailWidth, foot), detailWidth, foot)
 	for len(detail) < top {
@@ -115,8 +124,8 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	gap := strings.Repeat(" ", columnGap)
 	for i := range art {
 		row := art[i] + gap + detail[i]
-		if trace != nil {
-			row += gap + trace[i]
+		if right != nil {
+			row += gap + right[i]
 		}
 		out = append(out, row)
 	}
@@ -647,7 +656,12 @@ func (m Model) playlistDetailOf(p *player.Playlist, w, rows int) []string {
 			lines = append(lines, "")
 		}
 	}
-	lines = append(lines, m.fact("Tracks", fmt.Sprintf("%d", p.Tracks), w))
+	// A count of nothing is not a count: the saved tracks are read a page at a
+	// time and their number is not known until the last page has come in, and
+	// Spotify has been known to leave a playlist's total out altogether.
+	if p.Tracks > 0 {
+		lines = append(lines, m.fact("Tracks", fmt.Sprintf("%d", p.Tracks), w))
+	}
 	if p.Duration > 0 {
 		lines = append(lines, m.fact("Length", formatSpan(p.Duration), w))
 	}
