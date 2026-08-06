@@ -3,8 +3,6 @@ package ui
 import (
 	"math"
 	"time"
-
-	"github.com/pottom/spindle/internal/ui/cover"
 )
 
 // The face, in dots.
@@ -433,10 +431,6 @@ const (
 	// long enough that he has been read as a face first.
 	faceGagAfter = 1100 * time.Millisecond
 
-	// faceDrawn is how long the face takes to draw itself on. The same order as
-	// the gathering a line of words arrives with, so the two read as one screen
-	// doing one thing.
-	faceDrawn = 520 * time.Millisecond
 )
 
 // faceDoing is what the face has started and not yet finished.
@@ -517,15 +511,10 @@ func (m *Model) faceFlow() {
 	// The face going down is handed to the machinery that carries a line off
 	// the screen, so it leaves the way it came and fades as it goes rather than
 	// being switched off.
+	// If he went out with both arms up, they go off as he does.
 	up := m.faceUp()
-	if m.face.was && !up {
-		if g, ok := m.faceGrain(m.width, m.height); ok {
-			m.words.was, m.words.went, m.words.leave = g, now, m.faceMove()
-		}
-		// And if he went out with both arms up, they go off as he does.
-		if m.face.gag == faceGaping {
-			m.faceSparks(m.width, m.height)
-		}
+	if m.face.was && !up && m.face.gag == faceGaping {
+		m.faceSparks(m.width, m.height)
 	}
 	m.face.was = up
 
@@ -730,29 +719,9 @@ func (m Model) faceLines(w, rows int) []string {
 		ride[i] = -int(m.wordsBeatRide(int(i), int(faceParts_)) * faceRide)
 	}
 
-	// How it arrives. A face is dealt the same set of ways a line of the song
-	// is, and its own besides — see faceComing.
-	gather, move, drawn := m.faceGrown(), m.faceMove(), m.faceDrawing()
-
-	grow := float64(1)
-	if drawn {
-		grow = gather
-	}
-
-	p.draw(m.faceNow(), grow, func(x, y int, at facePart) {
+	// He sketches himself on as he walks on, and is whole by the time he stops.
+	p.draw(m.faceNow(), m.faceGrown(), func(x, y int, at facePart) {
 		x, y = x+left, y+top+ride[at]
-
-		// Thrown in the way the words are thrown in, dot by dot, from wherever
-		// this one belongs: the same eight arrivals, so the screen has one
-		// vocabulary rather than one for type and another for faces.
-		if !drawn && gather < 1 {
-			if along := wordsAlong(move, float32(gather), x, y, dotsX, dotsY); along < 1 {
-				dx, dy := wordsFrom(move, x, y, dotsX, dotsY)
-				x += int(dx * (1 - along))
-				y += int(dy * (1 - along))
-			}
-		}
-
 		if x < 0 || y < 0 || x >= dotsX || y >= dotsY {
 			return
 		}
@@ -779,11 +748,7 @@ func (m Model) faceLines(w, rows int) []string {
 // own dots when it lands, and a face that simply appears is the one thing on it
 // that was pasted there.
 func (m Model) faceGrown() float64 {
-	since := time.Since(m.face.came)
-	if m.face.came.IsZero() || since >= faceDrawn {
-		return 1
-	}
-	return float64(since) / float64(faceDrawn)
+	return faceShare(m.faceGone(), 0, faceWalkIn*0.9)
 }
 
 // faceSparks throws the water off his fingertips as he goes.
@@ -831,30 +796,6 @@ const (
 	faceSparkThrow = 5.0
 )
 
-// faceGrain bakes the face as it stands into a field of dots, so that the same
-// machinery that carries a line of the song off the screen can carry the face
-// off it: the picture goes out the way it came in, and fades as it goes.
-func (m Model) faceGrain(w, rows int) (cover.Grain, bool) {
-	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
-	if dotsX <= 0 || dotsY <= 0 {
-		return cover.Grain{}, false
-	}
-
-	p, left, top, ok := m.faceRoom(w, rows)
-	if !ok {
-		return cover.Grain{}, false
-	}
-
-	g := cover.Grain{DotsX: dotsX, DotsY: dotsY, CellsX: w, CellsY: rows, Lum: make([]uint8, dotsX*dotsY)}
-	p.draw(m.faceNow(), 1, func(x, y int, _ facePart) {
-		x, y = x+left, y+top
-		if x >= 0 && y >= 0 && x < dotsX && y < dotsY {
-			g.Lum[y*dotsX+x] = 255
-		}
-	})
-	return g, true
-}
-
 // faceRoom is where the face sits on a screen of this size: its parts, and the
 // corner they are drawn from.
 func (m Model) faceRoom(w, rows int) (faceParts, int, int, bool) {
@@ -870,38 +811,67 @@ func (m Model) faceRoom(w, rows int) (faceParts, int, int, bool) {
 		return faceParts{}, 0, 0, false
 	}
 
-	// What is left either side of him is where his hands go, and — on the
-	// visits he takes a walk — where he goes.
+	// What is left either side of him is where his hands go.
 	room := (dotsX - wide) / 2
 	p.reach = room
 
-	step := m.faceStep()
-	left := room + int(step*faceStroll*float64(room))
+	// And where he is: off one side, across to the middle, and off the other.
+	walk := m.faceWalk()
+	left := room + int(walk*float64(room+wide))
 
-	// He bobs as he walks. Two dots: enough that he is walking rather than
-	// sliding, little enough that the meters do not notice.
+	// He bobs as he goes. A couple of dots: enough that he is walking rather
+	// than being slid across, little enough that the meters do not notice.
 	top := (dotsY - high) / 2
-	if step != 0 {
+	if walk != 0 {
 		top += int(faceBob * math.Abs(math.Sin(2*math.Pi*faceSteps*m.faceGone())))
 	}
 	return p, left, top, true
 }
 
-// faceStep is how far along his walk he is, from -1 at one side to +1 at the
-// other, and 0 on the visits he stands still for.
+// faceWalk is where he is across the screen: -1 is off the side he came in
+// from, 0 is where he stops to do his turn, and +1 is off the side he leaves by.
 //
-// It is the same idea as the arrival that comes in from the side, carried on
-// past the arrival: he walks on, keeps going while he is here, and walks off.
-func (m Model) faceStep() float64 {
-	way, walks := m.faceStrolling()
-	if !walks {
-		return 0
-	}
-
-	// Eased at both ends, so he sets off and pulls up rather than being slid
-	// across at a constant speed.
+// He always comes in from a side and always leaves by one. It is the whole
+// shape of the thing — somebody walks on, does something, walks off — and a
+// figure who instead materialised out of a scatter of dots in the middle of the
+// screen was four different entrances competing with one joke.
+func (m Model) faceWalk() float64 {
+	in, out := m.faceWays()
 	t := m.faceGone()
-	return way * (2*(t*t*(3-2*t)) - 1)
+
+	switch {
+	case t < faceWalkIn:
+		return in * (1 - faceEased(t/faceWalkIn))
+	case t > 1-faceWalkOut:
+		return out * faceEased((t-(1-faceWalkOut))/faceWalkOut)
+	}
+	return 0
+}
+
+// faceEased is a movement that sets off and pulls up rather than running at one
+// speed from end to end.
+func faceEased(t float64) float64 {
+	t = min64(max64(t, 0), 1)
+	return t * t * (3 - 2*t)
+}
+
+// faceWays is which side he comes on from and which side he leaves by. Two
+// visits in three he carries on the way he was going; the third he thinks
+// better of it and goes back out the way he came.
+func (m Model) faceWays() (float64, float64) {
+	h := uint64(m.words.starts)*0x2545f4914f6cdd1d + 0x9e3779b97f4a7c15
+	h ^= h >> 32
+	h *= 0xd6e8feb86659fd93
+	h ^= h >> 32
+
+	in := -1.0
+	if h&(1<<40) != 0 {
+		in = 1
+	}
+	if h%3 == 0 {
+		return in, in // back out the way he came
+	}
+	return in, -in
 }
 
 // faceGone is how far through his visit he is, 0 to 1.
@@ -911,64 +881,6 @@ func (m Model) faceGone() float64 {
 	}
 	into := m.wordsClock() - m.words.starts - faceEnters.Milliseconds()
 	return min64(max64(float64(into)/float64(faceStays.Milliseconds()), 0), 1)
-}
-
-// faceStrolling is whether this visit is a walk, and which way it goes.
-func (m Model) faceStrolling() (float64, bool) {
-	h := uint64(m.words.starts)*0x2545f4914f6cdd1d + 0x9e3779b97f4a7c15
-	h ^= h >> 32
-	h *= 0xd6e8feb86659fd93
-	h ^= h >> 32
-
-	if h%3 != 0 {
-		return 0, false
-	}
-	if h&(1<<40) != 0 {
-		return -1, true
-	}
-	return 1, true
-}
-
-// faceComing is how a face arrives: one of the ways a line of the song arrives,
-// or drawn on stroke by stroke, which is the face's own.
-//
-// Dealt from the bar it belongs to, the way everything else on this screen is
-// dealt, so a record does the same thing twice — and so that the same face
-// twice running does not come in the same way twice running.
-func (m Model) faceComing() (wordsMove, bool) {
-	h := uint64(m.words.starts)*0x9e3779b97f4a7c15 + 0xff51afd7ed558ccd
-	h ^= h >> 30
-	h *= 0xbf58476d1ce4e5b9
-	h ^= h >> 27
-
-	// A walk comes in from the side it is walking from, so the arrival and the
-	// walk are one movement rather than two.
-	if way, walks := m.faceStrolling(); walks {
-		if way > 0 {
-			return wordsWiping, false
-		}
-		return wordsWipingBack, false
-	}
-
-	// One in three of the rest is drawn on. It is the arrival that belongs to a
-	// face rather than to type, and it is worth keeping rare enough to be a
-	// pleasure.
-	if h%3 == 0 {
-		return wordsDrifting, true
-	}
-	return wordsMove((h >> 8) % uint64(wordsMoves)), false
-}
-
-// faceMove and faceDrawing are the two halves of that answer, for the callers
-// that only want one of them.
-func (m Model) faceMove() wordsMove {
-	move, _ := m.faceComing()
-	return move
-}
-
-func (m Model) faceDrawing() bool {
-	_, drawn := m.faceComing()
-	return drawn
 }
 
 // faceUp reports that the face is on screen now.
@@ -1043,12 +955,15 @@ const (
 	faceSwing = 0.30
 	faceWaves = 2.4
 
-	// faceStroll is how far he walks, as a share of the room outside him;
-	// faceBob how far he rises and falls with each step, in dots; and faceSteps
-	// how many steps he takes crossing the screen.
-	faceStroll = 0.86
-	faceBob    = 2.5
-	faceSteps  = 6
+	// faceWalkIn and faceWalkOut are the shares of a visit spent coming on and
+	// going off; the rest of it he stands where he stopped and does his turn.
+	faceWalkIn  = 0.26
+	faceWalkOut = 0.26
+
+	// faceBob is how far he rises and falls as he walks, in dots, and faceSteps
+	// how many steps that is over a visit.
+	faceBob   = 2.5
+	faceSteps = 7
 
 	// faceOpens is how far up the music has to bring a hand before the fist
 	// opens into fingers.

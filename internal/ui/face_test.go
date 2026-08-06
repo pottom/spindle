@@ -360,96 +360,6 @@ func TestTheFaceDrawsItselfOn(t *testing.T) {
 	}
 }
 
-// A face arrives the way everything else on this screen arrives — one of the
-// ways a line of the song is dealt — and now and again by drawing itself on,
-// which is its own.
-func TestAFaceArrivesADifferentWay(t *testing.T) {
-	m := scopeModel(160, 46)
-	m.words.beats = true
-
-	seen := map[wordsMove]int{}
-	var drawn int
-	for bar := range int64(60) {
-		m.words.starts = bar * 7_000
-		move, on := m.faceComing()
-		if on {
-			drawn++
-			continue
-		}
-		seen[move]++
-	}
-	t.Logf("sixty bars: %d drawn on, and %d different ways in besides", drawn, len(seen))
-
-	if drawn == 0 || drawn == 60 {
-		t.Errorf("%d of sixty faces draw themselves on, want some of them", drawn)
-	}
-	if len(seen) < 4 {
-		t.Errorf("the faces came in %d different ways, want the screen's whole vocabulary", len(seen))
-	}
-
-	// And a bar answers the same way twice, so a record plays the same twice.
-	m.words.starts = 12_345
-	one, oneOn := m.faceComing()
-	two, twoOn := m.faceComing()
-	if one != two || oneOn != twoOn {
-		t.Error("one bar was dealt two arrivals")
-	}
-}
-
-// And he leaves the way he came, handed to the same machinery that carries a
-// line of the song off the screen.
-func TestAFaceLeavesTheWayItCame(t *testing.T) {
-	m := scopeModel(160, 46)
-	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
-	m.ps.Duration = 4 * time.Minute
-	m.words.beats, m.words.text = true, wordsNotes
-
-	var bar int64 = -1
-	for at := range int64(60) {
-		if faceDealt(at * 7_000) {
-			bar = at * 7_000
-			break
-		}
-	}
-	if bar < 0 {
-		t.Fatal("no bar in sixty was dealt him")
-	}
-	m.words.starts = bar
-
-	// In the middle of his turn.
-	m.setProgress(time.Duration(bar)*time.Millisecond + faceEnters + time.Second)
-	if !m.faceUp() {
-		t.Fatal("he is not there in the middle of his own turn")
-	}
-	m.faceFlow()
-
-	// And after it.
-	m.setProgress(time.Duration(bar)*time.Millisecond + faceEnters + faceStays + time.Second)
-	if m.faceUp() {
-		t.Fatal("he is still there after his turn")
-	}
-	m.faceFlow()
-
-	if m.words.was.DotsX != m.width*dotsPerCellX {
-		t.Fatalf("he left nothing behind to be carried off: %d dots wide", m.words.was.DotsX)
-	}
-	if time.Since(m.words.went) > time.Second {
-		t.Error("he was not given notice as he went")
-	}
-
-	var lit int
-	for _, v := range m.words.was.Lum {
-		if v > 0 {
-			lit++
-		}
-	}
-	t.Logf("he left %d dots to be carried off", lit)
-	if lit == 0 {
-		t.Error("what was handed on is empty")
-	}
-}
-
 // He has hands, and they are drawn out to the sides where there is room — a
 // palm, a thumb and at most two fingers, out of the same stroke as the rest of
 // him. Four fingers at this size is a comb.
@@ -579,53 +489,75 @@ func TestHisArmsRideTheMusic(t *testing.T) {
 	}
 }
 
-// And some visits he walks, in from one side and out toward the other.
-func TestSometimesHeTakesAWalk(t *testing.T) {
+// He always comes in from a side and leaves by one. That is the whole shape of
+// him: somebody walks on, does something and walks off.
+func TestHeWalksOnAndOff(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
 	m.scope.modes[tabPlayer] = scopeWords
 	m.ps.Duration = 4 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
-	var walks int
+	var back, through int
 	for bar := range int64(60) {
 		m.words.starts = bar * 7_000
-		if _, on := m.faceStrolling(); on {
-			walks++
+		if in, out := m.faceWays(); in == out {
+			back++
+		} else {
+			through++
 		}
 	}
-	t.Logf("%d of sixty visits are a walk", walks)
-	if walks == 0 || walks == 60 {
-		t.Errorf("%d of sixty visits are a walk, want some of them", walks)
+	t.Logf("of sixty visits, %d walk straight through and %d turn back", through, back)
+	if back == 0 || through == 0 {
+		t.Error("every visit went the same way, want both")
 	}
 
-	// On one of them he is somewhere else at the end than at the start, and he
-	// comes in from the side he is walking from.
-	for bar := range int64(60) {
-		m.words.starts = bar * 7_000
-		way, on := m.faceStrolling()
-		if !on {
-			continue
-		}
-
-		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters)
-		_, from, _, _ := m.faceRoom(m.width, m.height)
-		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters + faceStays)
-		_, to, _, _ := m.faceRoom(m.width, m.height)
-
-		t.Logf("he walks from %d to %d dots across", from, to)
-		if way > 0 && to <= from {
-			t.Error("he was walking to the right and did not get there")
-		}
-		if way < 0 && to >= from {
-			t.Error("he was walking to the left and did not get there")
-		}
-
-		move, drawn := m.faceComing()
-		if drawn || (move != wordsWiping && move != wordsWipingBack) {
-			t.Errorf("a walk arrived as %d (drawn %v), want it coming in from the side it walks from", move, drawn)
-		}
-		return
+	// Across one visit: off the side he came from, in the middle for his turn,
+	// and off a side again.
+	m.words.starts = 0
+	where := func(t float64) int {
+		into := faceEnters + time.Duration(t*float64(faceStays))
+		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + into)
+		_, at, _, _ := m.faceRoom(m.width, m.height)
+		return at
 	}
-	t.Skip("no walk in sixty bars")
+
+	on, middle, off := where(0), where(0.5), where(1)
+	p, _, _, _ := m.faceRoom(m.width, m.height)
+	room := (m.width*dotsPerCellX - p.w) / 2
+	t.Logf("he walks %d → %d → %d, standing at %d", on, middle, off, room)
+
+	if middle != room {
+		t.Errorf("he does his turn at %d, want the middle at %d", middle, room)
+	}
+	for _, at := range []int{on, off} {
+		if at+p.w > 0 && at < m.width*dotsPerCellX {
+			t.Errorf("he is at %d at one end of his visit, want him off the screen", at)
+		}
+	}
+}
+
+// And he sketches himself on as he walks on, whole by the time he stops.
+func TestHeIsWholeByTheTimeHeStops(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 4 * time.Minute
+	m.words.beats, m.words.text, m.words.starts = true, wordsNotes, 0
+
+	grown := func(t float64) float64 {
+		m.setProgress(faceEnters + time.Duration(t*float64(faceStays)))
+		return m.faceGrown()
+	}
+
+	t.Logf("drawn %.2f on, %.2f part way, %.2f by the time he stops", grown(0), grown(faceWalkIn/2), grown(faceWalkIn))
+	if grown(0) > 0.1 {
+		t.Error("he is already drawn as he steps on")
+	}
+	if grown(faceWalkIn) < 1 {
+		t.Errorf("he is %.2f drawn by the time he stops, want all of him", grown(faceWalkIn))
+	}
+	if g := grown(faceWalkIn / 2); g <= 0 || g >= 1 {
+		t.Errorf("half way on he is %.2f drawn, want him still arriving", g)
+	}
 }
