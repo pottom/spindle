@@ -449,3 +449,87 @@ func TestAFaceLeavesTheWayItCame(t *testing.T) {
 		t.Error("what was handed on is empty")
 	}
 }
+
+// He has hands, and they are drawn out to the sides where there is room — a
+// palm, a thumb and at most two fingers, out of the same stroke as the rest of
+// him. Four fingers at this size is a comb.
+func TestHeHasHands(t *testing.T) {
+	dotsX, dotsY := 320, 184
+	high := int(wordsMark * float64(dotsY))
+	wide := min(int(faceWide*float64(high)), int(0.62*float64(dotsX)))
+
+	p, ok := faceLayout(wide, high)
+	if !ok {
+		t.Fatal("no face")
+	}
+	p.reach = (dotsX - wide) / 2
+
+	hands := func(hold faceHold) int {
+		var n int
+		p.draw(faceLook{hold: [2]faceHold{hold, hold}}, 1, func(x, y int, at facePart) {
+			if at == facePartHand {
+				n++
+			}
+		})
+		return n
+	}
+
+	down := hands(faceHoldDown)
+	t.Logf("hands down: %d dots; wave %d; thumb %d; one %d; up %d",
+		down, hands(faceHoldWave), hands(faceHoldThumb), hands(faceHoldOne), hands(faceHoldUp))
+
+	if down != 0 {
+		t.Errorf("hands hanging by his sides drew %d dots, want them out of the way", down)
+	}
+	for _, hold := range []faceHold{faceHoldWave, faceHoldThumb, faceHoldOne, faceHoldUp} {
+		if hands(hold) < 40 {
+			t.Errorf("hold %d drew %d dots, want a hand", hold, hands(hold))
+		}
+	}
+
+	// And where there is no room outside the face, there are no hands: a hand
+	// drawn into the meter is a smudge.
+	tight := p
+	tight.reach = 4
+	var n int
+	tight.draw(faceLook{hold: [2]faceHold{faceHoldUp, faceHoldUp}}, 1, func(_, _ int, at facePart) {
+		if at == facePartHand {
+			n++
+		}
+	})
+	if n != 0 {
+		t.Errorf("with no room outside him the hands still drew %d dots", n)
+	}
+}
+
+// And when he goes out with both arms up, they go off as he does.
+func TestHisHandsThrowTheWater(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.drops = nil
+
+	m.faceSparks(m.width, m.height)
+	t.Logf("his hands threw %d drops", len(m.stage.drops))
+
+	if len(m.stage.drops) != 2*faceSparkEach {
+		t.Errorf("his hands threw %d drops, want %d", len(m.stage.drops), 2*faceSparkEach)
+	}
+	// Two handfuls, one from each side of him.
+	var left, right int
+	for _, d := range m.stage.drops {
+		if d.col < m.width*dotsPerCellX/2 {
+			left++
+		} else {
+			right++
+		}
+	}
+	if left == 0 || right == 0 {
+		t.Errorf("the drops came %d from the left and %d from the right, want both hands", left, right)
+	}
+	for _, d := range m.stage.drops {
+		if d.speed <= 0 {
+			t.Error("a drop was thrown downwards")
+		}
+	}
+}

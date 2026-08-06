@@ -75,6 +75,10 @@ type faceLook struct {
 	brow  [2]float32 // 0 level, 1 raised
 	mouth float32    // 0 closed, 1 open
 	look  float32    // -1 left, +1 right
+
+	// hold is what each hand is doing and swing where a wave has got to.
+	hold  [2]faceHold
+	swing float64
 }
 
 // faceParts is where each part of the face goes in a box of the given size,
@@ -89,8 +93,10 @@ type faceParts struct {
 	brows [2]faceBox
 	lip   faceBox
 
-	// browsToo says the box is deep enough to carry brows at all.
+	// browsToo says the box is deep enough to carry brows at all, and reach is
+	// how much room there is outside it for the hands.
 	browsToo bool
+	reach    int
 }
 
 // faceBox is a part's own rectangle inside the face, in dots.
@@ -143,6 +149,7 @@ const (
 	facePartBrow facePart = iota
 	facePartEye
 	facePartLip
+	facePartHand
 	faceParts_
 )
 
@@ -162,6 +169,7 @@ func (p faceParts) draw(look faceLook, grow float64, light func(x, y int, part f
 		p.eye(i, look, faceShare(grow, 0.00, 0.70), light)
 	}
 	p.mouth(look, faceShare(grow, 0.55, 1.00), light)
+	p.hands(look.hold, look.swing, faceShare(grow, 0.45, 1.00), p.reach, light)
 }
 
 // faceShare is how far one part has come, given how far the whole face has: it
@@ -503,6 +511,10 @@ func (m *Model) faceFlow() {
 		if g, ok := m.faceGrain(m.width, m.height); ok {
 			m.words.was, m.words.went, m.words.leave = g, now, m.faceMove()
 		}
+		// And if he went out with both arms up, they go off as he does.
+		if m.face.gag == faceGaping {
+			m.faceSparks(m.width, m.height)
+		}
 	}
 	m.face.was = up
 
@@ -570,25 +582,43 @@ func faceDoingFor(doing faceDoing) time.Duration {
 func (m Model) faceNow() faceLook {
 	look := faceLook{look: m.face.look, mouth: m.face.mouth}
 
+	// He waves himself on. After that the hands are down until whatever he came
+	// to do wants them.
+	if m.faceGrown() < 1 {
+		look.hold = [2]faceHold{faceHoldWave, faceHoldWave}
+	}
+	look.swing = faceSwing * math.Sin(2*math.Pi*faceWaves*time.Since(m.face.came).Seconds())
+
 	since := time.Since(m.face.since)
 	switch m.face.doing {
 	case faceBlinking:
 		v := faceShutting(since)
 		look.lid = [2]float32{v, v}
 	case faceWinking:
-		// One lid, the brow over it lifting with it, and the eyes glancing away
-		// from the side that closed.
+		// One lid, the brow over it lifting with it, the eyes glancing away
+		// from the side that closed — and a finger up on the same side, which
+		// is what a wink is for.
 		v := faceShutting(since - (faceWinkHold-faceBlinkHold)/2)
 		look.lid[1] = v
 		look.brow[1] = v
 		look.look = min32(look.look-0.5*v, 1)
+		if v > 0 {
+			look.hold[1] = faceHoldOne
+		}
 	case faceBrowing:
 		v := faceRising(since, 2*faceBlinkShut, faceBrowHold)
 		look.brow = [2]float32{v, v}
+		if v > 0.4 {
+			look.hold = [2]faceHold{faceHoldThumb, faceHoldThumb}
+		}
 	case faceGaping:
+		// Both arms up, which is the whole joke.
 		v := faceRising(since, faceBlinkShut, faceBrowHold)
 		look.mouth = max32(look.mouth, v)
 		look.brow = [2]float32{v * 0.6, v * 0.6}
+		if v > 0.3 {
+			look.hold = [2]faceHold{faceHoldUp, faceHoldUp}
+		}
 	}
 	return look
 }
@@ -743,6 +773,51 @@ func (m Model) faceGrown() float64 {
 	return float64(since) / float64(faceDrawn)
 }
 
+// faceSparks throws the water off his fingertips as he goes.
+//
+// It is the one thing he leaves behind. The drops belong to the meter and cross
+// the whole screen already, so this is not a new picture — it is his hands
+// handing something to the picture that was there before him.
+func (m *Model) faceSparks(w, rows int) {
+	p, left, top, ok := m.faceRoom(w, rows)
+	if !ok {
+		return
+	}
+	dotsY := rows * dotsPerCellY
+
+	for side := range 2 {
+		dir := 1.0
+		if side == 0 {
+			dir = -1
+		}
+		arm, mitt := faceArm*float64(p.h), faceMitt*float64(p.h)
+		turn := faceHoldTurn(faceHoldUp)
+
+		sx := float64(left) + float64(p.w)*0.5 + dir*float64(p.w)*0.5
+		sy := float64(top) + float64(p.eyes[side].y+p.eyes[side].h/2)
+		tipX := sx + dir*(arm+mitt*2.2)*math.Sin(turn)
+		tipY := sy - (arm+mitt*2.2)*math.Cos(turn)
+
+		for range faceSparkEach {
+			if len(m.stage.drops) >= stageDrops {
+				return
+			}
+			m.stage.drops = append(m.stage.drops, stageDrop{
+				col:    int(tipX + float64(dir)*float64(m.scope.roll())*mitt),
+				at:     float32(dotsY-1) - float32(tipY),
+				speed:  faceSparkThrow * (0.6 + m.scope.roll()),
+				bright: 0.7 + 0.3*m.scope.roll(),
+			})
+		}
+	}
+}
+
+// faceSparkEach is how many drops leave each hand, and faceSparkThrow how hard.
+const (
+	faceSparkEach  = 14
+	faceSparkThrow = 5.0
+)
+
 // faceGrain bakes the face as it stands into a field of dots, so that the same
 // machinery that carries a line of the song off the screen can carry the face
 // off it: the picture goes out the way it came in, and fades as it goes.
@@ -781,6 +856,8 @@ func (m Model) faceRoom(w, rows int) (faceParts, int, int, bool) {
 	if !ok {
 		return faceParts{}, 0, 0, false
 	}
+	// What is left either side of him is where his hands go.
+	p.reach = (dotsX - wide) / 2
 	return p, (dotsX - wide) / 2, (dotsY - high) / 2, true
 }
 
@@ -864,4 +941,142 @@ func (m *Model) faceShow() {
 		m.face.gag, m.face.gagAt = faceGagFor(now.UnixMilli()), now.Add(faceGagAfter)
 	}
 	m.face.shown = now
+}
+
+// The hands.
+//
+// There is room for them: the face takes 124 dots of a 320 dot screen, which
+// leaves ninety either side — wider than one of his own eyes. What there is not
+// room for is a cartoon glove. These are drawn out of the same stroke as the
+// rest of him: a palm, a thumb, and at most two fingers, because four fingers
+// at this size is a comb.
+//
+// The arm is not drawn out to a shoulder. It is a short stem that comes in from
+// off the picture and turns about a point, so waving is one angle changing
+// rather than a set of hand-drawn frames.
+const (
+	// faceArm is the stem's length and faceMitt the palm's radius, both as
+	// shares of the face's own height.
+	faceArm  = 0.34
+	faceMitt = 0.15
+
+	// faceSwing is how far a wave swings either way, in radians, and faceWaves
+	// how many times it goes over and back in a second.
+	faceSwing = 0.30
+	faceWaves = 2.4
+)
+
+// faceHold is what the hands are doing.
+type faceHold int
+
+const (
+	faceHoldDown faceHold = iota // by his sides, out of the way
+	faceHoldWave                 // hello, and goodbye
+	faceHoldThumb                // that was good
+	faceHoldOne                  // wait for it
+	faceHoldUp                   // both arms up, which is the whole joke
+)
+
+// hands draws the pair, out to the sides of the face.
+//
+// reach is how much room there is outside the face's own box, which is what
+// decides whether they are drawn at all: on a narrow terminal the meters and
+// the screen's edge are already there, and a hand drawn into them is a smudge.
+func (p faceParts) hands(hold [2]faceHold, swing, grow float64, reach int, light func(int, int, facePart)) {
+	arm := faceArm * float64(p.h)
+	mitt := faceMitt * float64(p.h)
+	if reach < int(arm+2*mitt) || mitt < float64(p.stroke) {
+		return
+	}
+
+	for side := range 2 {
+		p.hand(side, hold[side], swing, grow, arm, mitt, light)
+	}
+}
+
+// hand draws one of them, from the shoulder out.
+func (p faceParts) hand(side int, hold faceHold, swing, grow, arm, mitt float64, light func(int, int, facePart)) {
+	if hold == faceHoldDown && grow >= 1 {
+		// Down and still is out of the way, and out of the way is not drawn:
+		// two mitts hanging beside a face that is doing nothing is clutter.
+		return
+	}
+
+	// Which way is out. The two are mirrors of each other, so one set of
+	// arithmetic draws both.
+	dir := 1.0
+	if side == 0 {
+		dir = -1
+	}
+
+	// The shoulder sits just outside the face, level with the eyes.
+	sx := float64(p.w)*0.5 + dir*float64(p.w)*0.5
+	sy := float64(p.eyes[side].y + p.eyes[side].h/2)
+
+	// How far round from hanging straight down. Up is a bigger angle; a wave
+	// swings about wherever it is held.
+	turn := faceHoldTurn(hold) + swing
+	sin, cos := math.Sin(turn), math.Cos(turn)
+
+	// Where the wrist and the palm sit along it.
+	wx, wy := sx+dir*arm*sin, sy-arm*cos
+	px, py := sx+dir*(arm+mitt*0.9)*sin, sy-(arm+mitt*0.9)*cos
+
+	// The stem, drawn out from the shoulder as far as it has arrived.
+	p.curve(func(t float64) (float64, float64) {
+		return sx + (wx-sx)*t, sy + (wy-sy)*t
+	}, int(arm), grow, facePartHand, light)
+
+	if grow < 0.6 {
+		return
+	}
+
+	// The palm: a round of its own, open rather than filled, so it is a hand
+	// and not a bat.
+	fine := p
+	fine.stroke = max(p.stroke-1, 2)
+	fine.curve(func(t float64) (float64, float64) {
+		a := 2 * math.Pi * t
+		return px + mitt*math.Cos(a), py + mitt*0.85*math.Sin(a)
+	}, int(8*mitt), faceShare(grow, 0.6, 0.85), facePartHand, light)
+
+	// The thumb, off the inner edge — pointing up when that is the whole point
+	// of the gesture, and tucked along the palm otherwise.
+	thumb := turn - dir*0.9
+	if hold == faceHoldThumb {
+		thumb = math.Pi
+	}
+	p.stem(px, py, mitt*1.15, thumb, dir, faceShare(grow, 0.7, 0.95), light)
+
+	// And the fingers, along the arm.
+	switch hold {
+	case faceHoldOne:
+		p.stem(px, py, mitt*1.5, turn, dir, faceShare(grow, 0.75, 1), light)
+	case faceHoldWave, faceHoldUp:
+		p.stem(px+dir*mitt*0.45*cos, py+mitt*0.45*sin, mitt*1.35, turn, dir, faceShare(grow, 0.75, 1), light)
+		p.stem(px-dir*mitt*0.45*cos, py-mitt*0.45*sin, mitt*1.35, turn, dir, faceShare(grow, 0.8, 1), light)
+	}
+}
+
+// stem draws a finger or a thumb: a short stroke out from a point.
+func (p faceParts) stem(x, y, long, turn, dir, grow float64, light func(int, int, facePart)) {
+	sin, cos := math.Sin(turn), math.Cos(turn)
+	p.curve(func(t float64) (float64, float64) {
+		return x + dir*long*sin*t, y - long*cos*t
+	}, int(long*2), grow, facePartHand, light)
+}
+
+// faceHoldTurn is how far round from hanging down each hold is held.
+func faceHoldTurn(hold faceHold) float64 {
+	switch hold {
+	case faceHoldWave:
+		return 2.5
+	case faceHoldThumb:
+		return 0.7
+	case faceHoldOne:
+		return 2.3
+	case faceHoldUp:
+		return 2.9
+	}
+	return 0.35
 }
