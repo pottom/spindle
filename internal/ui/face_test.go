@@ -478,10 +478,8 @@ func TestHeHasHands(t *testing.T) {
 	t.Logf("hands down: %d dots; wave %d; thumb %d; one %d; up %d",
 		down, hands(faceHoldWave), hands(faceHoldThumb), hands(faceHoldOne), hands(faceHoldUp))
 
-	if down != 0 {
-		t.Errorf("hands hanging by his sides drew %d dots, want them out of the way", down)
-	}
-	for _, hold := range []faceHold{faceHoldWave, faceHoldThumb, faceHoldOne, faceHoldUp} {
+	// They are always on him — hanging at his sides is a pose, not an absence.
+	for _, hold := range []faceHold{faceHoldDown, faceHoldWave, faceHoldThumb, faceHoldOne, faceHoldUp} {
 		if hands(hold) < 40 {
 			t.Errorf("hold %d drew %d dots, want a hand", hold, hands(hold))
 		}
@@ -515,10 +513,17 @@ func TestHisHandsThrowTheWater(t *testing.T) {
 	if len(m.stage.drops) != 2*faceSparkEach {
 		t.Errorf("his hands threw %d drops, want %d", len(m.stage.drops), 2*faceSparkEach)
 	}
-	// Two handfuls, one from each side of him.
+	// Two handfuls, one from each side of him — of him, not of the screen,
+	// since he may have walked halfway across it by the time he goes.
+	p, at, _, ok := m.faceRoom(m.width, m.height)
+	if !ok {
+		t.Fatal("no room for him")
+	}
+	middle := at + p.w/2
+
 	var left, right int
 	for _, d := range m.stage.drops {
-		if d.col < m.width*dotsPerCellX/2 {
+		if d.col < middle {
 			left++
 		} else {
 			right++
