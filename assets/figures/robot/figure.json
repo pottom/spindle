@@ -12,10 +12,6 @@
     {
       "tall": 100,
       "thick": 2
-    },
-    {
-      "tall": 140,
-      "thick": 3
     }
   ],
   "//head": "The share of the figure the head is looked for in, from the top. face is how much of that head is cleared for a face to be drawn into; at nought the head is left exactly as it was drawn, which is what a figure with a face of its own wants.",
@@ -31,10 +27,29 @@
     "walk5": "walk5.png",
     "walk6": "walk6.png",
     "walk7": "walk7.png",
-    "cheer": "cheer1.png",
     "talk": "talk.png",
     "think": "think.png",
     "show": "show.png",
-    "duck": "duck.png"
+    "duck": "duck.png",
+    "cheer0": "cheer0.png",
+    "attack0": "attack0.png",
+    "attack1": "attack1.png",
+    "attack2": "attack2.png",
+    "attackKick": "attackKick.png",
+    "kick": "kick.png",
+    "hurt": "hurt.png",
+    "hit": "hit.png",
+    "interact": "interact.png",
+    "hold": "hold.png",
+    "wide": "wide.png",
+    "side": "side.png",
+    "slide": "slide.png",
+    "run0": "run0.png",
+    "run1": "run1.png",
+    "run2": "run2.png",
+    "switch0": "switch0.png",
+    "switch1": "switch1.png",
+    "cheer1": "cheer1.png",
+    "jump": "jump.png"
   }
 }

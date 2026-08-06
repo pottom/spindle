@@ -3,6 +3,7 @@ package ui
 import (
 	"math"
 	"sort"
+	"time"
 )
 
 // The figures: small line drawings that walk about the screen.
@@ -151,24 +152,89 @@ func (m Model) figureLines(w, rows int) []string {
 	return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
 }
 
-// figurePose is the drawing he is in this frame: walking through the cycle as
-// he moves, and whatever he is doing when he has stopped.
+// figureFrame is one drawing held for a while.
+type figureFrame struct {
+	pose string
+	held time.Duration
+}
+
+// figureActs are the things a figure does: a run of drawings rather than one.
+//
+// A still picture swapped in for a second is a figure holding a sign. Two or
+// three of them in a row is somebody doing something — which is the whole
+// reason he walks on. The drawings come with forty-four poses; these are the
+// runs worth making out of them.
+var figureActs = map[string][]figureFrame{
+	// Both feet off the ground, twice. The one that reads from across a room.
+	"cheer": {{"cheer0", 170}, {"cheer1", 200}, {"cheer0", 170}, {"cheer1", 260}, {"idle", 120}},
+
+	// Down, up, and a moment to land.
+	"jump": {{"duck", 130}, {"jump", 260}, {"jump", 120}, {"duck", 110}, {"idle", 120}},
+
+	// Three frames of a swing, which at this size is a dance move.
+	"punch": {{"attack0", 110}, {"attack1", 110}, {"attack2", 190}, {"idle", 130}},
+
+	// One leg out, held long enough to be seen, then back.
+	"kick": {{"attackKick", 300}, {"idle", 140}},
+
+	// Talking is the mouth moving, and the mouth is a whole drawing here, so
+	// talking is the drawing moving.
+	"talk": {{"talk", 150}, {"idle", 130}, {"talk", 170}, {"idle", 120}, {"talk", 160}, {"idle", 130}},
+
+	// A pose held: he has stopped to consider something.
+	"think": {{"think", 900}, {"idle", 150}},
+
+	// Look at this.
+	"show": {{"show", 700}, {"idle", 150}},
+
+	// Knocked about by the music, and back on his feet.
+	"hurt": {{"hit", 140}, {"hurt", 280}, {"idle", 160}},
+
+	// Arms out wide, the way somebody stands in front of a speaker.
+	"wide": {{"wide", 520}, {"idle", 140}},
+}
+
+// figureActNames is the acts in a settled order, so a record deals the same one
+// twice. Maps in Go do not have an order; this does.
+var figureActNames = []string{"cheer", "jump", "punch", "kick", "talk", "think", "show", "hurt", "wide"}
+
+// figureActFor is the act a bar's nth turn gets.
+func figureActFor(starts int64, turn int) string {
+	h := uint64(starts)*0xff51afd7ed558ccd + uint64(turn+1)*0xbf58476d1ce4e5b9
+	h ^= h >> 33
+	h *= 0x9e3779b97f4a7c15
+	h ^= h >> 29
+	return figureActNames[h%uint64(len(figureActNames))]
+}
+
+// figureActLong is how long an act runs, end to end.
+func figureActLong(act string) time.Duration {
+	var all time.Duration
+	for _, f := range figureActs[act] {
+		all += f.held * time.Millisecond
+	}
+	return all
+}
+
+// figurePose is the drawing he is in this frame: the act he is in the middle
+// of, the walk cycle while he is moving, and standing about otherwise.
 func (m Model) figurePose() string {
+	if act, ok := figureActs[m.face.act]; ok {
+		since := time.Since(m.face.actAt)
+		for _, f := range act {
+			if since < f.held*time.Millisecond {
+				return f.pose
+			}
+			since -= f.held * time.Millisecond
+		}
+	}
+
 	if _, moving := m.faceGoing(); moving {
 		at := int(math.Abs(math.Sin(math.Pi*faceSteps*m.faceGone()))*4) % 4
 		if m.faceWalk() > 0 {
 			at += 4
 		}
 		return "walk" + string(rune('0'+at))
-	}
-
-	switch m.face.doing {
-	case faceGaping:
-		return "cheer"
-	case faceBrowing:
-		return "show"
-	case faceWinking:
-		return "talk"
 	}
 	return "idle"
 }

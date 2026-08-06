@@ -18,7 +18,7 @@ func TestAFigureArrivesAsALineDrawing(t *testing.T) {
 		t.Error("a figure was generated without saying where it came from")
 	}
 
-	for _, tall := range []int{62, 100, 140} {
+	for _, tall := range []int{62, 100} {
 		p, ok := d.at(tall, "idle")
 		if !ok {
 			t.Fatalf("no idle pose at %d dots", tall)
@@ -66,15 +66,18 @@ func TestAFigureArrivesAsALineDrawing(t *testing.T) {
 			t.Errorf("walk frame %d is missing", i)
 		}
 	}
-	for _, pose := range []string{"cheer", "talk", "think", "show", "duck"} {
-		if _, ok := d.at(100, pose); !ok {
-			t.Errorf("the %s pose is missing", pose)
+	// And every drawing the acts call for. See figureActs.
+	for _, act := range figureActNames {
+		for _, f := range figureActs[act] {
+			if _, ok := d.at(100, f.pose); !ok {
+				t.Errorf("the %s act wants the %s pose, which is missing", act, f.pose)
+			}
 		}
 	}
 
 	// The nearest size is the one that comes back, whatever is asked for.
 	p, _ := d.at(1000, "idle")
-	if p.tall != 140 {
+	if p.tall != 100 {
 		t.Errorf("asked for a figure 1000 dots tall and got %d, want the tallest there is", p.tall)
 	}
 }
@@ -184,5 +187,97 @@ func TestADrawnFigureTakesTheSlot(t *testing.T) {
 		t.Error("he is in no pose at all")
 	} else {
 		t.Logf("he is drawn as %q", got)
+	}
+}
+
+// He does things rather than holding a sign. A still picture swapped in for a
+// second is a figure showing you something; two or three in a row is somebody
+// doing something, which is the reason he walked on.
+func TestHisActsAreRunsOfDrawings(t *testing.T) {
+	d, ok := figureFor("robot")
+	if !ok {
+		t.Fatal("no robot")
+	}
+
+	// Every act is made of poses the figure actually has, and every one of them
+	// is more than a single held picture.
+	for _, name := range figureActNames {
+		act, ok := figureActs[name]
+		if !ok {
+			t.Fatalf("%q is dealt but has no drawings", name)
+		}
+		var seen int
+		was := ""
+		for _, f := range act {
+			if _, ok := d.at(100, f.pose); !ok {
+				t.Errorf("%q wants the pose %q, which the robot has not got", name, f.pose)
+			}
+			if f.pose != was {
+				seen++
+			}
+			was = f.pose
+		}
+		t.Logf("%-6s %d frames, %d changes, %s", name, len(act), seen, figureActLong(name))
+		if seen < 2 {
+			t.Errorf("%q never changes drawing, which is a sign being held up", name)
+		}
+		if long := figureActLong(name); long < 300*time.Millisecond || long > 2*time.Second {
+			t.Errorf("%q runs %s, want it long enough to read and short enough to be a turn", name, long)
+		}
+	}
+
+	// And which one he does is the bar's business, so a record plays the same
+	// way twice and a long visit is not the same trick over and over.
+	seen := map[string]bool{}
+	for turn := range 6 {
+		seen[figureActFor(7_000, turn)] = true
+	}
+	t.Logf("over six turns he does %d different acts", len(seen))
+	if len(seen) < 3 {
+		t.Error("he does the same act every time in one visit")
+	}
+	once := figureActFor(12_345, 0)
+	if again := figureActFor(12_345, 0); again != once {
+		t.Errorf("one turn was dealt %q and then %q", once, again)
+	}
+}
+
+// And the drawing follows the act while it runs.
+func TestTheDrawingFollowsTheAct(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 4 * time.Minute
+	m.words.beats, m.words.text = true, wordsNotes
+
+	// Standing in the middle of a visit, where an act is done.
+	for bar := range int64(60) {
+		if at := bar * 7_000; faceDealt(at) {
+			m.words.starts = at
+			break
+		}
+	}
+	m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters + m.faceStay()/2)
+
+	m.face.act, m.face.actAt = "cheer", time.Now()
+	if got := m.figurePose(); got != figureActs["cheer"][0].pose {
+		t.Errorf("at the top of the act he is drawn as %q, want %q", got, figureActs["cheer"][0].pose)
+	}
+
+	// Past the end of it he is back to himself: standing about, or walking on
+	// to the next place he stops at, but not still cheering.
+	m.face.actAt = time.Now().Add(-figureActLong("cheer") - time.Second)
+	got := m.figurePose()
+	t.Logf("after the act he is drawn as %q", got)
+	for _, f := range figureActs["cheer"] {
+		if got == f.pose && f.pose != "idle" {
+			t.Errorf("after the act he is still drawn as %q", got)
+		}
+	}
+
+	// And an act nobody has heard of does not stop him being drawn.
+	m.face.act = "nonesuch"
+	if got := m.figurePose(); got == "" {
+		t.Error("an unknown act left him with no drawing at all")
 	}
 }

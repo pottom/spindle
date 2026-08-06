@@ -505,9 +505,13 @@ type faceState struct {
 	// look, mouth and lift follow the sound rather than a clock.
 	look, mouth, lift float32
 
-	// turns is how many things he has done this visit, did whether he has done
-	// any at all, rested when he may do the next, and wasLoud what a cue in the
-	// music is measured against.
+	// act is the run of drawings a figure is in the middle of and actAt when it
+	// started; turns is how many things he has done this visit, did whether he
+	// has done any at all, rested when he may do the next, and wasLoud what a
+	// cue in the music is measured against.
+	act   string
+	actAt time.Time
+
 	turns   int
 	did     bool
 	rested  time.Time
@@ -571,7 +575,7 @@ func (m *Model) faceFlow() {
 	if up && (!was || m.words.starts != m.face.bar) {
 		m.face.bar, m.face.came = m.words.starts, now
 		m.face.turns, m.face.did = 0, false
-		m.face.rested = time.Time{}
+		m.face.rested, m.face.act = time.Time{}, ""
 
 		// Measured from where the music is as he arrives, or the first frame
 		// of every visit reads as a rise out of silence and he takes it as a
@@ -580,8 +584,11 @@ func (m *Model) faceFlow() {
 	}
 
 	if m.face.doing != faceStill {
-		if now.Sub(m.face.since) > faceDoingFor(m.face.doing) {
+		// However long the face's own gesture takes, he is not done until the
+		// run of drawings that goes with it has played out.
+		if now.Sub(m.face.since) > max(faceDoingFor(m.face.doing), figureActLong(m.face.act)) {
 			m.face.doing, m.face.since = faceStill, now
+			m.face.act = ""
 			m.face.rested = now.Add(faceGagRest)
 		}
 		return
@@ -612,6 +619,11 @@ func (m *Model) faceFlow() {
 	}
 
 	m.face.doing, m.face.since = faceGagFor(m.words.starts, m.face.turns), now
+
+	// And, if a drawn figure is on, the run of drawings that goes with it. The
+	// face's own doing is for the geometry; his is a set of pictures.
+	m.face.act, m.face.actAt = figureActFor(m.words.starts, m.face.turns), now
+
 	m.face.turns, m.face.did = m.face.turns+1, true
 }
 
