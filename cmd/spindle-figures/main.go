@@ -218,11 +218,7 @@ func convert(path, name string, h height, f figure) (pose, error) {
 	// helmet, visor and jaw are kept, and only what they enclose is cleared.
 	// The rim has to survive — it is the head.
 	hx, hy, hw, hh := head(scaled, wide, h.Tall, f.Head)
-	if hw > 0 && hh > 0 {
-		share := f.Face
-		if share <= 0 || share > 1 {
-			share = 0.7
-		}
+	if share := f.Face; hw > 0 && hh > 0 && share > 0 && share <= 1 {
 		p.headW, p.headH = int(float64(hw)*share), int(float64(hh)*share)
 		p.headX, p.headY = hx+(hw-p.headW)/2, hy+(hh-p.headH)/2
 

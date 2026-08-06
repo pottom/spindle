@@ -7,9 +7,9 @@ import (
 )
 
 // The figures come from drawings, converted by cmd/spindle-figures. What the
-// generator has to hand over is a line drawing with a hollow head: the strokes
-// are the figure, and the hole is where a face that can blink goes.
-func TestAFigureArrivesAsALineDrawingWithAHollowHead(t *testing.T) {
+// generator has to hand over is a line drawing — the strokes are the figure —
+// and, if the manifest asked for one, a hollow head for a face to go in.
+func TestAFigureArrivesAsALineDrawing(t *testing.T) {
 	d, ok := figureFor("robot")
 	if !ok {
 		t.Fatal("the robot was not generated — run go run ./cmd/spindle-figures")
@@ -42,17 +42,20 @@ func TestAFigureArrivesAsALineDrawingWithAHollowHead(t *testing.T) {
 			t.Errorf("%.0f%% of the figure is lit, want a drawing rather than a mass", share*100)
 		}
 
-		// The head is hollow, and big enough to put something in.
+		// A figure that asked for a face has a hollow head to put one in; one
+		// that did not is left exactly as it was drawn, face and all.
 		var inside int
 		p.draw(func(x, y int) {
 			if x >= p.headX && x < p.headX+p.headW && y >= p.headY && y < p.headY+p.headH {
 				inside++
 			}
 		})
-		if inside != 0 {
+		switch {
+		case p.headW == 0:
+			t.Log("      the head was left as it was drawn")
+		case inside != 0:
 			t.Errorf("%d dots are still inside the head, want it cleared for the face", inside)
-		}
-		if p.headW < 8 || p.headH < 6 {
+		case p.headW < 8 || p.headH < 6:
 			t.Errorf("the face box is %dx%d, too small to put a face in", p.headW, p.headH)
 		}
 	}

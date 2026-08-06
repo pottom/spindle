@@ -135,8 +135,10 @@ func (m Model) figureLines(w, rows int) []string {
 
 	pose.draw(func(x, y int) { light(x+left, y+top, facePartBody) })
 
-	// And the face, in the hole the generator left.
-	if p, ok := faceLayout(pose.headW, pose.headH); ok {
+	// And a face, if the figure left a hole for one. A figure drawn with a face
+	// of its own does not want a second pair of eyes over it — what changes his
+	// expression then is the pose, not something drawn on top.
+	if p, ok := faceLayout(pose.headW, pose.headH); ok && pose.headW > 0 {
 		p.reach = 0 // his own arms are in the drawing; he does not want two pairs
 		p.draw(m.faceNow(), func(x, y int, at facePart) {
 			light(x+left+pose.headX, y+top+pose.headY, at)
@@ -183,13 +185,13 @@ func (m Model) faceWho() string {
 		return ""
 	}
 
+	// For now, always one of the drawn ones: the geometry is kept for the size
+	// where no drawing fits and for the day another is wanted, but it is not
+	// dealt while the figures are being looked at.
 	h := uint64(m.words.starts)*0x94d049bb133111eb + 0xd6e8feb86659fd93
 	h ^= h >> 30
 	h *= 0x9e3779b97f4a7c15
 	h ^= h >> 27
-	if h%2 == 0 {
-		return ""
-	}
 
 	names := make([]string, 0, len(figures))
 	for name := range figures {

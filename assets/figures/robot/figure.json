@@ -18,9 +18,9 @@
       "thick": 3
     }
   ],
-  "//head": "The share of the figure the head is looked for in, from the top. What is inside it is cleared and the face is drawn there instead, which is why a still drawing can blink.",
+  "//head": "The share of the figure the head is looked for in, from the top. face is how much of that head is cleared for a face to be drawn into; at nought the head is left exactly as it was drawn, which is what a figure with a face of its own wants.",
   "head": 0.52,
-  "face": 0.72,
+  "face": 0,
   "poses": {
     "idle": "idle.png",
     "walk0": "walk0.png",
