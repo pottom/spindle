@@ -66,56 +66,34 @@ func TestAWordlessRecordTakesTurns(t *testing.T) {
 	}
 }
 
-// The card is worth a few seconds of the turn. The rest of it belongs to the
-// music, the same as a title has ever been.
-func TestTheMusicHasMostOfEachTurn(t *testing.T) {
+// A wordless record is one long solo, so the marks have the screen whenever a
+// card does not — never another visualiser. Switching between two of those put
+// a different program up every half minute, and the join was what you saw.
+func TestAWordlessRecordKeepsTheMarksUp(t *testing.T) {
 	m := wordless(t)
 
-	m.setProgress(wordsSpell)
-	if lines, _ := m.wordsIdle(); len(lines) == 0 {
-		t.Fatal("the turn that says the record's name says nothing")
+	for _, at := range []time.Duration{0, wordsTitle + time.Second, wordsSpell + 10*time.Second} {
+		m.setProgress(at)
+		lines, _ := m.wordsIdle()
+		if len(lines) != 1 || lines[0] != wordsNotes {
+			t.Errorf("%s in, the screen has %q, want the marks", at, lines)
+		}
+	}
+
+	// And the card takes their place for its few seconds, then hands it back.
+	m.setProgress(wordsSpell + time.Second)
+	lines, card := m.wordsIdle()
+	if len(lines) != 2 || lines[0] != m.ps.Title {
+		t.Fatalf("the turn that says the record's name has %q", lines)
 	}
 
 	m.setProgress(wordsSpell + wordsTitle + time.Second)
-	if lines, _ := m.wordsIdle(); len(lines) != 0 {
-		t.Errorf("the card is still up %s into the turn, want the music to have it: %q",
-			wordsTitle+time.Second, lines)
+	back, marks := m.wordsIdle()
+	if len(back) != 1 || back[0] != wordsNotes {
+		t.Errorf("after the card the screen has %q, want the marks back", back)
 	}
-
-	// And the turn after that brings one back.
-	m.setProgress(2*wordsSpell + time.Second)
-	if lines, _ := m.wordsIdle(); len(lines) == 0 {
-		t.Error("the next turn deals nothing")
-	}
-}
-
-// While the music has the screen it is not drawn the same way every time: the
-// mirrored meter one turn, the stack of lamps the next.
-func TestTheLampsTakeEveryOtherTurn(t *testing.T) {
-	m := wordless(t)
-
-	var lamps int
-	for spell := range 6 {
-		m.setProgress(time.Duration(spell)*wordsSpell + wordsTitle + time.Second)
-		if m.wordsIdleLadder() {
-			lamps++
-		}
-	}
-	if lamps == 0 || lamps == 6 {
-		t.Errorf("the lamps took %d of six turns, want them to take turns", lamps)
-	}
-
-	// A record with words of its own has no turns to take: the gap between two
-	// lines is a song playing, not an empty screen wanting something on it.
-	m.lyrics.forTrack, m.lyrics.missing, m.lyrics.synced = m.ps.TrackID, false, true
-	for spell := range 6 {
-		m.setProgress(time.Duration(spell)*wordsSpell + wordsTitle + time.Second)
-		if m.wordsIdleLadder() {
-			t.Fatal("a song with words was given the lamps between two lines")
-		}
-	}
-	if lines, _ := m.wordsIdle(); len(lines) != 0 {
-		t.Errorf("a song with words was dealt %q", lines)
+	if marks <= card {
+		t.Errorf("the marks are stamped %d against the card's %d, want them arriving after it", marks, card)
 	}
 }
 

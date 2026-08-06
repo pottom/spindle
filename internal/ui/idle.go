@@ -70,13 +70,12 @@ func (m Model) wordsIdle() ([]string, int64) {
 
 	spell, into := m.wordsSpells()
 	if into > wordsTitle {
-		return nil, 0 // the music has the rest of the turn
+		return m.wordsIdleMarks(spell) // the rest of the turn keeps time on its own
 	}
 
 	var lines []string
 	switch m.wordsCardFor(spell) {
 	case wordsCardNone:
-		return nil, 0
 	case wordsCardTitle:
 		lines = []string{m.ps.Title}
 		if len(m.ps.Artists) > 0 {
@@ -97,9 +96,22 @@ func (m Model) wordsIdle() ([]string, int64) {
 	}
 
 	if len(lines) == 0 || lines[0] == "" {
-		return nil, 0 // nothing to say: the whole turn is the music's
+		return m.wordsIdleMarks(spell)
 	}
 	return lines, int64(spell) * wordsSpell.Milliseconds()
+}
+
+// wordsIdleMarks is what a wordless record has up the rest of the time: the
+// three marks, the same as a bar of a song nobody is singing.
+//
+// Which is what a record with no words is, from here — one long solo. The cards
+// take the marks' place for a few seconds and hand it back, exactly as the
+// record's name does in the middle of a real one, and the screen is the same
+// picture throughout instead of a different one every half minute.
+func (m Model) wordsIdleMarks(spell int) ([]string, int64) {
+	// Stamped after the card that opens the turn, so the marks arrive again
+	// once it has gone rather than sitting through it.
+	return []string{wordsNotes}, int64(spell)*wordsSpell.Milliseconds() + wordsTitle.Milliseconds()
 }
 
 // wordsCardFor is the card a turn gets.
@@ -139,24 +151,14 @@ func wordsDeal(track string, turn int) uint64 {
 	return h
 }
 
-// wordsIdleLadder reports that the music has this turn drawn as the stack of
-// lamps rather than as the mirrored meter. Turn and turn about: the two are the
-// same reading and they do not look anything like each other, which is the
-// whole point of alternating them.
-func (m Model) wordsIdleLadder() bool {
-	if !m.wordsWordless() {
-		return false
-	}
-	spell, _ := m.wordsSpells()
-	return spell%2 == 1
-}
-
-// wordsIdleArt is the picture a wordless record gets while nothing is set on it.
+// wordsIdleArt is what is drawn while nothing at all is set.
+//
+// The mirrored meter, and nothing else. It used to take turns with the stack of
+// lamps, which was a different program on screen every half minute; and a
+// wordless record hardly comes here any more anyway, because the marks have the
+// screen when no card is up. What is left is the gap between two lines of a
+// song, where the meter jumping to the middle and springing apart again as the
+// next line lands is the whole of the effect.
 func (m Model) wordsIdleArt(w, rows int) []string {
-	if m.wordsIdleLadder() {
-		if art := m.ladderLines(w, rows); art != nil {
-			return art
-		}
-	}
 	return m.stageArt(w, rows)
 }
