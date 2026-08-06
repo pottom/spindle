@@ -37,6 +37,12 @@ const (
 	faceLipTop  = 0.79
 	faceLipLow  = 0.99
 
+	// The nose: where it hangs between the eyes, and how far its hook turns at
+	// the bottom as a share of the gap it lives in.
+	faceNoseTop  = 0.44
+	faceNoseLow  = 0.70
+	faceNoseHook = 0.30
+
 	// faceEyeWide is how much of the width one eye takes, and faceEyeGap the
 	// air between the two of them.
 	faceEyeWide = 0.34
@@ -153,6 +159,7 @@ type facePart int
 const (
 	facePartBrow facePart = iota
 	facePartEye
+	facePartNose
 	facePartLip
 	facePartHand
 	facePartLeg
@@ -173,6 +180,7 @@ func (p faceParts) draw(look faceLook, light func(x, y int, part facePart)) {
 	for i := range 2 {
 		p.eye(i, look, light)
 	}
+	p.nose(look, light)
 	p.mouth(look, light)
 	p.hands(look, p.reach, light)
 	p.legs(look, light)
@@ -329,6 +337,40 @@ func (p faceParts) brow(i int, look faceLook, light func(int, int, facePart)) {
 	}
 }
 
+// nose draws the nose: a stroke down the middle with a hook at the foot of it.
+//
+// Drawn the way somebody sketching a face would draw one — in profile, on a
+// face that is otherwise front on. Two nostrils would be two specks, and a
+// triangle would be a shape rather than a stroke; the hook is what says nose
+// at a glance and at this size.
+func (p faceParts) nose(look faceLook, light func(int, int, facePart)) {
+	// It lives in the gap between the eyes, which is the only room there is.
+	gap := p.eyes[1].x - (p.eyes[0].x + p.eyes[0].w)
+	if gap < p.stroke*4 {
+		return
+	}
+
+	top := float64(p.h) * faceNoseTop
+	low := float64(p.h) * faceNoseLow
+	x := float64(p.w) / 2
+
+	// It lifts a shade as the mouth opens, the way a face does when it is
+	// pulling one.
+	top -= float64(look.mouth) * float64(p.stroke)
+	low -= float64(look.mouth) * float64(p.stroke)
+
+	p.curve(func(t float64) (float64, float64) {
+		return x, top + (low-top)*t
+	}, int(low-top), facePartNose, light)
+
+	// The hook, turning to his left, which is the side a right-handed hand
+	// draws toward.
+	hook := float64(gap) * faceNoseHook
+	p.curve(func(t float64) (float64, float64) {
+		return x - hook*t, low + hook*0.35*math.Sin(math.Pi*t*0.5)
+	}, int(hook*2), facePartNose, light)
+}
+
 // mouth draws the mouth: a level bar whose last fifth turns up, opening into a
 // slot as the sound does.
 //
@@ -405,18 +447,24 @@ const (
 	// faceMouthMost is how far the mouth opens on the loudest thing playing.
 	faceMouthMost = 0.85
 
-	// faceEnters is how far into a bar he comes on, and faceStays how long he
-	// is there for. Long enough to arrive, do the one thing he came to do and
-	// leave; short enough that what you remember is the thing rather than him.
-	faceEnters = 2500 * time.Millisecond
-	faceStays  = 3800 * time.Millisecond
+	// faceEnters is how far into a bar he comes on, and faceStayLeast to
+	// faceStayMost how long he is there for — dealt from the bar, so one visit
+	// is a walk-through and the next is a whole turn.
+	faceEnters    = 2500 * time.Millisecond
+	faceStayLeast = 2800 * time.Millisecond
+	faceStayMost  = 7000 * time.Millisecond
 
 	// faceShows is how long he stays when he is asked for by hand.
 	faceShows = 5 * time.Second
 
-	// faceGagAfter is how long after he arrives he does the thing he came for —
-	// long enough that he has been read as a face first.
-	faceGagAfter = 1100 * time.Millisecond
+	// faceGagRest is how long he leaves between two things, so a long stay is a
+	// turn rather than a twitch, and faceGagBy how far through his stay he does
+	// something anyway if the music has not given him a cue.
+	faceGagRest = 600 * time.Millisecond
+	faceGagBy   = 0.45
+
+	// faceTurn is the rise in loudness he takes as his cue.
+	faceTurn = 0.055
 
 )
 
@@ -446,9 +494,13 @@ type faceState struct {
 	// look, mouth and lift follow the sound rather than a clock.
 	look, mouth, lift float32
 
-	// gag is the thing he came to do and gagAt when he does it.
-	gag   faceDoing
-	gagAt time.Time
+	// turns is how many things he has done this visit, did whether he has done
+	// any at all, rested when he may do the next, and wasLoud what a cue in the
+	// music is measured against.
+	turns   int
+	did     bool
+	rested  time.Time
+	wasLoud float32
 
 	// came is when the face last arrived, which is what it is drawn on from,
 	// bar is the moment of the bar it arrived for, and was says it was up last
@@ -495,53 +547,68 @@ func (m *Model) faceFlow() {
 		m.face.lift += (min32(all/float32(len(bands))*faceLiftFrom, 1) - m.face.lift) * faceLiftEase
 	}
 
-	// The face going down is handed to the machinery that carries a line off
-	// the screen, so it leaves the way it came and fades as it goes rather than
-	// being switched off.
 	// If he went out with both arms up, they go off as he does.
-	up := m.faceUp()
-	if m.face.was && !up && m.face.gag == faceGaping {
+	up, was := m.faceUp(), m.face.was
+	if was && !up && m.face.doing == faceGaping {
 		m.faceSparks(m.width, m.height)
 	}
 	m.face.was = up
 
-	// A new bar is a new face: it draws itself on, and whether it will wink is
-	// settled there and then from the bar's own moment, so a record does the
-	// same thing twice.
-	if up && m.words.starts != m.face.bar {
+	// A new visit: a bar he was not on for, or a different bar from the one he
+	// was on for. Both, because a bar at the very top of a record is stamped
+	// nought, which is also what the field holds before he has ever been on.
+	if up && (!was || m.words.starts != m.face.bar) {
 		m.face.bar, m.face.came = m.words.starts, now
-		m.face.gag, m.face.gagAt = faceGagFor(m.words.starts), now.Add(faceGagAfter)
+		m.face.turns, m.face.did = 0, false
+		m.face.rested = time.Time{}
+
+		// Measured from where the music is as he arrives, or the first frame
+		// of every visit reads as a rise out of silence and he takes it as a
+		// cue before he is even on.
+		m.face.wasLoud = m.scope.envelope
 	}
 
 	if m.face.doing != faceStill {
 		if now.Sub(m.face.since) > faceDoingFor(m.face.doing) {
 			m.face.doing, m.face.since = faceStill, now
+			m.face.rested = now.Add(faceGagRest)
 		}
 		return
 	}
 
-	// Nothing starts while he is still walking on.
-	if m.faceGone() < faceWalkIn {
+	// Nothing while he is on his way on or off.
+	gone := m.faceGone()
+	if !up || gone < faceWalkIn || gone > 1-faceWalkOut {
 		return
 	}
 
-	// The thing he came to do, once, a moment after he has arrived.
-	if !m.face.gagAt.IsZero() && now.After(m.face.gagAt) {
-		m.face.doing, m.face.since = m.face.gag, now
-		m.face.gagAt = time.Time{}
+	// What he does he does on the music. The cue is the same rise the meter
+	// throws its water on, so his timing is the record's rather than a clock's,
+	// and however long the bar gave him is how many he gets in.
+	rise := max32(m.scope.envelope-m.face.wasLoud, 0) / max32(m.scope.envelope, scopeFloor)
+	m.face.wasLoud = m.scope.envelope
+
+	cue := rise > faceTurn && now.After(m.face.rested)
+
+	// And if the music never gives him one, he does something anyway rather
+	// than standing there: he came on to do a thing.
+	if !cue && (m.face.did || gone < faceGagBy) {
+		if now.After(m.face.due) {
+			m.face.doing, m.face.since = faceBlinking, now
+			m.face.due = now.Add(faceBlinkEvery + time.Duration(m.scope.roll()*float32(faceBlinkVary)))
+		}
 		return
 	}
 
-	if now.After(m.face.due) {
-		m.face.doing, m.face.since = faceBlinking, now
-		m.face.due = now.Add(faceBlinkEvery + time.Duration(m.scope.roll()*float32(faceBlinkVary)))
-	}
+	m.face.doing, m.face.since = faceGagFor(m.words.starts, m.face.turns), now
+	m.face.turns, m.face.did = m.face.turns+1, true
 }
 
-// faceGagFor is what he came to do. He always does one: somebody who turns up,
-// stands there and leaves again is not a turn, he is a glitch.
-func faceGagFor(starts int64) faceDoing {
-	h := uint64(starts)*0xbf58476d1ce4e5b9 + 0x94d049bb133111eb
+// faceGagFor is his nth thing this visit. He always does one — somebody who
+// turns up, stands there and leaves again is not a turn, he is a glitch — and
+// on a long stay, with a busy enough record, he does several.
+func faceGagFor(starts int64, turn int) faceDoing {
+	h := uint64(starts)*0xbf58476d1ce4e5b9 + 0x94d049bb133111eb + uint64(turn)*0x9e3779b97f4a7c15
 	h ^= h >> 31
 	h *= 0x9e3779b97f4a7c15
 	h ^= h >> 29
@@ -860,13 +927,32 @@ func (m Model) faceWays() (float64, float64) {
 	return in, -in
 }
 
+// faceStay is how long this visit lasts. Dealt from the bar, so one is a walk
+// through and the next is a whole turn — and so that the same bar is the same
+// visit twice.
+func (m Model) faceStay() time.Duration {
+	if !m.face.shown.IsZero() && time.Since(m.face.shown) < faceShows {
+		return faceShows
+	}
+	return m.faceStayFor(m.words.starts)
+}
+
+// faceStayFor is the same for a bar that is not the one playing.
+func (m Model) faceStayFor(starts int64) time.Duration {
+	h := uint64(starts)*0x9e3779b97f4a7c15 + 0x2545f4914f6cdd1d
+	h ^= h >> 29
+	h *= 0xbf58476d1ce4e5b9
+	h ^= h >> 32
+	return faceStayLeast + time.Duration(h%uint64(faceStayMost-faceStayLeast))
+}
+
 // faceGone is how far through his visit he is, 0 to 1.
 func (m Model) faceGone() float64 {
 	if !m.face.shown.IsZero() && time.Since(m.face.shown) < faceShows {
 		return float64(time.Since(m.face.shown)) / float64(faceShows)
 	}
 	into := m.wordsClock() - m.words.starts - faceEnters.Milliseconds()
-	return min64(max64(float64(into)/float64(faceStays.Milliseconds()), 0), 1)
+	return min64(max64(float64(into)/float64(m.faceStay().Milliseconds()), 0), 1)
 }
 
 // faceUp reports that the face is on screen now.
@@ -885,7 +971,7 @@ func (m Model) faceUp() bool {
 	}
 
 	since := m.wordsClock() - m.words.starts - faceEnters.Milliseconds()
-	return since >= 0 && since < faceStays.Milliseconds()
+	return since >= 0 && since < m.faceStay().Milliseconds()
 }
 
 // faceDealt is whether the bar starting at a given moment gets a face rather
@@ -912,9 +998,8 @@ func (m *Model) faceShow() {
 		m.face.doing, m.face.since = m.face.stepped, now
 	} else {
 		m.face.stepped = faceStill
-		m.face.came = now // asked for, and so drawn on from nothing
-		m.face.bar = 0
-		m.face.gag, m.face.gagAt = faceGagFor(now.UnixMilli()), now.Add(faceGagAfter)
+		m.face.came, m.face.bar = now, 0
+		m.face.turns, m.face.did, m.face.rested = 0, false, time.Time{}
 	}
 	m.face.shown = now
 }
@@ -943,8 +1028,8 @@ const (
 
 	// faceWalkIn and faceWalkOut are the shares of a visit spent coming on and
 	// going off; the rest of it he stands where he stopped and does his turn.
-	faceWalkIn  = 0.26
-	faceWalkOut = 0.26
+	faceWalkIn  = 0.18
+	faceWalkOut = 0.18
 
 	// faceBob is how far he rises and falls as he walks, in dots, and faceSteps
 	// how many steps that is over a visit.

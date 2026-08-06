@@ -80,21 +80,20 @@ func TestTheFaceIsDrawnAtAnySize(t *testing.T) {
 func TestTheEyeClosesToALine(t *testing.T) {
 	const w, h = 100, 50
 
+	p, ok := faceLayout(w, h)
+	if !ok {
+		t.Fatal("no face")
+	}
+
+	// The eye alone: he has hands and legs beside it now, and they are not it.
 	tall := func(shut float32) int {
-		dots := faceDots(t, w, h, faceLook{lid: [2]float32{shut, shut}})
-		p, _ := faceLayout(w, h)
-		top, bottom := -1, -1
-		for y := p.eyes[0].y - p.stroke; y <= p.eyes[0].y+p.eyes[0].h+p.stroke && y < h; y++ {
-			if y < 0 {
-				continue
+		top, bottom := 1<<30, -1
+		p.draw(faceLook{lid: [2]float32{shut, shut}}, func(x, y int, part facePart) {
+			if part != facePartEye || x > w/2 {
+				return
 			}
-			if strings.Contains(dots[y][:w/2], "#") {
-				if top < 0 {
-					top = y
-				}
-				bottom = y
-			}
-		}
+			top, bottom = min(top, y), max(bottom, y)
+		})
 		return bottom - top + 1
 	}
 
@@ -142,7 +141,7 @@ func TestHeVisitsABarRatherThanTakingIt(t *testing.T) {
 	if !at(faceEnters + time.Second) {
 		t.Error("he never turns up in a bar he was dealt")
 	}
-	if at(faceEnters + faceStays + time.Second) {
+	if at(faceEnters + m.faceStay() + time.Second) {
 		t.Error("he is still there long after his turn, want the marks back")
 	}
 
@@ -172,7 +171,7 @@ func TestHeVisitsABarRatherThanTakingIt(t *testing.T) {
 func TestHeAlwaysDoesSomething(t *testing.T) {
 	seen := map[faceDoing]int{}
 	for bar := range int64(60) {
-		gag := faceGagFor(bar * 7_000)
+		gag := faceGagFor(bar*7_000, 0)
 		if gag == faceStill || gag == faceBlinking {
 			t.Fatalf("a visit was given %d, which is nothing to watch", gag)
 		}
@@ -477,7 +476,7 @@ func TestHeWalksOnAndOff(t *testing.T) {
 	// and off a side again.
 	m.words.starts = 0
 	where := func(t float64) int {
-		into := faceEnters + time.Duration(t*float64(faceStays))
+		into := faceEnters + time.Duration(t*float64(m.faceStay()))
 		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + into)
 		_, at, _, _ := m.faceRoom(m.width, m.height)
 		return at
@@ -550,5 +549,157 @@ func TestHeHasLegsThatMarch(t *testing.T) {
 	}
 	if twoR >= twoL {
 		t.Errorf("the other way they are at %d and %d, want the right one up", twoL, twoR)
+	}
+}
+
+// And a nose, drawn the way somebody sketching a face would draw one: in
+// profile, on a face that is otherwise front on. It lives in the gap between
+// the eyes, clear of the mouth, and it lifts a shade as the mouth opens.
+func TestHeHasANose(t *testing.T) {
+	dotsX, dotsY := 320, 184
+	high := int(wordsMark * float64(dotsY))
+	wide := min(int(faceWide*float64(high)), int(0.62*float64(dotsX)))
+
+	p, ok := faceLayout(wide, high)
+	if !ok {
+		t.Fatal("no face")
+	}
+	p.reach = (dotsX - wide) / 2
+
+	// What is drawn in the gap between the eyes, which is the nose's own room.
+	from, to := p.eyes[0].x+p.eyes[0].w, p.eyes[1].x
+	nose := func(look faceLook) (int, int, int) {
+		top, bottom, n := 1<<30, -1, 0
+		p.draw(look, func(_, y int, part facePart) {
+			if part != facePartNose {
+				return
+			}
+			top, bottom, n = min(top, y), max(bottom, y), n+1
+		})
+		return top, bottom, n
+	}
+
+	top, bottom, n := nose(faceLook{})
+	t.Logf("the nose runs rows %d..%d, %d dots, in a gap %d wide", top, bottom, n, to-from)
+
+	if n == 0 {
+		t.Fatal("he has no nose")
+	}
+	if bottom >= p.lip.y {
+		t.Errorf("the nose reaches row %d and the mouth starts at %d, want daylight between them", bottom, p.lip.y)
+	}
+	if bottom-top < p.stroke*3 {
+		t.Errorf("the nose is %d dots deep, want a stroke rather than a speck", bottom-top)
+	}
+
+	// It lifts as the mouth opens.
+	openTop, _, _ := nose(faceLook{mouth: 1})
+	if openTop >= top {
+		t.Errorf("with the mouth open the nose starts at %d against %d shut, want it lifting", openTop, top)
+	}
+
+	// And where the eyes leave it no room, there is no nose.
+	tight := p
+	tight.eyes[0].w = tight.eyes[1].x - tight.eyes[0].x - tight.stroke
+	_ = from
+	_ = to
+	var still int
+	tight.nose(faceLook{}, func(_, _ int, _ facePart) { still++ })
+	if still != 0 {
+		t.Errorf("with no gap between the eyes the nose drew %d dots", still)
+	}
+}
+
+// How long he stays is the bar's business, and so is what he does while he is
+// there — but when he does it is the music's.
+func TestHowLongHeStaysIsDealt(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.words.beats = true
+
+	seen := map[time.Duration]int{}
+	var least, most time.Duration = time.Hour, 0
+	for bar := range int64(60) {
+		m.words.starts = bar * 7_000
+		stay := m.faceStay()
+		seen[stay/time.Second]++
+		least, most = min(least, stay), max(most, stay)
+	}
+	t.Logf("sixty visits run from %s to %s, over %d different lengths", least, most, len(seen))
+
+	if len(seen) < 3 {
+		t.Errorf("the visits came in %d lengths, want them dealt", len(seen))
+	}
+	if least < faceStayLeast || most > faceStayMost {
+		t.Errorf("a visit ran %s..%s, want it inside %s..%s", least, most, faceStayLeast, faceStayMost)
+	}
+
+	// And the same bar is the same visit twice, while the bar after it is its
+	// own: the length is dealt from the moment, not taken from a clock.
+	once := m.faceStayFor(12_345)
+	if again := m.faceStayFor(12_345); again != once {
+		t.Errorf("one bar was dealt %s and then %s", once, again)
+	}
+	var alike int
+	for bar := range int64(20) {
+		if m.faceStayFor(bar*7_000)/time.Second == m.faceStayFor(bar*7_000+3_000)/time.Second {
+			alike++
+		}
+	}
+	if alike == 20 {
+		t.Error("every neighbouring pair of bars was dealt the same length")
+	}
+}
+
+// He takes his cue from the music: the same rise the meter throws its water on.
+// And if the record never gives him one, he does something anyway rather than
+// standing there — he came on to do a thing.
+func TestHeTakesHisCueFromTheMusic(t *testing.T) {
+	at := func(gone float64, rise bool) faceDoing {
+		m := scopeModel(160, 46)
+		m.stage.on = true
+		m.scope.modes[tabPlayer] = scopeWords
+		m.ps.Duration = 4 * time.Minute
+		m.words.beats, m.words.text = true, wordsNotes
+
+		for bar := range int64(60) {
+			if s := bar * 7_000; faceDealt(s) {
+				m.words.starts = s
+				break
+			}
+		}
+
+		// On, and standing.
+		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters)
+		m.scope.envelope = 0.4
+		m.faceFlow()
+
+		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters +
+			time.Duration(gone*float64(m.faceStay())))
+		if rise {
+			m.scope.envelope = 1
+		}
+		m.faceFlow()
+		return m.face.doing
+	}
+
+	if got := at(0.3, false); got != faceStill {
+		t.Errorf("early in a quiet passage he is already doing %d, want him waiting for a cue", got)
+	}
+	if got := at(0.3, true); got == faceStill || got == faceBlinking {
+		t.Errorf("the music gave him a cue and he did %d, want him taking it", got)
+	}
+	if got := at(0.6, false); got == faceStill {
+		t.Error("the record never gave him a cue and he did nothing at all")
+	}
+
+	// And what he does changes as he does more of them, so a long stay is a
+	// turn rather than the same trick over and over.
+	seen := map[faceDoing]bool{}
+	for turn := range 6 {
+		seen[faceGagFor(7_000, turn)] = true
+	}
+	t.Logf("over six turns he does %d different things", len(seen))
+	if len(seen) < 2 {
+		t.Error("he does the same thing every time in one visit")
 	}
 }
