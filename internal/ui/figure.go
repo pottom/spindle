@@ -815,6 +815,12 @@ func figureBroken(low, high, at, wide int) float64 {
 
 // figureThrough draws what is left of the row he is walking into. The marks
 // keep their own light: they are the picture and he is the visitor.
+//
+// And their own ride. A mark is on its own part of the sound the whole time it
+// is up, and this row is the same row — he has walked into it, not replaced it.
+// Drawn still it dropped to the floor on the frame he arrived, a whole row of
+// them going from riding the music to standing to attention between two frames,
+// which is the one thing on this screen that ever looked like a bug.
 func (m Model) figureThrough(w, rows int, light func(x, y, piece int, burn float32)) {
 	low, high := m.figureSwept()
 	g, where := m.words.have, m.words.where
@@ -822,6 +828,7 @@ func (m Model) figureThrough(w, rows int, light func(x, y, piece int, burn float
 	if g.DotsX != dotsX || g.DotsY != dotsY || where.Count == 0 {
 		return
 	}
+	ride := m.wordsRiding(where.Count)
 
 	for y := range dotsY {
 		for x := range dotsX {
@@ -839,8 +846,12 @@ func (m Model) figureThrough(w, rows int, light func(x, y, piece int, burn float
 				continue
 			}
 
-			// Standing still until he arrives, then out from its own middle.
+			// Riding its own part of the sound until he arrives, and then out
+			// from its own middle, from wherever the ride had carried it.
 			at, to := x, y
+			if piece < len(ride) {
+				to += ride[piece]
+			}
 			burn := float32(1)
 			if broken > 0 {
 				mx, my := where.Middle(piece)

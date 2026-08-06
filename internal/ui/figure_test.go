@@ -776,6 +776,63 @@ func TestHeWalksThroughTheMarks(t *testing.T) {
 	}
 }
 
+// The marks he has not reached yet go on riding the music.
+//
+// He walks into the row; he does not replace it. Drawn still, a whole row of
+// them went from riding the sound to standing to attention on the frame he
+// arrived — which read as the picture breaking rather than as somebody
+// arriving.
+func TestTheMarksGoOnRidingWhileHeWalksIn(t *testing.T) {
+	const w, rows = 160, 46
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+
+	m := scopeModel(w, rows)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 4 * time.Minute
+
+	var found bool
+	for bar := range int64(400) {
+		m.words.starts = bar * 7_000
+		if faceDealt(m.words.starts) && m.faceWho() != "" && m.figureComesBy() == figureWalks {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Skip("no walking visit in four hundred bars")
+	}
+
+	line := wordsMarks(dotsX, dotsY)
+	img, layout, ok := wordsImage([]string{line}, dotsX, dotsY)
+	if !ok {
+		t.Fatal("the row would not draw")
+	}
+	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	m.words.where, m.words.beats, m.words.text = layout, true, line
+	m.face.sweptLow, m.face.sweptHigh = figureUnswept, -figureUnswept
+	m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters)
+
+	// The top of the row as he draws it, with the music loud and with it silent.
+	top := func(loud float32) int {
+		bands := make([]float32, 28)
+		for i := range bands {
+			bands[i] = loud
+		}
+		m.scope.bands = bands
+
+		high := 1 << 30
+		m.figureThrough(w, rows, func(_, y, _ int, _ float32) { high = min(high, y) })
+		return high
+	}
+
+	still, riding := top(0), top(0.9)
+	t.Logf("the row he is walking into stands at %d silent and %d loud", still, riding)
+	if riding >= still {
+		t.Errorf("the row is at %d loud and %d silent, want the music lifting it", riding, still)
+	}
+}
+
 // A figure that gets about by hopping has to be lifted off the floor, because
 // the drawing will not do it: a rabbit in mid air over the same patch of ground
 // is a rabbit standing on its toes.
