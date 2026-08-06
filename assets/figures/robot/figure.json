@@ -1,0 +1,40 @@
+{
+  "name": "robot",
+  "from": "Kenney, Toon Characters (kenney.nl)",
+  "licence": "CC0",
+  "//": "How the drawing is turned into dots. gate is how much the brightness has to change from one dot to the next to count as a line; thick is the stroke it is drawn at, per height. See cmd/spindle-figures.",
+  "gate": 0.25,
+  "heights": [
+    {
+      "tall": 62,
+      "thick": 1
+    },
+    {
+      "tall": 100,
+      "thick": 2
+    },
+    {
+      "tall": 140,
+      "thick": 3
+    }
+  ],
+  "//head": "The share of the figure the head is looked for in, from the top. What is inside it is cleared and the face is drawn there instead, which is why a still drawing can blink.",
+  "head": 0.52,
+  "face": 0.72,
+  "poses": {
+    "idle": "idle.png",
+    "walk0": "walk0.png",
+    "walk1": "walk1.png",
+    "walk2": "walk2.png",
+    "walk3": "walk3.png",
+    "walk4": "walk4.png",
+    "walk5": "walk5.png",
+    "walk6": "walk6.png",
+    "walk7": "walk7.png",
+    "cheer": "cheer1.png",
+    "talk": "talk.png",
+    "think": "think.png",
+    "show": "show.png",
+    "duck": "duck.png"
+  }
+}
