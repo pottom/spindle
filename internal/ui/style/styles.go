@@ -340,6 +340,7 @@ const (
 // record keeps a warm meter.
 func ladderPalette(t Theme, accent color.Color) []lipgloss.Style {
 	base, sat, light := toHSL(accent)
+	sat = max(min(sat*hueLift, 1), hueLeast)
 
 	out := make([]lipgloss.Style, ladderSteps)
 	for i := range out {
@@ -372,8 +373,22 @@ func barPalette(t Theme, accent color.Color) [][]lipgloss.Style {
 
 // huePalette builds one of those: hue across a given arc, strength up the
 // height.
+// hueLift is how far past the accent's own saturation the pictures are drawn,
+// and hueLeast how little colour they are allowed however grey the cover was.
+//
+// Measured on real covers: the accent comes back a fifth to a half saturated,
+// because it is an average of a photograph. At a fifth, a screenful of single
+// dots reads as grey with a tint whatever it is multiplied by — which is why
+// there is a floor as well as a lift. The hue is still the record's own; what
+// is taken from it is only the greyness.
+const (
+	hueLift  = 1.5
+	hueLeast = 0.55
+)
+
 func huePalette(t Theme, accent color.Color, arc float64) [][]lipgloss.Style {
 	base, sat, light := toHSL(accent)
+	sat = max(min(sat*hueLift, 1), hueLeast)
 
 	out := make([][]lipgloss.Style, barFreqSteps)
 	for f := range out {
@@ -388,11 +403,18 @@ func huePalette(t Theme, accent color.Color, arc float64) [][]lipgloss.Style {
 
 			// The foot of a bar sits close to the ground and the tip lifts well
 			// past the accent, so height reads before colour does.
-			c := fromHSL(hue, min(sat*(0.55+0.5*v), 1), light*(0.42+0.75*v))
-			if v > 0.82 {
+			//
+			// The colour is pushed past the accent's own saturation rather than
+			// held under it. A cover's accent is an average of a photograph and
+			// comes out washed; a meter drawn in it looks like a meter that has
+			// been left in the sun, and the dots are small enough that a weak
+			// colour reads as grey.
+			c := fromHSL(hue, min(sat*(0.62+0.45*v), 1), light*(0.42+0.75*v))
+			if v > 0.86 {
 				// The last step goes toward white: a tip that only gets lighter
-				// in its own hue stops registering as hotter.
-				c = blend(c, t.Text, (v-0.82)/0.18*0.55)
+				// in its own hue stops registering as hotter. Late and little,
+				// or the top of every bar is a white smear.
+				c = blend(c, t.Text, (v-0.86)/0.14*0.42)
 			}
 			out[f][l] = lipgloss.NewStyle().Foreground(c)
 		}

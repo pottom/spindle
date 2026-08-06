@@ -346,10 +346,11 @@ func TestEveryFigureIsWhole(t *testing.T) {
 	}
 }
 
-// He does not only walk on and off. Six ways in and out, dealt from the bar,
-// and never the same one at both ends of a visit — the dots are what move, and
-// a dot can be sent anywhere.
-func TestHeComesAndGoesSixWays(t *testing.T) {
+// He does not only walk on and off. He can gather out of specks and come apart
+// into them, which is the one thing this screen can do that a cartoon cannot:
+// every one of him is a dot, and a dot can be sent anywhere — or handed to the
+// water.
+func TestHeComesAndGoesTwoWays(t *testing.T) {
 	d, _ := figureFor("robot")
 	p, ok := d.at(100, "idle")
 	if !ok {
@@ -389,7 +390,7 @@ func TestHeComesAndGoesSixWays(t *testing.T) {
 			}
 		})
 		t.Logf("way %d part way: %d of %d dots moved, %d gone", way, moved, all, lost)
-		if moved+lost < all/2 {
+		if moved+lost < all/5 {
 			t.Errorf("way %d moved %d and dropped %d of %d dots, want it doing something", way, moved, lost, all)
 		}
 	}
@@ -428,22 +429,36 @@ func TestHeComesAndGoesSixWays(t *testing.T) {
 		t.Error("two dots were given the same number, so they will wander together")
 	}
 
-	// The two ends of a visit are two different things.
+	// He comes on one of two ways and leaves one of two, and either end may be
+	// on his feet: what was thrown out was spinning, dropping in from over the
+	// top, rising through the floor and bursting apart. They moved him about
+	// the screen, which is what a sprite does; these do something to what he is
+	// made of, which only this screen can do.
 	m := scopeModel(160, 46)
 	m.words.beats = true
-	ways := map[figureWay]int{}
+	in, out := map[figureWay]int{}, map[figureWay]int{}
 	for bar := range int64(60) {
 		m.words.starts = bar * 7_000
-		in, out := m.figureComesBy(), m.figureGoesBy()
-		if in == out {
-			t.Errorf("bar %d comes and goes the same way (%d)", m.words.starts, in)
-		}
-		ways[in]++
-		ways[out]++
+		in[m.figureComesBy()]++
+		out[m.figureGoesBy()]++
 	}
-	t.Logf("over sixty visits: %v", ways)
-	if len(ways) < int(figureWays) {
-		t.Errorf("only %d of the %d ways ever came up", len(ways), figureWays)
+	t.Logf("over sixty visits: in %v, out %v", in, out)
+
+	if in[figureCrumbles] != 0 {
+		t.Error("he arrived by coming apart")
+	}
+	if out[figureGathers] != 0 {
+		t.Error("he left by gathering")
+	}
+	for _, way := range []figureWay{figureWalks, figureGathers} {
+		if in[way] == 0 {
+			t.Errorf("he never arrived by way %d", way)
+		}
+	}
+	for _, way := range []figureWay{figureWalks, figureCrumbles} {
+		if out[way] == 0 {
+			t.Errorf("he never left by way %d", way)
+		}
 	}
 }
 

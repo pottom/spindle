@@ -147,12 +147,7 @@ func (m Model) figureLines(w, rows int) []string {
 		paint[i] = -1
 	}
 
-	var part [faceParts_]wordPaint
-	for i := range part {
-		part[i] = m.wordsBeatPaint(int(i), int(faceParts_), freqs, levels)
-	}
-
-	lightAt := func(x, y int, at facePart, burn float32) {
+	lightAt := func(x, y int, _ facePart, burn float32) {
 		burn *= figureBurn
 		if x < 0 || y < 0 || x >= dotsX || y >= dotsY {
 			return
@@ -160,9 +155,14 @@ func (m Model) figureLines(w, rows int) []string {
 		cell := (y/dotsPerCellY)*w + x/dotsPerCellX
 		grid[cell] |= 1 << brailleBit[x%dotsPerCellX][y%dotsPerCellY]
 
-		s := part[at]
-		if level := int8(float32(s.level) * burn); level > paint[cell] {
-			paint[cell], hue[cell] = level, s.hue
+		// He takes the colour of the picture he is standing in rather than one
+		// of his own: the hue of his column, the same way the meter hues its
+		// columns, and the brightness of whatever that column of the spectrum
+		// is doing. So he glows where the music is loud beside him, and he is
+		// never a colour the screen is not already using.
+		his := m.stageLevel(x, dotsX)
+		if level := int8(float32(levels-1) * burn * (0.35 + 0.65*his)); level > paint[cell] {
+			paint[cell], hue[cell] = level, int8(min(x/dotsPerCellX*freqs/w, freqs-1))
 		}
 	}
 	light := func(x, y int, at facePart) { lightAt(x, y, at, 1) }
@@ -341,22 +341,17 @@ type figureWay int
 
 const (
 	figureWalks    figureWay = iota // on from the side, off by one
-	figureSpins                     // turning, and growing or shrinking as he turns
-	figureDrops                     // in from over the top, fast, and a squash as he lands
-	figureRises                     // up through the floor
-	figureBursts                    // apart, every dot on its own line out
-	figureCrumbles                  // to pieces, and the pieces fall
+	figureGathers                   // out of specks, from the floor up
+	figureCrumbles                  // to pieces, and the pieces are handed to the water
 	figureWays
 )
 
-const (
-	// figureTurns is how many times round a spin goes, figureFalls how far a
-	// drop comes from as a share of the screen, and figureFlies how far a burst
-	// throws a dot as a share of the figure's own size.
-	figureTurns = 1.5
-	figureFalls = 1.4
-	figureFlies = 2.2
+// Spinning, dropping in from over the top, rising through the floor and
+// bursting apart were all built and all thrown out. They moved him about the
+// screen, which is a thing a sprite does; these two do something to what he is
+// made of, which is the thing only this screen can do.
 
+const (
 	// figureGrain is how much of a dot's own moment is decided by where it is
 	// rather than by the dot itself, and figureGrainOver how far through the
 	// movement the last of them has turned up — short of the end, so he stands
@@ -400,7 +395,11 @@ func (m Model) figureComesBy() figureWay {
 	h ^= h >> 31
 	h *= 0x9e3779b97f4a7c15
 	h ^= h >> 29
-	return figureWay(h % uint64(figureWays))
+
+	if h%2 == 0 {
+		return figureWalks
+	}
+	return figureGathers
 }
 
 func (m Model) figureGoesBy() figureWay {
@@ -409,12 +408,10 @@ func (m Model) figureGoesBy() figureWay {
 	h *= 0xbf58476d1ce4e5b9
 	h ^= h >> 27
 
-	// Not the way he came in, so the two ends of a visit are two things.
-	way := figureWay(h % uint64(figureWays-1))
-	if way >= m.figureComesBy() {
-		way++
+	if h%2 == 0 {
+		return figureWalks
 	}
-	return way
+	return figureCrumbles
 }
 
 // figureSliding reports that a way is one he does with his feet, so the walk
@@ -448,40 +445,7 @@ func figureWarp(way figureWay, t float64, x, y, wide, tall, dotsY int) (int, int
 		return 0, 0, 0, false
 	}
 
-	cx, cy := float64(wide)/2, float64(tall)/2
-	dx, dy := float64(x)-cx, float64(y)-cy
-
 	switch way {
-	case figureSpins:
-		// Turning about himself, and small until he has finished turning.
-		a := (1 - t) * figureTurns * 2 * math.Pi
-		sin, cos := math.Sin(a), math.Cos(a)
-		size := 0.25 + 0.75*t
-		return int(cx + (dx*cos-dy*sin)*size), int(cy + (dx*sin+dy*cos)*size), burn, true
-
-	case figureDrops:
-		// From over the top, fast, and squashed for the moment he lands.
-		fall := (1 - t) * (1 - t) * figureFalls * float64(dotsY)
-		squash := 1.0
-		if t > 0.82 {
-			squash = 1 - 0.35*math.Sin(math.Pi*(t-0.82)/0.18)
-		}
-		return x, int(cy + dy*squash - fall), burn, true
-
-	case figureRises:
-		return x, y + int((1-t)*figureFalls*float64(dotsY)), burn, true
-
-	case figureBursts:
-		// Every dot on its own line out from the middle, and gone before it has
-		// got far — what is left of a burst is a shape you have to remember.
-		away := (1 - t) * figureFlies
-		if figureSpeck(x, y)%100 < int(away*45) {
-			return 0, 0, 0, false
-		}
-		// A piece that has flown further is further gone, the way a spark is.
-		return int(float64(x) + dx*away), int(float64(y) + dy*away),
-			burn * float32(1-0.7*away/figureFlies), true
-
 	case figureCrumbles:
 		// He does not fall apart on screen: he is handed to the water. Every
 		// dot that has come loose has left him and is a drop now, arcing and
@@ -507,11 +471,8 @@ func figureNotYet(way figureWay, x, y, tall int, t float64) bool {
 	high := 1 - float64(y)/float64(max(tall, 1))
 
 	var by float64
-	switch way {
-	case figureRises:
-		by = high // the feet first
-	case figureDrops:
-		by = 1 - high // the head first
+	if way == figureGathers {
+		by = high // out of the floor, the feet first
 	}
 	return own*(1-figureGrain)+by*figureGrain > t*figureGrainOver
 }
