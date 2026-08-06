@@ -143,6 +143,11 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		m.words.forced = time.Now()
 		return nil, true
 
+	case key.Matches(k, m.keys.Face):
+		// Puts a face up, and walks its expressions a press at a time.
+		m.faceShow()
+		return nil, true
+
 	case key.Matches(k, m.keys.PlayPause),
 		key.Matches(k, m.keys.VolUp), key.Matches(k, m.keys.VolDown),
 		key.Matches(k, m.keys.Mute),
@@ -190,6 +195,9 @@ func (m Model) stagePicture(w, rows int) []string {
 		// lyric sheet marks with nothing — there are no words to set. The
 		// picture does not go blank and does not hold the last line up either:
 		// it gives the whole screen to the music until the singer comes back.
+		if art = m.faceLines(w, rows); art != nil {
+			break
+		}
 		if m.wordsSilent() {
 			art = m.wordsIdleArt(w, rows)
 		} else if art = m.wordsLines(w, rows); art == nil {

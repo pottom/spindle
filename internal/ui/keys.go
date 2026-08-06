@@ -46,6 +46,7 @@ type keyMap struct {
 	// record's own name up there without waiting for a solo to make room.
 	Stage  key.Binding
 	Tell   key.Binding
+	Face   key.Binding
 	Lyrics key.Binding
 	Peek   key.Binding
 	Mute   key.Binding
@@ -201,6 +202,10 @@ func newKeyMap() keyMap {
 		Tell: key.NewBinding(
 			key.WithKeys("t"),
 			key.WithHelp("t", "what is playing"),
+		),
+		Face: key.NewBinding(
+			key.WithKeys("w"),
+			key.WithHelp("w", "a face"),
 		),
 		Lyrics: key.NewBinding(
 			key.WithKeys("l"),

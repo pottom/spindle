@@ -905,7 +905,7 @@ func (m Model) wordsLines(w, rows int) []string {
 	// the leash: a drop thrown from the meter can cross the whole screen and
 	// pass through the lyric, instead of stopping at the top of a box.
 	if _, tall := m.wordsRoom(rows); tall >= wordsBand {
-		m.wordsUnder(grid, paint, hue, w, rows, tall)
+		m.wordsUnder(grid, paint, hue, w, rows, tall, m.wordsHeadroom(rows))
 	}
 
 	return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
@@ -913,7 +913,7 @@ func (m Model) wordsLines(w, rows int) []string {
 
 // wordsUnder draws the meter into the rows the words left over, and its water
 // over the whole screen.
-func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall int) {
+func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall, head int) {
 	dotsX := w * dotsPerCellX
 	dotsY := rows * dotsPerCellY
 	levels, freqs := len(m.styles.Words[0]), len(m.styles.Words)
@@ -941,7 +941,6 @@ func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall int) {
 	// The columns, standing on the floor and hanging from the ceiling, as tall
 	// as the band allows.
 	reach := wordsReach * float32(tall*dotsPerCellY)
-	head := m.wordsHeadroom(rows)
 
 	for x := range dotsX {
 		if x%stagePitch != 0 {

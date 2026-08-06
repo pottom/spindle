@@ -530,7 +530,7 @@ func TestWordsWaterFadesAsItClimbs(t *testing.T) {
 	for i := range paint {
 		paint[i] = -1
 	}
-	m.wordsUnder(grid, paint, hue, w, rows, tall)
+	m.wordsUnder(grid, paint, hue, w, rows, tall, m.wordsHeadroom(rows))
 
 	level := func(col int) int8 {
 		best := int8(-1)
