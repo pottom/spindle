@@ -299,12 +299,18 @@ func wordsSize(lines []string, w, h int) int {
 // screen is a row of specks. Breaking it is what buys the letters their dots
 // back: two lines of half the length are twice the size.
 func wordsWrap(line string, w, h int) []string {
+	return wordsWrapTo(line, w, h, wordsMostLines)
+}
+
+// wordsWrapTo is the same, held to a given number of lines. A lyric is given
+// four; a part of a card is given two, because past that a name is a paragraph.
+func wordsWrapTo(line string, w, h, most int) []string {
 	line = strings.TrimSpace(line)
 	if line == "" {
 		return nil
 	}
 
-	for n := 1; n <= wordsMostLines; n++ {
+	for n := 1; n <= most; n++ {
 		lines := wordsSplit(line, n)
 		if len(lines) < n {
 			return lines // it will not break any further
@@ -316,12 +322,51 @@ func wordsWrap(line string, w, h int) []string {
 			for _, l := range lines {
 				longest = max(longest, len([]rune(l)))
 			}
-			if int(float64(w)*(1-wordsMargin))/max(longest, 1) >= wordsReadable || n == wordsMostLines {
+			if int(float64(w)*(1-wordsMargin))/max(longest, 1) >= wordsReadable || n == most {
 				return lines
 			}
 		}
 	}
-	return wordsSplit(line, wordsMostLines)
+	return wordsSplit(line, most)
+}
+
+// wordsCardMost is the most lines one part of a card may be broken into.
+const wordsCardMost = 2
+
+// wordsCard sets out a card — what the record is called, whose it is, what it
+// came out on — breaking any part of it that is too long for the room.
+//
+// Every other line on this screen goes through wordsWrap before it is set.
+// These did not, and a long title was left to be set at whatever size fitted it
+// on one line: on a narrow terminal a row of specks, and past a point nothing
+// at all, because the type ran under the smallest the face can be cut at and
+// the picture was refused outright.
+func (m Model) wordsCard(parts ...string) []string {
+	dotsX, dotsY := m.width*dotsPerCellX, m.height*dotsPerCellY
+	if dotsX <= 0 || dotsY <= 0 {
+		return nil
+	}
+
+	var kept []string
+	for _, part := range parts {
+		if strings.TrimSpace(part) != "" {
+			kept = append(kept, part)
+		}
+	}
+	if len(kept) == 0 {
+		return nil
+	}
+
+	// Each part is measured against its own share of the height, so that a
+	// title broken in two is not sized as though it had the screen to itself
+	// with the artist still to come under it.
+	share := max(dotsY/len(kept), 1)
+
+	var out []string
+	for _, part := range kept {
+		out = append(out, wordsWrapTo(part, dotsX, share, wordsCardMost)...)
+	}
+	return out
 }
 
 // wordsSplit breaks a line into n roughly equal pieces, at spaces.
@@ -482,7 +527,12 @@ type wordsState struct {
 	have           cover.Grain
 	text           string
 	cellsX, cellsY int
+
+	// asked is the text a picture has been sent for, with the size it was sent
+	// for at, so that a text the setter refused is tried again when the screen
+	// changes shape rather than being given up on for good.
 	asked          string
+	askedX, askedY int
 
 	// since is when this line arrived. The dots gather over the moment after
 	// it, which is what makes a line change something you see rather than
@@ -1108,11 +1158,15 @@ func (m *Model) wordsGrind() tea.Cmd {
 		}
 		return nil
 	}
-	if m.words.asked == text {
+	// A picture that could not be built is not asked for again — the face has
+	// no glyph for it, or there is no room to set it — but only at the size it
+	// failed at. Without the size in the test, one refusal held for the rest of
+	// the record and a window that had since been made wider changed nothing.
+	if m.words.asked == text && m.words.askedX == m.width && m.words.askedY == m.height {
 		return nil
 	}
 
-	m.words.asked = text
+	m.words.asked, m.words.askedX, m.words.askedY = text, m.width, m.height
 	return wordsCmd(lines, m.width, m.height)
 }
 

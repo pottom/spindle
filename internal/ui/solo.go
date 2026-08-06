@@ -157,14 +157,10 @@ func (m Model) soloTelling() bool {
 }
 
 // soloName is what the record is called, as it is set: its own name and whose
-// it is, one under the other.
+// it is, one under the other, each broken where it is too long for the room.
 func (m Model) soloName() []string {
 	if m.ps == nil || m.ps.Title == "" {
 		return nil
 	}
-	lines := []string{m.ps.Title}
-	if len(m.ps.Artists) > 0 {
-		lines = append(lines, strings.Join(m.ps.Artists, ", "))
-	}
-	return lines
+	return m.wordsCard(m.ps.Title, strings.Join(m.ps.Artists, ", "))
 }

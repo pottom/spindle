@@ -212,3 +212,87 @@ func TestTheNameCanBeAskedFor(t *testing.T) {
 		t.Error("the card asked for is still up long after it went up")
 	}
 }
+
+// A long name is broken rather than shrunk.
+//
+// Every other line on this screen is wrapped before it is set; the card was
+// not, so a long title was left to be set at whatever size fitted it on one
+// line — which on a narrow terminal is a row of specks.
+func TestALongNameIsBrokenRatherThanShrunk(t *testing.T) {
+	names := []struct{ title, artist string }{
+		{"Dübörög a ház", "Emergency House"},
+		{"Pattanások és szemüvegek", "Tankcsapda"},
+		{"The Lamb Lies Down On Broadway - 2007 Stereo Mix", "Genesis, Peter Gabriel, Phil Collins"},
+		{"Wouldn't It Be Nice (Remastered 1999 / Stereo Mix)", "The Beach Boys"},
+	}
+
+	// How tall the type comes out, which is the whole question: the same words
+	// over more lines are set larger.
+	tall := func(lines []string, w, rows int) int {
+		img, _, ok := wordsImage(lines, w*dotsPerCellX, rows*dotsPerCellY)
+		if !ok {
+			return 0
+		}
+		top, bottom := -1, -1
+		for y := range rows * dotsPerCellY {
+			for x := range w * dotsPerCellX {
+				if img.GrayAt(x, y).Y >= wordsLit {
+					if top < 0 {
+						top = y
+					}
+					bottom = y
+					break
+				}
+			}
+		}
+		return bottom - top + 1
+	}
+
+	for _, size := range [][2]int{{60, 20}, {100, 30}, {180, 46}} {
+		w, rows := size[0], size[1]
+		for _, name := range names {
+			m := scopeModel(100, 44)
+			m.width, m.height = w, rows
+			m.ps.Title, m.ps.Artists = name.title, strings.Split(name.artist, ", ")
+
+			card := m.soloName()
+			if len(card) == 0 {
+				t.Fatalf("%dx%d: %q made no card", w, rows, name.title)
+			}
+			// Two parts, and neither is given more than its share of lines.
+			if len(card) > 2*wordsCardMost {
+				t.Errorf("%dx%d: %q came out as %d lines, want no more than %d",
+					w, rows, name.title, len(card), 2*wordsCardMost)
+			}
+
+			straight := tall([]string{name.title, name.artist}, w, rows)
+			broken := tall(card, w, rows)
+			t.Logf("%3dx%-3d %-50.50q  one line each %2d dots, broken %2d", w, rows, name.title, straight, broken)
+
+			if broken < straight {
+				t.Errorf("%dx%d: %q is set at %d dots broken and %d straight, want breaking it to help",
+					w, rows, name.title, broken, straight)
+			}
+		}
+	}
+}
+
+// A picture that could not be set is not asked for over and over — but the
+// refusal belongs to the size it happened at. Held without one, a name the
+// screen had no room for stayed given up on after the window was made wider.
+func TestARefusedPictureIsTriedAgainAtANewSize(t *testing.T) {
+	m := sung(30, 45, 90, 200, 210, 225)
+	m.words.forced = time.Now() // the card, whatever the record is doing
+
+	if cmd := m.wordsGrind(); cmd == nil {
+		t.Fatal("the card was never sent for")
+	}
+	if cmd := m.wordsGrind(); cmd != nil {
+		t.Error("the same card at the same size was sent for twice")
+	}
+
+	m.width += 20
+	if cmd := m.wordsGrind(); cmd == nil {
+		t.Error("the screen changed shape and the card was not sent for again")
+	}
+}

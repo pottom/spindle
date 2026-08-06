@@ -77,19 +77,14 @@ func (m Model) wordsIdle() ([]string, int64) {
 	switch m.wordsCardFor(spell) {
 	case wordsCardNone:
 	case wordsCardTitle:
-		lines = []string{m.ps.Title}
-		if len(m.ps.Artists) > 0 {
-			lines = append(lines, strings.Join(m.ps.Artists, ", "))
-		}
+		lines = m.soloName()
 	case wordsCardArtist:
-		if len(m.ps.Artists) > 0 {
-			lines = []string{strings.Join(m.ps.Artists, ", ")}
-		}
+		lines = m.wordsCard(strings.Join(m.ps.Artists, ", "))
 	case wordsCardAlbum:
 		// A single is its own record, and setting the same name twice in a row
 		// under two different headings is a screen with a bug in it.
-		if m.ps.Album != "" && m.ps.Album != m.ps.Title {
-			lines = []string{m.ps.Album}
+		if m.ps.Album != m.ps.Title {
+			lines = m.wordsCard(m.ps.Album)
 		}
 	case wordsCardNotes:
 		lines = []string{wordsNotes}
