@@ -451,6 +451,23 @@ const (
 	// faceBrowHold is how long raised brows stay up.
 	faceBrowHold = 700 * time.Millisecond
 
+	// A double take: the eyes go, stay gone long enough for it to be a look
+	// rather than a flick, and come back. The brows arrive with them, which is
+	// the half of it that says he saw something.
+	faceLookOut  = 170 * time.Millisecond
+	faceLookHold = 300 * time.Millisecond
+	faceLookBack = 240 * time.Millisecond
+
+	// faceGrinHold is how long a grin is held, and faceGrinSquint how far the
+	// lids come down with it — a grin is as much the eyes as the mouth, and a
+	// wide mouth under open eyes is a shout.
+	faceGrinHold   = 620 * time.Millisecond
+	faceGrinSquint = 0.45
+
+	// faceWaveFor is how long he waves at whoever is watching. The wave itself
+	// is the arm swing that is already going; this only puts the hand up.
+	faceWaveFor = 900 * time.Millisecond
+
 	// faceEase is how fast the eyes follow the sound and the mouth follows the
 	// loudness. Slow enough to be a glance rather than a twitch.
 	faceEase = 0.14
@@ -464,6 +481,10 @@ const (
 	faceEnters    = 2500 * time.Millisecond
 	faceStayLeast = 4200 * time.Millisecond
 	faceStayMost  = 10500 * time.Millisecond
+
+	// faceStayMore is what the one this code draws itself gets on top of that.
+	// See faceStayFor.
+	faceStayMore = 1.5
 
 	// faceShows is how long he stays when he is asked for by hand.
 	faceShows = 7 * time.Second
@@ -488,6 +509,9 @@ const (
 	faceWinking
 	faceBrowing
 	faceGaping
+	faceLooking
+	faceGrinning
+	faceWaving
 	faceDoings
 )
 
@@ -665,6 +689,12 @@ func faceDoingFor(doing faceDoing) time.Duration {
 		return 2*faceBlinkShut + faceBrowHold
 	case faceGaping:
 		return faceBlinkShut + faceBrowHold
+	case faceLooking:
+		return faceLookOut + faceLookHold + faceLookBack
+	case faceGrinning:
+		return 2*faceBlinkShut + faceGrinHold
+	case faceWaving:
+		return faceWaveFor
 	}
 	return 0
 }
@@ -732,8 +762,45 @@ func (m Model) faceNow() faceLook {
 		if v > 0.3 {
 			look.hold = [2]faceHold{faceHoldUp, faceHoldUp}
 		}
+	case faceLooking:
+		// A double take. The eyes go, and the brows go with them on the way
+		// back, which is the half of it that says he saw something.
+		v := faceGlancing(since)
+		look.look = min32(max32(look.look+v, -1), 1)
+		if back := max32(-abs32(v)+1, 0); since > faceLookOut {
+			look.brow = [2]float32{back, back}
+		}
+	case faceGrinning:
+		// A grin is as much the eyes as the mouth: a wide mouth under open eyes
+		// is a shout, and the same mouth under a squeeze is a grin.
+		v := faceRising(since, 2*faceBlinkShut, faceGrinHold)
+		look.mouth = max32(look.mouth, v*0.8)
+		look.lid = [2]float32{v * faceGrinSquint, v * faceGrinSquint}
+		look.brow = [2]float32{v * 0.35, v * 0.35}
+	case faceWaving:
+		// At whoever is watching, rather than at the room he is walking into.
+		// The wave is the arm swing that is going anyway; this puts the hand up
+		// and lifts the brows over it.
+		v := faceRising(since, faceBlinkShut, faceWaveFor-faceBlinkShut-faceBlinkOpen)
+		if v > 0.2 {
+			look.hold[0] = faceHoldWave
+		}
+		look.brow[0] = max32(look.brow[0], v*0.5)
 	}
 	return look
+}
+
+// faceGlancing is where a double take has got to: away, held, and back.
+func faceGlancing(since time.Duration) float32 {
+	switch {
+	case since < faceLookOut:
+		return -float32(since) / float32(faceLookOut)
+	case since < faceLookOut+faceLookHold:
+		return -1
+	case since < faceLookOut+faceLookHold+faceLookBack:
+		return -1 + float32(since-faceLookOut-faceLookHold)/float32(faceLookBack)
+	}
+	return 0
 }
 
 // faceShutting is how far a lid has come down, given how long ago it started.
@@ -1038,12 +1105,23 @@ func (m Model) faceStay() time.Duration {
 }
 
 // faceStayFor is the same for a bar that is not the one playing.
+//
+// The one this code draws itself stays longer than the drawings do. A drawing
+// walks on, holds a pose and goes, and there is only so long a still picture is
+// worth looking at; he has a face that answers every rise in the music, a pair
+// of hands and a dozen things to do with them, and cutting him off after one of
+// them is throwing away the part of him that is not a sprite.
 func (m Model) faceStayFor(starts int64) time.Duration {
 	h := uint64(starts)*0x9e3779b97f4a7c15 + 0x2545f4914f6cdd1d
 	h ^= h >> 29
 	h *= 0xbf58476d1ce4e5b9
 	h ^= h >> 32
-	return faceStayLeast + time.Duration(h%uint64(faceStayMost-faceStayLeast))
+
+	stay := faceStayLeast + time.Duration(h%uint64(faceStayMost-faceStayLeast))
+	if faceWhoFor(starts) == "" {
+		stay = time.Duration(float64(stay) * faceStayMore)
+	}
+	return stay
 }
 
 // faceGone is how far through his visit he is, 0 to 1.

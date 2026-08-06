@@ -2,6 +2,7 @@ package ui
 
 import (
 	"math"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -181,6 +182,55 @@ func TestHeAlwaysDoesSomething(t *testing.T) {
 	t.Logf("sixty visits: %v", seen)
 	if len(seen) < int(faceDoings-faceWinking) {
 		t.Errorf("only %d of the %d turns ever come up", len(seen), faceDoings-faceWinking)
+	}
+}
+
+// And every one of them shows on his face. A turn that is dealt and looks
+// exactly like standing there is a turn nobody will ever see.
+func TestEveryTurnShows(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.words.beats = true
+	m.ps.Duration = 4 * time.Minute
+
+	// The middle of a visit, where his hands are his own: on the way in he is
+	// waving with both of them, and everything would be measured against that.
+	m.setProgress(faceEnters + m.faceStay()/2)
+
+	still := m.faceNow()
+	for doing := faceWinking; doing < faceDoings; doing++ {
+		long := faceDoingFor(doing)
+		if long <= 0 {
+			t.Errorf("the turn %d runs for no time at all", doing)
+			continue
+		}
+
+		moved := map[string]bool{}
+		for _, at := range []float64{0.3, 0.5, 0.75} {
+			m.face.doing = doing
+			m.face.since = time.Now().Add(-time.Duration(at * float64(long)))
+			look := m.faceNow()
+
+			for part, changed := range map[string]bool{
+				"the lids":  look.lid != still.lid,
+				"the brows": look.brow != still.brow,
+				"the mouth": look.mouth != still.mouth,
+				"the eyes":  look.look != still.look,
+				"the hands": look.hold != still.hold,
+			} {
+				if changed {
+					moved[part] = true
+				}
+			}
+		}
+		keys := make([]string, 0, len(moved))
+		for part := range moved {
+			keys = append(keys, part)
+		}
+		sort.Strings(keys)
+		t.Logf("turn %d runs %s and moves %v", doing, long, keys)
+		if len(moved) == 0 {
+			t.Errorf("the turn %d changes nothing on him over its whole %s", doing, long)
+		}
 	}
 }
 
@@ -637,19 +687,34 @@ func TestHowLongHeStaysIsDealt(t *testing.T) {
 
 	seen := map[time.Duration]int{}
 	var least, most time.Duration = time.Hour, 0
+	var his, theirs time.Duration
 	for bar := range int64(60) {
 		m.words.starts = bar * 7_000
 		stay := m.faceStay()
 		seen[stay/time.Second]++
 		least, most = min(least, stay), max(most, stay)
+		if faceWhoFor(m.words.starts) == "" {
+			his = max(his, stay)
+		} else {
+			theirs = max(theirs, stay)
+		}
 	}
 	t.Logf("sixty visits run from %s to %s, over %d different lengths", least, most, len(seen))
 
 	if len(seen) < 3 {
 		t.Errorf("the visits came in %d lengths, want them dealt", len(seen))
 	}
-	if least < faceStayLeast || most > faceStayMost {
-		t.Errorf("a visit ran %s..%s, want it inside %s..%s", least, most, faceStayLeast, faceStayMost)
+	if least < faceStayLeast || most > time.Duration(faceStayMore*float64(faceStayMost)) {
+		t.Errorf("a visit ran %s..%s, want it inside %s..%s",
+			least, most, faceStayLeast, time.Duration(faceStayMore*float64(faceStayMost)))
+	}
+
+	// The one this code draws itself is worth more of a stay than a drawing:
+	// he has a face and a pair of hands that answer the music, and one turn is
+	// not enough of him.
+	t.Logf("the longest of his own visits was %s, the longest of theirs %s", his, theirs)
+	if his <= theirs {
+		t.Errorf("his longest visit was %s and a drawing's %s, want him the longer", his, theirs)
 	}
 
 	// And the same bar is the same visit twice, while the bar after it is its

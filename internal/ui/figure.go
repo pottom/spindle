@@ -462,17 +462,35 @@ func (m Model) faceWho() string {
 	if !m.face.shown.IsZero() && time.Since(m.face.shown) < faceShows {
 		return m.face.picked
 	}
+	return faceWhoFor(m.words.starts)
+}
 
-	// One of the drawn ones, or the one this code draws itself. He is in the
-	// set with the rest of them: he has a face that blinks and a pair of hands
-	// that answer the music, which no still drawing does, and the drawings have
-	// a body and a walk that no formula does. Both are worth turning up.
-	h := uint64(m.words.starts)*0x94d049bb133111eb + 0xd6e8feb86659fd93
+// figureGeometryOne is how often the one this code draws itself gets the visit
+// rather than a drawing.
+//
+// He was one lot among all of them, which was fair and wrong: every drawing
+// added made him rarer, so a cast that grew from three to eight quietly cut him
+// to a tenth. He is not one of eight, he is one of two kinds — the drawings
+// between them take the rest.
+const figureGeometryOne = 4
+
+// faceWhoFor is who a bar was dealt, whatever bar is playing.
+//
+// One of the drawn ones, or the one this code draws itself. He is in the set
+// with the rest of them: he has a face that blinks and a pair of hands that
+// answer the music, which no still drawing does, and the drawings have a body
+// and a walk that no formula does. Both are worth turning up.
+func faceWhoFor(starts int64) string {
+	if len(figures) == 0 {
+		return ""
+	}
+
+	h := uint64(starts)*0x94d049bb133111eb + 0xd6e8feb86659fd93
 	h ^= h >> 30
 	h *= 0x9e3779b97f4a7c15
 	h ^= h >> 27
 
-	if h%uint64(len(figures)+1) == 0 {
+	if h%figureGeometryOne == 0 {
 		return ""
 	}
 
