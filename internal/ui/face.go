@@ -88,8 +88,9 @@ type faceLook struct {
 	swing float64
 
 	// stride is where his legs are in their step, -1 to 1, and nought while he
-	// stands; going is which way he is walking.
-	stride, going float64
+	// stands; facing is which way he is going, which he keeps facing after he
+	// has stopped.
+	stride, facing float64
 }
 
 // faceParts is where each part of the face goes in a box of the given size,
@@ -363,11 +364,16 @@ func (p faceParts) nose(look faceLook, light func(int, int, facePart)) {
 		return x, top + (low-top)*t
 	}, int(low-top), facePartNose, light)
 
-	// The hook, turning to his left, which is the side a right-handed hand
-	// draws toward.
+	// The hook turns the way he is going. A nose drawn in profile is the one
+	// part of him that says which way he is facing, so it had better agree with
+	// his feet.
+	way := look.facing
+	if way == 0 {
+		way = -1
+	}
 	hook := float64(gap) * faceNoseHook
 	p.curve(func(t float64) (float64, float64) {
-		return x - hook*t, low + hook*0.35*math.Sin(math.Pi*t*0.5)
+		return x + way*hook*t, low + hook*0.35*math.Sin(math.Pi*t*0.5)
 	}, int(hook*2), facePartNose, light)
 }
 
@@ -645,14 +651,17 @@ func (m Model) faceNow() faceLook {
 	look.swing = faceSwing * float64(0.35+0.65*m.face.lift) *
 		math.Sin(2*math.Pi*faceWaves*time.Since(m.face.came).Seconds())
 
-	// His legs, while he is on his way in or out: the same phase the bob is
-	// taken from, so the two are one walk rather than two.
-	if walk := m.faceWalk(); walk != 0 {
+	// Which way he is going, and so which way he is looking and stepping. He
+	// keeps facing the way he was going after he stops: a figure who turns to
+	// face front the moment he pulls up is a sprite being swapped.
+	way, moving := m.faceGoing()
+	look.facing = way
+	if look.facing == 0 {
+		in, _ := m.faceWays()
+		look.facing = -in
+	}
+	if moving {
 		look.stride = math.Sin(2 * math.Pi * faceSteps * m.faceGone())
-		look.going = math.Copysign(1, walk)
-		if m.faceGone() < faceWalkIn {
-			look.going = -look.going // still coming on, so he faces the other way
-		}
 	}
 
 	since := time.Since(m.face.since)
@@ -875,30 +884,70 @@ func (m Model) faceRoom(w, rows int) (faceParts, int, int, bool) {
 	// He bobs as he goes. A couple of dots: enough that he is walking rather
 	// than being slid across, little enough that the meters do not notice.
 	top := (dotsY - high) / 2
-	if walk != 0 {
+	if _, moving := m.faceGoing(); moving {
 		top += int(faceBob * math.Abs(math.Sin(2*math.Pi*faceSteps*m.faceGone())))
 	}
 	return p, left, top, true
 }
 
-// faceWalk is where he is across the screen: -1 is off the side he came in
-// from, 0 is where he stops to do his turn, and +1 is off the side he leaves by.
+// faceWalk is where he is across the screen: -1 is off one side, +1 is off the
+// other, and in between is on it.
 //
-// He always comes in from a side and always leaves by one. It is the whole
-// shape of the thing — somebody walks on, does something, walks off — and a
-// figure who instead materialised out of a scatter of dots in the middle of the
-// screen was four different entrances competing with one joke.
-func (m Model) faceWalk() float64 {
+// He comes on from a side, wanders about while he is here, and goes off by a
+// side. Standing on one spot for the whole of a visit made him a picture that
+// had been put there; moving between two or three of them makes him somebody
+// who came in.
+func (m Model) faceWalk() float64 { return m.faceAt(m.faceGone()) }
+
+// faceAt is where he is at a given point of his visit.
+func (m Model) faceAt(t float64) float64 {
 	in, out := m.faceWays()
-	t := m.faceGone()
 
 	switch {
 	case t < faceWalkIn:
-		return in * (1 - faceEased(t/faceWalkIn))
+		// On from the side, as far as the first place he stops.
+		return in + (m.faceSpot(0)-in)*faceEased(t/faceWalkIn)
 	case t > 1-faceWalkOut:
-		return out * faceEased((t-(1-faceWalkOut))/faceWalkOut)
+		last := m.faceSpot(faceStops - 1)
+		return last + (out-last)*faceEased((t-(1-faceWalkOut))/faceWalkOut)
 	}
-	return 0
+
+	// And in between, from one spot to the next, standing about at each of them
+	// before he moves on.
+	u := (t - faceWalkIn) / (1 - faceWalkIn - faceWalkOut) * float64(faceStops-1)
+	leg := min(int(u), faceStops-2)
+
+	from, to := m.faceSpot(leg), m.faceSpot(leg+1)
+	if f := u - float64(leg); f > facePause {
+		return from + (to-from)*faceEased((f-facePause)/(1-facePause))
+	}
+	return from
+}
+
+// faceSpot is the nth place he stops at, dealt from the bar so that one visit
+// is a pace across and the next is a shuffle on the spot.
+func (m Model) faceSpot(at int) float64 {
+	h := uint64(m.words.starts)*0xd6e8feb86659fd93 + uint64(at+1)*0x9e3779b97f4a7c15
+	h ^= h >> 31
+	h *= 0xbf58476d1ce4e5b9
+	h ^= h >> 29
+
+	// Somewhere on the screen, never so far out that he is half off it.
+	return (float64(h%2001)/1000 - 1) * faceRoam
+}
+
+// faceGoing is which way he is moving and whether he is moving at all.
+//
+// Taken from where he was a moment ago and where he will be a moment from now,
+// rather than stored: one path decides where he is, and everything that has to
+// agree with it — his feet, his nose — reads it off the same place.
+func (m Model) faceGoing() (float64, bool) {
+	t := m.faceGone()
+	d := m.faceAt(min64(t+faceLook_, 1)) - m.faceAt(max64(t-faceLook_, 0))
+	if math.Abs(d) < faceStill_ {
+		return 0, false
+	}
+	return math.Copysign(1, d), math.Abs(d) > faceStill_*2
 }
 
 // faceEased is a movement that sets off and pulls up rather than running at one
@@ -1030,6 +1079,19 @@ const (
 	// going off; the rest of it he stands where he stopped and does his turn.
 	faceWalkIn  = 0.18
 	faceWalkOut = 0.18
+
+	// faceStops is how many places he stops at while he is here, faceRoam how
+	// far from the middle those are as a share of the room, and facePause how
+	// much of the way between two of them he spends standing at the first.
+	faceStops = 3
+	faceRoam  = 0.5
+	facePause = 0.45
+
+	// faceLook_ is how far either side of now his own path is read to tell
+	// which way he is going, and faceStill_ how little of a move counts as
+	// standing about.
+	faceLook_  = 0.03
+	faceStill_ = 0.004
 
 	// faceBob is how far he rises and falls as he walks, in dots, and faceSteps
 	// how many steps that is over a visit.
@@ -1235,8 +1297,8 @@ func (p faceParts) legs(look faceLook, light func(int, int, facePart)) {
 
 		// The foot points the way he is going, or outwards while he stands.
 		toe := dir
-		if look.stride != 0 && look.going != 0 {
-			toe = look.going
+		if look.stride != 0 && look.facing != 0 {
+			toe = look.facing
 		}
 		p.curve(func(t float64) (float64, float64) {
 			return footX + toe*faceFoot*leg*t, footY

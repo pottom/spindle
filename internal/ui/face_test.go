@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -449,8 +450,9 @@ func TestHisArmsRideTheMusic(t *testing.T) {
 	}
 }
 
-// He always comes in from a side and leaves by one. That is the whole shape of
-// him: somebody walks on, does something and walks off.
+// He always comes in from a side and leaves by one, and wanders about the
+// screen in between. That is the whole shape of him: somebody walks on, does
+// something and walks off.
 func TestHeWalksOnAndOff(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
@@ -472,28 +474,31 @@ func TestHeWalksOnAndOff(t *testing.T) {
 		t.Error("every visit went the same way, want both")
 	}
 
-	// Across one visit: off the side he came from, in the middle for his turn,
-	// and off a side again.
+	// Across one visit: off the side he came from at the start, on the screen
+	// through the middle, and off a side at the end.
 	m.words.starts = 0
-	where := func(t float64) int {
-		into := faceEnters + time.Duration(t*float64(m.faceStay()))
-		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + into)
-		_, at, _, _ := m.faceRoom(m.width, m.height)
-		return at
-	}
 
-	on, middle, off := where(0), where(0.5), where(1)
-	p, _, _, _ := m.faceRoom(m.width, m.height)
-	room := (m.width*dotsPerCellX - p.w) / 2
-	t.Logf("he walks %d → %d → %d, standing at %d", on, middle, off, room)
-
-	if middle != room {
-		t.Errorf("he does his turn at %d, want the middle at %d", middle, room)
-	}
-	for _, at := range []int{on, off} {
-		if at+p.w > 0 && at < m.width*dotsPerCellX {
-			t.Errorf("he is at %d at one end of his visit, want him off the screen", at)
+	on, off := m.faceAt(0), m.faceAt(1)
+	t.Logf("he starts at %.2f and ends at %.2f", on, off)
+	for _, at := range []float64{on, off} {
+		if math.Abs(at) < 0.95 {
+			t.Errorf("he is at %.2f at one end of his visit, want him off the screen", at)
 		}
+	}
+
+	// And in between he is on it, and he does not stand on one spot: he came in
+	// to wander about, not to be put there.
+	seen := map[int]bool{}
+	for step := range 40 {
+		at := m.faceAt(faceWalkIn + (1-faceWalkIn-faceWalkOut)*float64(step)/39)
+		if math.Abs(at) > faceRoam+0.01 {
+			t.Errorf("he wandered to %.2f, want him inside %.2f of the middle", at, faceRoam)
+		}
+		seen[int(at*20)] = true
+	}
+	t.Logf("while he was here he stood in %d different places", len(seen))
+	if len(seen) < 3 {
+		t.Error("he stood on one spot the whole time")
 	}
 }
 
@@ -540,8 +545,8 @@ func TestHeHasLegsThatMarch(t *testing.T) {
 	}
 
 	// One step, then the other.
-	oneL, oneR := feet(faceLook{stride: 1, going: 1})
-	twoL, twoR := feet(faceLook{stride: -1, going: 1})
+	oneL, oneR := feet(faceLook{stride: 1, facing: 1})
+	twoL, twoR := feet(faceLook{stride: -1, facing: 1})
 	t.Logf("mid stride: %d and %d; the other foot: %d and %d", oneL, oneR, twoL, twoR)
 
 	if oneL >= oneR {
@@ -701,5 +706,80 @@ func TestHeTakesHisCueFromTheMusic(t *testing.T) {
 	t.Logf("over six turns he does %d different things", len(seen))
 	if len(seen) < 2 {
 		t.Error("he does the same thing every time in one visit")
+	}
+}
+
+// His nose turns the way he is going. Drawn in profile, it is the one part of
+// him that says which way he is facing, so it had better agree with his feet.
+func TestHisNoseFollowsHim(t *testing.T) {
+	dotsX, dotsY := 320, 184
+	high := int(wordsMark * float64(dotsY))
+	wide := min(int(faceWide*float64(high)), int(0.62*float64(dotsX)))
+
+	p, ok := faceLayout(wide, high)
+	if !ok {
+		t.Fatal("no face")
+	}
+
+	// How far the nose reaches either side of the middle of him.
+	nose := func(facing float64) (int, int) {
+		from, to := 1<<30, -1
+		p.draw(faceLook{facing: facing}, func(x, _ int, part facePart) {
+			if part == facePartNose {
+				from, to = min(from, x), max(to, x)
+			}
+		})
+		return from, to
+	}
+
+	leftFrom, leftTo := nose(-1)
+	rightFrom, rightTo := nose(1)
+	t.Logf("facing left the nose runs %d..%d, facing right %d..%d, on a face %d wide",
+		leftFrom, leftTo, rightFrom, rightTo, p.w)
+
+	if leftFrom >= rightFrom || leftTo >= rightTo {
+		t.Error("the nose does not turn with him")
+	}
+	if leftTo > p.w/2+p.stroke {
+		t.Errorf("facing left the nose still reaches %d, past his middle at %d", leftTo, p.w/2)
+	}
+	if rightFrom < p.w/2-p.stroke {
+		t.Errorf("facing right the nose still reaches back to %d, past his middle at %d", rightFrom, p.w/2)
+	}
+
+	// And it agrees with where he is actually going.
+	m := scopeModel(160, 46)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 4 * time.Minute
+	m.words.beats, m.words.text = true, wordsNotes
+	for bar := range int64(60) {
+		if at := bar * 7_000; faceDealt(at) {
+			m.words.starts = at
+			break
+		}
+	}
+
+	var moved, agreed int
+	for step := range 60 {
+		gone := float64(step) / 59
+		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters +
+			time.Duration(gone*float64(m.faceStay())))
+
+		was, is := m.faceAt(gone-0.01), m.faceAt(gone+0.01)
+		if math.Abs(is-was) < 0.01 {
+			continue
+		}
+		moved++
+		if math.Signbit(is-was) == math.Signbit(m.faceNow().facing) {
+			agreed++
+		}
+	}
+	t.Logf("he was moving at %d of sixty moments, facing the right way at %d", moved, agreed)
+	if moved == 0 {
+		t.Fatal("he never moved")
+	}
+	if agreed < moved {
+		t.Errorf("he faced the way he was going at %d of %d moments", agreed, moved)
 	}
 }
