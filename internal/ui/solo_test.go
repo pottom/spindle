@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/player"
+	"github.com/pottom/spindle/internal/ui/msg"
 )
 
 // sung is a model playing a track with the words given, at the seconds given.
@@ -210,6 +211,56 @@ func TestTheNameCanBeAskedFor(t *testing.T) {
 	m.words.forced = time.Now().Add(-soloTells - time.Second)
 	if m.soloTelling() {
 		t.Error("the card asked for is still up long after it went up")
+	}
+}
+
+// The card comes in the same way whether the record put it up or somebody
+// asked for it.
+//
+// A lyric line is wound back so that it finishes gathering as it is sung, which
+// is right for a line and wrong for a card: the card's moment is when it starts
+// arriving, so wound back it was already there before anybody saw it move, and
+// the one on the key was the livelier of the two for no reason.
+func TestTheCardComesInTheSameWayTwice(t *testing.T) {
+	gathering := func(m Model, telling bool) time.Duration {
+		m.words.telling = telling
+		var tm tea.Model = m
+		tm, _ = tm.Update(msg.WordsReady{Text: "A Long Song\nThe Band", CellsX: m.width, CellsY: m.height})
+		return time.Since(tm.(Model).words.since)
+	}
+
+	// The record's own moment: the picture is asked for as the card's time
+	// arrives, which is exactly where a line would have been wound back.
+	m := sung(30, 45, 200, 210, 225)
+	card, ok := m.soloCard()
+	if !ok {
+		t.Fatal("this record has no solo to say its name in")
+	}
+	m.setProgress(time.Duration(card.from) * time.Millisecond)
+	m.words.starts = card.from
+	itself := gathering(m, true)
+
+	// And on the key, wherever the record happens to be.
+	m = sung(30, 45, 200, 210, 225)
+	m.setProgress(5 * time.Second)
+	m.words.forced = time.Now()
+	m.words.starts = m.words.forced.UnixMilli()
+	asked := gathering(m, true)
+
+	t.Logf("by itself the gathering was %s in, on the key %s in", itself, asked)
+	if itself > wordsGather/4 {
+		t.Errorf("the card put up by itself was already %s into its arrival, want it starting", itself)
+	}
+	if asked > wordsGather/4 {
+		t.Errorf("the card on the key was already %s into its arrival, want it starting", asked)
+	}
+
+	// A sung line is still wound back: it has somewhere to be.
+	m = sung(30, 45, 200, 210, 225)
+	m.setProgress(30 * time.Second)
+	m.words.starts = 30_000
+	if line := gathering(m, false); line < wordsGather/2 {
+		t.Errorf("a line due now was %s into its arrival, want it nearly there", line)
 	}
 }
 

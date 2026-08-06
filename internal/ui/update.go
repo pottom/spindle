@@ -271,6 +271,17 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		// Wound back so that the gathering finishes as the line is sung rather
 		// than starting then: whatever is left of the wait is taken off what the
 		// gathering costs.
+		//
+		// Except the record's name, which is not sung and so has nothing to be
+		// on time for. Its moment is when it starts arriving, not when it has to
+		// be there — wound back it would be complete before anybody saw it move,
+		// and the card that comes up on the key would be the livelier of the two
+		// for no reason anyone could name.
+		if m.words.telling {
+			m.words.since = time.Now()
+			return m, nil
+		}
+
 		wait := time.Duration(m.words.starts-m.wordsClock()) * time.Millisecond
 		m.words.since = time.Now().Add(-max(wordsGather-wait, 0))
 		return m, nil
