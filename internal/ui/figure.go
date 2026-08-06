@@ -153,6 +153,7 @@ func (m Model) figureLines(w, rows int) []string {
 	}
 
 	lightAt := func(x, y int, at facePart, burn float32) {
+		burn *= figureBurn
 		if x < 0 || y < 0 || x >= dotsX || y >= dotsY {
 			return
 		}
@@ -361,9 +362,18 @@ const (
 	figureCrumb = 1.1
 	figureGrit  = 0.35
 
-	// figureFaint is how much of his own light he has as he arrives or leaves.
-	// Low: what crosses this screen the rest of the time is water and sparks,
-	// and he comes and goes out of the same stuff before he is anybody.
+	// figureBurn is how brightly he is drawn at all — under the water and the
+	// sparks that cross the same screen, never mind the type.
+	//
+	// He is a thing that wanders through the picture, not the picture. Drawn at
+	// full strength he is a cut-out laid over the music; drawn under everything
+	// else he is in the room with it, and the eye goes to him because he moves
+	// rather than because he is the brightest thing there.
+	figureBurn = 0.5
+
+	// figureFaint is how much of that he has as he arrives or leaves. What
+	// crosses this screen the rest of the time is water and sparks, and he
+	// comes and goes out of the same stuff before he is anybody.
 	figureFaint = 0.22
 )
 

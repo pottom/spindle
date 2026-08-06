@@ -446,3 +446,49 @@ func TestHeComesAndGoesSixWays(t *testing.T) {
 		t.Errorf("only %d of the %d ways ever came up", len(ways), figureWays)
 	}
 }
+
+// He is drawn under everything else on the screen — under the water and the
+// sparks, never mind the type. A figure at full strength is a cut-out laid over
+// the music; one drawn beneath it is in the room with it, and the eye goes to
+// him because he moves rather than because he is the brightest thing there.
+func TestHeIsFainterThanTheSparks(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 4 * time.Minute
+	m.words.beats, m.words.text = true, wordsNotes
+
+	// Loud, so the meter and its water are burning as brightly as they can.
+	bands := make([]float32, 28)
+	for i := range bands {
+		bands[i] = 1
+	}
+	m.scope.bands = bands
+	m.scope.envelope = 1
+
+	for bar := range int64(60) {
+		if at := bar * 7_000; faceDealt(at) && m.faceWho() != "" {
+			m.words.starts = at
+			break
+		}
+	}
+	m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters + m.faceStay()/2)
+
+	// What the meter is given against what he is given, out of the same palette.
+	levels := len(m.styles.Words[0])
+	meter := m.wordsBeatPaint(0, int(faceParts_), len(m.styles.Words), levels).level
+	his := int8(float32(meter) * figureBurn)
+	t.Logf("standing still he burns at %d of %d, where the meter beside him burns at %d", his, levels-1, meter)
+
+	if figureBurn >= 1 {
+		t.Error("he is drawn at full strength, want him under the rest of the picture")
+	}
+	if his >= meter && meter > 0 {
+		t.Errorf("he burns at %d and the meter at %d, want him the fainter of the two", his, meter)
+	}
+
+	// And fainter still while he is coming or going.
+	if figureFaint >= figureBurn {
+		t.Errorf("he arrives at %.2f and stands at %.2f, want the arrival the fainter", figureFaint, figureBurn)
+	}
+}
