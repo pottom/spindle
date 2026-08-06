@@ -918,9 +918,8 @@ func (m Model) faceLines(w, rows int) []string {
 
 	// The meter takes what the face left, the same way it takes what a line of
 	// words leaves.
-	tall := max((dotsY-(top+p.h))/dotsPerCellY, 0)
-	if tall >= wordsBand {
-		m.wordsUnder(grid, paint, hue, w, rows, tall, max(top-dotsPerCellY, 0))
+	if tall, head := m.wordsBandNow(w, rows); tall >= wordsBand {
+		m.wordsUnder(grid, paint, hue, w, rows, tall, head)
 	}
 	return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
 }

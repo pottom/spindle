@@ -317,6 +317,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if m.stage.on && m.scopeMode().words() {
 			m.wordsFlow(m.width, m.height)
 			m.faceFlow()
+			m.wordsEase(m.width, m.height)
 			m.figureSpray(m.width, m.height)
 			m.figureSweep(m.width, m.height)
 			// Thrown from the tips of the band along the foot, and given the

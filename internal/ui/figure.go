@@ -131,6 +131,25 @@ func abs(v int) int {
 // than a line of type, and the meters take what he leaves.
 const figureTall = 0.55
 
+// figureRoom is the room a drawn figure leaves the meter: the rows under his
+// feet, and the dots over his head. Nought and false when the one on is not a
+// drawn figure at all.
+func (m Model) figureRoom(w, rows int) (tall, head int, ok bool) {
+	who, there := figureFor(m.faceWho())
+	if !there || !m.faceUp() || w <= 0 || rows <= 0 {
+		return 0, 0, false
+	}
+
+	dotsY := rows * dotsPerCellY
+	pose, there := who.at(int(figureTall*float64(dotsY)), m.figurePose())
+	if !there {
+		return 0, 0, false
+	}
+
+	top := (dotsY-int(wordsMark*float64(dotsY)))/2 + int(wordsMark*float64(dotsY)) - pose.tall - m.figureLift(who)
+	return max((dotsY-(top+pose.tall))/dotsPerCellY, 0), max(top-dotsPerCellY, 0), true
+}
+
 // figureLines draws the figure who is on, with the face drawn into his head.
 //
 // The drawing gives the body, the arms, the legs and the walk; it cannot give
@@ -220,8 +239,8 @@ func (m Model) figureLines(w, rows int) []string {
 
 	// The face only while he is whole: a head coming apart does not blink.
 	if t < 1 {
-		if tall := max((dotsY-(top+pose.tall))/dotsPerCellY, 0); tall >= wordsBand {
-			m.wordsUnder(grid, paint, hue, w, rows, tall, max(top-dotsPerCellY, 0))
+		if tall, head := m.wordsBandNow(w, rows); tall >= wordsBand {
+			m.wordsUnder(grid, paint, hue, w, rows, tall, head)
 		}
 		return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
 	}
@@ -240,8 +259,8 @@ func (m Model) figureLines(w, rows int) []string {
 		})
 	}
 
-	if tall := max((dotsY-(top+pose.tall))/dotsPerCellY, 0); tall >= wordsBand {
-		m.wordsUnder(grid, paint, hue, w, rows, tall, max(top-dotsPerCellY, 0))
+	if tall, head := m.wordsBandNow(w, rows); tall >= wordsBand {
+		m.wordsUnder(grid, paint, hue, w, rows, tall, head)
 	}
 	return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
 }

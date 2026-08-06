@@ -653,6 +653,11 @@ type wordsState struct {
 	// happened to be built, so the words are complete as the line begins rather
 	// than half a second into it.
 	starts int64
+
+	// band and head are the room the meter has, in rows under whatever is on
+	// and in dots over it, eased towards what the picture actually leaves. See
+	// wordsEase.
+	band, head float32
 }
 
 // wordPaint is a word's colour: which hue of the palette, and at what strength.
@@ -777,6 +782,11 @@ const (
 	// at the top and the bottom, which is what a picture like this can least
 	// afford.
 	wordsReach = 0.94
+
+	// wordsRoomEase is how much of the way the meter's room moves towards what
+	// the picture leaves it, each frame. At thirty frames a second this is most
+	// of the way inside the time a line takes to gather. See wordsEase.
+	wordsRoomEase = 0.12
 
 	// wordsSpray is what a drop keeps of its light the moment it leaves the band
 	// and enters the lyric, and wordsSpent how sharply what is left falls away
@@ -925,8 +935,8 @@ func (m Model) wordsLines(w, rows int) []string {
 	// rather than into a picture of its own — which is what lets the water off
 	// the leash: a drop thrown from the meter can cross the whole screen and
 	// pass through the lyric, instead of stopping at the top of a box.
-	if _, tall := m.wordsRoom(rows); tall >= wordsBand {
-		m.wordsUnder(grid, paint, hue, w, rows, tall, m.wordsHeadroom(rows))
+	if tall, head := m.wordsBandNow(w, rows); tall >= wordsBand {
+		m.wordsUnder(grid, paint, hue, w, rows, tall, head)
 	}
 
 	return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
@@ -1123,6 +1133,57 @@ func (m Model) wordsHeadroom(rows int) int {
 
 	// A row of clear air under it, as under the words themselves.
 	return max(high-wordsCeiling*dotsPerCellY-dotsPerCellY, 0)
+}
+
+// wordsRoomNow is the room the meter has this frame, whatever is holding the
+// middle of the screen: a line of words, a row of marks, a card, a drawn figure
+// or the face this code draws itself.
+//
+// Every one of them leaves a different amount, and until this was asked in one
+// place each of them worked it out for itself at the moment it was drawn. The
+// meter stands on the floor and hangs from the ceiling either way, so what
+// changed at every change of picture was how far the columns reached — and it
+// changed between one frame and the next. A row of marks giving way to a line
+// of words moved three rows of meter across the whole width of the screen in a
+// single frame, which is the picture cutting rather than the picture moving.
+func (m Model) wordsRoomNow(w, rows int) (tall, head int) {
+	if p, _, top, ok := m.faceRoom(w, rows); ok && m.faceUp() && m.faceWho() == "" {
+		return max((rows*dotsPerCellY-(top+p.h))/dotsPerCellY, 0), max(top-dotsPerCellY, 0)
+	}
+	if tall, head, ok := m.figureRoom(w, rows); ok {
+		return tall, head
+	}
+	_, tall = m.wordsRoom(rows)
+	return tall, m.wordsHeadroom(rows)
+}
+
+// wordsEase moves the meter's room towards what the picture on screen leaves
+// it, rather than taking it whole.
+//
+// Over the time a line takes to gather, so that the meter arrives with whatever
+// it is making room for: while it is still too tall for the new picture the new
+// picture is not there yet — it is halfway through coming together, a scatter of
+// dim specks — and by the time there is a solid line of type to touch, the
+// columns have pulled back under it.
+func (m *Model) wordsEase(w, rows int) {
+	tall, head := m.wordsRoomNow(w, rows)
+	if m.words.band == 0 && m.words.head == 0 {
+		m.words.band, m.words.head = float32(tall), float32(head)
+		return
+	}
+
+	m.words.band += (float32(tall) - m.words.band) * wordsRoomEase
+	m.words.head += (float32(head) - m.words.head) * wordsRoomEase
+}
+
+// wordsBandNow is the meter's room as it is drawn this frame: what it has been
+// eased to, or what the picture leaves it on the first frame of all, before
+// there has been anything to ease from.
+func (m Model) wordsBandNow(w, rows int) (tall, head int) {
+	if m.words.band == 0 && m.words.head == 0 {
+		return m.wordsRoomNow(w, rows)
+	}
+	return int(m.words.band + 0.5), int(m.words.head + 0.5)
 }
 
 // wordsRoom is the band left under the words: where it starts, in rows, and how

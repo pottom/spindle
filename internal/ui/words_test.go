@@ -1257,3 +1257,53 @@ func TestTheMarksPopInTurn(t *testing.T) {
 		t.Errorf("%d marks were still standing at the end", was)
 	}
 }
+
+// The meter does not jump when the picture it is making room for changes.
+//
+// Every picture on this screen leaves the meter a different amount of room: a
+// line of words, a row of marks, a card, a figure standing in the middle. Each
+// of them used to be measured at the moment it was drawn, so the columns along
+// the top and the foot of the screen changed height between one frame and the
+// next — a change of picture read as a cut rather than as one picture giving
+// way to another.
+func TestTheMeterDoesNotJumpBetweenPictures(t *testing.T) {
+	m := sung(10, 40, 44, 48)
+	w, rows := m.width, m.height
+
+	was, wasHead := -1, -1
+	var most, mostHead int
+	var when time.Duration
+
+	for at := 5 * time.Second; at < 50*time.Second; at += 33 * time.Millisecond {
+		m.setProgress(at)
+		if cmd := m.wordsGrind(); cmd != nil {
+			if got := cmd(); got != nil {
+				tm, _ := m.Update(got)
+				m = tm.(Model)
+			}
+		}
+		m.faceFlow()
+		m.wordsEase(w, rows)
+
+		// Measured from the first picture on: before there is one there is no
+		// room to ease from, and the meter arriving with it is the meter
+		// arriving, not the meter jumping.
+		tall, head := m.wordsBandNow(w, rows)
+		if was > 0 {
+			if abs(tall-was) > most {
+				most, when = abs(tall-was), at
+			}
+			mostHead = max(mostHead, abs(head-wasHead))
+		}
+		was, wasHead = tall, head
+	}
+
+	t.Logf("over the record the meter's room moved at most %d rows in a frame (at %s), and %d dots over the head",
+		most, when, mostHead)
+	if most > 1 {
+		t.Errorf("the meter's room moved %d rows in one frame, want it eased", most)
+	}
+	if mostHead > dotsPerCellY {
+		t.Errorf("the room over the head moved %d dots in one frame, want it eased", mostHead)
+	}
+}
