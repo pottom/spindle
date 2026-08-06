@@ -397,31 +397,6 @@ func TestHeComesAndGoesTwoWays(t *testing.T) {
 		}
 	}
 
-	// And he is faint on his way in, the way the water and the sparks are: a
-	// figure who slams in at full strength is a picture being switched on.
-	for way := range figureWays {
-		var dim, full float32
-		var n int
-		p.draw(func(x, y int) {
-			if _, _, burn, on := figureWarp(way, 0.15, x, y, p.wide, p.tall, 184); on {
-				dim += burn
-				n++
-			}
-		})
-		p.draw(func(x, y int) {
-			_, _, burn, _ := figureWarp(way, 1, x, y, p.wide, p.tall, 184)
-			full += burn
-		})
-		if n == 0 {
-			continue
-		}
-		dim /= float32(n)
-		t.Logf("way %d burns at %.2f as it starts against 1.00 standing", way, dim)
-		if dim > 0.5 {
-			t.Errorf("way %d burns at %.2f on its way in, want it faint", way, dim)
-		}
-	}
-
 	// A dot wanders the same way twice, so a record comes apart the same twice.
 	once := figureSpeck(11, 7)
 	if again := figureSpeck(11, 7); again != once {
@@ -431,32 +406,24 @@ func TestHeComesAndGoesTwoWays(t *testing.T) {
 		t.Error("two dots were given the same number, so they will wander together")
 	}
 
-	// He comes on one of two ways and leaves one of two, and either end may be
-	// on his feet: what was thrown out was spinning, dropping in from over the
-	// top, rising through the floor and bursting apart. They moved him about
-	// the screen, which is what a sprite does; these do something to what he is
-	// made of, which only this screen can do.
+	// He always walks on. How he leaves is dealt: on his feet, or by coming
+	// apart. What was thrown out was spinning, dropping in from over the top,
+	// rising through the floor, bursting apart — those moved him about the
+	// screen, which is what a sprite does — and gathering out of specks, which
+	// however it was worked out read as a fade, and a fade is what happens to a
+	// picture rather than to somebody.
 	m := scopeModel(160, 46)
 	m.words.beats = true
-	in, out := map[figureWay]int{}, map[figureWay]int{}
+	out := map[figureWay]int{}
 	for bar := range int64(60) {
 		m.words.starts = bar * 7_000
-		in[m.figureComesBy()]++
+		if m.figureComesBy() != figureWalks {
+			t.Errorf("bar %d comes on some way other than on his feet", m.words.starts)
+		}
 		out[m.figureGoesBy()]++
 	}
-	t.Logf("over sixty visits: in %v, out %v", in, out)
+	t.Logf("over sixty visits he leaves: %v", out)
 
-	if in[figureCrumbles] != 0 {
-		t.Error("he arrived by coming apart")
-	}
-	if out[figureGathers] != 0 {
-		t.Error("he left by gathering")
-	}
-	for _, way := range []figureWay{figureWalks, figureGathers} {
-		if in[way] == 0 {
-			t.Errorf("he never arrived by way %d", way)
-		}
-	}
 	for _, way := range []figureWay{figureWalks, figureCrumbles} {
 		if out[way] == 0 {
 			t.Errorf("he never left by way %d", way)
@@ -510,35 +477,43 @@ func TestHeIsFainterThanTheSparks(t *testing.T) {
 	}
 }
 
-// He does not fade in and out — he comes together out of specks and goes back
-// to them. Every dot has its own moment, so what you watch is a shape being
-// assembled rather than a picture being turned up.
-func TestHeComesTogetherOutOfSpecks(t *testing.T) {
+// He comes apart a speck at a time. Not evenly — the top goes first, the way a
+// wall does, and each dot on its own moment, because a shape that comes apart
+// in rows is a shape being wiped.
+func TestHeComesApartOutOfSpecks(t *testing.T) {
 	d, _ := figureFor("robot")
 	p, _ := d.at(100, "idle")
 
-	there := func(way figureWay, at float64) int {
+	there := func(at float64) int {
 		var n int
 		p.draw(func(x, y int) {
-			if _, _, _, on := figureWarp(way, at, x, y, p.wide, p.tall, 184); on {
+			if _, _, _, on := figureWarp(figureCrumbles, at, x, y, p.wide, p.tall, 184); on {
 				n++
 			}
 		})
 		return n
 	}
 
-	for way := range figureWays {
-		early, half, whole := there(way, 0.1), there(way, 0.5), there(way, 1)
-		t.Logf("way %d: %d dots a tenth in, %d half way, %d standing", way, early, half, whole)
+	early, half, whole := there(0.1), there(0.5), there(1)
+	t.Logf("%d dots a tenth of the way through coming apart, %d half way, %d standing", early, half, whole)
 
-		// The ones with no bias have all turned up by half way, which is what
-		// lets him stand there whole for a moment before he is done arriving.
-		if early >= half || half > whole {
-			t.Errorf("way %d went %d → %d → %d, want him gathering", way, early, half, whole)
+	if early >= half || half >= whole {
+		t.Errorf("it went %d → %d → %d, want him coming apart", early, half, whole)
+	}
+	if early > whole/3 {
+		t.Errorf("%d of %d dots are still up a tenth of the way through", early, whole)
+	}
+
+	// Walking on and off moves nothing: he is off the side of the screen, and a
+	// figure being walked on is not a figure being drawn on.
+	var moved int
+	p.draw(func(x, y int) {
+		if nx, ny, burn, on := figureWarp(figureWalks, 0.3, x, y, p.wide, p.tall, 184); !on || nx != x || ny != y || burn != 1 {
+			moved++
 		}
-		if early > whole/3 {
-			t.Errorf("way %d has %d of %d dots up a tenth of the way in, want a few specks", way, early, whole)
-		}
+	})
+	if moved != 0 {
+		t.Errorf("walking on moved %d dots, want him whole and on his feet", moved)
 	}
 }
 
@@ -690,15 +665,10 @@ func TestHeWalksThroughTheMarks(t *testing.T) {
 		t.Error("what he knocked over never reached the water")
 	}
 
-	// And a visit that gathers out of specks leaves the row alone.
-	for bar := range int64(400) {
-		m.words.starts = bar * 7_000
-		if faceDealt(m.words.starts) && m.faceWho() != "" && m.figureComesBy() == figureGathers {
-			break
-		}
-	}
+	// And a bar with no marks up is a bar with nothing to walk into.
+	m.words.beats = false
 	if m.figureSweeps() {
-		t.Error("he came together out of specks in the middle of the row and still knocked it over")
+		t.Error("he walked into a row of marks that was not there")
 	}
 }
 

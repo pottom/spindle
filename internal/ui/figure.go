@@ -408,24 +408,21 @@ type figureWay int
 
 const (
 	figureWalks    figureWay = iota // on from the side, off by one
-	figureGathers                   // out of specks, from the floor up
 	figureCrumbles                  // to pieces, and the pieces are handed to the water
 	figureWays
 )
 
-// Spinning, dropping in from over the top, rising through the floor and
-// bursting apart were all built and all thrown out. They moved him about the
-// screen, which is a thing a sprite does; these two do something to what he is
-// made of, which is the thing only this screen can do.
+// Spinning, dropping in from over the top, rising through the floor, bursting
+// apart and gathering out of specks were all built and all thrown out. The
+// first four moved him about the screen, which is a thing a sprite does. The
+// last was worse: however it was worked out, a figure arriving a dot at a time
+// reads as one being faded up, and a fade is what happens to a picture rather
+// than to somebody.
+//
+// So he arrives on his feet, whole, from the side. What is left is the one that
+// does something to what he is made of instead of to where he is.
 
 const (
-	// figureGrain is how much of a dot's own moment is decided by where it is
-	// rather than by the dot itself, and figureGrainOver how far through the
-	// movement the last of them has turned up — short of the end, so he stands
-	// there whole for a moment before he is done arriving.
-	figureGrain     = 0.45
-	figureGrainOver = 1.35
-
 	// figureCrumbFall is how much of coming apart is decided by how high a dot
 	// is and how much by the dot itself. All height and he unzips in rows; all
 	// chance and he dissolves evenly, which is a fade. Between them he comes
@@ -453,21 +450,9 @@ const (
 	figureFaint = 0.22
 )
 
-// figureComesBy and figureGoesBy are how this visit starts and ends.
-//
-// Dealt from the bar like everything else, and never the same way twice in one
-// visit: coming and going by the same trick is a figure with one idea.
-func (m Model) figureComesBy() figureWay {
-	h := uint64(m.words.starts)*0xd6e8feb86659fd93 + 0x94d049bb133111eb
-	h ^= h >> 31
-	h *= 0x9e3779b97f4a7c15
-	h ^= h >> 29
-
-	if h%2 == 0 {
-		return figureWalks
-	}
-	return figureGathers
-}
+// figureComesBy and figureGoesBy are how this visit starts and ends. He always
+// walks on; how he leaves is dealt from the bar like everything else.
+func (m Model) figureComesBy() figureWay { return figureWalks }
 
 func (m Model) figureGoesBy() figureWay {
 	h := uint64(m.words.starts)*0x2545f4914f6cdd1d + 0xff51afd7ed558ccd
@@ -489,59 +474,16 @@ func figureSliding(way figureWay) bool { return way == figureWalks }
 // is drawn at all.
 //
 // t is how far the movement has run: nought as it begins, one when he is whole
-// and standing. Everything is worked out from where the dot belongs, so a
-// thousand of them cost nothing to remember and come apart the same way twice.
-//
-// The brightness is what makes it read. A figure who slams in at full strength
-// is a picture being switched on; the same dots coming up out of the dark, or
-// going out as they fall, are the water and the sparks that cross this screen
-// all the time — the same stuff, doing something else.
+// and standing. Only coming apart moves anything — he walks on and off on his
+// feet, and a figure being walked on is not a figure being drawn on.
 func figureWarp(way figureWay, t float64, x, y, wide, tall, dotsY int) (int, int, float32, bool) {
-	if t >= 1 {
+	if way != figureCrumbles || t >= 1 {
 		return x, y, 1, true
 	}
-	t = min64(max64(t, 0), 1)
-
-	// Faint while he is on his way, and only at full strength once he is whole.
-	burn := float32(figureFaint + (1-figureFaint)*t*t)
-
-	// And not all of him at once. Every dot has its own moment, so he comes
-	// together out of specks and goes back to them — which is what the water
-	// does, and what a shape being faded up and down is not.
-	if way != figureCrumbles && figureNotYet(way, x, y, tall, t) {
+	if figureLoose(x, y, tall, min64(max64(t, 0), 1)) {
 		return 0, 0, 0, false
 	}
-
-	switch way {
-	case figureCrumbles:
-		// He does not fall apart on screen: he is handed to the water. Every
-		// dot that has come loose has left him and is a drop now, arcing and
-		// fading on the same physics the meter throws — so what you watch is
-		// not a dimmer figure, it is a figure turning into sparks. See
-		// figureLoose and Model.figureSpray.
-		if figureLoose(x, y, tall, t) {
-			return 0, 0, 0, false
-		}
-		return x, y, burn, true
-	}
-
-	return x, y, burn, true
-}
-
-// figureNotYet reports that a dot has not arrived yet, or has already gone.
-//
-// Its moment is its own, nudged by where it is: what rises comes up from the
-// feet, what falls lands from the head down, and the rest of them turn up in no
-// order at all. A shape that arrives all at once is a slide changing.
-func figureNotYet(way figureWay, x, y, tall int, t float64) bool {
-	own := float64(figureSpeck(x, y)%1000) / 1000
-	high := 1 - float64(y)/float64(max(tall, 1))
-
-	var by float64
-	if way == figureGathers {
-		by = high // out of the floor, the feet first
-	}
-	return own*(1-figureGrain)+by*figureGrain > t*figureGrainOver
+	return x, y, 1, true
 }
 
 // figureLoose reports that a dot has come away from him: the top goes first,
