@@ -152,21 +152,24 @@ func (m Model) figureLines(w, rows int) []string {
 		part[i] = m.wordsBeatPaint(int(i), int(faceParts_), freqs, levels)
 	}
 
-	light := func(x, y int, at facePart) {
+	lightAt := func(x, y int, at facePart, burn float32) {
 		if x < 0 || y < 0 || x >= dotsX || y >= dotsY {
 			return
 		}
 		cell := (y/dotsPerCellY)*w + x/dotsPerCellX
 		grid[cell] |= 1 << brailleBit[x%dotsPerCellX][y%dotsPerCellY]
-		if s := part[at]; s.level > paint[cell] {
-			paint[cell], hue[cell] = s.level, s.hue
+
+		s := part[at]
+		if level := int8(float32(s.level) * burn); level > paint[cell] {
+			paint[cell], hue[cell] = level, s.hue
 		}
 	}
+	light := func(x, y int, at facePart) { lightAt(x, y, at, 1) }
 
 	pose.draw(func(x, y int) {
-		x, y, on := figureWarp(way, t, x, y, pose.wide, pose.tall, dotsY)
+		x, y, burn, on := figureWarp(way, t, x, y, pose.wide, pose.tall, dotsY)
 		if on {
-			light(x+left, y+top, facePartBody)
+			lightAt(x+left, y+top, facePartBody, burn)
 		}
 	})
 
@@ -357,6 +360,11 @@ const (
 	// figureGrit how much they wander sideways on the way down.
 	figureCrumb = 1.1
 	figureGrit  = 0.35
+
+	// figureFaint is how much of his own light he has as he arrives or leaves.
+	// Low: what crosses this screen the rest of the time is water and sparks,
+	// and he comes and goes out of the same stuff before he is anybody.
+	figureFaint = 0.22
 )
 
 // figureComesBy and figureGoesBy are how this visit starts and ends.
@@ -389,16 +397,25 @@ func (m Model) figureGoesBy() figureWay {
 // carries him on or off rather than something happening to his dots.
 func figureSliding(way figureWay) bool { return way == figureWalks }
 
-// figureWarp is where a dot of his goes, and whether it is drawn at all.
+// figureWarp is where a dot of his goes, how brightly it burns, and whether it
+// is drawn at all.
 //
 // t is how far the movement has run: nought as it begins, one when he is whole
 // and standing. Everything is worked out from where the dot belongs, so a
 // thousand of them cost nothing to remember and come apart the same way twice.
-func figureWarp(way figureWay, t float64, x, y, wide, tall, dotsY int) (int, int, bool) {
+//
+// The brightness is what makes it read. A figure who slams in at full strength
+// is a picture being switched on; the same dots coming up out of the dark, or
+// going out as they fall, are the water and the sparks that cross this screen
+// all the time — the same stuff, doing something else.
+func figureWarp(way figureWay, t float64, x, y, wide, tall, dotsY int) (int, int, float32, bool) {
 	if t >= 1 {
-		return x, y, true
+		return x, y, 1, true
 	}
 	t = min64(max64(t, 0), 1)
+
+	// Faint while he is on his way, and only at full strength once he is whole.
+	burn := float32(figureFaint + (1-figureFaint)*t*t)
 
 	cx, cy := float64(wide)/2, float64(tall)/2
 	dx, dy := float64(x)-cx, float64(y)-cy
@@ -409,7 +426,7 @@ func figureWarp(way figureWay, t float64, x, y, wide, tall, dotsY int) (int, int
 		a := (1 - t) * figureTurns * 2 * math.Pi
 		sin, cos := math.Sin(a), math.Cos(a)
 		size := 0.25 + 0.75*t
-		return int(cx + (dx*cos-dy*sin)*size), int(cy + (dx*sin+dy*cos)*size), true
+		return int(cx + (dx*cos-dy*sin)*size), int(cy + (dx*sin+dy*cos)*size), burn, true
 
 	case figureDrops:
 		// From over the top, fast, and squashed for the moment he lands.
@@ -418,19 +435,21 @@ func figureWarp(way figureWay, t float64, x, y, wide, tall, dotsY int) (int, int
 		if t > 0.82 {
 			squash = 1 - 0.35*math.Sin(math.Pi*(t-0.82)/0.18)
 		}
-		return x, int(cy + dy*squash - fall), true
+		return x, int(cy + dy*squash - fall), burn, true
 
 	case figureRises:
-		return x, y + int((1-t)*figureFalls*float64(dotsY)), true
+		return x, y + int((1-t)*figureFalls*float64(dotsY)), burn, true
 
 	case figureBursts:
 		// Every dot on its own line out from the middle, and gone before it has
 		// got far — what is left of a burst is a shape you have to remember.
 		away := (1 - t) * figureFlies
 		if figureSpeck(x, y)%100 < int(away*45) {
-			return 0, 0, false
+			return 0, 0, 0, false
 		}
-		return int(float64(x) + dx*away), int(float64(y) + dy*away), true
+		// A piece that has flown further is further gone, the way a spark is.
+		return int(float64(x) + dx*away), int(float64(y) + dy*away),
+			burn * float32(1-0.7*away/figureFlies), true
 
 	case figureCrumbles:
 		// The top goes first, the way a wall does, and every piece takes its own
@@ -438,14 +457,17 @@ func figureWarp(way figureWay, t float64, x, y, wide, tall, dotsY int) (int, int
 		gone := 1 - t
 		high := 1 - float64(y)/float64(max(tall, 1))
 		if high < gone-0.15 {
-			return 0, 0, false
+			return 0, 0, 0, false
 		}
 		drop := gone * gone * figureCrumb * float64(dotsY)
 		drift := (float64(figureSpeck(x, y)%200)/100 - 1) * figureGrit * gone * float64(wide)
-		return int(float64(x) + drift), y + int(drop), true
+
+		// A piece that has fallen further has less of itself left.
+		return int(float64(x) + drift), y + int(drop),
+			burn * float32(1-0.75*drop/(figureCrumb*float64(dotsY))), true
 	}
 
-	return x, y, true
+	return x, y, burn, true
 }
 
 // figureSpeck is a number of a dot's own, so a piece of him wanders the same

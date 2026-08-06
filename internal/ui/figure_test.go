@@ -360,10 +360,10 @@ func TestHeComesAndGoesSixWays(t *testing.T) {
 	for way := range figureWays {
 		var moved, lost int
 		p.draw(func(x, y int) {
-			nx, ny, on := figureWarp(way, 1, x, y, p.wide, p.tall, 184)
+			nx, ny, burn, on := figureWarp(way, 1, x, y, p.wide, p.tall, 184)
 			if !on {
 				lost++
-			} else if nx != x || ny != y {
+			} else if nx != x || ny != y || burn != 1 {
 				moved++
 			}
 		})
@@ -380,7 +380,7 @@ func TestHeComesAndGoesSixWays(t *testing.T) {
 		var moved, lost, all int
 		p.draw(func(x, y int) {
 			all++
-			nx, ny, on := figureWarp(way, 0.4, x, y, p.wide, p.tall, 184)
+			nx, ny, _, on := figureWarp(way, 0.4, x, y, p.wide, p.tall, 184)
 			switch {
 			case !on:
 				lost++
@@ -391,6 +391,31 @@ func TestHeComesAndGoesSixWays(t *testing.T) {
 		t.Logf("way %d part way: %d of %d dots moved, %d gone", way, moved, all, lost)
 		if moved+lost < all/2 {
 			t.Errorf("way %d moved %d and dropped %d of %d dots, want it doing something", way, moved, lost, all)
+		}
+	}
+
+	// And he is faint on his way in, the way the water and the sparks are: a
+	// figure who slams in at full strength is a picture being switched on.
+	for way := range figureWays {
+		var dim, full float32
+		var n int
+		p.draw(func(x, y int) {
+			if _, _, burn, on := figureWarp(way, 0.15, x, y, p.wide, p.tall, 184); on {
+				dim += burn
+				n++
+			}
+		})
+		p.draw(func(x, y int) {
+			_, _, burn, _ := figureWarp(way, 1, x, y, p.wide, p.tall, 184)
+			full += burn
+		})
+		if n == 0 {
+			continue
+		}
+		dim /= float32(n)
+		t.Logf("way %d burns at %.2f as it starts against 1.00 standing", way, dim)
+		if dim > 0.5 {
+			t.Errorf("way %d burns at %.2f on its way in, want it faint", way, dim)
 		}
 	}
 
