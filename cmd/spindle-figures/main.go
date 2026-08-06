@@ -26,6 +26,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"go/format"
@@ -60,7 +61,7 @@ type height struct {
 type pose struct {
 	name       string
 	wide, tall int
-	rows       []string
+	bits       string
 
 	// head is where the face goes: the box the figure's own head fills, which
 	// is found rather than given, so a head that bobs through a walk cycle is
@@ -138,12 +139,8 @@ func emit(b *strings.Builder, dir string, f figure) error {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(b, "\t\t\t\t%q: {wide: %d, tall: %d, headX: %d, headY: %d, headW: %d, headH: %d, rows: []string{\n",
-				name, p.wide, p.tall, p.headX, p.headY, p.headW, p.headH)
-			for _, row := range p.rows {
-				fmt.Fprintf(b, "\t\t\t\t\t%q,\n", row)
-			}
-			fmt.Fprintf(b, "\t\t\t\t}},\n")
+			fmt.Fprintf(b, "\t\t\t\t%q: {wide: %d, tall: %d, headX: %d, headY: %d, headW: %d, headH: %d, bits: %q},\n",
+				name, p.wide, p.tall, p.headX, p.headY, p.headW, p.headH, p.bits)
 		}
 		fmt.Fprintf(b, "\t\t\t}},\n")
 	}
@@ -229,17 +226,19 @@ func convert(path, name string, h height, f figure) (pose, error) {
 		}
 	}
 
-	for _, row := range lit {
-		var sb strings.Builder
-		for _, on := range row {
+	// Packed a dot to a bit and written as base64: a drawing spelled out one
+	// character a dot is six times the source, and six figures of it is a
+	// megabyte of Go nobody will ever read.
+	stride := (wide + 7) / 8
+	packed := make([]byte, stride*h.Tall)
+	for y, row := range lit {
+		for x, on := range row {
 			if on {
-				sb.WriteByte('#')
-			} else {
-				sb.WriteByte('.')
+				packed[y*stride+x/8] |= 1 << (x % 8)
 			}
 		}
-		p.rows = append(p.rows, sb.String())
 	}
+	p.bits = base64.StdEncoding.EncodeToString(packed)
 	return p, nil
 }
 

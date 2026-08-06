@@ -1,8 +1,10 @@
 package ui
 
 import (
+	"encoding/base64"
 	"math"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -32,10 +34,15 @@ type figureSize struct {
 }
 
 // figurePose is one drawing: the dots, and where its head is.
+//
+// The dots are packed a bit each and written as base64, because a drawing
+// spelled out a character a dot is six times the size in the source and this
+// file already holds every pose of every figure. Nothing is unpacked: drawing
+// reads the bit it wants.
 type figurePose struct {
 	wide, tall                 int
 	headX, headY, headW, headH int
-	rows                       []string
+	bits                       string
 }
 
 // figureFor is the drawing of a given name, and whether there is one.
@@ -63,13 +70,32 @@ func (d figureDrawing) at(tall int, pose string) (figurePose, bool) {
 // draw lights the pose's dots. The head is not drawn: it was cleared when the
 // figure was made, and what goes in it is the caller's business.
 func (p figurePose) draw(light func(x, y int)) {
-	for y, row := range p.rows {
-		for x, on := range row {
-			if on == '#' {
+	packed := figureDots(p.bits)
+	stride := (p.wide + 7) / 8
+	for y := range p.tall {
+		for x := range p.wide {
+			if at := y*stride + x/8; at < len(packed) && packed[at]&(1<<(x%8)) != 0 {
 				light(x, y)
 			}
 		}
 	}
+}
+
+// figureDots unpacks a drawing, once. Every frame asks for the same handful of
+// them, and unpacking a thousand bytes thirty times a second to look at the
+// same picture is work nobody asked for.
+var figureUnpacked sync.Map
+
+func figureDots(bits string) []byte {
+	if got, ok := figureUnpacked.Load(bits); ok {
+		return got.([]byte)
+	}
+	packed, err := base64.StdEncoding.DecodeString(bits)
+	if err != nil {
+		return nil
+	}
+	figureUnpacked.Store(bits, packed)
+	return packed
 }
 
 func abs(v int) int {

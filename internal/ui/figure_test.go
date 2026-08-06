@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -279,5 +280,65 @@ func TestTheDrawingFollowsTheAct(t *testing.T) {
 	m.face.act = "nonesuch"
 	if got := m.figurePose(); got == "" {
 		t.Error("an unknown act left him with no drawing at all")
+	}
+}
+
+// Every figure in the box is whole: it has the drawings the acts call for, at
+// every size, and it says where it came from.
+func TestEveryFigureIsWhole(t *testing.T) {
+	if len(figures) < 2 {
+		t.Fatal("there is only one figure — run go run ./cmd/spindle-figures")
+	}
+
+	names := make([]string, 0, len(figures))
+	for name := range figures {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	t.Logf("%d figures: %v", len(names), names)
+
+	for _, name := range names {
+		d := figures[name]
+		if d.from == "" || d.licence == "" {
+			t.Errorf("%s does not say where it came from", name)
+		}
+		if len(d.sizes) < 2 {
+			t.Errorf("%s comes in %d sizes, want one for a narrow terminal and one for a wide", name, len(d.sizes))
+		}
+
+		for _, size := range d.sizes {
+			for _, act := range figureActNames {
+				for _, f := range figureActs[act] {
+					p, ok := size.poses[f.pose]
+					if !ok {
+						t.Errorf("%s at %d dots has no %q, which the %s act wants", name, size.tall, f.pose, act)
+						continue
+					}
+					var lit int
+					p.draw(func(_, _ int) { lit++ })
+					if lit == 0 {
+						t.Errorf("%s at %d dots draws nothing for %q", name, size.tall, f.pose)
+					}
+				}
+			}
+			for i := range 8 {
+				if _, ok := size.poses["walk"+string(rune('0'+i))]; !ok {
+					t.Errorf("%s at %d dots is missing walk frame %d", name, size.tall, i)
+				}
+			}
+		}
+	}
+
+	// And they take turns: a record does not get the same one every time.
+	m := scopeModel(160, 46)
+	m.words.beats = true
+	seen := map[string]int{}
+	for bar := range int64(120) {
+		m.words.starts = bar * 7_000
+		seen[m.faceWho()]++
+	}
+	t.Logf("over a hundred and twenty bars: %v", seen)
+	if len(seen) < len(names) {
+		t.Errorf("only %d of the %d figures ever came on", len(seen), len(names))
 	}
 }
