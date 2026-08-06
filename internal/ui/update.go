@@ -243,7 +243,17 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		// What is on screen is given notice, and goes out the way the line
 		// before it came in.
 		if m.words.have.DotsX == message.Grain.DotsX {
-			m.words.was, m.words.went, m.words.leave = m.words.have, time.Now(), m.words.move
+			m.words.was, m.words.wasWhere = m.words.have, m.words.where
+			m.words.went, m.words.leave = time.Now(), m.words.move
+
+			// A row of marks goes off the way a row of anything goes when
+			// somebody walks down it: one bursts, then the next. See wordsPop.
+			//
+			// Asked of the text that is leaving rather than of the flag, which
+			// by now says what is arriving.
+			if wordsBeats(m.words.text) {
+				m.words.leave = wordsPopping
+			}
 		}
 
 		m.words.have, m.words.text = message.Grain, message.Text

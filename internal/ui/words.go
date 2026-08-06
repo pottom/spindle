@@ -571,16 +571,20 @@ const (
 	wordsWiping                      // left to right, like something being written
 	wordsWipingBack                  // right to left
 	wordsBlurring                    // barely anywhere: a picture coming into focus
+	wordsPopping                     // one piece at a time, and each one bursts
 	wordsMoves
 )
 
 // wordsMoveFor picks one from the line.
+//
+// Popping is not among them: it is a way of leaving, and a line that arrived by
+// un-bursting would be a film run backwards.
 func wordsMoveFor(text string) wordsMove {
 	var h uint32 = 2166136261
 	for _, r := range text {
 		h = (h ^ uint32(r)) * 16777619
 	}
-	return wordsMove(h % uint32(wordsMoves))
+	return wordsMove(h % uint32(wordsPopping))
 }
 
 // wordsState is the picture the words are drawn from, and how far it has
@@ -591,10 +595,12 @@ type wordsState struct {
 	// a line that leaves the way it came looks like it was pushed.
 	move, leave wordsMove
 
-	// was is the line before this one, still on its way out, and went is when it
-	// was given notice.
-	was  cover.Grain
-	went time.Time
+	// was is the line before this one, still on its way out, wasWhere is where
+	// its pieces were — a picture that goes off a piece at a time has to know
+	// what its pieces were — and went is when it was given notice.
+	was      cover.Grain
+	wasWhere msg.WordLayout
+	went     time.Time
 
 	have           cover.Grain
 	text           string
@@ -674,6 +680,15 @@ const (
 	// moves that arrive a row or a column at a time: at nothing they all land
 	// together, at one the last dot only starts as the first one finishes.
 	wordsStagger = 0.55
+
+	// wordsPopHold is how much of the leaving one piece's own burst takes. The
+	// starts are spread over the rest, so the bursts overlap — which is what
+	// makes it a run down the row rather than a queue being served.
+	wordsPopHold = 0.42
+
+	// wordsPopFlies is how far a dot of a bursting piece gets, as a share of
+	// how far it already is from the middle of that piece.
+	wordsPopFlies = 2.5
 
 	// wordsAhead is how bright a word that has not been sung yet is drawn, as a
 	// share of the palette. Dim enough to read as waiting, bright enough to read
@@ -1144,20 +1159,72 @@ func (m Model) drawLeaving(grid []uint8, paint, hue []int8, w, rows int, gone fl
 				continue
 			}
 
-			p := 1 - wordsAlong(m.words.leave, gone, x, y, dotsX, dotsY)
-			dx, dy := wordsFrom(m.words.leave, x, y, dotsX, dotsY)
-			at, to := x+int(dx*(1-p)), y+int(dy*(1-p))
+			var at, to int
+			var burn int8
+
+			if m.words.leave == wordsPopping {
+				var ok bool
+				at, to, burn, ok = m.wordsPop(x, y, gone, levels)
+				if !ok {
+					continue
+				}
+			} else {
+				p := 1 - wordsAlong(m.words.leave, gone, x, y, dotsX, dotsY)
+				dx, dy := wordsFrom(m.words.leave, x, y, dotsX, dotsY)
+				at, to, burn = x+int(dx*(1-p)), y+int(dy*(1-p)), step
+			}
+
 			if at < 0 || to < 0 || at >= dotsX || to >= dotsY {
 				continue
 			}
 
 			cell := (to/dotsPerCellY)*w + at/dotsPerCellX
 			grid[cell] |= 1 << brailleBit[at%dotsPerCellX][to%dotsPerCellY]
-			if step > paint[cell] {
-				paint[cell] = step
+			if burn > paint[cell] {
+				paint[cell] = burn
 			}
 		}
 	}
+}
+
+// wordsPop is where a dot of the picture on its way out has got to, when the
+// picture is going off one piece at a time.
+//
+// A row of marks does not want to be wiped or slid away: it wants to go the way
+// a row of anything goes when somebody walks down it — the first one bursts, and
+// then the next, and then the next. Each piece waits its turn, holds still while
+// it waits, and then flies apart from its own middle and is gone.
+func (m Model) wordsPop(x, y int, gone float32, levels int) (int, int, int8, bool) {
+	where := m.words.wasWhere
+	piece := where.WordAt(x, y)
+	if piece < 0 || where.Count == 0 {
+		return 0, 0, 0, false
+	}
+
+	// Whose turn it is, and how far into that turn we are. The turns are spread
+	// over what is left after one burst's own length, so the last of them
+	// finishes exactly as the leaving does rather than being cut off.
+	start := float32(piece) / float32(max(where.Count-1, 1)) * (1 - wordsPopHold)
+	mine := (gone - start) / wordsPopHold
+	switch {
+	case mine <= 0:
+		// Still standing there, waiting to go.
+		return x, y, int8(min(int(wordsAhead*float32(levels)), levels-1)), true
+	case mine >= 1:
+		return 0, 0, 0, false
+	}
+
+	// Gone off: out from the middle of its own piece, fast at first, and out of
+	// light before it has gone far.
+	cx, cy := where.Middle(piece)
+	dx, dy := float32(x-cx), float32(y-cy)
+	fly := mine * mine * wordsPopFlies
+
+	burn := int8(float32(levels-1) * (1 - mine) * wordsAhead * 2)
+	if burn < 0 {
+		return 0, 0, 0, false
+	}
+	return x + int(dx*fly), y + int(dy*fly), burn, true
 }
 
 // wordsStep is one dot's share of the gathering, given how far down the queue

@@ -159,9 +159,12 @@ func TestWordsGatherEveryWay(t *testing.T) {
 		return sb.String()
 	}
 
+	// The arrivals only. Popping is a way of leaving — a line that arrived by
+	// un-bursting would be a film run backwards — and it is drawn by wordsPop
+	// rather than by the gathering. See TestTheMarksPopInTurn.
 	half := map[string]wordsMove{}
 	var settled string
-	for move := wordsDrifting; move < wordsMoves; move++ {
+	for move := wordsDrifting; move < wordsPopping; move++ {
 		m.words.move = move
 
 		if got := picture(wordsGather / 2); half[got] != 0 || len(half) > 0 && got == "" {
@@ -178,10 +181,10 @@ func TestWordsGatherEveryWay(t *testing.T) {
 			t.Errorf("move %d settled into a different picture", move)
 		}
 	}
-	if len(half) != int(wordsMoves) {
-		t.Errorf("%d of the %d moves look alike halfway through", int(wordsMoves)-len(half), wordsMoves)
+	if len(half) != int(wordsPopping) {
+		t.Errorf("%d of the %d arrivals look alike halfway through", int(wordsPopping)-len(half), wordsPopping)
 	}
-	t.Logf("all %d moves look different halfway through, and land in the same place", wordsMoves)
+	t.Logf("all %d arrivals look different halfway through, and land in the same place", wordsPopping)
 }
 
 // Which move a line gets is worked out from the line, so it is the same every
@@ -1179,5 +1182,78 @@ func TestABarOfMusicFillsTheRow(t *testing.T) {
 	t.Logf("across seven marks the sound gives %d different brightnesses", len(seen))
 	if len(seen) < 3 {
 		t.Errorf("the row lights at %d different levels, want it shimmering across", len(seen))
+	}
+}
+
+// A row of marks does not slide or wipe away. It goes the way a row of anything
+// goes when somebody walks down it: the first one bursts, then the next, then
+// the next.
+func TestTheMarksPopInTurn(t *testing.T) {
+	const w, rows = 100, 30
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+
+	m := scopeModel(160, 46)
+	m.width, m.height = w, rows
+
+	line := wordsMarks(dotsX, dotsY)
+	img, layout, ok := wordsImage([]string{line}, dotsX, dotsY)
+	if !ok {
+		t.Fatal("the row would not draw")
+	}
+	m.words.was = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	m.words.wasWhere, m.words.leave = layout, wordsPopping
+
+	// Which marks are still standing where they were drawn, as it goes off.
+	standing := func(gone float32) []bool {
+		out := make([]bool, layout.Count)
+		for y := range dotsY {
+			for x := range dotsX {
+				if m.words.was.Lum[y*dotsX+x] < wordsLit {
+					continue
+				}
+				piece := layout.WordAt(x, y)
+				if piece < 0 {
+					continue
+				}
+				if at, to, _, ok := m.wordsPop(x, y, gone, 6); ok && at == x && to == y {
+					out[piece] = true
+				}
+			}
+		}
+		return out
+	}
+
+	var was int
+	for _, gone := range []float32{0, 0.25, 0.5, 0.75, 1} {
+		up := standing(gone)
+		var n int
+		for _, on := range up {
+			if on {
+				n++
+			}
+		}
+		t.Logf("%.0f%% through, %d of %d marks are still standing: %v", gone*100, n, layout.Count, up)
+
+		if gone == 0 && n != layout.Count {
+			t.Errorf("%d of %d marks were already going as it began", layout.Count-n, layout.Count)
+		}
+		if gone > 0 && n > was {
+			t.Errorf("%d marks are standing where %d were before, want them going one way", n, was)
+		}
+		// They go in order, left to right: once the row has started standing
+		// again it does not stop, so there is no mark left behind in a gap.
+		var back int
+		for i := 1; i < len(up); i++ {
+			if !up[i] && up[i-1] {
+				back++
+			}
+		}
+		if back > 1 {
+			t.Errorf("at %.0f%% the row goes in and out %d times, want it going one way along", gone*100, back)
+		}
+		was = n
+	}
+	if was != 0 {
+		t.Errorf("%d marks were still standing at the end", was)
 	}
 }

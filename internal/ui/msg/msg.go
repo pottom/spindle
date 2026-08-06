@@ -57,6 +57,26 @@ type WordLayout struct {
 	Tops, Bottoms []int
 }
 
+// Middle is the dot in the middle of a word, which is what a piece bursting
+// apart flies out from.
+func (l WordLayout) Middle(word int) (int, int) {
+	var first, last, top, bottom = l.DotsX, -1, 1 << 30, -1
+	for i, at := range l.At {
+		if int(at) != word {
+			continue
+		}
+		x, line := i%max(l.DotsX, 1), i/max(l.DotsX, 1)
+		first, last = min(first, x), max(last, x)
+		if line < len(l.Tops) && line < len(l.Bottoms) {
+			top, bottom = min(top, l.Tops[line]), max(bottom, l.Bottoms[line])
+		}
+	}
+	if last < 0 {
+		return 0, 0
+	}
+	return (first + last) / 2, (top + bottom) / 2
+}
+
 // WordAt is the word under a dot, or -1 where there is none.
 func (l WordLayout) WordAt(x, y int) int {
 	for i, top := range l.Tops {
