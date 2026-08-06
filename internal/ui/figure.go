@@ -137,6 +137,9 @@ func (m Model) figureLines(w, rows int) []string {
 	left := room + int(m.faceWalk()*float64(room+pose.wide))
 	top := (dotsY-int(wordsMark*float64(dotsY)))/2 + int(wordsMark*float64(dotsY)) - pose.tall
 
+	// And how he is coming or going, if he is in the middle of either.
+	way, t := m.figureWaying()
+
 	grid := make([]uint8, w*rows)
 	paint := make([]int8, w*rows)
 	hue := make([]int8, w*rows)
@@ -160,7 +163,20 @@ func (m Model) figureLines(w, rows int) []string {
 		}
 	}
 
-	pose.draw(func(x, y int) { light(x+left, y+top, facePartBody) })
+	pose.draw(func(x, y int) {
+		x, y, on := figureWarp(way, t, x, y, pose.wide, pose.tall, dotsY)
+		if on {
+			light(x+left, y+top, facePartBody)
+		}
+	})
+
+	// The face only while he is whole: a head coming apart does not blink.
+	if t < 1 {
+		if tall := max((dotsY-(top+pose.tall))/dotsPerCellY, 0); tall >= wordsBand {
+			m.wordsUnder(grid, paint, hue, w, rows, tall, max(top-dotsPerCellY, 0))
+		}
+		return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
+	}
 
 	// And a face, if the figure left a hole for one. A figure drawn with a face
 	// of its own does not want a second pair of eyes over it — what changes his
@@ -242,6 +258,19 @@ func figureActLong(act string) time.Duration {
 	return all
 }
 
+// figureWaying is the way he is coming or going, and how far through it he is:
+// one when he is whole and standing about, which is most of a visit.
+func (m Model) figureWaying() (figureWay, float64) {
+	gone := m.faceGone()
+	switch {
+	case gone < faceWalkIn:
+		return m.figureComesBy(), gone / faceWalkIn
+	case gone > 1-faceWalkOut:
+		return m.figureGoesBy(), (1 - gone) / faceWalkOut
+	}
+	return figureWalks, 1
+}
+
 // figurePose is the drawing he is in this frame: the act he is in the middle
 // of, the walk cycle while he is moving, and standing about otherwise.
 func (m Model) figurePose() string {
@@ -277,13 +306,18 @@ func (m Model) faceWho() string {
 		return ""
 	}
 
-	// For now, always one of the drawn ones: the geometry is kept for the size
-	// where no drawing fits and for the day another is wanted, but it is not
-	// dealt while the figures are being looked at.
+	// One of the drawn ones, or the one this code draws itself. He is in the
+	// set with the rest of them: he has a face that blinks and a pair of hands
+	// that answer the music, which no still drawing does, and the drawings have
+	// a body and a walk that no formula does. Both are worth turning up.
 	h := uint64(m.words.starts)*0x94d049bb133111eb + 0xd6e8feb86659fd93
 	h ^= h >> 30
 	h *= 0x9e3779b97f4a7c15
 	h ^= h >> 27
+
+	if h%uint64(len(figures)+1) == 0 {
+		return ""
+	}
 
 	names := make([]string, 0, len(figures))
 	for name := range figures {
@@ -291,4 +325,135 @@ func (m Model) faceWho() string {
 	}
 	sort.Strings(names)
 	return names[int(h>>8)%len(names)]
+}
+
+// How he comes and goes.
+//
+// Walking on from the side is the plainest thing a figure can do, and doing
+// only that is what made him predictable. These are the others: they move his
+// dots rather than him, which is the one thing this screen can do that a
+// cartoon cannot — every one of him is a dot, and a dot can be sent anywhere.
+type figureWay int
+
+const (
+	figureWalks    figureWay = iota // on from the side, off by one
+	figureSpins                     // turning, and growing or shrinking as he turns
+	figureDrops                     // in from over the top, fast, and a squash as he lands
+	figureRises                     // up through the floor
+	figureBursts                    // apart, every dot on its own line out
+	figureCrumbles                  // to pieces, and the pieces fall
+	figureWays
+)
+
+const (
+	// figureTurns is how many times round a spin goes, figureFalls how far a
+	// drop comes from as a share of the screen, and figureFlies how far a burst
+	// throws a dot as a share of the figure's own size.
+	figureTurns = 1.5
+	figureFalls = 1.4
+	figureFlies = 2.2
+
+	// figureCrumb is how far the pieces fall as a share of the screen, and
+	// figureGrit how much they wander sideways on the way down.
+	figureCrumb = 1.1
+	figureGrit  = 0.35
+)
+
+// figureComesBy and figureGoesBy are how this visit starts and ends.
+//
+// Dealt from the bar like everything else, and never the same way twice in one
+// visit: coming and going by the same trick is a figure with one idea.
+func (m Model) figureComesBy() figureWay {
+	h := uint64(m.words.starts)*0xd6e8feb86659fd93 + 0x94d049bb133111eb
+	h ^= h >> 31
+	h *= 0x9e3779b97f4a7c15
+	h ^= h >> 29
+	return figureWay(h % uint64(figureWays))
+}
+
+func (m Model) figureGoesBy() figureWay {
+	h := uint64(m.words.starts)*0x2545f4914f6cdd1d + 0xff51afd7ed558ccd
+	h ^= h >> 33
+	h *= 0xbf58476d1ce4e5b9
+	h ^= h >> 27
+
+	// Not the way he came in, so the two ends of a visit are two things.
+	way := figureWay(h % uint64(figureWays-1))
+	if way >= m.figureComesBy() {
+		way++
+	}
+	return way
+}
+
+// figureSliding reports that a way is one he does with his feet, so the walk
+// carries him on or off rather than something happening to his dots.
+func figureSliding(way figureWay) bool { return way == figureWalks }
+
+// figureWarp is where a dot of his goes, and whether it is drawn at all.
+//
+// t is how far the movement has run: nought as it begins, one when he is whole
+// and standing. Everything is worked out from where the dot belongs, so a
+// thousand of them cost nothing to remember and come apart the same way twice.
+func figureWarp(way figureWay, t float64, x, y, wide, tall, dotsY int) (int, int, bool) {
+	if t >= 1 {
+		return x, y, true
+	}
+	t = min64(max64(t, 0), 1)
+
+	cx, cy := float64(wide)/2, float64(tall)/2
+	dx, dy := float64(x)-cx, float64(y)-cy
+
+	switch way {
+	case figureSpins:
+		// Turning about himself, and small until he has finished turning.
+		a := (1 - t) * figureTurns * 2 * math.Pi
+		sin, cos := math.Sin(a), math.Cos(a)
+		size := 0.25 + 0.75*t
+		return int(cx + (dx*cos-dy*sin)*size), int(cy + (dx*sin+dy*cos)*size), true
+
+	case figureDrops:
+		// From over the top, fast, and squashed for the moment he lands.
+		fall := (1 - t) * (1 - t) * figureFalls * float64(dotsY)
+		squash := 1.0
+		if t > 0.82 {
+			squash = 1 - 0.35*math.Sin(math.Pi*(t-0.82)/0.18)
+		}
+		return x, int(cy + dy*squash - fall), true
+
+	case figureRises:
+		return x, y + int((1-t)*figureFalls*float64(dotsY)), true
+
+	case figureBursts:
+		// Every dot on its own line out from the middle, and gone before it has
+		// got far — what is left of a burst is a shape you have to remember.
+		away := (1 - t) * figureFlies
+		if figureSpeck(x, y)%100 < int(away*45) {
+			return 0, 0, false
+		}
+		return int(float64(x) + dx*away), int(float64(y) + dy*away), true
+
+	case figureCrumbles:
+		// The top goes first, the way a wall does, and every piece takes its own
+		// line down.
+		gone := 1 - t
+		high := 1 - float64(y)/float64(max(tall, 1))
+		if high < gone-0.15 {
+			return 0, 0, false
+		}
+		drop := gone * gone * figureCrumb * float64(dotsY)
+		drift := (float64(figureSpeck(x, y)%200)/100 - 1) * figureGrit * gone * float64(wide)
+		return int(float64(x) + drift), y + int(drop), true
+	}
+
+	return x, y, true
+}
+
+// figureSpeck is a number of a dot's own, so a piece of him wanders the same
+// way every time the same record plays.
+func figureSpeck(x, y int) int {
+	h := uint32(x)*2654435761 + uint32(y)*40503
+	h ^= h >> 13
+	h *= 2246822519
+	h ^= h >> 16
+	return int(h & 0x7fffffff)
 }

@@ -165,9 +165,16 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 // set into the top of it and the progress along the foot.
 func (m Model) stageView() string {
 	rows := m.height
-	if rows < 6 || m.width < 20 || m.ps == nil {
+	if rows < 6 || m.width < 20 {
 		return ""
 	}
+
+	// Not on the state, though. The picture is drawn from the sound, and the
+	// sound keeps coming while the daemon is being restarted or the device is
+	// being taken back — moments when there is no track to speak of. Waiting
+	// for one turned the big screen black just as something interesting was
+	// happening, which is the opposite of what it is for. What needs a track is
+	// the progress round the edge, and that asks for itself.
 
 	// Nothing but the picture. What was here — the track's name, the clock, the
 	// progress bar along the foot — is what the player screen is for; up here it

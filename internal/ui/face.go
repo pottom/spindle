@@ -927,10 +927,18 @@ func (m Model) faceAt(t float64) float64 {
 
 	switch {
 	case t < faceWalkIn:
-		// On from the side, as far as the first place he stops.
+		// On from the side, as far as the first place he stops — unless he is
+		// arriving some other way, in which case he is already where he means
+		// to be and it is his dots that are doing the moving. See figureWarp.
+		if !figureSliding(m.figureComesBy()) {
+			return m.faceSpot(0)
+		}
 		return in + (m.faceSpot(0)-in)*faceEased(t/faceWalkIn)
 	case t > 1-faceWalkOut:
 		last := m.faceSpot(faceStops - 1)
+		if !figureSliding(m.figureGoesBy()) {
+			return last
+		}
 		return last + (out-last)*faceEased((t-(1-faceWalkOut))/faceWalkOut)
 	}
 

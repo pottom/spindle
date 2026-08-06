@@ -337,8 +337,87 @@ func TestEveryFigureIsWhole(t *testing.T) {
 		m.words.starts = bar * 7_000
 		seen[m.faceWho()]++
 	}
-	t.Logf("over a hundred and twenty bars: %v", seen)
-	if len(seen) < len(names) {
-		t.Errorf("only %d of the %d figures ever came on", len(seen), len(names))
+	t.Logf("over a hundred and twenty bars: %v (the empty one is the geometry)", seen)
+	if len(seen) < len(names)+1 {
+		t.Errorf("only %d of the %d figures and the geometry ever came on", len(seen), len(names))
+	}
+	if seen[""] == 0 {
+		t.Error("the one this code draws itself never came on")
+	}
+}
+
+// He does not only walk on and off. Six ways in and out, dealt from the bar,
+// and never the same one at both ends of a visit — the dots are what move, and
+// a dot can be sent anywhere.
+func TestHeComesAndGoesSixWays(t *testing.T) {
+	d, _ := figureFor("robot")
+	p, ok := d.at(100, "idle")
+	if !ok {
+		t.Fatal("no pose")
+	}
+
+	// At rest every way leaves him exactly where he was drawn.
+	for way := range figureWays {
+		var moved, lost int
+		p.draw(func(x, y int) {
+			nx, ny, on := figureWarp(way, 1, x, y, p.wide, p.tall, 184)
+			if !on {
+				lost++
+			} else if nx != x || ny != y {
+				moved++
+			}
+		})
+		if moved != 0 || lost != 0 {
+			t.Errorf("way %d moved %d dots and dropped %d with the movement over", way, moved, lost)
+		}
+	}
+
+	// And part way through, every way but walking has moved him.
+	for way := range figureWays {
+		if figureSliding(way) {
+			continue
+		}
+		var moved, lost, all int
+		p.draw(func(x, y int) {
+			all++
+			nx, ny, on := figureWarp(way, 0.4, x, y, p.wide, p.tall, 184)
+			switch {
+			case !on:
+				lost++
+			case nx != x || ny != y:
+				moved++
+			}
+		})
+		t.Logf("way %d part way: %d of %d dots moved, %d gone", way, moved, all, lost)
+		if moved+lost < all/2 {
+			t.Errorf("way %d moved %d and dropped %d of %d dots, want it doing something", way, moved, lost, all)
+		}
+	}
+
+	// A dot wanders the same way twice, so a record comes apart the same twice.
+	once := figureSpeck(11, 7)
+	if again := figureSpeck(11, 7); again != once {
+		t.Errorf("a dot was given %d and then %d", once, again)
+	}
+	if figureSpeck(11, 7) == figureSpeck(12, 7) {
+		t.Error("two dots were given the same number, so they will wander together")
+	}
+
+	// The two ends of a visit are two different things.
+	m := scopeModel(160, 46)
+	m.words.beats = true
+	ways := map[figureWay]int{}
+	for bar := range int64(60) {
+		m.words.starts = bar * 7_000
+		in, out := m.figureComesBy(), m.figureGoesBy()
+		if in == out {
+			t.Errorf("bar %d comes and goes the same way (%d)", m.words.starts, in)
+		}
+		ways[in]++
+		ways[out]++
+	}
+	t.Logf("over sixty visits: %v", ways)
+	if len(ways) < int(figureWays) {
+		t.Errorf("only %d of the %d ways ever came up", len(ways), figureWays)
 	}
 }

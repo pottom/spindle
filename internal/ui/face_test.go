@@ -474,17 +474,24 @@ func TestHeWalksOnAndOff(t *testing.T) {
 		t.Error("every visit went the same way, want both")
 	}
 
-	// Across one visit: off the side he came from at the start, on the screen
-	// through the middle, and off a side at the end.
-	m.words.starts = 0
+	// Across one visit: off the side at the start and the end when that is how
+	// he is coming and going, and standing where he means to when it is his
+	// dots that are doing the arriving. See figureWarp.
+	for bar := range int64(60) {
+		m.words.starts = bar * 7_000
+		on, off := m.faceAt(0), m.faceAt(1)
 
-	on, off := m.faceAt(0), m.faceAt(1)
-	t.Logf("he starts at %.2f and ends at %.2f", on, off)
-	for _, at := range []float64{on, off} {
-		if math.Abs(at) < 0.95 {
-			t.Errorf("he is at %.2f at one end of his visit, want him off the screen", at)
+		if figureSliding(m.figureComesBy()) && math.Abs(on) < 0.95 {
+			t.Errorf("he walks on but starts at %.2f, want him off the screen", on)
+		}
+		if !figureSliding(m.figureComesBy()) && math.Abs(on) > faceRoam+0.01 {
+			t.Errorf("he arrives some other way but starts at %.2f, want him on the screen", on)
+		}
+		if figureSliding(m.figureGoesBy()) && math.Abs(off) < 0.95 {
+			t.Errorf("he walks off but ends at %.2f, want him off the screen", off)
 		}
 	}
+	m.words.starts = 0
 
 	// And in between he is on it, and he does not stand on one spot: he came in
 	// to wander about, not to be put there.
