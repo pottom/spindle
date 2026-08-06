@@ -409,17 +409,18 @@ const (
 	// faceMouthMost is how far the mouth opens on the loudest thing playing.
 	faceMouthMost = 0.85
 
-	// faceShows is how long the face stays up when it is asked for by hand.
-	faceShows = 6 * time.Second
+	// faceEnters is how far into a bar he comes on, and faceStays how long he
+	// is there for. Long enough to arrive, do the one thing he came to do and
+	// leave; short enough that what you remember is the thing rather than him.
+	faceEnters = 2500 * time.Millisecond
+	faceStays  = 3800 * time.Millisecond
 
-	// faceWinkAfter is how far into a bar its wink falls — long enough in that
-	// the face has been read first.
-	faceWinkAfter = 1600 * time.Millisecond
+	// faceShows is how long he stays when he is asked for by hand.
+	faceShows = 5 * time.Second
 
-	// faceTurn is the rise in loudness the brows answer, and faceRest how long
-	// they are left alone afterwards.
-	faceTurn = 0.09
-	faceRest = 6 * time.Second
+	// faceGagAfter is how long after he arrives he does the thing he came for —
+	// long enough that he has been read as a face first.
+	faceGagAfter = 1100 * time.Millisecond
 
 	// faceDrawn is how long the face takes to draw itself on. The same order as
 	// the gathering a line of words arrives with, so the two read as one screen
@@ -450,13 +451,12 @@ type faceState struct {
 	since time.Time
 	due   time.Time // when the next blink falls
 
-	// look and mouth follow the sound rather than a clock, and wasLoud is what
-	// a turn in the music is measured against.
-	look, mouth, wasLoud float32
+	// look and mouth follow the sound rather than a clock.
+	look, mouth float32
 
-	// winks is when this bar's wink falls, if it was given one, and rested is
-	// how long the brows are left alone after they have been up.
-	winks, rested time.Time
+	// gag is the thing he came to do and gagAt when he does it.
+	gag   faceDoing
+	gagAt time.Time
 
 	// came is when the face last arrived, which is what it is drawn on from,
 	// bar is the moment of the bar it arrived for, and was says it was up last
@@ -511,10 +511,7 @@ func (m *Model) faceFlow() {
 	// same thing twice.
 	if up && m.words.starts != m.face.bar {
 		m.face.bar, m.face.came = m.words.starts, now
-		m.face.winks = time.Time{}
-		if faceWinks(m.words.starts) {
-			m.face.winks = now.Add(faceWinkAfter)
-		}
+		m.face.gag, m.face.gagAt = faceGagFor(m.words.starts), now.Add(faceGagAfter)
 	}
 
 	if m.face.doing != faceStill {
@@ -529,21 +526,10 @@ func (m *Model) faceFlow() {
 		return
 	}
 
-	// A wink, once in a bar, at the moment that bar was given.
-	if !m.face.winks.IsZero() && now.After(m.face.winks) {
-		m.face.doing, m.face.since = faceWinking, now
-		m.face.winks = time.Time{}
-		return
-	}
-
-	// The brows go up on the music turning a corner rather than on a clock: the
-	// same rise the meter throws its water on. Held off for a while afterwards,
-	// because a face that answers every bar is a face nobody reads.
-	rise := max32(m.scope.envelope-m.face.wasLoud, 0) / max32(m.scope.envelope, scopeFloor)
-	m.face.wasLoud = m.scope.envelope
-	if rise > faceTurn && now.After(m.face.rested) {
-		m.face.doing, m.face.since = faceBrowing, now
-		m.face.rested = now.Add(faceRest)
+	// The thing he came to do, once, a moment after he has arrived.
+	if !m.face.gagAt.IsZero() && now.After(m.face.gagAt) {
+		m.face.doing, m.face.since = m.face.gag, now
+		m.face.gagAt = time.Time{}
 		return
 	}
 
@@ -553,15 +539,16 @@ func (m *Model) faceFlow() {
 	}
 }
 
-// faceWinks is whether the bar starting at a given moment gets a wink. One in
-// three of the bars that get a face at all, so it is a thing that happens to
-// you rather than a thing the screen does.
-func faceWinks(starts int64) bool {
+// faceGagFor is what he came to do. He always does one: somebody who turns up,
+// stands there and leaves again is not a turn, he is a glitch.
+func faceGagFor(starts int64) faceDoing {
 	h := uint64(starts)*0xbf58476d1ce4e5b9 + 0x94d049bb133111eb
 	h ^= h >> 31
 	h *= 0x9e3779b97f4a7c15
 	h ^= h >> 29
-	return h%3 == 0
+
+	// Anything but standing still and blinking, which he does anyway.
+	return faceWinking + faceDoing(h%uint64(faceDoings-faceWinking))
 }
 
 // faceDoingFor is how long each thing the face does takes, end to end.
@@ -829,20 +816,23 @@ func (m Model) faceDrawing() bool {
 	return drawn
 }
 
-// faceUp reports that a face is what should be in the slot now.
+// faceUp reports that the face is on screen now.
 //
-// Either it was asked for by hand, or the bar that is playing is one of the
-// ones a face was dealt: a record with no words is one long solo, and a solo
-// with the same three notes over it every time is a screen that has stopped
-// saying anything.
+// He is not what a bar of music looks like — the marks are that. He is somebody
+// who turns up in the middle of one, does a thing, and goes again, and the
+// marks have the bar back afterwards. So this is a window inside a bar rather
+// than the whole of it: a few seconds, a while after the bar started, on the
+// bars that were dealt him.
 func (m Model) faceUp() bool {
-	if !m.words.beats {
-		return false
-	}
 	if !m.face.shown.IsZero() && time.Since(m.face.shown) < faceShows {
 		return true
 	}
-	return faceDealt(m.words.starts)
+	if !m.words.beats || !faceDealt(m.words.starts) {
+		return false
+	}
+
+	since := m.wordsClock() - m.words.starts - faceEnters.Milliseconds()
+	return since >= 0 && since < faceStays.Milliseconds()
 }
 
 // faceDealt is whether the bar starting at a given moment gets a face rather
@@ -870,6 +860,8 @@ func (m *Model) faceShow() {
 	} else {
 		m.face.stepped = faceStill
 		m.face.came = now // asked for, and so drawn on from nothing
+		m.face.bar = 0
+		m.face.gag, m.face.gagAt = faceGagFor(now.UnixMilli()), now.Add(faceGagAfter)
 	}
 	m.face.shown = now
 }

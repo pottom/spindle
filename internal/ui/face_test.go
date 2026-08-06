@@ -109,31 +109,78 @@ func TestTheEyeClosesToALine(t *testing.T) {
 	}
 }
 
-// The face takes the marks' place on some bars, and it can be asked for.
-func TestTheFaceTakesTheMarksPlace(t *testing.T) {
+// He is not what a bar of music looks like — the marks are that. He turns up in
+// the middle of one, does his thing and goes, and the marks have the bar back.
+func TestHeVisitsABarRatherThanTakingIt(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
 	m.scope.modes[tabPlayer] = scopeWords
-
-	// A bar of marks, which is the only thing a face may stand in for.
+	m.ps.Duration = 4 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
-	var faces int
-	for bar := range int64(30) {
-		m.words.starts = bar * 7_000
-		if m.faceUp() {
-			faces++
+	// A bar he was dealt.
+	var bar int64 = -1
+	for at := range int64(60) {
+		if faceDealt(at * 7_000) {
+			bar = at * 7_000
+			break
 		}
 	}
-	t.Logf("%d of thirty bars are given a face", faces)
-	if faces == 0 || faces == 30 {
-		t.Errorf("%d of thirty bars are given a face, want some of them", faces)
+	if bar < 0 {
+		t.Fatal("no bar in sixty was dealt him")
+	}
+	m.words.starts = bar
+
+	at := func(into time.Duration) bool {
+		m.setProgress(time.Duration(bar)*time.Millisecond + into)
+		return m.faceUp()
 	}
 
-	// A line of words never is.
+	if at(0) {
+		t.Error("he is there the moment the bar starts, want the marks first")
+	}
+	if !at(faceEnters + time.Second) {
+		t.Error("he never turns up in a bar he was dealt")
+	}
+	if at(faceEnters + faceStays + time.Second) {
+		t.Error("he is still there long after his turn, want the marks back")
+	}
+
+	// And the bars he was not dealt are the marks' own, all the way through.
+	for _, other := range []int64{bar + 7_000, bar + 14_000} {
+		if faceDealt(other) {
+			continue
+		}
+		m.words.starts = other
+		m.setProgress(time.Duration(other)*time.Millisecond + faceEnters + time.Second)
+		if m.faceUp() {
+			t.Error("he turned up in a bar he was not dealt")
+		}
+	}
+
+	// Never over a line that is being sung.
 	m.words.beats, m.words.text = false, "a line of the song"
+	m.words.starts = bar
+	m.setProgress(time.Duration(bar)*time.Millisecond + faceEnters + time.Second)
 	if m.faceUp() {
-		t.Error("a face was put over a line that is being sung")
+		t.Error("he walked on over a line of the song")
+	}
+}
+
+// And he always does something. Somebody who turns up, stands there and leaves
+// again is not a turn, he is a glitch.
+func TestHeAlwaysDoesSomething(t *testing.T) {
+	seen := map[faceDoing]int{}
+	for bar := range int64(60) {
+		gag := faceGagFor(bar * 7_000)
+		if gag == faceStill || gag == faceBlinking {
+			t.Fatalf("a visit was given %d, which is nothing to watch", gag)
+		}
+		seen[gag]++
+	}
+	t.Logf("sixty visits: %v", seen)
+	if len(seen) < int(faceDoings-faceWinking) {
+		t.Errorf("only %d of the %d turns ever come up", len(seen), faceDoings-faceWinking)
 	}
 }
 
@@ -313,32 +360,6 @@ func TestTheFaceDrawsItselfOn(t *testing.T) {
 	}
 }
 
-// A wink happens to a bar, not to a clock: some bars are given one and the same
-// bar is given it again.
-func TestSomeBarsWink(t *testing.T) {
-	var winks int
-	for bar := range int64(60) {
-		if faceWinks(bar * 7_000) {
-			winks++
-		}
-	}
-	t.Logf("%d of sixty bars wink", winks)
-	if winks == 0 || winks == 60 {
-		t.Errorf("%d of sixty bars wink, want some of them", winks)
-	}
-	// And it is the bar that decides, not the moment it is asked: two bars a
-	// second apart do not have to agree, and one bar always does with itself.
-	var same int
-	for bar := range int64(20) {
-		if faceWinks(bar*7_000) == faceWinks(bar*7_000+1_000) {
-			same++
-		}
-	}
-	if same == 20 {
-		t.Error("every neighbouring pair of bars answered alike, so nothing is being decided")
-	}
-}
-
 // A face arrives the way everything else on this screen arrives — one of the
 // ways a line of the song is dealt — and now and again by drawing itself on,
 // which is its own.
@@ -375,42 +396,46 @@ func TestAFaceArrivesADifferentWay(t *testing.T) {
 	}
 }
 
-// And it leaves the way it came, handed to the same machinery that carries a
+// And he leaves the way he came, handed to the same machinery that carries a
 // line of the song off the screen.
 func TestAFaceLeavesTheWayItCame(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
 	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 4 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
-	// A bar with a face on it, and then one without.
-	for bar := range int64(60) {
-		m.words.starts = bar * 7_000
-		if faceDealt(m.words.starts) {
+	var bar int64 = -1
+	for at := range int64(60) {
+		if faceDealt(at * 7_000) {
+			bar = at * 7_000
 			break
 		}
 	}
+	if bar < 0 {
+		t.Fatal("no bar in sixty was dealt him")
+	}
+	m.words.starts = bar
+
+	// In the middle of his turn.
+	m.setProgress(time.Duration(bar)*time.Millisecond + faceEnters + time.Second)
 	if !m.faceUp() {
-		t.Skip("no bar in the run was dealt a face")
+		t.Fatal("he is not there in the middle of his own turn")
 	}
 	m.faceFlow()
 
-	for bar := range int64(60) {
-		if at := bar * 7_000; !faceDealt(at) {
-			m.words.starts = at
-			break
-		}
-	}
+	// And after it.
+	m.setProgress(time.Duration(bar)*time.Millisecond + faceEnters + faceStays + time.Second)
 	if m.faceUp() {
-		t.Fatal("the next bar has a face as well")
+		t.Fatal("he is still there after his turn")
 	}
-
 	m.faceFlow()
+
 	if m.words.was.DotsX != m.width*dotsPerCellX {
-		t.Fatalf("the face left nothing behind to carry off: %d dots wide", m.words.was.DotsX)
+		t.Fatalf("he left nothing behind to be carried off: %d dots wide", m.words.was.DotsX)
 	}
 	if time.Since(m.words.went) > time.Second {
-		t.Error("the face was not given notice as it went")
+		t.Error("he was not given notice as he went")
 	}
 
 	var lit int
@@ -419,7 +444,7 @@ func TestAFaceLeavesTheWayItCame(t *testing.T) {
 			lit++
 		}
 	}
-	t.Logf("the face left %d dots to be carried off", lit)
+	t.Logf("he left %d dots to be carried off", lit)
 	if lit == 0 {
 		t.Error("what was handed on is empty")
 	}
