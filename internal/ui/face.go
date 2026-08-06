@@ -80,6 +80,10 @@ type faceLook struct {
 	hold  [2]faceHold
 	lift  float32
 	swing float64
+
+	// stride is where his legs are in their step, -1 to 1, and nought while he
+	// stands; going is which way he is walking.
+	stride, going float64
 }
 
 // faceParts is where each part of the face goes in a box of the given size,
@@ -151,6 +155,7 @@ const (
 	facePartEye
 	facePartLip
 	facePartHand
+	facePartLeg
 	faceParts_
 )
 
@@ -170,6 +175,7 @@ func (p faceParts) draw(look faceLook, light func(x, y int, part facePart)) {
 	}
 	p.mouth(look, light)
 	p.hands(look, p.reach, light)
+	p.legs(look, light)
 }
 
 // faceShare is how far one part has come, given how far the whole face has: it
@@ -571,6 +577,16 @@ func (m Model) faceNow() faceLook {
 	look.lift = m.face.lift
 	look.swing = faceSwing * float64(0.35+0.65*m.face.lift) *
 		math.Sin(2*math.Pi*faceWaves*time.Since(m.face.came).Seconds())
+
+	// His legs, while he is on his way in or out: the same phase the bob is
+	// taken from, so the two are one walk rather than two.
+	if walk := m.faceWalk(); walk != 0 {
+		look.stride = math.Sin(2 * math.Pi * faceSteps * m.faceGone())
+		look.going = math.Copysign(1, walk)
+		if m.faceGone() < faceWalkIn {
+			look.going = -look.going // still coming on, so he faces the other way
+		}
+	}
 
 	since := time.Since(m.face.since)
 	switch m.face.doing {
@@ -1074,4 +1090,71 @@ func faceHoldTurn(hold faceHold) float64 {
 		return 2.9
 	}
 	return 0.35
+}
+
+// The legs.
+//
+// He walks, and until now he walked by sliding. Two short legs under him are
+// what turn that into walking: they swing against each other, the near one
+// forward as the far one goes back, and the bob he already had becomes the
+// thing that goes with them rather than a wobble on its own.
+//
+// Short on purpose. He is a head with limbs on it — there is no body, and legs
+// long enough to want one would ask where it went.
+const (
+	// faceLeg is how far down he stands, as a share of his own height, and
+	// faceFoot how long a foot is as a share of the leg.
+	faceLeg  = 0.30
+	faceFoot = 0.42
+
+	// faceLift is how much of a leg comes up as its foot does, and faceStand
+	// how far apart the two of them stand.
+	faceLift  = 0.42
+	faceStand = 0.13
+)
+
+// legs draws the pair, hanging from the bottom of him.
+func (p faceParts) legs(look faceLook, light func(int, int, facePart)) {
+	leg := faceLeg * float64(p.h)
+	if leg < float64(p.stroke)*2 {
+		return
+	}
+
+	// Under the mouth, a little in from the sides of him — where a small figure
+	// drawn by hand would put them.
+	hipY := float64(p.lip.y + p.lip.h)
+	for side := range 2 {
+		dir := 1.0
+		if side == 0 {
+			dir = -1
+		}
+		hipX := float64(p.w)/2 + dir*float64(p.w)*0.11
+
+		// He is drawn face on, so a walk is not two legs swinging sideways —
+		// from the front that is a pair of scissors. It is one foot up while
+		// the other is down, which is what a small figure marching looks like
+		// and what reads at this size.
+		up := max64(look.stride, 0)
+		if side == 1 {
+			up = max64(-look.stride, 0)
+		}
+
+		turn := dir * faceStand
+		sin, cos := math.Sin(turn), math.Cos(turn)
+		long := leg * (1 - faceLift*up)
+		footX, footY := hipX+long*sin, hipY+long*cos
+
+		p.curve(func(t float64) (float64, float64) {
+			return hipX + (footX-hipX)*t, hipY + (footY-hipY)*t
+		}, int(long), facePartLeg, light)
+
+		// The foot points the way he is going, or outwards while he stands.
+		toe := dir
+		if look.stride != 0 && look.going != 0 {
+			toe = look.going
+		}
+		p.curve(func(t float64) (float64, float64) {
+			return footX + toe*faceFoot*leg*t, footY
+		}, int(faceFoot*leg), facePartLeg, light)
+	}
 }

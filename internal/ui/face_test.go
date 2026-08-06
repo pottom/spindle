@@ -497,3 +497,58 @@ func TestHeWalksOnAndOff(t *testing.T) {
 		}
 	}
 }
+
+// He has legs, and they march. He is drawn face on, so a walk is not two legs
+// swinging sideways — from the front that is a pair of scissors — it is one
+// foot up while the other is down.
+func TestHeHasLegsThatMarch(t *testing.T) {
+	dotsX, dotsY := 320, 184
+	high := int(wordsMark * float64(dotsY))
+	wide := min(int(faceWide*float64(high)), int(0.62*float64(dotsX)))
+
+	p, ok := faceLayout(wide, high)
+	if !ok {
+		t.Fatal("no face")
+	}
+	p.reach = (dotsX - wide) / 2
+
+	// How far down each leg reaches, taking the two halves of him apart.
+	feet := func(look faceLook) (int, int) {
+		left, right := -1, -1
+		p.draw(look, func(x, y int, part facePart) {
+			if part != facePartLeg {
+				return
+			}
+			if x < p.w/2 {
+				left = max(left, y)
+			} else {
+				right = max(right, y)
+			}
+		})
+		return left, right
+	}
+
+	standL, standR := feet(faceLook{})
+	t.Logf("standing, his feet are at %d and %d", standL, standR)
+	if standL < 0 || standR < 0 {
+		t.Fatal("he has no legs")
+	}
+	if standL != standR {
+		t.Errorf("standing still his feet are at %d and %d, want him level", standL, standR)
+	}
+	if standL <= p.lip.y+p.lip.h {
+		t.Error("his legs do not reach below him")
+	}
+
+	// One step, then the other.
+	oneL, oneR := feet(faceLook{stride: 1, going: 1})
+	twoL, twoR := feet(faceLook{stride: -1, going: 1})
+	t.Logf("mid stride: %d and %d; the other foot: %d and %d", oneL, oneR, twoL, twoR)
+
+	if oneL >= oneR {
+		t.Errorf("one way through the step his feet are at %d and %d, want the left one up", oneL, oneR)
+	}
+	if twoR >= twoL {
+		t.Errorf("the other way they are at %d and %d, want the right one up", twoL, twoR)
+	}
+}
