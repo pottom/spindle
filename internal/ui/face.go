@@ -462,11 +462,11 @@ const (
 	// faceStayMost how long he is there for — dealt from the bar, so one visit
 	// is a walk-through and the next is a whole turn.
 	faceEnters    = 2500 * time.Millisecond
-	faceStayLeast = 2800 * time.Millisecond
-	faceStayMost  = 7000 * time.Millisecond
+	faceStayLeast = 4200 * time.Millisecond
+	faceStayMost  = 10500 * time.Millisecond
 
 	// faceShows is how long he stays when he is asked for by hand.
-	faceShows = 5 * time.Second
+	faceShows = 7 * time.Second
 
 	// faceGagRest is how long he leaves between two things, so a long stay is a
 	// turn rather than a twitch, and faceGagBy how far through his stay he does
