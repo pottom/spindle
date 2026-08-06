@@ -533,3 +533,94 @@ func TestHisHandsThrowTheWater(t *testing.T) {
 		}
 	}
 }
+
+// The hands are always there. What they are doing is the music's: down at his
+// sides through a quiet passage, up as it builds, and the fist opening into
+// fingers on the way.
+func TestHisArmsRideTheMusic(t *testing.T) {
+	dotsX, dotsY := 320, 184
+	high := int(wordsMark * float64(dotsY))
+	wide := min(int(faceWide*float64(high)), int(0.62*float64(dotsX)))
+
+	p, ok := faceLayout(wide, high)
+	if !ok {
+		t.Fatal("no face")
+	}
+	p.reach = (dotsX - wide) / 2
+
+	// How high the hands are drawn, and how much of them there is.
+	at := func(lift float32) (int, int) {
+		top, n := 1<<30, 0
+		p.draw(faceLook{lift: lift}, 1, func(_, y int, part facePart) {
+			if part == facePartHand {
+				top, n = min(top, y), n+1
+			}
+		})
+		return top, n
+	}
+
+	quiet, quietDots := at(0)
+	loud, loudDots := at(1)
+	t.Logf("quiet: the hands reach row %d, %d dots; loud: row %d, %d dots", quiet, quietDots, loud, loudDots)
+
+	if quietDots == 0 {
+		t.Error("the hands are not drawn at all in a quiet passage, want them at his sides")
+	}
+	if loud >= quiet {
+		t.Errorf("the hands reach row %d loud and %d quiet, want the music to lift them", loud, quiet)
+	}
+	if loudDots <= quietDots {
+		t.Errorf("%d dots of hand loud against %d quiet, want the fist to open", loudDots, quietDots)
+	}
+}
+
+// And some visits he walks, in from one side and out toward the other.
+func TestSometimesHeTakesAWalk(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 4 * time.Minute
+	m.words.beats, m.words.text = true, wordsNotes
+
+	var walks int
+	for bar := range int64(60) {
+		m.words.starts = bar * 7_000
+		if _, on := m.faceStrolling(); on {
+			walks++
+		}
+	}
+	t.Logf("%d of sixty visits are a walk", walks)
+	if walks == 0 || walks == 60 {
+		t.Errorf("%d of sixty visits are a walk, want some of them", walks)
+	}
+
+	// On one of them he is somewhere else at the end than at the start, and he
+	// comes in from the side he is walking from.
+	for bar := range int64(60) {
+		m.words.starts = bar * 7_000
+		way, on := m.faceStrolling()
+		if !on {
+			continue
+		}
+
+		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters)
+		_, from, _, _ := m.faceRoom(m.width, m.height)
+		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters + faceStays)
+		_, to, _, _ := m.faceRoom(m.width, m.height)
+
+		t.Logf("he walks from %d to %d dots across", from, to)
+		if way > 0 && to <= from {
+			t.Error("he was walking to the right and did not get there")
+		}
+		if way < 0 && to >= from {
+			t.Error("he was walking to the left and did not get there")
+		}
+
+		move, drawn := m.faceComing()
+		if drawn || (move != wordsWiping && move != wordsWipingBack) {
+			t.Errorf("a walk arrived as %d (drawn %v), want it coming in from the side it walks from", move, drawn)
+		}
+		return
+	}
+	t.Skip("no walk in sixty bars")
+}

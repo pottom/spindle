@@ -76,8 +76,11 @@ type faceLook struct {
 	mouth float32    // 0 closed, 1 open
 	look  float32    // -1 left, +1 right
 
-	// hold is what each hand is doing and swing where a wave has got to.
+	// hold is what each hand is doing, lift how far the music has raised the
+	// arms when it is doing nothing in particular, and swing where the swing
+	// of them has got to.
 	hold  [2]faceHold
+	lift  float32
 	swing float64
 }
 
@@ -169,7 +172,7 @@ func (p faceParts) draw(look faceLook, grow float64, light func(x, y int, part f
 		p.eye(i, look, faceShare(grow, 0.00, 0.70), light)
 	}
 	p.mouth(look, faceShare(grow, 0.55, 1.00), light)
-	p.hands(look.hold, look.swing, faceShare(grow, 0.45, 1.00), p.reach, light)
+	p.hands(look, faceShare(grow, 0.45, 1.00), p.reach, light)
 }
 
 // faceShare is how far one part has come, given how far the whole face has: it
@@ -459,8 +462,8 @@ type faceState struct {
 	since time.Time
 	due   time.Time // when the next blink falls
 
-	// look and mouth follow the sound rather than a clock.
-	look, mouth float32
+	// look, mouth and lift follow the sound rather than a clock.
+	look, mouth, lift float32
 
 	// gag is the thing he came to do and gagAt when he does it.
 	gag   faceDoing
@@ -501,6 +504,14 @@ func (m *Model) faceFlow() {
 		want := (float32(at)/float32(max(len(bands)-1, 1)))*2 - 1
 		m.face.look += (want - m.face.look) * faceEase
 		m.face.mouth += (loud*faceMouthMost - m.face.mouth) * faceEase
+
+		// The arms answer the whole of it rather than one band, and slowly, so
+		// they climb through a build rather than flapping on every beat.
+		var all float32
+		for _, v := range bands {
+			all += v
+		}
+		m.face.lift += (min32(all/float32(len(bands))*faceLiftFrom, 1) - m.face.lift) * faceLiftEase
 	}
 
 	// The face going down is handed to the machinery that carries a line off
@@ -582,12 +593,14 @@ func faceDoingFor(doing faceDoing) time.Duration {
 func (m Model) faceNow() faceLook {
 	look := faceLook{look: m.face.look, mouth: m.face.mouth}
 
-	// He waves himself on. After that the hands are down until whatever he came
-	// to do wants them.
+	// He waves himself on. After that the hands are the music's until whatever
+	// he came to do wants them.
 	if m.faceGrown() < 1 {
 		look.hold = [2]faceHold{faceHoldWave, faceHoldWave}
 	}
-	look.swing = faceSwing * math.Sin(2*math.Pi*faceWaves*time.Since(m.face.came).Seconds())
+	look.lift = m.face.lift
+	look.swing = faceSwing * float64(0.35+0.65*m.face.lift) *
+		math.Sin(2*math.Pi*faceWaves*time.Since(m.face.came).Seconds())
 
 	since := time.Since(m.face.since)
 	switch m.face.doing {
@@ -796,7 +809,7 @@ func (m *Model) faceSparks(w, rows int) {
 		sx := float64(left) + float64(p.w)*0.5 + dir*float64(p.w)*0.5
 		sy := float64(top) + float64(p.eyes[side].y+p.eyes[side].h/2)
 		tipX := sx + dir*(arm+mitt*2.2)*math.Sin(turn)
-		tipY := sy - (arm+mitt*2.2)*math.Cos(turn)
+		tipY := sy + (arm+mitt*2.2)*math.Cos(turn)
 
 		for range faceSparkEach {
 			if len(m.stage.drops) >= stageDrops {
@@ -856,9 +869,64 @@ func (m Model) faceRoom(w, rows int) (faceParts, int, int, bool) {
 	if !ok {
 		return faceParts{}, 0, 0, false
 	}
-	// What is left either side of him is where his hands go.
-	p.reach = (dotsX - wide) / 2
-	return p, (dotsX - wide) / 2, (dotsY - high) / 2, true
+
+	// What is left either side of him is where his hands go, and — on the
+	// visits he takes a walk — where he goes.
+	room := (dotsX - wide) / 2
+	p.reach = room
+
+	step := m.faceStep()
+	left := room + int(step*faceStroll*float64(room))
+
+	// He bobs as he walks. Two dots: enough that he is walking rather than
+	// sliding, little enough that the meters do not notice.
+	top := (dotsY - high) / 2
+	if step != 0 {
+		top += int(faceBob * math.Abs(math.Sin(2*math.Pi*faceSteps*m.faceGone())))
+	}
+	return p, left, top, true
+}
+
+// faceStep is how far along his walk he is, from -1 at one side to +1 at the
+// other, and 0 on the visits he stands still for.
+//
+// It is the same idea as the arrival that comes in from the side, carried on
+// past the arrival: he walks on, keeps going while he is here, and walks off.
+func (m Model) faceStep() float64 {
+	way, walks := m.faceStrolling()
+	if !walks {
+		return 0
+	}
+
+	// Eased at both ends, so he sets off and pulls up rather than being slid
+	// across at a constant speed.
+	t := m.faceGone()
+	return way * (2*(t*t*(3-2*t)) - 1)
+}
+
+// faceGone is how far through his visit he is, 0 to 1.
+func (m Model) faceGone() float64 {
+	if !m.face.shown.IsZero() && time.Since(m.face.shown) < faceShows {
+		return float64(time.Since(m.face.shown)) / float64(faceShows)
+	}
+	into := m.wordsClock() - m.words.starts - faceEnters.Milliseconds()
+	return min64(max64(float64(into)/float64(faceStays.Milliseconds()), 0), 1)
+}
+
+// faceStrolling is whether this visit is a walk, and which way it goes.
+func (m Model) faceStrolling() (float64, bool) {
+	h := uint64(m.words.starts)*0x2545f4914f6cdd1d + 0x9e3779b97f4a7c15
+	h ^= h >> 32
+	h *= 0xd6e8feb86659fd93
+	h ^= h >> 32
+
+	if h%3 != 0 {
+		return 0, false
+	}
+	if h&(1<<40) != 0 {
+		return -1, true
+	}
+	return 1, true
 }
 
 // faceComing is how a face arrives: one of the ways a line of the song arrives,
@@ -873,8 +941,18 @@ func (m Model) faceComing() (wordsMove, bool) {
 	h *= 0xbf58476d1ce4e5b9
 	h ^= h >> 27
 
-	// One in three is drawn on. It is the arrival that belongs to a face rather
-	// than to type, and it is worth keeping rare enough to be a pleasure.
+	// A walk comes in from the side it is walking from, so the arrival and the
+	// walk are one movement rather than two.
+	if way, walks := m.faceStrolling(); walks {
+		if way > 0 {
+			return wordsWiping, false
+		}
+		return wordsWipingBack, false
+	}
+
+	// One in three of the rest is drawn on. It is the arrival that belongs to a
+	// face rather than to type, and it is worth keeping rare enough to be a
+	// pleasure.
 	if h%3 == 0 {
 		return wordsDrifting, true
 	}
@@ -960,10 +1038,30 @@ const (
 	faceArm  = 0.34
 	faceMitt = 0.15
 
-	// faceSwing is how far a wave swings either way, in radians, and faceWaves
-	// how many times it goes over and back in a second.
+	// faceSwing is how far the arms swing either way, in radians, and faceWaves
+	// how many times they go over and back in a second.
 	faceSwing = 0.30
 	faceWaves = 2.4
+
+	// faceStroll is how far he walks, as a share of the room outside him;
+	// faceBob how far he rises and falls with each step, in dots; and faceSteps
+	// how many steps he takes crossing the screen.
+	faceStroll = 0.86
+	faceBob    = 2.5
+	faceSteps  = 6
+
+	// faceOpens is how far up the music has to bring a hand before the fist
+	// opens into fingers.
+	faceOpens = 0.45
+
+	// faceLiftFrom is how much of the range the arms take as fully up: the mean
+	// of the bands rarely comes near one, and arms that never leave his sides
+	// are arms nobody put there.
+	faceLiftFrom = 2.2
+
+	// faceLiftEase is how fast the arms follow the music. Slower than the mouth
+	// and the eyes: arms answer a passage, not a beat.
+	faceLiftEase = 0.05
 )
 
 // faceHold is what the hands are doing.
@@ -982,7 +1080,7 @@ const (
 // reach is how much room there is outside the face's own box, which is what
 // decides whether they are drawn at all: on a narrow terminal the meters and
 // the screen's edge are already there, and a hand drawn into them is a smudge.
-func (p faceParts) hands(hold [2]faceHold, swing, grow float64, reach int, light func(int, int, facePart)) {
+func (p faceParts) hands(look faceLook, grow float64, reach int, light func(int, int, facePart)) {
 	arm := faceArm * float64(p.h)
 	mitt := faceMitt * float64(p.h)
 	if reach < int(arm+2*mitt) || mitt < float64(p.stroke) {
@@ -990,17 +1088,19 @@ func (p faceParts) hands(hold [2]faceHold, swing, grow float64, reach int, light
 	}
 
 	for side := range 2 {
-		p.hand(side, hold[side], swing, grow, arm, mitt, light)
+		p.hand(side, look, side, grow, arm, mitt, light)
 	}
 }
 
 // hand draws one of them, from the shoulder out.
-func (p faceParts) hand(side int, hold faceHold, swing, grow, arm, mitt float64, light func(int, int, facePart)) {
-	if hold == faceHoldDown && grow >= 1 {
-		// Down and still is out of the way, and out of the way is not drawn:
-		// two mitts hanging beside a face that is doing nothing is clutter.
-		return
-	}
+//
+// The hands are always there. What they are doing is the music's: with nothing
+// else going on the arms ride the loudness, hanging at his sides through a
+// quiet passage and coming up as it builds, and the fist opens into fingers on
+// the way up. A gesture — a thumb, a finger, both arms over his head — takes
+// them off the music for as long as it lasts.
+func (p faceParts) hand(side int, look faceLook, index int, grow, arm, mitt float64, light func(int, int, facePart)) {
+	hold := look.hold[index]
 
 	// Which way is out. The two are mirrors of each other, so one set of
 	// arithmetic draws both.
@@ -1013,14 +1113,20 @@ func (p faceParts) hand(side int, hold faceHold, swing, grow, arm, mitt float64,
 	sx := float64(p.w)*0.5 + dir*float64(p.w)*0.5
 	sy := float64(p.eyes[side].y + p.eyes[side].h/2)
 
-	// How far round from hanging straight down. Up is a bigger angle; a wave
-	// swings about wherever it is held.
-	turn := faceHoldTurn(hold) + swing
+	// How far round from hanging straight down. Up is a bigger angle; the swing
+	// goes about wherever they are held.
+	turn := faceHoldTurn(hold) + look.swing
+	if hold == faceHoldDown {
+		// Nothing in particular: the music has them.
+		turn = faceHoldTurn(faceHoldDown) +
+			float64(look.lift)*(faceHoldTurn(faceHoldUp)-faceHoldTurn(faceHoldDown)) + look.swing
+	}
 	sin, cos := math.Sin(turn), math.Cos(turn)
 
-	// Where the wrist and the palm sit along it.
-	wx, wy := sx+dir*arm*sin, sy-arm*cos
-	px, py := sx+dir*(arm+mitt*0.9)*sin, sy-(arm+mitt*0.9)*cos
+	// Where the wrist and the palm sit along it. Nought is straight down, which
+	// is where an arm is when nothing is being done with it.
+	wx, wy := sx+dir*arm*sin, sy+arm*cos
+	px, py := sx+dir*(arm+mitt*0.9)*sin, sy+(arm+mitt*0.9)*cos
 
 	// The stem, drawn out from the shoulder as far as it has arrived.
 	p.curve(func(t float64) (float64, float64) {
@@ -1048,13 +1154,20 @@ func (p faceParts) hand(side int, hold faceHold, swing, grow, arm, mitt float64,
 	}
 	p.stem(px, py, mitt*1.15, thumb, dir, faceShare(grow, 0.7, 0.95), light)
 
-	// And the fingers, along the arm.
+	// And the fingers, along the arm. A hand at his side is a loose fist; it
+	// opens as the music brings it up.
+	if hold == faceHoldDown && look.lift > faceOpens {
+		open := faceShare(float64(look.lift), faceOpens, 1)
+		p.stem(px+dir*mitt*0.45*cos, py-mitt*0.45*sin, mitt*1.35*open, turn, dir, grow, light)
+		p.stem(px-dir*mitt*0.45*cos, py+mitt*0.45*sin, mitt*1.35*open, turn, dir, grow, light)
+	}
+
 	switch hold {
 	case faceHoldOne:
 		p.stem(px, py, mitt*1.5, turn, dir, faceShare(grow, 0.75, 1), light)
 	case faceHoldWave, faceHoldUp:
-		p.stem(px+dir*mitt*0.45*cos, py+mitt*0.45*sin, mitt*1.35, turn, dir, faceShare(grow, 0.75, 1), light)
-		p.stem(px-dir*mitt*0.45*cos, py-mitt*0.45*sin, mitt*1.35, turn, dir, faceShare(grow, 0.8, 1), light)
+		p.stem(px+dir*mitt*0.45*cos, py-mitt*0.45*sin, mitt*1.35, turn, dir, faceShare(grow, 0.75, 1), light)
+		p.stem(px-dir*mitt*0.45*cos, py+mitt*0.45*sin, mitt*1.35, turn, dir, faceShare(grow, 0.8, 1), light)
 	}
 }
 
@@ -1062,11 +1175,12 @@ func (p faceParts) hand(side int, hold faceHold, swing, grow, arm, mitt float64,
 func (p faceParts) stem(x, y, long, turn, dir, grow float64, light func(int, int, facePart)) {
 	sin, cos := math.Sin(turn), math.Cos(turn)
 	p.curve(func(t float64) (float64, float64) {
-		return x + dir*long*sin*t, y - long*cos*t
+		return x + dir*long*sin*t, y + long*cos*t
 	}, int(long*2), grow, facePartHand, light)
 }
 
-// faceHoldTurn is how far round from hanging down each hold is held.
+// faceHoldTurn is how far round from hanging straight down each hold is held,
+// in radians: nought is by his side, pi is straight over his head.
 func faceHoldTurn(hold faceHold) float64 {
 	switch hold {
 	case faceHoldWave:
