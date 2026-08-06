@@ -18,7 +18,7 @@ func faceDots(t *testing.T, w, h int, look faceLook) []string {
 	for y := range grid {
 		grid[y] = []byte(strings.Repeat(".", w))
 	}
-	p.draw(look, 1, func(x, y int, _ facePart) {
+	p.draw(look, func(x, y int, _ facePart) {
 		if x >= 0 && y >= 0 && x < w && y < h {
 			grid[y][x] = '#'
 		}
@@ -321,45 +321,6 @@ func TestTheEyeHasAPupilInIt(t *testing.T) {
 	}
 }
 
-// The face is drawn on rather than pasted up: a stroke at a time, in the order
-// somebody would draw one — the eyes, then the brows, then the mouth.
-func TestTheFaceDrawsItselfOn(t *testing.T) {
-	const w, h = 124, 62
-
-	lit := func(grow float64) int {
-		p, ok := faceLayout(w, h)
-		if !ok {
-			t.Fatal("no face")
-		}
-		var n int
-		seen := map[int]bool{}
-		p.draw(faceLook{}, grow, func(x, y int, _ facePart) {
-			if x >= 0 && y >= 0 && x < w && y < h && !seen[y*w+x] {
-				seen[y*w+x] = true
-				n++
-			}
-		})
-		return n
-	}
-
-	was := 0
-	for _, grow := range []float64{0.1, 0.3, 0.5, 0.7, 0.9, 1} {
-		now := lit(grow)
-		t.Logf("%.0f%% drawn: %d dots", grow*100, now)
-		if now < was {
-			t.Errorf("at %.0f%% the face is %d dots against %d before it, want it only arriving", grow*100, now, was)
-		}
-		was = now
-	}
-
-	if full, part := lit(1), lit(0.4); part >= full {
-		t.Errorf("the face is %d dots part way in and %d finished, want it still coming", part, full)
-	}
-	if lit(0.02) == 0 {
-		t.Error("nothing at all is drawn as the face starts")
-	}
-}
-
 // He has hands, and they are drawn out to the sides where there is room — a
 // palm, a thumb and at most two fingers, out of the same stroke as the rest of
 // him. Four fingers at this size is a comb.
@@ -376,7 +337,7 @@ func TestHeHasHands(t *testing.T) {
 
 	hands := func(hold faceHold) int {
 		var n int
-		p.draw(faceLook{hold: [2]faceHold{hold, hold}}, 1, func(x, y int, at facePart) {
+		p.draw(faceLook{hold: [2]faceHold{hold, hold}}, func(x, y int, at facePart) {
 			if at == facePartHand {
 				n++
 			}
@@ -400,7 +361,7 @@ func TestHeHasHands(t *testing.T) {
 	tight := p
 	tight.reach = 4
 	var n int
-	tight.draw(faceLook{hold: [2]faceHold{faceHoldUp, faceHoldUp}}, 1, func(_, _ int, at facePart) {
+	tight.draw(faceLook{hold: [2]faceHold{faceHoldUp, faceHoldUp}}, func(_, _ int, at facePart) {
 		if at == facePartHand {
 			n++
 		}
@@ -466,7 +427,7 @@ func TestHisArmsRideTheMusic(t *testing.T) {
 	// How high the hands are drawn, and how much of them there is.
 	at := func(lift float32) (int, int) {
 		top, n := 1<<30, 0
-		p.draw(faceLook{lift: lift}, 1, func(_, y int, part facePart) {
+		p.draw(faceLook{lift: lift}, func(_, y int, part facePart) {
 			if part == facePartHand {
 				top, n = min(top, y), n+1
 			}
@@ -534,30 +495,5 @@ func TestHeWalksOnAndOff(t *testing.T) {
 		if at+p.w > 0 && at < m.width*dotsPerCellX {
 			t.Errorf("he is at %d at one end of his visit, want him off the screen", at)
 		}
-	}
-}
-
-// And he sketches himself on as he walks on, whole by the time he stops.
-func TestHeIsWholeByTheTimeHeStops(t *testing.T) {
-	m := scopeModel(160, 46)
-	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
-	m.ps.Duration = 4 * time.Minute
-	m.words.beats, m.words.text, m.words.starts = true, wordsNotes, 0
-
-	grown := func(t float64) float64 {
-		m.setProgress(faceEnters + time.Duration(t*float64(faceStays)))
-		return m.faceGrown()
-	}
-
-	t.Logf("drawn %.2f on, %.2f part way, %.2f by the time he stops", grown(0), grown(faceWalkIn/2), grown(faceWalkIn))
-	if grown(0) > 0.1 {
-		t.Error("he is already drawn as he steps on")
-	}
-	if grown(faceWalkIn) < 1 {
-		t.Errorf("he is %.2f drawn by the time he stops, want all of him", grown(faceWalkIn))
-	}
-	if g := grown(faceWalkIn / 2); g <= 0 || g >= 1 {
-		t.Errorf("half way on he is %.2f drawn, want him still arriving", g)
 	}
 }

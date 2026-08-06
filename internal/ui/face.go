@@ -154,23 +154,22 @@ const (
 	faceParts_
 )
 
-// draw lights the face. grow is how far it has arrived, 0 to 1: at anything
-// under one the face is still being drawn, stroke by stroke, the way a line of
-// type gathers out of its own dots.
-func (p faceParts) draw(look faceLook, grow float64, light func(x, y int, part facePart)) {
-	// The parts arrive in the order somebody would draw them: the eyes first,
-	// because they are the face; then the brows; then the mouth last, which is
-	// the stroke that decides what the face is doing.
+// draw lights the face.
+//
+// All of him at once. He is whole before he is on: what he does is walk in from
+// the side, and a figure who assembles himself out of strokes while he walks is
+// two entrances at the same time.
+func (p faceParts) draw(look faceLook, light func(x, y int, part facePart)) {
 	if p.browsToo {
 		for i := range 2 {
-			p.brow(i, look, faceShare(grow, 0.30, 0.75), light)
+			p.brow(i, look, light)
 		}
 	}
 	for i := range 2 {
-		p.eye(i, look, faceShare(grow, 0.00, 0.70), light)
+		p.eye(i, look, light)
 	}
-	p.mouth(look, faceShare(grow, 0.55, 1.00), light)
-	p.hands(look, faceShare(grow, 0.45, 1.00), p.reach, light)
+	p.mouth(look, light)
+	p.hands(look, p.reach, light)
 }
 
 // faceShare is how far one part has come, given how far the whole face has: it
@@ -188,7 +187,7 @@ func faceShare(grow, from, to float64) float64 {
 // The lid does not slide down over the eye like a shutter. It closes the way an
 // eye closes: the top arc comes down to meet the bottom one, so the shape stays
 // an eye all the way to the line it ends as.
-func (p faceParts) eye(i int, look faceLook, grow float64, light func(int, int, facePart)) {
+func (p faceParts) eye(i int, look faceLook, light func(int, int, facePart)) {
 	box := p.eyes[i]
 	shut := look.lid[i]
 
@@ -216,12 +215,7 @@ func (p faceParts) eye(i int, look faceLook, grow float64, light func(int, int, 
 			reach = down * 0.82 // the lower lid is the shallower of the two
 		}
 		return float64(cx) + rx*c, float64(cy) + math.Copysign(reach*faceAlmond(c), s)
-	}, int(4*(rx+ry)), grow, facePartEye, light)
-
-	// Nothing inside until the outline has closed on itself.
-	if grow < 0.7 {
-		return
-	}
+	}, int(4*(rx+ry)), facePartEye, light)
 
 	// What is inside only survives while the eye is open enough to hold it —
 	// the iris first, then the pupil, so a lid coming down takes the eye apart
@@ -246,7 +240,7 @@ func (p faceParts) eye(i int, look faceLook, grow float64, light func(int, int, 
 		fine.curve(func(t float64) (float64, float64) {
 			a := 2 * math.Pi * t
 			return lookX + iris*math.Cos(a), lookY + iris*math.Sin(a)
-		}, int(8*iris), faceShare(grow, 0.6, 1), facePartEye, light)
+		}, int(8*iris), facePartEye, light)
 	}
 
 	p.disc(lookX, lookY, pupil, facePartEye, light)
@@ -261,9 +255,9 @@ func faceAlmond(c float64) float64 {
 
 // curve walks a closed path and stamps the face's stroke along it, so the line
 // is the same weight wherever it is going.
-func (p faceParts) curve(at func(float64) (float64, float64), steps int, grow float64, part facePart, light func(int, int, facePart)) {
+func (p faceParts) curve(at func(float64) (float64, float64), steps int, part facePart, light func(int, int, facePart)) {
 	steps = max(steps, 24)
-	for i := range int(float64(steps) * min64(grow, 1)) {
+	for i := range steps {
 		x, y := at(float64(i) / float64(steps))
 		p.stamp(x, y, part, light)
 	}
@@ -298,7 +292,7 @@ func (p faceParts) disc(cx, cy, r float64, part facePart, light func(int, int, f
 
 // brow draws one brow: a tapered arc that lifts and arches together, because a
 // brow that only rises reads as a bar being dragged about.
-func (p faceParts) brow(i int, look faceLook, grow float64, light func(int, int, facePart)) {
+func (p faceParts) brow(i int, look faceLook, light func(int, int, facePart)) {
 	box := p.brows[i]
 	up := float64(look.brow[i])
 
@@ -308,16 +302,6 @@ func (p faceParts) brow(i int, look faceLook, grow float64, light func(int, int,
 	steps := box.w * 3
 	for step := range steps {
 		t := float64(step) / float64(steps-1)
-
-		// Drawn from the outer end in, so a brow arrives as a stroke somebody
-		// pulled rather than as a bar that faded up.
-		if along := t; i == 0 {
-			if 1-along > grow {
-				continue
-			}
-		} else if along > grow {
-			continue
-		}
 
 		// The outer end of a brow is the one away from the nose, and that is
 		// where its peak sits; the inner end runs down and thin.
@@ -345,7 +329,7 @@ func (p faceParts) brow(i int, look faceLook, grow float64, light func(int, int,
 // Level on purpose. A bowl is what makes a smiley, and a smiley is a shape with
 // no craft in it; a straight mouth with one corner lifted is a face that is
 // thinking about something.
-func (p faceParts) mouth(look faceLook, grow float64, light func(int, int, facePart)) {
+func (p faceParts) mouth(look faceLook, light func(int, int, facePart)) {
 	box := p.lip
 	open := float64(box.h-p.stroke) * float64(look.mouth)
 	turn := float64(box.h) * 0.22
@@ -361,9 +345,6 @@ func (p faceParts) mouth(look faceLook, grow float64, light func(int, int, faceP
 	steps := box.w * 2
 	for step := range steps {
 		t := float64(step) / float64(steps-1)
-		if t > grow {
-			break
-		}
 		x, y := lip(t)
 		p.stamp(x, y, facePartLip, light)
 
@@ -533,8 +514,8 @@ func (m *Model) faceFlow() {
 		return
 	}
 
-	// Nothing starts while the face is still on its way in.
-	if m.faceGrown() < 1 {
+	// Nothing starts while he is still walking on.
+	if m.faceGone() < faceWalkIn {
 		return
 	}
 
@@ -584,7 +565,7 @@ func (m Model) faceNow() faceLook {
 
 	// He waves himself on. After that the hands are the music's until whatever
 	// he came to do wants them.
-	if m.faceGrown() < 1 {
+	if m.faceGone() < faceWalkIn {
 		look.hold = [2]faceHold{faceHoldWave, faceHoldWave}
 	}
 	look.lift = m.face.lift
@@ -719,8 +700,7 @@ func (m Model) faceLines(w, rows int) []string {
 		ride[i] = -int(m.wordsBeatRide(int(i), int(faceParts_)) * faceRide)
 	}
 
-	// He sketches himself on as he walks on, and is whole by the time he stops.
-	p.draw(m.faceNow(), m.faceGrown(), func(x, y int, at facePart) {
+	p.draw(m.faceNow(), func(x, y int, at facePart) {
 		x, y = x+left, y+top+ride[at]
 		if x < 0 || y < 0 || x >= dotsX || y >= dotsY {
 			return
@@ -739,16 +719,6 @@ func (m Model) faceLines(w, rows int) []string {
 		m.wordsUnder(grid, paint, hue, w, rows, tall, max(top-dotsPerCellY, 0))
 	}
 	return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
-}
-
-// faceGrown is how far the face has arrived, 0 to 1.
-//
-// It is drawn on rather than faded up: a stroke at a time, in the order
-// somebody would draw one. Everything else on this screen gathers out of its
-// own dots when it lands, and a face that simply appears is the one thing on it
-// that was pasted there.
-func (m Model) faceGrown() float64 {
-	return faceShare(m.faceGone(), 0, faceWalkIn*0.9)
 }
 
 // faceSparks throws the water off his fingertips as he goes.
@@ -995,7 +965,7 @@ const (
 // reach is how much room there is outside the face's own box, which is what
 // decides whether they are drawn at all: on a narrow terminal the meters and
 // the screen's edge are already there, and a hand drawn into them is a smudge.
-func (p faceParts) hands(look faceLook, grow float64, reach int, light func(int, int, facePart)) {
+func (p faceParts) hands(look faceLook, reach int, light func(int, int, facePart)) {
 	arm := faceArm * float64(p.h)
 	mitt := faceMitt * float64(p.h)
 	if reach < int(arm+2*mitt) || mitt < float64(p.stroke) {
@@ -1003,7 +973,7 @@ func (p faceParts) hands(look faceLook, grow float64, reach int, light func(int,
 	}
 
 	for side := range 2 {
-		p.hand(side, look, side, grow, arm, mitt, light)
+		p.hand(side, look, side, arm, mitt, light)
 	}
 }
 
@@ -1014,7 +984,7 @@ func (p faceParts) hands(look faceLook, grow float64, reach int, light func(int,
 // quiet passage and coming up as it builds, and the fist opens into fingers on
 // the way up. A gesture — a thumb, a finger, both arms over his head — takes
 // them off the music for as long as it lasts.
-func (p faceParts) hand(side int, look faceLook, index int, grow, arm, mitt float64, light func(int, int, facePart)) {
+func (p faceParts) hand(side int, look faceLook, index int, arm, mitt float64, light func(int, int, facePart)) {
 	hold := look.hold[index]
 
 	// Which way is out. The two are mirrors of each other, so one set of
@@ -1046,11 +1016,7 @@ func (p faceParts) hand(side int, look faceLook, index int, grow, arm, mitt floa
 	// The stem, drawn out from the shoulder as far as it has arrived.
 	p.curve(func(t float64) (float64, float64) {
 		return sx + (wx-sx)*t, sy + (wy-sy)*t
-	}, int(arm), grow, facePartHand, light)
-
-	if grow < 0.6 {
-		return
-	}
+	}, int(arm), facePartHand, light)
 
 	// The palm: a round of its own, open rather than filled, so it is a hand
 	// and not a bat.
@@ -1059,7 +1025,7 @@ func (p faceParts) hand(side int, look faceLook, index int, grow, arm, mitt floa
 	fine.curve(func(t float64) (float64, float64) {
 		a := 2 * math.Pi * t
 		return px + mitt*math.Cos(a), py + mitt*0.85*math.Sin(a)
-	}, int(8*mitt), faceShare(grow, 0.6, 0.85), facePartHand, light)
+	}, int(8*mitt), facePartHand, light)
 
 	// The thumb, off the inner edge — pointing up when that is the whole point
 	// of the gesture, and tucked along the palm otherwise.
@@ -1067,31 +1033,31 @@ func (p faceParts) hand(side int, look faceLook, index int, grow, arm, mitt floa
 	if hold == faceHoldThumb {
 		thumb = math.Pi
 	}
-	p.stem(px, py, mitt*1.15, thumb, dir, faceShare(grow, 0.7, 0.95), light)
+	p.stem(px, py, mitt*1.15, thumb, dir, light)
 
 	// And the fingers, along the arm. A hand at his side is a loose fist; it
 	// opens as the music brings it up.
 	if hold == faceHoldDown && look.lift > faceOpens {
 		open := faceShare(float64(look.lift), faceOpens, 1)
-		p.stem(px+dir*mitt*0.45*cos, py-mitt*0.45*sin, mitt*1.35*open, turn, dir, grow, light)
-		p.stem(px-dir*mitt*0.45*cos, py+mitt*0.45*sin, mitt*1.35*open, turn, dir, grow, light)
+		p.stem(px+dir*mitt*0.45*cos, py-mitt*0.45*sin, mitt*1.35*open, turn, dir, light)
+		p.stem(px-dir*mitt*0.45*cos, py+mitt*0.45*sin, mitt*1.35*open, turn, dir, light)
 	}
 
 	switch hold {
 	case faceHoldOne:
-		p.stem(px, py, mitt*1.5, turn, dir, faceShare(grow, 0.75, 1), light)
+		p.stem(px, py, mitt*1.5, turn, dir, light)
 	case faceHoldWave, faceHoldUp:
-		p.stem(px+dir*mitt*0.45*cos, py-mitt*0.45*sin, mitt*1.35, turn, dir, faceShare(grow, 0.75, 1), light)
-		p.stem(px-dir*mitt*0.45*cos, py+mitt*0.45*sin, mitt*1.35, turn, dir, faceShare(grow, 0.8, 1), light)
+		p.stem(px+dir*mitt*0.45*cos, py-mitt*0.45*sin, mitt*1.35, turn, dir, light)
+		p.stem(px-dir*mitt*0.45*cos, py+mitt*0.45*sin, mitt*1.35, turn, dir, light)
 	}
 }
 
 // stem draws a finger or a thumb: a short stroke out from a point.
-func (p faceParts) stem(x, y, long, turn, dir, grow float64, light func(int, int, facePart)) {
+func (p faceParts) stem(x, y, long, turn, dir float64, light func(int, int, facePart)) {
 	sin, cos := math.Sin(turn), math.Cos(turn)
 	p.curve(func(t float64) (float64, float64) {
 		return x + dir*long*sin*t, y + long*cos*t
-	}, int(long*2), grow, facePartHand, light)
+	}, int(long*2), facePartHand, light)
 }
 
 // faceHoldTurn is how far round from hanging straight down each hold is held,
