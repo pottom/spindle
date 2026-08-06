@@ -516,7 +516,7 @@ func (m Model) wordsComing() ([]string, int64) {
 				card, _ := m.soloCard()
 				return m.soloName(), card.from
 			}
-			return []string{wordsNotes}, gap.from
+			return []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)}, gap.from
 		}
 
 		// The next line, if it is close enough that its gathering has begun.
@@ -532,7 +532,8 @@ func (m Model) wordsComing() ([]string, int64) {
 				// than the one it wrote, so the picture has the width of a line
 				// and each of them can answer a different part of the sound.
 				if wordsBeats(line) {
-					return []string{wordsNotes}, m.lyrics.lines[at].At
+					return []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)},
+						m.lyrics.lines[at].At
 				}
 				return wordsWrap(line, m.width*dotsPerCellX, m.height*dotsPerCellY),
 					m.lyrics.lines[at].At
@@ -731,7 +732,8 @@ const (
 	// of the letter — above it the stroke, below it the air around it.
 	wordsLit = 128
 
-	// wordsNotes is what goes up for a bar with no words in it.
+	// wordsNotes is the shortest bar of marks there is: what a screen too narrow
+	// for anything else gets. See wordsMarks for what is usually put up.
 	wordsNotes = "♪ ♫ ♪"
 
 	// wordsMark is how much of the height a mark standing in for a line is set
@@ -984,6 +986,42 @@ func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall, head i
 		}
 	}
 }
+
+// wordsMarks is the row of marks a bar of music gets: as many as go across the
+// screen at the size one of them is set at, rather than the three that used to
+// sit in the middle of it.
+//
+// The size is not the question — the marks are set in the same band a line of
+// type would be, and that is what decides how tall they are. The question is
+// how many of them fit beside each other at that height, and the answer is
+// found by asking the setter: add one until it would have to make them smaller.
+func wordsMarks(w, h int) string {
+	if w <= 0 || h <= 0 {
+		return wordsNotes
+	}
+
+	fit := int(wordsMark * float64(h))
+	line := "♪"
+	was := wordsSize([]string{line}, w, fit)
+	if was <= 0 {
+		return wordsNotes
+	}
+
+	// Alternating, so a row of them is a phrase rather than a fence.
+	next := []string{"♫", "♪", "♪", "♫", "♪"}
+	for n := range wordsMarksMost {
+		try := line + " " + next[n%len(next)]
+		if wordsSize([]string{try}, w, fit) < was {
+			break
+		}
+		line = try
+	}
+	return line
+}
+
+// wordsMarksMost is where the row stops however wide the screen is. Past this
+// they stop being marks somebody put up and start being wallpaper.
+const wordsMarksMost = 24
 
 // wordsBeats reports that a line is a mark rather than words: the note a lyric
 // sheet puts where a line would be if anyone were singing one.

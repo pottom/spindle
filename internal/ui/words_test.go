@@ -351,7 +351,7 @@ func TestWordsGiveTheScreenBackBetweenLines(t *testing.T) {
 	// own and gets the marks.
 	m.setProgress(time.Second)
 	lines, _ := m.wordsComing()
-	if len(lines) != 1 || lines[0] != wordsNotes {
+	if len(lines) != 1 || !wordsBeats(lines[0]) {
 		t.Errorf("before the first line the screen has %q, want the marks", lines)
 	}
 
@@ -366,7 +366,7 @@ func TestWordsGiveTheScreenBackBetweenLines(t *testing.T) {
 	// the record says its own name — see solo.go.
 	m.setProgress(34 * time.Second)
 	lines, _ = m.wordsComing()
-	if len(lines) != 1 || lines[0] != wordsNotes {
+	if len(lines) != 1 || !wordsBeats(lines[0]) {
 		t.Errorf("through the solo the screen has %q, want the marks", lines)
 	}
 
@@ -389,7 +389,7 @@ func TestWordsGiveTheScreenBackBetweenLines(t *testing.T) {
 		t.Errorf("the turn that names a wordless record has %q", lines)
 	}
 	m.setProgress(wordsSpell + wordsTitle + time.Second)
-	if lines, _ := m.wordsComing(); len(lines) != 1 || lines[0] != wordsNotes {
+	if lines, _ := m.wordsComing(); len(lines) != 1 || !wordsBeats(lines[0]) {
 		t.Errorf("after the card a wordless record has %q, want the marks", lines)
 	}
 }
@@ -640,7 +640,7 @@ func TestWordsSetTheNoteThroughASolo(t *testing.T) {
 
 	m.setProgress(2 * time.Second)
 	lines, _ := m.wordsComing()
-	if len(lines) != 1 || lines[0] != wordsNotes {
+	if len(lines) != 1 || !wordsBeats(lines[0]) {
 		t.Errorf("an instrumental bar set %q, want %q", lines, wordsNotes)
 	}
 	if m.wordsSilent() {
@@ -1118,5 +1118,66 @@ func TestAnOpeningMarkFollowsTheWordAfterIt(t *testing.T) {
 	}
 	if _, ok := wordsBesideMark([]bool{true, true}, 0); ok {
 		t.Error("a bar of nothing but marks found a word to follow")
+	}
+}
+
+// A bar of music is a row of marks across the screen, not three of them sitting
+// in the middle of it — as many as go beside each other at the size one is set
+// at, each with its own colour off the spectrum behind it.
+func TestABarOfMusicFillsTheRow(t *testing.T) {
+	for _, size := range [][2]int{{60, 20}, {100, 30}, {160, 46}, {240, 60}} {
+		w, rows := size[0], size[1]
+		dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+
+		line := wordsMarks(dotsX, dotsY)
+		marks := strings.Count(line, "♪") + strings.Count(line, "♫")
+
+		_, layout, ok := wordsImage([]string{line}, dotsX, dotsY)
+		if !ok {
+			t.Fatalf("%dx%d: the row would not draw", w, rows)
+		}
+		t.Logf("%3dx%-3d %d marks, %d pieces: %s", w, rows, marks, layout.Count, line)
+
+		if marks < 5 {
+			t.Errorf("%dx%d: %d marks, want the row filled", w, rows, marks)
+		}
+		if marks > wordsMarksMost {
+			t.Errorf("%dx%d: %d marks, past the %d that is a row rather than wallpaper", w, rows, marks, wordsMarksMost)
+		}
+		if layout.Count != marks {
+			t.Errorf("%d marks came out as %d pieces, want each its own", marks, layout.Count)
+		}
+
+		// They are set no smaller for being many: the band decides the height,
+		// and the row stops where the width would start shrinking them.
+		one := wordsSize([]string{"♪"}, dotsX, int(wordsMark*float64(dotsY)))
+		many := wordsSize([]string{line}, dotsX, int(wordsMark*float64(dotsY)))
+		if many < one {
+			t.Errorf("%dx%d: one mark is set at %d and the row at %d, want them the same", w, rows, one, many)
+		}
+	}
+
+	// And each of them answers its own part of the sound, so the row shimmers
+	// across rather than lighting all at once.
+	m := scopeModel(160, 46)
+	bands := make([]float32, 28)
+	for i := range bands {
+		bands[i] = float32(i%7) / 6
+	}
+	m.scope.bands = bands
+
+	levels, freqs := len(m.styles.Words[0]), len(m.styles.Words)
+	seen := map[int8]bool{}
+	var hues int8 = -1
+	for i := range 7 {
+		p := m.wordsBeatPaint(i, 7, freqs, levels)
+		seen[p.level] = true
+		if p.hue != hues {
+			hues, _ = p.hue, 0
+		}
+	}
+	t.Logf("across seven marks the sound gives %d different brightnesses", len(seen))
+	if len(seen) < 3 {
+		t.Errorf("the row lights at %d different levels, want it shimmering across", len(seen))
 	}
 }

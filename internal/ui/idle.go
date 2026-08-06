@@ -87,7 +87,7 @@ func (m Model) wordsIdle() ([]string, int64) {
 			lines = m.wordsCard(m.ps.Album)
 		}
 	case wordsCardNotes:
-		lines = []string{wordsNotes}
+		lines = []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)}
 	}
 
 	if len(lines) == 0 || lines[0] == "" {
@@ -106,7 +106,8 @@ func (m Model) wordsIdle() ([]string, int64) {
 func (m Model) wordsIdleMarks(spell int) ([]string, int64) {
 	// Stamped after the card that opens the turn, so the marks arrive again
 	// once it has gone rather than sitting through it.
-	return []string{wordsNotes}, int64(spell)*wordsSpell.Milliseconds() + wordsTitle.Milliseconds()
+	return []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)},
+		int64(spell)*wordsSpell.Milliseconds() + wordsTitle.Milliseconds()
 }
 
 // wordsCardFor is the card a turn gets.

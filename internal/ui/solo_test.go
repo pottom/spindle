@@ -48,7 +48,7 @@ func TestALineGivesWayToTheMarks(t *testing.T) {
 
 	m.setProgress(30 * time.Second)
 	lines, starts := m.wordsComing()
-	if len(lines) != 1 || lines[0] != wordsNotes {
+	if len(lines) != 1 || !wordsBeats(lines[0]) {
 		t.Errorf("sixteen seconds into the solo the screen has %q, want the marks", lines)
 	}
 	if want := (14*time.Second + soloHold).Milliseconds(); starts != want {
@@ -100,7 +100,7 @@ func TestTheRecordSaysItsNameInTheLongestSolo(t *testing.T) {
 	// A moment either side of it, the marks have the bar back.
 	for _, at := range []int64{card.from - 2000, card.to + 2000} {
 		m.setProgress(time.Duration(at) * time.Millisecond)
-		if lines, _ := m.wordsComing(); len(lines) != 1 || lines[0] != wordsNotes {
+		if lines, _ := m.wordsComing(); len(lines) != 1 || !wordsBeats(lines[0]) {
 			t.Errorf("%dms in, the screen has %q, want the marks around the card", at, lines)
 		}
 		if m.soloTelling() {

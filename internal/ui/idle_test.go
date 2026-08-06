@@ -75,7 +75,7 @@ func TestAWordlessRecordKeepsTheMarksUp(t *testing.T) {
 	for _, at := range []time.Duration{0, wordsTitle + time.Second, wordsSpell + 10*time.Second} {
 		m.setProgress(at)
 		lines, _ := m.wordsIdle()
-		if len(lines) != 1 || lines[0] != wordsNotes {
+		if len(lines) != 1 || !wordsBeats(lines[0]) {
 			t.Errorf("%s in, the screen has %q, want the marks", at, lines)
 		}
 	}
@@ -89,7 +89,7 @@ func TestAWordlessRecordKeepsTheMarksUp(t *testing.T) {
 
 	m.setProgress(wordsSpell + wordsTitle + time.Second)
 	back, marks := m.wordsIdle()
-	if len(back) != 1 || back[0] != wordsNotes {
+	if len(back) != 1 || !wordsBeats(back[0]) {
 		t.Errorf("after the card the screen has %q, want the marks back", back)
 	}
 	if marks <= card {
