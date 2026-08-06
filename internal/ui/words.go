@@ -722,10 +722,14 @@ const (
 	wordsWordRide = 3
 	wordsLineRide = 4
 
-	// wordsBounce is how far a note rides its own part of the sound, in dots.
-	// Half a cell at a beat: enough to see them keeping time, little enough that
-	// three of them do not turn into a fairground.
-	wordsBounce = 6
+	// wordsBounce is how far a mark rides its own part of the sound, in dots.
+	//
+	// Two and a half cells at a beat. It was half of that when a bar was three
+	// marks in the middle of the screen and a big movement read as a fairground;
+	// a row of seven across the width is a different picture — there the travel
+	// is what makes the sound run along the row, and too little of it is a line
+	// of type that happens to twitch.
+	wordsBounce = 11
 
 	// wordsLit is how bright a dot of the rasterised type has to be to be set.
 	// Half: type is drawn white on black and anti-aliased, so this is the edge
