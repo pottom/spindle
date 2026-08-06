@@ -213,3 +213,63 @@ func TestTheFaceFillsTheScreen(t *testing.T) {
 		t.Error("nothing was drawn")
 	}
 }
+
+// The eye is three things, not one lump: an outline, an iris ring inside it and
+// a pupil inside that, with daylight between them. Drawn any closer together
+// the iris and the pupil run into each other and the eye has no pupil at all.
+func TestTheEyeHasAPupilInIt(t *testing.T) {
+	// The face as a 160x46 terminal sets it.
+	dotsX, dotsY := 320, 184
+	high := int(wordsMark * float64(dotsY))
+	wide := min(int(faceWide*float64(high)), int(0.62*float64(dotsX)))
+
+	p, ok := faceLayout(wide, high)
+	if !ok {
+		t.Fatal("no face at the size a terminal gives it")
+	}
+	dots := faceDots(t, wide, high, faceLook{})
+	eye := p.eyes[0]
+
+	// Count the runs of lit dots across the middle of the eye: outline, iris,
+	// pupil, iris, outline is five.
+	row := dots[eye.y+eye.h/2][eye.x : eye.x+eye.w]
+	var runs int
+	for i := range row {
+		if row[i] == '#' && (i == 0 || row[i-1] != '#') {
+			runs++
+		}
+	}
+	t.Logf("across the middle of the eye: %q — %d runs", row, runs)
+
+	if runs < 5 {
+		t.Errorf("the eye crosses in %d runs, want the outline, the iris and the pupil each on their own", runs)
+	}
+
+	// And the pupil goes where the eye is looking, without reaching the rim.
+	left := faceDots(t, wide, high, faceLook{look: -1})
+	right := faceDots(t, wide, high, faceLook{look: 1})
+	// Where the pupil is: the middle run of the five, since the outline does
+	// not move and would hide the answer if it were measured with them.
+	at := func(dots []string) int {
+		row := dots[eye.y+eye.h/2]
+		var runs [][2]int
+		for x := eye.x; x < eye.x+eye.w; x++ {
+			if row[x] != '#' {
+				continue
+			}
+			if n := len(runs); n > 0 && runs[n-1][1] == x-1 {
+				runs[n-1][1] = x
+				continue
+			}
+			runs = append(runs, [2]int{x, x})
+		}
+		if len(runs) < 3 {
+			t.Fatalf("the eye crosses in %d runs, with no pupil to find", len(runs))
+		}
+		mid := runs[len(runs)/2]
+		return (mid[0] + mid[1]) / 2
+	}
+	if at(left) >= at(right) {
+		t.Error("the eyes do not follow the sound")
+	}
+}

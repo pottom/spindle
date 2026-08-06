@@ -42,15 +42,17 @@ const (
 	faceEyeWide = 0.34
 	faceEyeGap  = 0.20
 
-	// faceIris is the ring inside the eye and facePupil the dot inside that,
-	// as shares of the eye's own height.
-	faceIris  = 0.30 // of the eye's height
-	facePupil = 0.13
+	// faceIris is the ring inside the eye and facePupil the dot inside that, as
+	// shares of the eye's half height. Far enough apart that there is daylight
+	// between them: closer, and the two run together into a lump, which is an
+	// eye with no pupil in it.
+	faceIris  = 0.55
+	facePupil = 0.19
 
 	// faceLiftMost is how far a pupil may travel from the middle of its eye,
 	// as a share of the room it has. Short of the rim: an eye whose pupil is
 	// touching its own outline is a cartoon.
-	faceLookMost = 0.55
+	faceLookMost = 0.38
 
 	// faceLeast is the fewest dot rows a face can be set in. Under this the
 	// eyes fall to four rows and the mouth to two, which is a colon and a
@@ -190,10 +192,12 @@ func (p faceParts) eye(i int, look faceLook, light func(int, int, facePart)) {
 		return float64(cx) + rx*c, float64(cy) + math.Copysign(reach*faceAlmond(c), s)
 	}, int(4*(rx+ry)), facePartEye, light)
 
-	// What is inside only survives while the eye is open enough to hold it.
+	// What is inside only survives while the eye is open enough to hold it —
+	// the iris first, then the pupil, so a lid coming down takes the eye apart
+	// in the order an eye goes rather than all at once.
 	open := up + down
-	iris := faceIris * ry
-	if open < iris*2+float64(p.stroke)*2 || iris < float64(p.stroke)*1.4 {
+	iris, pupil := faceIris*ry, facePupil*ry
+	if open < pupil*2+float64(p.stroke) || pupil < 1 {
 		return
 	}
 
@@ -203,12 +207,18 @@ func (p faceParts) eye(i int, look faceLook, light func(int, int, facePart)) {
 	lookX := float64(cx) + float64(look.look)*faceLookMost*(rx-iris-float64(p.stroke))
 	lookY := float64(cy)
 
-	p.curve(func(t float64) (float64, float64) {
-		a := 2 * math.Pi * t
-		return lookX + iris*math.Cos(a), lookY + iris*math.Sin(a)
-	}, int(8*iris), facePartEye, light)
+	// The iris is struck a shade finer than the eye it sits in, the way the
+	// inside of a drawing is lighter than its outline.
+	if open >= iris*2+float64(p.stroke)*2 && iris >= float64(p.stroke)*1.4 {
+		fine := p
+		fine.stroke = max(p.stroke-1, 2)
+		fine.curve(func(t float64) (float64, float64) {
+			a := 2 * math.Pi * t
+			return lookX + iris*math.Cos(a), lookY + iris*math.Sin(a)
+		}, int(8*iris), facePartEye, light)
+	}
 
-	p.disc(lookX, lookY, facePupil*ry, facePartEye, light)
+	p.disc(lookX, lookY, pupil, facePartEye, light)
 }
 
 // faceAlmond is the eye's own profile. An ellipse would give it round ends and
