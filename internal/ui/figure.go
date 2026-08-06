@@ -636,8 +636,13 @@ func (m *Model) figureSweep(w, rows int) {
 	edge := m.figureEdge(left, pose.wide)
 
 	// The stretch he has walked, from one end of it to the other. It only ever
-	// grows, so a mark he has knocked over stays knocked over.
+	// grows, so a mark he has knocked over stays knocked over. Where he came in
+	// is kept with it: that is the side he walked away from, and how far past a
+	// mark he has got is only a question once you know which way he passed it.
 	wasLow, wasHigh := m.face.sweptLow, m.face.sweptHigh
+	if wasLow == figureUnswept {
+		m.face.sweptFrom = edge
+	}
 	m.face.sweptLow, m.face.sweptHigh = min(wasLow, edge), max(wasHigh, edge)
 
 	g, where := m.words.have, m.words.where
@@ -658,8 +663,8 @@ func (m *Model) figureSweep(w, rows int) {
 				continue
 			}
 			cx, _ := where.Middle(piece)
-			if figureBroken(m.face.sweptLow, m.face.sweptHigh, cx, span) < 0.5 ||
-				figureBroken(wasLow, wasHigh, cx, span) >= 0.5 {
+			if figureBroken(m.face.sweptLow, m.face.sweptHigh, m.face.sweptFrom, cx, span) < 0.5 ||
+				figureBroken(wasLow, wasHigh, m.face.sweptFrom, cx, span) >= 0.5 {
 				continue
 			}
 			if n++; n%figureShards != 0 || len(m.stage.drops) >= stageDrops {
@@ -789,6 +794,12 @@ func (m Model) figureSweeps() bool {
 	return m.words.beats && m.figureComesBy() == figureWalks
 }
 
+// figureCrosses reports that this visit is a drawn figure walking through a row
+// of marks, and so one that has to go all the way across.
+func (m Model) figureCrosses() bool {
+	return m.figureSweeps() && m.faceWho() != ""
+}
+
 // figureEdge is the front of him, in dots across the screen.
 func (m Model) figureEdge(left, wide int) int {
 	if way, _ := m.faceGoing(); way < 0 {
@@ -797,19 +808,32 @@ func (m Model) figureEdge(left, wide int) int {
 	return left + wide
 }
 
-// figureSwept is the stretch he has walked through so far this visit.
-func (m Model) figureSwept() (int, int) { return m.face.sweptLow, m.face.sweptHigh }
+// figureSwept is the stretch he has walked through so far this visit, and the
+// end of it he came in at.
+func (m Model) figureSwept() (int, int, int) {
+	return m.face.sweptLow, m.face.sweptHigh, m.face.sweptFrom
+}
 
 // figureBroken is how far a mark has come apart: nought while it is still
 // standing in front of him, one once he is well past it.
 //
-// Measured against the whole stretch he has walked, from one end of it to the
-// other, rather than against where he is standing this moment. Against the
-// moment, everything on both sides of him counted as broken before he had taken
-// a step — and worse, a mark he had already knocked over stood back up as he
+// Measured against the whole stretch he has walked, from where he came in,
+// rather than against where he is standing this moment. Against the moment,
+// everything on both sides of him counted as broken before he had taken a
+// step — and worse, a mark he had already knocked over stood back up as he
 // wandered away from it. Broken is broken.
-func figureBroken(low, high, at, wide int) float64 {
-	past := min64(float64(at-low), float64(high-at)) - float64(wide)*figureReach
+//
+// From matters. Measured against the nearer end of the stretch, a mark at
+// either end of it never came apart at all: he had walked past it, but he had
+// not walked past it twice, and the end he came in at is an end he is never
+// going to be on the far side of. So how far past a mark he has got is asked of
+// the frontier he is making, which is the end away from where he came in.
+func figureBroken(low, high, from, at, wide int) float64 {
+	past := float64(high - at)
+	if at < from {
+		past = float64(at - low)
+	}
+	past -= float64(wide) * figureReach
 	return min64(max64(past/figureBreaks, 0), 1)
 }
 
@@ -822,7 +846,7 @@ func figureBroken(low, high, at, wide int) float64 {
 // them going from riding the music to standing to attention between two frames,
 // which is the one thing on this screen that ever looked like a bug.
 func (m Model) figureThrough(w, rows int, light func(x, y, piece int, burn float32)) {
-	low, high := m.figureSwept()
+	low, high, from := m.figureSwept()
 	g, where := m.words.have, m.words.where
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
 	if g.DotsX != dotsX || g.DotsY != dotsY || where.Count == 0 {
@@ -841,7 +865,7 @@ func (m Model) figureThrough(w, rows int, light func(x, y, piece int, burn float
 			}
 
 			cx, _ := where.Middle(piece)
-			broken := figureBroken(low, high, cx, dotsX/max(where.Count, 1))
+			broken := figureBroken(low, high, from, cx, dotsX/max(where.Count, 1))
 			if broken >= 1 {
 				continue
 			}

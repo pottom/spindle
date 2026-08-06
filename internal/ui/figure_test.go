@@ -735,11 +735,11 @@ func TestHeWalksThroughTheMarks(t *testing.T) {
 	}
 
 	whole := func() int {
-		low, high := m.figureSwept()
+		low, high, from := m.figureSwept()
 		var n int
 		for piece := range layout.Count {
 			cx, _ := layout.Middle(piece)
-			if figureBroken(low, high, cx, dotsX/layout.Count) < 1 {
+			if figureBroken(low, high, from, cx, dotsX/layout.Count) < 1 {
 				n++
 			}
 		}
@@ -773,6 +773,65 @@ func TestHeWalksThroughTheMarks(t *testing.T) {
 	m.words.beats = false
 	if m.figureSweeps() {
 		t.Error("he walked into a row of marks that was not there")
+	}
+}
+
+// He finishes the row. Every mark he walked on to walk through is down by the
+// time he leaves — not most of them, and not all but the one on the end.
+//
+// It used to be all but the ends. How far past a mark he had got was measured
+// against the nearer end of the stretch he had walked, so a mark at either end
+// of that stretch was never past him by much, however far he went; and on the
+// visits where he turned back the way he came, the whole far side of the row
+// was never walked at all.
+func TestHeLeavesNoMarkStanding(t *testing.T) {
+	const w, rows = 160, 46
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+
+	line := wordsMarks(dotsX, dotsY)
+	img, layout, ok := wordsImage([]string{line}, dotsX, dotsY)
+	if !ok {
+		t.Fatal("the row would not draw")
+	}
+	grain := cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	span := dotsX / max(layout.Count, 1)
+
+	stood, visits := map[int]int{}, 0
+	for bar := range int64(150) {
+		m := scopeModel(w, rows)
+		m.stage.on = true
+		m.scope.modes[tabPlayer] = scopeWords
+		m.ps.Duration = 90 * time.Minute
+		m.words.starts = bar * 7_000
+		if !faceDealt(m.words.starts) || m.faceWho() == "" {
+			continue
+		}
+		m.words.have, m.words.where = grain, layout
+		m.words.beats, m.words.text = true, line
+		m.face.sweptLow, m.face.sweptHigh = figureUnswept, -figureUnswept
+		visits++
+
+		base := time.Duration(m.words.starts) * time.Millisecond
+		for step := range 120 {
+			m.setProgress(base + faceEnters + time.Duration(float64(step)/119*float64(m.faceStay())))
+			m.figureSweep(w, rows)
+		}
+
+		low, high, from := m.figureSwept()
+		for piece := range layout.Count {
+			cx, _ := layout.Middle(piece)
+			if figureBroken(low, high, from, cx, span) < 1 {
+				stood[piece]++
+			}
+		}
+	}
+
+	t.Logf("over %d visits through a row of %d marks, what was left standing: %v", visits, layout.Count, stood)
+	if visits == 0 {
+		t.Fatal("no visit in a hundred and fifty bars walked through the marks")
+	}
+	if len(stood) > 0 {
+		t.Errorf("marks were left standing after he had gone: %v", stood)
 	}
 }
 

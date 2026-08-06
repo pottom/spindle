@@ -551,12 +551,17 @@ func TestHeWalksOnAndOff(t *testing.T) {
 	m.words.starts = 0
 
 	// And in between he is on it, and he does not stand on one spot: he came in
-	// to wander about, not to be put there.
+	// to wander about, not to be put there. A walk through a row of marks goes
+	// further out than a wander, because it has to reach the ends of the row.
+	most := faceRoam
+	if m.figureCrosses() {
+		most = faceCross + faceStep
+	}
 	seen := map[int]bool{}
 	for step := range 40 {
 		at := m.faceAt(faceWalkIn + (1-faceWalkIn-faceWalkOut)*float64(step)/39)
-		if math.Abs(at) > faceRoam+0.01 {
-			t.Errorf("he wandered to %.2f, want him inside %.2f of the middle", at, faceRoam)
+		if math.Abs(at) > most+0.01 {
+			t.Errorf("he wandered to %.2f, want him inside %.2f of the middle", at, most)
 		}
 		seen[int(at*20)] = true
 	}

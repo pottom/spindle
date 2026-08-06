@@ -541,7 +541,9 @@ type faceState struct {
 	// sweptLow and sweptHigh are the stretch of the screen he has walked through
 	// this visit, so a mark he has knocked over stays knocked over while he
 	// wanders about, and only what has just gone is handed to the water.
-	sweptLow, sweptHigh int
+	// sweptFrom is where he came in, which is the side everything he walks past
+	// is measured from. See figureBroken.
+	sweptLow, sweptHigh, sweptFrom int
 
 	turns   int
 	did     bool
@@ -1050,7 +1052,18 @@ func (m Model) faceSpot(at int) float64 {
 	h *= 0xbf58476d1ce4e5b9
 	h ^= h >> 29
 
-	// Somewhere on the screen, never so far out that he is half off it.
+	// Walking through a row of marks, his stops are spread across it rather
+	// than dealt anywhere: he came on to walk through the row, and three stops
+	// dealt to the same half of the screen leave the other half standing. Where
+	// each of them falls is still his own.
+	if m.figureCrosses() {
+		in, out := m.faceWays()
+		f := float64(at) / float64(faceStops-1)
+		return (in+(out-in)*f)*faceCross + (float64(h%1001)/1000-0.5)*faceStep
+	}
+
+	// Otherwise somewhere on the screen, never so far out that he is half off
+	// it.
 	return (float64(h%2001)/1000 - 1) * faceRoam
 }
 
@@ -1088,8 +1101,14 @@ func (m Model) faceWays() (float64, float64) {
 	if h&(1<<40) != 0 {
 		in = 1
 	}
-	if h%3 == 0 {
-		return in, in // back out the way he came
+
+	// Back out the way he came — unless there is a row of marks up for him to
+	// walk through, in which case he crosses it. Turning round halfway leaves
+	// the far end of the row standing, and a bar with one mark still up at the
+	// end of it reads as a figure who could not finish the job rather than as a
+	// figure who changed his mind. See figureBroken.
+	if h%3 == 0 && !m.figureCrosses() {
+		return in, in
 	}
 	return in, -in
 }
@@ -1230,6 +1249,16 @@ const (
 	faceStops = 3
 	faceRoam  = 0.5
 	facePause = 0.45
+
+	// faceStep is how far a stop on a walk across is allowed to fall either side
+	// of where the crossing puts it, so that walking through a row of marks is
+	// still a walk rather than a machine indexing along it.
+	faceStep = 0.16
+
+	// faceCross is how far out the stops of a walk across go, against faceRoam
+	// for a wander: he is going from one end of the row to the other, and a
+	// crossing that turns back at the halfway mark on both sides is a pace.
+	faceCross = 0.85
 
 	// faceLook_ is how far either side of now his own path is read to tell
 	// which way he is going, and faceStill_ how little of a move counts as
