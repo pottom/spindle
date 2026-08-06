@@ -754,3 +754,55 @@ func TestAHopperLeavesTheGround(t *testing.T) {
 		t.Errorf("the top of him moved %d rows as he came on, want him off the ground", low-high)
 	}
 }
+
+// One visit in a few he crosses the screen backwards. Nobody drew a moonwalk:
+// it is the walk played the other way round while the ground goes on going the
+// way it was going, which is what the thing actually is.
+func TestSometimesHeMoonwalks(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 4 * time.Minute
+	m.words.beats, m.words.text = true, wordsNotes
+
+	var moon int
+	for bar := range int64(120) {
+		m.words.starts = bar * 7_000
+		if m.figureMoonwalks() {
+			moon++
+		}
+	}
+	t.Logf("%d of a hundred and twenty visits cross backwards", moon)
+	if moon == 0 || moon > 40 {
+		t.Errorf("%d of a hundred and twenty moonwalk, want it rare and not never", moon)
+	}
+
+	// The frames run the other way, and he faces the other way with them.
+	walking, backwards := "", ""
+	for bar := range int64(600) {
+		m.words.starts = bar * 7_000
+		if !faceDealt(m.words.starts) || m.faceWho() == "" {
+			continue
+		}
+		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters + time.Duration(faceWalkIn/2*float64(m.faceStay())))
+		if _, moving := m.faceGoing(); !moving {
+			continue
+		}
+		if m.figureMoonwalks() && backwards == "" {
+			backwards = m.figurePose()
+		}
+		if !m.figureMoonwalks() && walking == "" {
+			walking = m.figurePose()
+		}
+		if walking != "" && backwards != "" {
+			break
+		}
+	}
+	t.Logf("walking he is drawn as %q, moonwalking as %q", walking, backwards)
+	if walking == "" || backwards == "" {
+		t.Skip("did not find one of each")
+	}
+	if walking == backwards {
+		t.Error("the moonwalk is drawn exactly like the walk")
+	}
+}

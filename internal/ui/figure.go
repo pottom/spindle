@@ -326,14 +326,37 @@ func (m Model) figurePose() string {
 		}
 	}
 
-	if _, moving := m.faceGoing(); moving {
+	if way, moving := m.faceGoing(); moving {
 		at := int(math.Abs(math.Sin(math.Pi*faceSteps*m.faceGone()))*4) % 4
-		if m.faceWalk() > 0 {
+
+		// A moonwalk is not a pose anybody drew. It is the walk played
+		// backwards while the ground goes the other way, which is what the
+		// thing is: the feet step away from where the body is going, and the
+		// body goes there anyway.
+		back := m.figureMoonwalks()
+		if back {
+			at = 3 - at
+			way = -way
+		}
+		if way > 0 {
 			at += 4
 		}
 		return "walk" + string(rune('0'+at))
 	}
 	return "idle"
+}
+
+// figureMoonwalks reports that this visit crosses the screen backwards.
+//
+// Rare. It is a joke that works once and wears out at three, and it only works
+// at all because everything else about him is ordinary — the same walk, the
+// same speed, the same figure, going the wrong way round.
+func (m Model) figureMoonwalks() bool {
+	h := uint64(m.words.starts)*0x9e3779b97f4a7c15 + 0x2545f4914f6cdd1d
+	h ^= h >> 32
+	h *= 0xff51afd7ed558ccd
+	h ^= h >> 29
+	return h%uint64(figureMoonOne) == 0
 }
 
 // faceWho is which figure is on: one of the drawn ones, or nothing at all,
@@ -689,6 +712,9 @@ const (
 
 	// figureShards is one drop for every this many dots of a mark he breaks.
 	figureShards = 4
+
+	// figureMoonOne is one visit in this many where he crosses backwards.
+	figureMoonOne = 6
 
 	// figureUnswept is the stretch of a visit he has not walked any of yet: an
 	// empty span rather than a point, so the first frame does not read as the
