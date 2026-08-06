@@ -357,10 +357,24 @@ const (
 	figureFalls = 1.4
 	figureFlies = 2.2
 
-	// figureCrumb is how far the pieces fall as a share of the screen, and
-	// figureGrit how much they wander sideways on the way down.
-	figureCrumb = 1.1
-	figureGrit  = 0.35
+	// figureGrain is how much of a dot's own moment is decided by where it is
+	// rather than by the dot itself, and figureGrainOver how far through the
+	// movement the last of them has turned up — short of the end, so he stands
+	// there whole for a moment before he is done arriving.
+	figureGrain     = 0.45
+	figureGrainOver = 1.35
+
+	// figureCrumbFall is how much of coming apart is decided by how high a dot
+	// is and how much by the dot itself. All height and he unzips in rows; all
+	// chance and he dissolves evenly, which is a fade. Between them he comes
+	// apart from the top, raggedly.
+	figureCrumbFall = 0.55
+
+	// figureSprayEvery is one drop for every this many dots that come loose,
+	// and figureSprayThrow how hard they are thrown. Not every dot: a thousand
+	// drops is the whole of the water's room, and the meter wants some of it.
+	figureSprayEvery = 3
+	figureSprayThrow = 3.5
 
 	// figureBurn is how brightly he is drawn at all — under the water and the
 	// sparks that cross the same screen, never mind the type.
@@ -427,6 +441,13 @@ func figureWarp(way figureWay, t float64, x, y, wide, tall, dotsY int) (int, int
 	// Faint while he is on his way, and only at full strength once he is whole.
 	burn := float32(figureFaint + (1-figureFaint)*t*t)
 
+	// And not all of him at once. Every dot has its own moment, so he comes
+	// together out of specks and goes back to them — which is what the water
+	// does, and what a shape being faded up and down is not.
+	if way != figureCrumbles && figureNotYet(way, x, y, tall, t) {
+		return 0, 0, 0, false
+	}
+
 	cx, cy := float64(wide)/2, float64(tall)/2
 	dx, dy := float64(x)-cx, float64(y)-cy
 
@@ -462,22 +483,46 @@ func figureWarp(way figureWay, t float64, x, y, wide, tall, dotsY int) (int, int
 			burn * float32(1-0.7*away/figureFlies), true
 
 	case figureCrumbles:
-		// The top goes first, the way a wall does, and every piece takes its own
-		// line down.
-		gone := 1 - t
-		high := 1 - float64(y)/float64(max(tall, 1))
-		if high < gone-0.15 {
+		// He does not fall apart on screen: he is handed to the water. Every
+		// dot that has come loose has left him and is a drop now, arcing and
+		// fading on the same physics the meter throws — so what you watch is
+		// not a dimmer figure, it is a figure turning into sparks. See
+		// figureLoose and Model.figureSpray.
+		if figureLoose(x, y, tall, t) {
 			return 0, 0, 0, false
 		}
-		drop := gone * gone * figureCrumb * float64(dotsY)
-		drift := (float64(figureSpeck(x, y)%200)/100 - 1) * figureGrit * gone * float64(wide)
-
-		// A piece that has fallen further has less of itself left.
-		return int(float64(x) + drift), y + int(drop),
-			burn * float32(1-0.75*drop/(figureCrumb*float64(dotsY))), true
+		return x, y, burn, true
 	}
 
 	return x, y, burn, true
+}
+
+// figureNotYet reports that a dot has not arrived yet, or has already gone.
+//
+// Its moment is its own, nudged by where it is: what rises comes up from the
+// feet, what falls lands from the head down, and the rest of them turn up in no
+// order at all. A shape that arrives all at once is a slide changing.
+func figureNotYet(way figureWay, x, y, tall int, t float64) bool {
+	own := float64(figureSpeck(x, y)%1000) / 1000
+	high := 1 - float64(y)/float64(max(tall, 1))
+
+	var by float64
+	switch way {
+	case figureRises:
+		by = high // the feet first
+	case figureDrops:
+		by = 1 - high // the head first
+	}
+	return own*(1-figureGrain)+by*figureGrain > t*figureGrainOver
+}
+
+// figureLoose reports that a dot has come away from him: the top goes first,
+// the way a wall does, and each one on its own moment rather than a whole row
+// at once — a shape that comes apart in rows is a shape being wiped.
+func figureLoose(x, y, tall int, t float64) bool {
+	high := 1 - float64(y)/float64(max(tall, 1))
+	own := float64(figureSpeck(x, y)%1000) / 1000
+	return high*figureCrumbFall+own*(1-figureCrumbFall) > t
 }
 
 // figureSpeck is a number of a dot's own, so a piece of him wanders the same
@@ -488,4 +533,64 @@ func figureSpeck(x, y int) int {
 	h *= 2246822519
 	h ^= h >> 16
 	return int(h & 0x7fffffff)
+}
+
+// figureSpray hands the dots that have come loose to the water.
+//
+// This is the whole of what makes it read as sparks rather than as a picture
+// being dimmed: a drop is not drawn by this code at all. It is thrown into the
+// same list the meter throws into, and from then on it arcs, falls and fades on
+// the physics that has been crossing this screen all along — because it is the
+// same water.
+func (m *Model) figureSpray(w, rows int) {
+	who, ok := figureFor(m.faceWho())
+	if !ok {
+		return
+	}
+
+	way, t := m.figureWaying()
+	if way != figureCrumbles || t >= 1 {
+		m.face.crumbled = 1
+		return
+	}
+
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+	pose, ok := who.at(int(figureTall*float64(dotsY)), m.figurePose())
+	if !ok {
+		return
+	}
+
+	// Where he is standing, the same arithmetic the drawing uses.
+	room := (dotsX - pose.wide) / 2
+	left := room + int(m.faceWalk()*float64(room+pose.wide))
+	top := (dotsY-int(wordsMark*float64(dotsY)))/2 + int(wordsMark*float64(dotsY)) - pose.tall
+
+	// Only what has come away since the last frame, so he sheds himself over
+	// the whole of his going rather than all at once.
+	was := m.face.crumbled
+	m.face.crumbled = t
+	if t >= was {
+		return
+	}
+
+	var n int
+	pose.draw(func(x, y int) {
+		if !figureLoose(x, y, pose.tall, t) || figureLoose(x, y, pose.tall, was) {
+			return
+		}
+		if n++; n%figureSprayEvery != 0 || len(m.stage.drops) >= stageDrops {
+			return
+		}
+
+		at := dotsY - 1 - (y + top)
+		if at < 0 || x+left < 0 || x+left >= dotsX {
+			return
+		}
+		m.stage.drops = append(m.stage.drops, stageDrop{
+			col:    x + left,
+			at:     float32(at),
+			speed:  figureSprayThrow * (m.scope.roll() - 0.35),
+			bright: 0.5 + 0.5*m.scope.roll(),
+		})
+	})
 }

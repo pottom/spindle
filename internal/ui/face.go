@@ -505,12 +505,14 @@ type faceState struct {
 	// look, mouth and lift follow the sound rather than a clock.
 	look, mouth, lift float32
 
-	// act is the run of drawings a figure is in the middle of and actAt when it
-	// started; turns is how many things he has done this visit, did whether he
+	// crumbled is how whole he was last frame, so only what has come away since
+	// is handed to the water; act is the run of drawings a figure is in the
+	// middle of and actAt when it started; turns is how many things he has done this visit, did whether he
 	// has done any at all, rested when he may do the next, and wasLoud what a
 	// cue in the music is measured against.
-	act   string
-	actAt time.Time
+	act      string
+	actAt    time.Time
+	crumbled float64
 
 	turns   int
 	did     bool
@@ -576,6 +578,7 @@ func (m *Model) faceFlow() {
 		m.face.bar, m.face.came = m.words.starts, now
 		m.face.turns, m.face.did = 0, false
 		m.face.rested, m.face.act = time.Time{}, ""
+		m.face.crumbled = 1
 
 		// Measured from where the music is as he arrives, or the first frame
 		// of every visit reads as a rise out of silence and he takes it as a

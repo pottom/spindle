@@ -492,3 +492,101 @@ func TestHeIsFainterThanTheSparks(t *testing.T) {
 		t.Errorf("he arrives at %.2f and stands at %.2f, want the arrival the fainter", figureFaint, figureBurn)
 	}
 }
+
+// He does not fade in and out — he comes together out of specks and goes back
+// to them. Every dot has its own moment, so what you watch is a shape being
+// assembled rather than a picture being turned up.
+func TestHeComesTogetherOutOfSpecks(t *testing.T) {
+	d, _ := figureFor("robot")
+	p, _ := d.at(100, "idle")
+
+	there := func(way figureWay, at float64) int {
+		var n int
+		p.draw(func(x, y int) {
+			if _, _, _, on := figureWarp(way, at, x, y, p.wide, p.tall, 184); on {
+				n++
+			}
+		})
+		return n
+	}
+
+	for way := range figureWays {
+		early, half, whole := there(way, 0.1), there(way, 0.5), there(way, 1)
+		t.Logf("way %d: %d dots a tenth in, %d half way, %d standing", way, early, half, whole)
+
+		// The ones with no bias have all turned up by half way, which is what
+		// lets him stand there whole for a moment before he is done arriving.
+		if early >= half || half > whole {
+			t.Errorf("way %d went %d → %d → %d, want him gathering", way, early, half, whole)
+		}
+		if early > whole/3 {
+			t.Errorf("way %d has %d of %d dots up a tenth of the way in, want a few specks", way, early, whole)
+		}
+	}
+}
+
+// And when he comes apart, the pieces are not drawn by this code at all: they
+// are thrown into the water the meter throws, and from then on they arc, fall
+// and fade on the same physics — which is what makes it read as sparks rather
+// than as a figure being dimmed.
+func TestComingApartHandsHimToTheWater(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 4 * time.Minute
+	m.words.beats, m.words.text = true, wordsNotes
+
+	bands := make([]float32, 28)
+	for i := range bands {
+		bands[i] = 0.6
+	}
+	m.scope.bands = bands
+
+	// A visit that ends by coming apart.
+	var found bool
+	for bar := range int64(400) {
+		m.words.starts = bar * 7_000
+		if faceDealt(m.words.starts) && m.faceWho() != "" && m.figureGoesBy() == figureCrumbles {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Skip("no crumbling exit in four hundred bars")
+	}
+
+	base := time.Duration(m.words.starts) * time.Millisecond
+	var most int
+	for step := range 80 {
+		m.setProgress(base + faceEnters + time.Duration(float64(step)/79*float64(m.faceStay())))
+		m.faceFlow()
+		m.figureSpray(m.width, m.height)
+		most = max(most, len(m.stage.drops))
+	}
+	t.Logf("coming apart threw %d drops into the water", most)
+
+	if most == 0 {
+		t.Error("he came apart and the water got nothing")
+	}
+	if most > stageDrops {
+		t.Errorf("he threw %d drops, past the %d the water holds", most, stageDrops)
+	}
+
+	// And a visit that walks off quietly throws nothing.
+	m.stage.drops = nil
+	for bar := range int64(400) {
+		m.words.starts = bar * 7_000
+		if faceDealt(m.words.starts) && m.faceWho() != "" && m.figureGoesBy() == figureWalks {
+			break
+		}
+	}
+	base = time.Duration(m.words.starts) * time.Millisecond
+	for step := range 80 {
+		m.setProgress(base + faceEnters + time.Duration(float64(step)/79*float64(m.faceStay())))
+		m.faceFlow()
+		m.figureSpray(m.width, m.height)
+	}
+	if len(m.stage.drops) != 0 {
+		t.Errorf("walking off threw %d drops, want him leaving on his feet", len(m.stage.drops))
+	}
+}
