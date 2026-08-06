@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // The figures come from drawings, converted by cmd/spindle-figures. What the
@@ -103,5 +104,82 @@ func TestAFigureDrawsWhereItIsPut(t *testing.T) {
 	t.Logf("the walking robot covers %d of its %d rows", rows, p.tall)
 	if rows < p.tall/2 {
 		t.Errorf("the figure covers %d of %d rows, want it filling its own box", rows, p.tall)
+	}
+}
+
+// A drawn figure takes the slot the same way the geometry does: he walks on,
+// the meters stand above and below him, and his face is in his head.
+func TestADrawnFigureTakesTheSlot(t *testing.T) {
+	const w, rows = 160, 46
+
+	m := scopeModel(w, rows)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 4 * time.Minute
+	m.words.beats, m.words.text = true, wordsNotes
+
+	bands := make([]float32, 28)
+	for i := range bands {
+		bands[i] = 0.5
+	}
+	m.scope.bands = bands
+
+	// A bar that was dealt a drawn figure rather than the geometry.
+	var found bool
+	for bar := range int64(200) {
+		m.words.starts = bar * 7_000
+		if faceDealt(m.words.starts) && m.faceWho() != "" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Skip("no bar in two hundred was dealt a drawn figure")
+	}
+	t.Logf("bar %d was dealt %q", m.words.starts, m.faceWho())
+
+	m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters + m.faceStay()/2)
+
+	art := m.figureLines(w, rows)
+	if art == nil {
+		t.Fatal("the figure drew nothing")
+	}
+	if len(art) != rows {
+		t.Fatalf("the figure drew %d rows, want %d", len(art), rows)
+	}
+	for i, line := range art {
+		if got := len([]rune(ansiOff(line))); got != w {
+			t.Errorf("row %d is %d cells wide, want %d", i, got, w)
+		}
+	}
+
+	// He is somewhere in the middle of it, with the meter above and below.
+	var top, bottom, middle int
+	for i, line := range art {
+		if strings.TrimSpace(ansiOff(line)) == "" {
+			continue
+		}
+		switch {
+		case i < rows/4:
+			top++
+		case i > 3*rows/4:
+			bottom++
+		default:
+			middle++
+		}
+	}
+	t.Logf("%d rows lit at the top, %d in the middle, %d at the foot", top, middle, bottom)
+	if top == 0 || bottom == 0 {
+		t.Error("the meters are not standing above and below him")
+	}
+	if middle == 0 {
+		t.Error("nothing is drawn where he is")
+	}
+
+	// And the pose follows what he is doing.
+	if got := m.figurePose(); got == "" {
+		t.Error("he is in no pose at all")
+	} else {
+		t.Logf("he is drawn as %q", got)
 	}
 }

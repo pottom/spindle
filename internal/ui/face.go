@@ -63,7 +63,11 @@ const (
 	// faceLeast is the fewest dot rows a face can be set in. Under this the
 	// eyes fall to four rows and the mouth to two, which is a colon and a
 	// bracket — and the marks are better than that.
-	faceLeast = 18
+	//
+	// Low enough to fit inside a drawn figure's head: what the generator leaves
+	// hollow in the robot is sixteen rows at the size he is usually drawn, and
+	// a face at that size is two lids and a mouth, which is enough to blink.
+	faceLeast = 12
 
 	// faceBrowLeast is the fewest rows that will hold brows as well. Under it
 	// the brow and the lid meet, and the lid carries the expression alone.
@@ -164,6 +168,7 @@ const (
 	facePartLip
 	facePartHand
 	facePartLeg
+	facePartBody
 	faceParts_
 )
 
@@ -759,6 +764,11 @@ const faceWide = 2.0
 func (m Model) faceLines(w, rows int) []string {
 	if !m.faceUp() || w <= 0 || rows <= 0 || len(m.styles.Words) == 0 {
 		return nil
+	}
+
+	// A drawn figure, if this bar was dealt one. See figure.go.
+	if art := m.figureLines(w, rows); art != nil {
+		return art
 	}
 
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
