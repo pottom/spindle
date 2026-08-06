@@ -338,3 +338,89 @@ func TestSomeBarsWink(t *testing.T) {
 		t.Error("every neighbouring pair of bars answered alike, so nothing is being decided")
 	}
 }
+
+// A face arrives the way everything else on this screen arrives — one of the
+// ways a line of the song is dealt — and now and again by drawing itself on,
+// which is its own.
+func TestAFaceArrivesADifferentWay(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.words.beats = true
+
+	seen := map[wordsMove]int{}
+	var drawn int
+	for bar := range int64(60) {
+		m.words.starts = bar * 7_000
+		move, on := m.faceComing()
+		if on {
+			drawn++
+			continue
+		}
+		seen[move]++
+	}
+	t.Logf("sixty bars: %d drawn on, and %d different ways in besides", drawn, len(seen))
+
+	if drawn == 0 || drawn == 60 {
+		t.Errorf("%d of sixty faces draw themselves on, want some of them", drawn)
+	}
+	if len(seen) < 4 {
+		t.Errorf("the faces came in %d different ways, want the screen's whole vocabulary", len(seen))
+	}
+
+	// And a bar answers the same way twice, so a record plays the same twice.
+	m.words.starts = 12_345
+	one, oneOn := m.faceComing()
+	two, twoOn := m.faceComing()
+	if one != two || oneOn != twoOn {
+		t.Error("one bar was dealt two arrivals")
+	}
+}
+
+// And it leaves the way it came, handed to the same machinery that carries a
+// line of the song off the screen.
+func TestAFaceLeavesTheWayItCame(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.words.beats, m.words.text = true, wordsNotes
+
+	// A bar with a face on it, and then one without.
+	for bar := range int64(60) {
+		m.words.starts = bar * 7_000
+		if faceDealt(m.words.starts) {
+			break
+		}
+	}
+	if !m.faceUp() {
+		t.Skip("no bar in the run was dealt a face")
+	}
+	m.faceFlow()
+
+	for bar := range int64(60) {
+		if at := bar * 7_000; !faceDealt(at) {
+			m.words.starts = at
+			break
+		}
+	}
+	if m.faceUp() {
+		t.Fatal("the next bar has a face as well")
+	}
+
+	m.faceFlow()
+	if m.words.was.DotsX != m.width*dotsPerCellX {
+		t.Fatalf("the face left nothing behind to carry off: %d dots wide", m.words.was.DotsX)
+	}
+	if time.Since(m.words.went) > time.Second {
+		t.Error("the face was not given notice as it went")
+	}
+
+	var lit int
+	for _, v := range m.words.was.Lum {
+		if v > 0 {
+			lit++
+		}
+	}
+	t.Logf("the face left %d dots to be carried off", lit)
+	if lit == 0 {
+		t.Error("what was handed on is empty")
+	}
+}

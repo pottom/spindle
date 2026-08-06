@@ -3,6 +3,8 @@ package ui
 import (
 	"math"
 	"time"
+
+	"github.com/pottom/spindle/internal/ui/cover"
 )
 
 // The face, in dots.
@@ -457,9 +459,11 @@ type faceState struct {
 	winks, rested time.Time
 
 	// came is when the face last arrived, which is what it is drawn on from,
-	// and bar is the moment of the bar it arrived for.
+	// bar is the moment of the bar it arrived for, and was says it was up last
+	// frame — which is how its going is noticed.
 	came time.Time
 	bar  int64
+	was  bool
 
 	// shown is when the face was last asked for by hand, and stepped which
 	// expression the key has walked to.
@@ -491,10 +495,21 @@ func (m *Model) faceFlow() {
 		m.face.mouth += (loud*faceMouthMost - m.face.mouth) * faceEase
 	}
 
+	// The face going down is handed to the machinery that carries a line off
+	// the screen, so it leaves the way it came and fades as it goes rather than
+	// being switched off.
+	up := m.faceUp()
+	if m.face.was && !up {
+		if g, ok := m.faceGrain(m.width, m.height); ok {
+			m.words.was, m.words.went, m.words.leave = g, now, m.faceMove()
+		}
+	}
+	m.face.was = up
+
 	// A new bar is a new face: it draws itself on, and whether it will wink is
 	// settled there and then from the bar's own moment, so a record does the
 	// same thing twice.
-	if m.faceUp() && m.words.starts != m.face.bar {
+	if up && m.words.starts != m.face.bar {
 		m.face.bar, m.face.came = m.words.starts, now
 		m.face.winks = time.Time{}
 		if faceWinks(m.words.starts) {
@@ -509,7 +524,7 @@ func (m *Model) faceFlow() {
 		return
 	}
 
-	// Nothing starts while the face is still being drawn.
+	// Nothing starts while the face is still on its way in.
 	if m.faceGrown() < 1 {
 		return
 	}
@@ -657,16 +672,10 @@ func (m Model) faceLines(w, rows int) []string {
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
 	levels, freqs := len(m.styles.Words[0]), len(m.styles.Words)
 
-	// The same band of the screen the marks are set in, so the meters above and
-	// below stand exactly where they stand for a bar of notes.
-	high := int(wordsMark * float64(dotsY))
-	wide := min(int(faceWide*float64(high)), int(0.62*float64(dotsX)))
-
-	p, ok := faceLayout(wide, high)
+	p, left, top, ok := m.faceRoom(w, rows)
 	if !ok {
 		return nil
 	}
-	left, top := (dotsX-wide)/2, (dotsY-high)/2
 
 	grid := make([]uint8, w*rows)
 	paint := make([]int8, w*rows)
@@ -691,8 +700,29 @@ func (m Model) faceLines(w, rows int) []string {
 		ride[i] = -int(m.wordsBeatRide(int(i), int(faceParts_)) * faceRide)
 	}
 
-	p.draw(m.faceNow(), m.faceGrown(), func(x, y int, at facePart) {
+	// How it arrives. A face is dealt the same set of ways a line of the song
+	// is, and its own besides — see faceComing.
+	gather, move, drawn := m.faceGrown(), m.faceMove(), m.faceDrawing()
+
+	grow := float64(1)
+	if drawn {
+		grow = gather
+	}
+
+	p.draw(m.faceNow(), grow, func(x, y int, at facePart) {
 		x, y = x+left, y+top+ride[at]
+
+		// Thrown in the way the words are thrown in, dot by dot, from wherever
+		// this one belongs: the same eight arrivals, so the screen has one
+		// vocabulary rather than one for type and another for faces.
+		if !drawn && gather < 1 {
+			if along := wordsAlong(move, float32(gather), x, y, dotsX, dotsY); along < 1 {
+				dx, dy := wordsFrom(move, x, y, dotsX, dotsY)
+				x += int(dx * (1 - along))
+				y += int(dy * (1 - along))
+			}
+		}
+
 		if x < 0 || y < 0 || x >= dotsX || y >= dotsY {
 			return
 		}
@@ -705,7 +735,7 @@ func (m Model) faceLines(w, rows int) []string {
 
 	// The meter takes what the face left, the same way it takes what a line of
 	// words leaves.
-	tall := max((dotsY-(top+high))/dotsPerCellY, 0)
+	tall := max((dotsY-(top+p.h))/dotsPerCellY, 0)
 	if tall >= wordsBand {
 		m.wordsUnder(grid, paint, hue, w, rows, tall, max(top-dotsPerCellY, 0))
 	}
@@ -724,6 +754,79 @@ func (m Model) faceGrown() float64 {
 		return 1
 	}
 	return float64(since) / float64(faceDrawn)
+}
+
+// faceGrain bakes the face as it stands into a field of dots, so that the same
+// machinery that carries a line of the song off the screen can carry the face
+// off it: the picture goes out the way it came in, and fades as it goes.
+func (m Model) faceGrain(w, rows int) (cover.Grain, bool) {
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+	if dotsX <= 0 || dotsY <= 0 {
+		return cover.Grain{}, false
+	}
+
+	p, left, top, ok := m.faceRoom(w, rows)
+	if !ok {
+		return cover.Grain{}, false
+	}
+
+	g := cover.Grain{DotsX: dotsX, DotsY: dotsY, CellsX: w, CellsY: rows, Lum: make([]uint8, dotsX*dotsY)}
+	p.draw(m.faceNow(), 1, func(x, y int, _ facePart) {
+		x, y = x+left, y+top
+		if x >= 0 && y >= 0 && x < dotsX && y < dotsY {
+			g.Lum[y*dotsX+x] = 255
+		}
+	})
+	return g, true
+}
+
+// faceRoom is where the face sits on a screen of this size: its parts, and the
+// corner they are drawn from.
+func (m Model) faceRoom(w, rows int) (faceParts, int, int, bool) {
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+
+	// The same band of the screen the marks are set in, so the meters above and
+	// below stand exactly where they stand for a bar of notes.
+	high := int(wordsMark * float64(dotsY))
+	wide := min(int(faceWide*float64(high)), int(0.62*float64(dotsX)))
+
+	p, ok := faceLayout(wide, high)
+	if !ok {
+		return faceParts{}, 0, 0, false
+	}
+	return p, (dotsX - wide) / 2, (dotsY - high) / 2, true
+}
+
+// faceComing is how a face arrives: one of the ways a line of the song arrives,
+// or drawn on stroke by stroke, which is the face's own.
+//
+// Dealt from the bar it belongs to, the way everything else on this screen is
+// dealt, so a record does the same thing twice — and so that the same face
+// twice running does not come in the same way twice running.
+func (m Model) faceComing() (wordsMove, bool) {
+	h := uint64(m.words.starts)*0x9e3779b97f4a7c15 + 0xff51afd7ed558ccd
+	h ^= h >> 30
+	h *= 0xbf58476d1ce4e5b9
+	h ^= h >> 27
+
+	// One in three is drawn on. It is the arrival that belongs to a face rather
+	// than to type, and it is worth keeping rare enough to be a pleasure.
+	if h%3 == 0 {
+		return wordsDrifting, true
+	}
+	return wordsMove((h >> 8) % uint64(wordsMoves)), false
+}
+
+// faceMove and faceDrawing are the two halves of that answer, for the callers
+// that only want one of them.
+func (m Model) faceMove() wordsMove {
+	move, _ := m.faceComing()
+	return move
+}
+
+func (m Model) faceDrawing() bool {
+	_, drawn := m.faceComing()
+	return drawn
 }
 
 // faceUp reports that a face is what should be in the slot now.
