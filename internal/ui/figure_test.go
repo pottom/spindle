@@ -701,3 +701,56 @@ func TestHeWalksThroughTheMarks(t *testing.T) {
 		t.Error("he came together out of specks in the middle of the row and still knocked it over")
 	}
 }
+
+// A figure that gets about by hopping has to be lifted off the floor, because
+// the drawing will not do it: a rabbit in mid air over the same patch of ground
+// is a rabbit standing on its toes.
+func TestAHopperLeavesTheGround(t *testing.T) {
+	bunny, ok := figureFor("bunny")
+	if !ok {
+		t.Fatal("no bunny — run go run ./cmd/spindle-figures")
+	}
+	robot, _ := figureFor("robot")
+
+	t.Logf("the bunny rises %d dots as it goes, the robot %d", bunny.bob, robot.bob)
+	if bunny.bob <= robot.bob {
+		t.Errorf("the bunny rises %d and the robot %d, want the hopper the higher", bunny.bob, robot.bob)
+	}
+
+	// And it is on the screen: the top of him moves as he goes.
+	m := scopeModel(160, 46)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 4 * time.Minute
+	m.words.beats, m.words.text = true, wordsNotes
+
+	for bar := range int64(600) {
+		m.words.starts = bar * 7_000
+		if faceDealt(m.words.starts) && m.faceWho() == "bunny" && m.figureComesBy() == figureWalks {
+			break
+		}
+	}
+	if m.faceWho() != "bunny" {
+		t.Skip("no bunny visit in six hundred bars")
+	}
+
+	base := time.Duration(m.words.starts) * time.Millisecond
+	high, low := 1<<30, -1
+	for step := range 40 {
+		m.setProgress(base + faceEnters + time.Duration(float64(step)/39*faceWalkIn*float64(m.faceStay())))
+		art := m.figureLines(m.width, m.height)
+		if art == nil {
+			continue
+		}
+		for i, line := range art {
+			if strings.TrimSpace(ansiOff(line)) != "" {
+				high, low = min(high, i), max(low, i)
+				break
+			}
+		}
+	}
+	t.Logf("coming on, the top of him ran between rows %d and %d", high, low)
+	if low-high < 2 {
+		t.Errorf("the top of him moved %d rows as he came on, want him off the ground", low-high)
+	}
+}

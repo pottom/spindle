@@ -1132,9 +1132,10 @@ const (
 	faceLook_  = 0.03
 	faceStill_ = 0.004
 
-	// faceBob is how far he rises and falls as he walks, in dots, and faceSteps
-	// how many steps that is over a visit.
-	faceBob   = 2.5
+	// faceBob is how far a figure rises and falls as it goes when its own
+	// drawing does not say, in dots, and faceSteps how many steps that is over
+	// a visit.
+	faceBob   = 3
 	faceSteps = 7
 
 	// faceOpens is how far up the music has to bring a hand before the fist

@@ -24,7 +24,15 @@ import (
 type figureDrawing struct {
 	from    string
 	licence string
-	sizes   []figureSize
+
+	// bob is how far he rises and falls as he goes, in dots at the height he is
+	// drawn at. A person walking lifts a couple; something that gets about by
+	// hopping lifts as far as it hops, and the drawing alone will not say so —
+	// a rabbit in mid air over the same patch of floor is a rabbit standing on
+	// its toes.
+	bob int
+
+	sizes []figureSize
 }
 
 // figureSize is a figure at one height.
@@ -136,6 +144,17 @@ func (m Model) figureLines(w, rows int) []string {
 	room := (dotsX - pose.wide) / 2
 	left := room + int(m.faceWalk()*float64(room+pose.wide))
 	top := (dotsY-int(wordsMark*float64(dotsY)))/2 + int(wordsMark*float64(dotsY)) - pose.tall
+
+	// He rises and falls as he goes, as far as his own drawing says: a couple
+	// of dots for somebody walking, the height of a hop for something that gets
+	// about by hopping.
+	if _, moving := m.faceGoing(); moving {
+		bob := who.bob
+		if bob <= 0 {
+			bob = faceBob
+		}
+		top -= int(float64(bob) * math.Abs(math.Sin(2*math.Pi*faceSteps*m.faceGone())))
+	}
 
 	// And how he is coming or going, if he is in the middle of either.
 	way, t := m.figureWaying()

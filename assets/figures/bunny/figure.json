@@ -1,0 +1,47 @@
+{
+  "name": "bunny",
+  "from": "Kenney, Jumper Pack (kenney.nl)",
+  "licence": "CC0",
+  "//": "How the drawing is turned into dots. gate is how much the brightness has to change from one dot to the next to count as a line; thick is the stroke it is drawn at, per height. See cmd/spindle-figures.",
+  "gate": 0.25,
+  "heights": [
+    {
+      "tall": 62,
+      "thick": 1
+    },
+    {
+      "tall": 100,
+      "thick": 2
+    }
+  ],
+  "//head": "The share of the figure the head is looked for in, from the top. face is how much of that head is cleared for a face to be drawn into; at nought the head is left exactly as it was drawn, which is what a figure with a face of its own wants.",
+  "head": 0.52,
+  "face": 0,
+  "poses": {
+    "idle": "stand.png",
+    "duck": "ready.png",
+    "jump": "jump.png",
+    "hurt": "hurt.png",
+    "hit": "hurt.png",
+    "show": "ready.png",
+    "think": "stand.png",
+    "talk": "walk1.png",
+    "wide": "walk2.png",
+    "cheer0": "ready.png",
+    "cheer1": "jump.png",
+    "attack0": "ready.png",
+    "attack1": "jump.png",
+    "attack2": "walk2.png",
+    "attackKick": "walk2.png",
+    "walk0": "stand.png",
+    "walk1": "ready.png",
+    "walk2": "jump.png",
+    "walk3": "jump.png",
+    "walk4": "walk1.png",
+    "walk5": "ready.png",
+    "walk6": "jump.png",
+    "walk7": "jump.png"
+  },
+  "bob": 16,
+  "//bob": "How far he rises and falls as he goes, in dots. A hop is not in the drawing: a rabbit in mid air over the same patch of floor is a rabbit standing on its toes."
+}

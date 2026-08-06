@@ -48,6 +48,7 @@ type figure struct {
 	Gate    float64           `json:"gate"`
 	Head    float64           `json:"head"`
 	Face    float64           `json:"face"`
+	Bob     int               `json:"bob"`
 	Heights []height          `json:"heights"`
 	Poses   map[string]string `json:"poses"`
 }
@@ -124,7 +125,8 @@ func read(path string) (figure, error) {
 }
 
 func emit(b *strings.Builder, dir string, f figure) error {
-	fmt.Fprintf(b, "\t%q: {\n\t\tfrom: %q,\n\t\tlicence: %q,\n\t\tsizes: []figureSize{\n", f.Name, f.From, f.Licence)
+	fmt.Fprintf(b, "\t%q: {\n\t\tfrom: %q,\n\t\tlicence: %q,\n\t\tbob: %d,\n\t\tsizes: []figureSize{\n",
+		f.Name, f.From, f.Licence, f.Bob)
 
 	for _, h := range f.Heights {
 		names := make([]string, 0, len(f.Poses))

@@ -51,5 +51,7 @@
     "walk6": "walk6.png",
     "walk7": "walk7.png",
     "wide": "wide.png"
-  }
+  },
+  "bob": 2,
+  "//bob": "How far he rises and falls as he goes, in dots. A hop is not in the drawing: a rabbit in mid air over the same patch of floor is a rabbit standing on its toes."
 }
