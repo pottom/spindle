@@ -1,0 +1,18 @@
+	Adventure Girl
+
+	Created by pzUH (www.gameart2d.com)
+	Published at https://opengameart.org/content/adventurer-girl-free-sprite
+
+			------------------------------
+
+	License: (Creative Commons Zero, CC0)
+	http://creativecommons.org/publicdomain/zero/1.0/
+
+	This content is free to use in personal, educational and commercial
+	projects. Crediting the author is not required.
+
+			------------------------------
+
+	The drawings here are the original frames cut to one box and scaled, so
+	that the walk does not jitter and the figure stands the same height as
+	the others. See cmd/spindle-figures for what happens to them next.

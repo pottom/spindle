@@ -49,8 +49,23 @@ type figure struct {
 	Head    float64           `json:"head"`
 	Face    float64           `json:"face"`
 	Bob     int               `json:"bob"`
+	Faces   string            `json:"faces"`
 	Heights []height          `json:"heights"`
 	Poses   map[string]string `json:"poses"`
+}
+
+// faces is which way a drawing looks: -1 left, 1 right, and 0 for a figure
+// drawn front on, which is what a manifest that does not say means.
+func (f figure) faces() (int, error) {
+	switch f.Faces {
+	case "", "front":
+		return 0, nil
+	case "left":
+		return -1, nil
+	case "right":
+		return 1, nil
+	}
+	return 0, fmt.Errorf("%s: faces is %q, want left, right or front", f.Name, f.Faces)
 }
 
 type height struct {
@@ -125,8 +140,12 @@ func read(path string) (figure, error) {
 }
 
 func emit(b *strings.Builder, dir string, f figure) error {
-	fmt.Fprintf(b, "\t%q: {\n\t\tfrom: %q,\n\t\tlicence: %q,\n\t\tbob: %d,\n\t\tsizes: []figureSize{\n",
-		f.Name, f.From, f.Licence, f.Bob)
+	faces, err := f.faces()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(b, "\t%q: {\n\t\tfrom: %q,\n\t\tlicence: %q,\n\t\tbob: %d,\n\t\tfaces: %d,\n\t\tsizes: []figureSize{\n",
+		f.Name, f.From, f.Licence, f.Bob, faces)
 
 	for _, h := range f.Heights {
 		names := make([]string, 0, len(f.Poses))

@@ -32,6 +32,14 @@ type figureDrawing struct {
 	// its toes.
 	bob int
 
+	// faces is the way the drawing looks, when it looks a way at all: -1 for a
+	// figure drawn from the side facing left, 1 facing right, 0 for one drawn
+	// front on, which is most of them. A figure with a side to it has to be
+	// turned around when he goes the other way; one drawn front on must not be,
+	// because turning a symmetrical drawing over does nothing but move the
+	// buckle on his belt.
+	faces int8
+
 	sizes []figureSize
 }
 
@@ -75,14 +83,19 @@ func (d figureDrawing) at(tall int, pose string) (figurePose, bool) {
 	return p, ok
 }
 
-// draw lights the pose's dots. The head is not drawn: it was cleared when the
-// figure was made, and what goes in it is the caller's business.
-func (p figurePose) draw(light func(x, y int)) {
+// draw lights the pose's dots, turned around or as drawn. The head is not
+// drawn: it was cleared when the figure was made, and what goes in it is the
+// caller's business.
+func (p figurePose) draw(turned bool, light func(x, y int)) {
 	packed := figureDots(p.bits)
 	stride := (p.wide + 7) / 8
 	for y := range p.tall {
 		for x := range p.wide {
 			if at := y*stride + x/8; at < len(packed) && packed[at]&(1<<(x%8)) != 0 {
+				if turned {
+					light(p.wide-1-x, y)
+					continue
+				}
 				light(x, y)
 			}
 		}
@@ -138,6 +151,8 @@ func (m Model) figureLines(w, rows int) []string {
 		return nil
 	}
 
+	turned := m.figureTurned(who)
+
 	// Where he stands: his own walk across the screen, and his feet on the foot
 	// of the band the marks are set in, so the meter below him is the meter a
 	// bar of notes leaves.
@@ -145,16 +160,7 @@ func (m Model) figureLines(w, rows int) []string {
 	left := room + int(m.faceWalk()*float64(room+pose.wide))
 	top := (dotsY-int(wordsMark*float64(dotsY)))/2 + int(wordsMark*float64(dotsY)) - pose.tall
 
-	// He rises and falls as he goes, as far as his own drawing says: a couple
-	// of dots for somebody walking, the height of a hop for something that gets
-	// about by hopping.
-	if _, moving := m.faceGoing(); moving {
-		bob := who.bob
-		if bob <= 0 {
-			bob = faceBob
-		}
-		top -= int(float64(bob) * math.Abs(math.Sin(2*math.Pi*faceSteps*m.faceGone())))
-	}
+	top -= m.figureLift(who)
 
 	// And how he is coming or going, if he is in the middle of either.
 	way, t := m.figureWaying()
@@ -205,7 +211,7 @@ func (m Model) figureLines(w, rows int) []string {
 		})
 	}
 
-	pose.draw(func(x, y int) {
+	pose.draw(turned, func(x, y int) {
 		x, y, burn, on := figureWarp(way, t, x, y, pose.wide, pose.tall, dotsY)
 		if on {
 			lightAt(x+left, y+top, facePartBody, burn)
@@ -224,9 +230,13 @@ func (m Model) figureLines(w, rows int) []string {
 	// of its own does not want a second pair of eyes over it — what changes his
 	// expression then is the pose, not something drawn on top.
 	if p, ok := faceLayout(pose.headW, pose.headH); ok && pose.headW > 0 {
+		headX := pose.headX
+		if turned {
+			headX = pose.wide - pose.headX - pose.headW
+		}
 		p.reach = 0 // his own arms are in the drawing; he does not want two pairs
 		p.draw(m.faceNow(), func(x, y int, at facePart) {
-			light(x+left+pose.headX, y+top+pose.headY, at)
+			light(x+left+headX, y+top+pose.headY, at)
 		})
 	}
 
@@ -234,6 +244,34 @@ func (m Model) figureLines(w, rows int) []string {
 		m.wordsUnder(grid, paint, hue, w, rows, tall, max(top-dotsPerCellY, 0))
 	}
 	return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
+}
+
+// figureTurned reports that the drawing has to be read the other way round.
+//
+// A figure drawn from the side was drawn facing one way and he goes both, so
+// going the other way means turning him over: a walk cycle read backwards is
+// the same walk, and a hat that pointed the way he was going still does. A
+// figure drawn front on is never turned — there is nothing to turn, and all it
+// would do is move the buckle on his belt.
+func (m Model) figureTurned(who figureDrawing) bool {
+	return who.faces != 0 && int8(m.faceFacing()) != who.faces
+}
+
+// figureLift is how far off the floor a figure is this frame, in dots.
+//
+// He rises and falls as he goes, as far as his own drawing says: a couple of
+// dots for somebody walking, the height of a hop for something that gets about
+// by hopping. Standing still he is on the ground, because a figure bobbing on
+// the spot is a figure being animated at.
+func (m Model) figureLift(who figureDrawing) int {
+	if _, moving := m.faceGoing(); !moving {
+		return 0
+	}
+	bob := who.bob
+	if bob <= 0 {
+		bob = faceBob
+	}
+	return int(float64(bob) * math.Abs(math.Sin(2*math.Pi*faceSteps*m.faceGone())))
 }
 
 // figureFrame is one drawing held for a while.
@@ -276,19 +314,67 @@ var figureActs = map[string][]figureFrame{
 
 	// Arms out wide, the way somebody stands in front of a speaker.
 	"wide": {{"wide", 520}, {"idle", 140}},
+
+	// Off his feet and along the floor, held long enough to be read as a move
+	// rather than a fall.
+	"slide": {{"duck", 110}, {"slide", 430}, {"idle", 150}},
 }
 
 // figureActNames is the acts in a settled order, so a record deals the same one
 // twice. Maps in Go do not have an order; this does.
-var figureActNames = []string{"cheer", "jump", "punch", "kick", "talk", "think", "show", "hurt", "wide"}
+var figureActNames = []string{"cheer", "jump", "punch", "kick", "talk", "think", "show", "hurt", "wide", "slide"}
 
-// figureActFor is the act a bar's nth turn gets.
-func figureActFor(starts int64, turn int) string {
+// figureActsFor is the acts a figure can do.
+//
+// The drawings are somebody else's, and no two sets carry the same poses: one
+// comes with a mouth that moves and one does not, one slides and one hops. So
+// an act belongs to a figure only if every drawing it asks for is there, and
+// what is dealt is dealt out of that — a figure asked for a pose he was never
+// drawn in has nothing to show, and a figure with nothing to show disappears.
+var figureCan sync.Map
+
+func figureActsFor(name string) []string {
+	if got, ok := figureCan.Load(name); ok {
+		return got.([]string)
+	}
+
+	can := make([]string, 0, len(figureActNames))
+	if d, ok := figures[name]; ok {
+		for _, act := range figureActNames {
+			if figureHas(d, figureActs[act]) {
+				can = append(can, act)
+			}
+		}
+	}
+	figureCan.Store(name, can)
+	return can
+}
+
+// figureHas reports that every size of a figure carries every pose in a run.
+func figureHas(d figureDrawing, run []figureFrame) bool {
+	for _, size := range d.sizes {
+		for _, f := range run {
+			if _, ok := size.poses[f.pose]; !ok {
+				return false
+			}
+		}
+	}
+	return len(d.sizes) > 0
+}
+
+// figureActFor is the act a bar's nth turn gets, out of the ones whoever is on
+// can do.
+func figureActFor(who string, starts int64, turn int) string {
+	can := figureActsFor(who)
+	if len(can) == 0 {
+		return ""
+	}
+
 	h := uint64(starts)*0xff51afd7ed558ccd + uint64(turn+1)*0xbf58476d1ce4e5b9
 	h ^= h >> 33
 	h *= 0x9e3779b97f4a7c15
 	h ^= h >> 29
-	return figureActNames[h%uint64(len(figureActNames))]
+	return can[h%uint64(len(can))]
 }
 
 // figureActLong is how long an act runs, end to end.
@@ -610,7 +696,7 @@ func (m *Model) figureSpray(w, rows int) {
 	}
 
 	var n int
-	pose.draw(func(x, y int) {
+	pose.draw(m.figureTurned(who), func(x, y int) {
 		if !figureLoose(x, y, pose.tall, t) || figureLoose(x, y, pose.tall, was) {
 			return
 		}

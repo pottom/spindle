@@ -1,0 +1,43 @@
+{
+  "name": "ranger",
+  "from": "pzUH (gameart2d.com), Adventure Girl, via OpenGameArt",
+  "licence": "CC0",
+  "//": "How the drawing is turned into dots. gate is how much the brightness has to change from one dot to the next to count as a line; thick is the stroke it is drawn at, per height. See cmd/spindle-figures.",
+  "gate": 0.5,
+  "heights": [
+    {
+      "tall": 62,
+      "thick": 2
+    },
+    {
+      "tall": 100,
+      "thick": 2
+    }
+  ],
+  "//head": "The share of the figure the head is looked for in, from the top. face is how much of that head is cleared for a face to be drawn into; at nought the head is left exactly as it was drawn, which is what a figure with a face of its own wants.",
+  "head": 0,
+  "face": 0,
+  "//faces": "Which way the drawing looks. She is drawn from the side, so going the other way means turning her over; front means the drawing has no side to it and must never be turned.",
+  "faces": "left",
+  "poses": {
+    "idle": "idle.png",
+    "walk0": "walk0.png",
+    "walk1": "walk1.png",
+    "walk2": "walk2.png",
+    "walk3": "walk3.png",
+    "walk4": "walk4.png",
+    "walk5": "walk5.png",
+    "walk6": "walk6.png",
+    "walk7": "walk7.png",
+    "cheer0": "cheer0.png",
+    "cheer1": "cheer1.png",
+    "duck": "duck.png",
+    "jump": "jump.png",
+    "attack0": "attack0.png",
+    "attack1": "attack1.png",
+    "attack2": "attack2.png",
+    "slide": "slide.png"
+  },
+  "bob": 5,
+  "//bob": "How far she rises and falls as she goes, in dots. Hers is a run rather than a walk, so she lifts further than the figures who stroll on."
+}

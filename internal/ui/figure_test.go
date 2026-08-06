@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -31,7 +32,7 @@ func TestAFigureArrivesAsALineDrawing(t *testing.T) {
 		}
 
 		var lit int
-		p.draw(func(_, _ int) { lit++ })
+		p.draw(false, func(_, _ int) { lit++ })
 		share := float64(lit) / float64(p.wide*p.tall)
 		t.Logf("%3d dots tall: %dx%d, %d lit (%.0f%%), face box %dx%d at %d,%d",
 			tall, p.wide, p.tall, lit, share*100, p.headW, p.headH, p.headX, p.headY)
@@ -48,7 +49,7 @@ func TestAFigureArrivesAsALineDrawing(t *testing.T) {
 		// A figure that asked for a face has a hollow head to put one in; one
 		// that did not is left exactly as it was drawn, face and all.
 		var inside int
-		p.draw(func(x, y int) {
+		p.draw(false, func(x, y int) {
 			if x >= p.headX && x < p.headX+p.headW && y >= p.headY && y < p.headY+p.headH {
 				inside++
 			}
@@ -97,7 +98,7 @@ func TestAFigureDrawsWhereItIsPut(t *testing.T) {
 	for y := range grid {
 		grid[y] = []byte(strings.Repeat(".", p.wide))
 	}
-	p.draw(func(x, y int) {
+	p.draw(false, func(x, y int) {
 		if x < 0 || y < 0 || x >= p.wide || y >= p.tall {
 			t.Fatalf("a dot at %d,%d is outside the %dx%d figure", x, y, p.wide, p.tall)
 		}
@@ -233,15 +234,118 @@ func TestHisActsAreRunsOfDrawings(t *testing.T) {
 	// way twice and a long visit is not the same trick over and over.
 	seen := map[string]bool{}
 	for turn := range 6 {
-		seen[figureActFor(7_000, turn)] = true
+		seen[figureActFor("robot", 7_000, turn)] = true
 	}
 	t.Logf("over six turns he does %d different acts", len(seen))
 	if len(seen) < 3 {
 		t.Error("he does the same act every time in one visit")
 	}
-	once := figureActFor(12_345, 0)
-	if again := figureActFor(12_345, 0); again != once {
+	once := figureActFor("robot", 12_345, 0)
+	if again := figureActFor("robot", 12_345, 0); again != once {
 		t.Errorf("one turn was dealt %q and then %q", once, again)
+	}
+}
+
+// A figure drawn from the side is turned around when he goes the other way, and
+// one drawn front on never is.
+func TestASideOnFigureTurnsAround(t *testing.T) {
+	var sided, front []string
+	for name, d := range figures {
+		if d.faces == 0 {
+			front = append(front, name)
+			continue
+		}
+		sided = append(sided, name)
+	}
+	sort.Strings(sided)
+	sort.Strings(front)
+	t.Logf("drawn from the side: %v; drawn front on: %v", sided, front)
+	if len(sided) == 0 {
+		t.Fatal("no figure is drawn from the side, so nothing is ever turned")
+	}
+
+	// Turning is a mirror, dot for dot.
+	for _, name := range sided {
+		d := figures[name]
+		p, ok := d.at(100, "idle")
+		if !ok {
+			t.Fatalf("%s has no idle pose", name)
+		}
+
+		as, over := map[[2]int]bool{}, map[[2]int]bool{}
+		p.draw(false, func(x, y int) { as[[2]int{x, y}] = true })
+		p.draw(true, func(x, y int) { over[[2]int{x, y}] = true })
+
+		if len(as) != len(over) {
+			t.Errorf("%s draws %d dots as drawn and %d turned", name, len(as), len(over))
+		}
+		for at := range as {
+			if !over[[2]int{p.wide - 1 - at[0], at[1]}] {
+				t.Errorf("%s has a dot at %v that is not there when he is turned", name, at)
+				break
+			}
+		}
+
+		// And she is worth turning: a drawing the same both ways is one that
+		// was never drawn from the side.
+		var same int
+		for at := range as {
+			if over[at] {
+				same++
+			}
+		}
+		t.Logf("%s: %d dots, %d of them in the same place either way", name, len(as), same)
+		if same > len(as)*3/4 {
+			t.Errorf("%s is %d%% the same turned over, which is not a figure with a side to it",
+				name, same*100/max(len(as), 1))
+		}
+	}
+
+	// And the figure the whole screen is drawn from is turned to face the way
+	// he is going, whichever way that is.
+	d := figures[sided[0]]
+	m := scopeModel(160, 46)
+	if got := m.figureTurned(d); got == m.figureTurned(figures[front[0]]) && got {
+		t.Error("a figure drawn front on was turned around with the rest")
+	}
+	if m.figureTurned(figures[front[0]]) {
+		t.Error("a figure drawn front on must never be turned")
+	}
+}
+
+// Nobody is asked for a pose they were never drawn in. The drawings come from
+// different hands and carry different poses, so what a figure is dealt has to
+// be dealt out of what that figure can do.
+func TestEachFigureIsOnlyAskedForWhatItCanDo(t *testing.T) {
+	for name := range figures {
+		can := figureActsFor(name)
+		t.Logf("%-9s %d acts: %v", name, len(can), can)
+		if len(can) < 3 {
+			t.Errorf("%s can do %d acts, which is not enough for a visit to be worth watching", name, len(can))
+		}
+
+		for _, act := range can {
+			for _, f := range figureActs[act] {
+				for _, size := range figures[name].sizes {
+					if _, ok := size.poses[f.pose]; !ok {
+						t.Errorf("%s is dealt %q at %d dots, which wants the pose %q it has not got",
+							name, act, size.tall, f.pose)
+					}
+				}
+			}
+		}
+
+		// And what is dealt is only ever one of them.
+		for turn := range 40 {
+			got := figureActFor(name, int64(turn)*7_000, turn)
+			if !slices.Contains(can, got) {
+				t.Errorf("%s was dealt %q, which is not one of the %d it can do", name, got, len(can))
+			}
+		}
+	}
+
+	if got := figureActFor("nobody at all", 7_000, 0); got != "" {
+		t.Errorf("a figure that does not exist was dealt %q", got)
 	}
 }
 
@@ -309,7 +413,7 @@ func TestEveryFigureIsWhole(t *testing.T) {
 		}
 
 		for _, size := range d.sizes {
-			for _, act := range figureActNames {
+			for _, act := range figureActsFor(name) {
 				for _, f := range figureActs[act] {
 					p, ok := size.poses[f.pose]
 					if !ok {
@@ -317,7 +421,7 @@ func TestEveryFigureIsWhole(t *testing.T) {
 						continue
 					}
 					var lit int
-					p.draw(func(_, _ int) { lit++ })
+					p.draw(false, func(_, _ int) { lit++ })
 					if lit == 0 {
 						t.Errorf("%s at %d dots draws nothing for %q", name, size.tall, f.pose)
 					}
@@ -362,7 +466,7 @@ func TestHeComesAndGoesTwoWays(t *testing.T) {
 	// At rest every way leaves him exactly where he was drawn.
 	for way := range figureWays {
 		var moved, lost int
-		p.draw(func(x, y int) {
+		p.draw(false, func(x, y int) {
 			nx, ny, burn, on := figureWarp(way, 1, x, y, p.wide, p.tall, 184)
 			if !on {
 				lost++
@@ -381,7 +485,7 @@ func TestHeComesAndGoesTwoWays(t *testing.T) {
 			continue
 		}
 		var moved, lost, all int
-		p.draw(func(x, y int) {
+		p.draw(false, func(x, y int) {
 			all++
 			nx, ny, _, on := figureWarp(way, 0.4, x, y, p.wide, p.tall, 184)
 			switch {
@@ -486,7 +590,7 @@ func TestHeComesApartOutOfSpecks(t *testing.T) {
 
 	there := func(at float64) int {
 		var n int
-		p.draw(func(x, y int) {
+		p.draw(false, func(x, y int) {
 			if _, _, _, on := figureWarp(figureCrumbles, at, x, y, p.wide, p.tall, 184); on {
 				n++
 			}
@@ -507,7 +611,7 @@ func TestHeComesApartOutOfSpecks(t *testing.T) {
 	// Walking on and off moves nothing: he is off the side of the screen, and a
 	// figure being walked on is not a figure being drawn on.
 	var moved int
-	p.draw(func(x, y int) {
+	p.draw(false, func(x, y int) {
 		if nx, ny, burn, on := figureWarp(figureWalks, 0.3, x, y, p.wide, p.tall, 184); !on || nx != x || ny != y || burn != 1 {
 			moved++
 		}
@@ -688,11 +792,20 @@ func TestAHopperLeavesTheGround(t *testing.T) {
 	}
 
 	// And it is on the screen: the top of him moves as he goes.
+	//
+	// With the spectrum silenced, because the meter hangs from the ceiling and
+	// the top row of a loud picture is the meter rather than the figure. What is
+	// being measured here is him.
 	m := scopeModel(160, 46)
 	m.stage.on = true
 	m.scope.modes[tabPlayer] = scopeWords
-	m.ps.Duration = 4 * time.Minute
+	m.scope.bands = nil
 	m.words.beats, m.words.text = true, wordsNotes
+
+	// Long enough to hold every bar looked at: the clock the visit is timed
+	// against stops at the end of the track, and a visit dealt past the end of
+	// one never comes on at all.
+	m.ps.Duration = 90 * time.Minute
 
 	for bar := range int64(600) {
 		m.words.starts = bar * 7_000
@@ -704,24 +817,39 @@ func TestAHopperLeavesTheGround(t *testing.T) {
 		t.Skip("no bunny visit in six hundred bars")
 	}
 
+	// And it happens as he crosses: over the middle of the visit, where he is
+	// all the way on and on the move, the rabbit leaves the floor and the robot
+	// hardly does.
 	base := time.Duration(m.words.starts) * time.Millisecond
-	high, low := 1<<30, -1
-	for step := range 40 {
-		m.setProgress(base + faceEnters + time.Duration(float64(step)/39*faceWalkIn*float64(m.faceStay())))
-		art := m.figureLines(m.width, m.height)
-		if art == nil {
+	hop, walk, moved := 0, 0, false
+	for step := range 60 {
+		gone := 0.25 + 0.5*float64(step)/59
+		m.setProgress(base + faceEnters + time.Duration(gone*float64(m.faceStay())))
+		if _, moving := m.faceGoing(); !moving {
 			continue
 		}
-		for i, line := range art {
-			if strings.TrimSpace(ansiOff(line)) != "" {
-				high, low = min(high, i), max(low, i)
-				break
-			}
-		}
+		moved = true
+		hop, walk = max(hop, m.figureLift(bunny)), max(walk, m.figureLift(robot))
 	}
-	t.Logf("coming on, the top of him ran between rows %d and %d", high, low)
-	if low-high < 2 {
-		t.Errorf("the top of him moved %d rows as he came on, want him off the ground", low-high)
+	t.Logf("crossing the screen the rabbit rose %d dots, the robot %d", hop, walk)
+	if !moved {
+		t.Fatal("he never moved, so there was nothing to measure")
+	}
+	if hop < bunny.bob/2 {
+		t.Errorf("the rabbit rose %d dots of its %d, want it off the ground", hop, bunny.bob)
+	}
+	if hop <= walk {
+		t.Errorf("the rabbit rose %d and the robot %d, want the hopper the higher", hop, walk)
+	}
+
+	// Standing still he is on the floor: something bobbing on the spot is being
+	// animated at rather than getting anywhere.
+	for step := range 60 {
+		m.setProgress(base + faceEnters + time.Duration(float64(step)/59*float64(m.faceStay())))
+		if _, moving := m.faceGoing(); !moving && m.figureLift(bunny) != 0 {
+			t.Errorf("standing still he is %d dots off the ground", m.figureLift(bunny))
+			break
+		}
 	}
 }
 

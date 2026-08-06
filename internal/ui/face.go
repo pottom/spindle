@@ -636,7 +636,7 @@ func (m *Model) faceFlow() {
 
 	// And, if a drawn figure is on, the run of drawings that goes with it. The
 	// face's own doing is for the geometry; his is a set of pictures.
-	m.face.act, m.face.actAt = figureActFor(m.words.starts, m.face.turns), now
+	m.face.act, m.face.actAt = figureActFor(m.faceWho(), m.words.starts, m.face.turns), now
 
 	m.face.turns, m.face.did = m.face.turns+1, true
 }
@@ -669,6 +669,19 @@ func faceDoingFor(doing faceDoing) time.Duration {
 	return 0
 }
 
+// faceFacing is the way whoever is on is turned.
+//
+// He keeps facing the way he was going after he stops: somebody who turns to
+// face front the moment he pulls up is a sprite being swapped, not a figure
+// having a rest. Before he has taken a step it is the way he came in.
+func (m Model) faceFacing() float64 {
+	if way, _ := m.faceGoing(); way != 0 {
+		return way
+	}
+	in, _ := m.faceWays()
+	return -in
+}
+
 // faceNow is the look the face wears this frame.
 func (m Model) faceNow() faceLook {
 	look := faceLook{look: m.face.look, mouth: m.face.mouth}
@@ -682,15 +695,9 @@ func (m Model) faceNow() faceLook {
 	look.swing = faceSwing * float64(0.35+0.65*m.face.lift) *
 		math.Sin(2*math.Pi*faceWaves*time.Since(m.face.came).Seconds())
 
-	// Which way he is going, and so which way he is looking and stepping. He
-	// keeps facing the way he was going after he stops: a figure who turns to
-	// face front the moment he pulls up is a sprite being swapped.
-	way, moving := m.faceGoing()
-	look.facing = way
-	if look.facing == 0 {
-		in, _ := m.faceWays()
-		look.facing = -in
-	}
+	// Which way he is going, and so which way he is looking and stepping.
+	_, moving := m.faceGoing()
+	look.facing = m.faceFacing()
 	if moving {
 		look.stride = math.Sin(2 * math.Pi * faceSteps * m.faceGone())
 	}
@@ -1103,7 +1110,7 @@ func (m *Model) faceShow() {
 		m.face.stepped = faceBlinking
 	}
 	m.face.doing, m.face.since = m.face.stepped, now
-	m.face.act, m.face.actAt = figureActFor(now.UnixMilli(), int(m.face.stepped)), now
+	m.face.act, m.face.actAt = figureActFor(m.face.picked, now.UnixMilli(), int(m.face.stepped)), now
 
 	m.face.came, m.face.bar = now, 0
 	m.face.turns, m.face.did, m.face.rested = 0, false, time.Time{}
