@@ -18,7 +18,7 @@ func faceDots(t *testing.T, w, h int, look faceLook) []string {
 	for y := range grid {
 		grid[y] = []byte(strings.Repeat(".", w))
 	}
-	p.draw(look, func(x, y int, _ facePart) {
+	p.draw(look, 1, func(x, y int, _ facePart) {
 		if x >= 0 && y >= 0 && x < w && y < h {
 			grid[y][x] = '#'
 		}
@@ -271,5 +271,70 @@ func TestTheEyeHasAPupilInIt(t *testing.T) {
 	}
 	if at(left) >= at(right) {
 		t.Error("the eyes do not follow the sound")
+	}
+}
+
+// The face is drawn on rather than pasted up: a stroke at a time, in the order
+// somebody would draw one — the eyes, then the brows, then the mouth.
+func TestTheFaceDrawsItselfOn(t *testing.T) {
+	const w, h = 124, 62
+
+	lit := func(grow float64) int {
+		p, ok := faceLayout(w, h)
+		if !ok {
+			t.Fatal("no face")
+		}
+		var n int
+		seen := map[int]bool{}
+		p.draw(faceLook{}, grow, func(x, y int, _ facePart) {
+			if x >= 0 && y >= 0 && x < w && y < h && !seen[y*w+x] {
+				seen[y*w+x] = true
+				n++
+			}
+		})
+		return n
+	}
+
+	was := 0
+	for _, grow := range []float64{0.1, 0.3, 0.5, 0.7, 0.9, 1} {
+		now := lit(grow)
+		t.Logf("%.0f%% drawn: %d dots", grow*100, now)
+		if now < was {
+			t.Errorf("at %.0f%% the face is %d dots against %d before it, want it only arriving", grow*100, now, was)
+		}
+		was = now
+	}
+
+	if full, part := lit(1), lit(0.4); part >= full {
+		t.Errorf("the face is %d dots part way in and %d finished, want it still coming", part, full)
+	}
+	if lit(0.02) == 0 {
+		t.Error("nothing at all is drawn as the face starts")
+	}
+}
+
+// A wink happens to a bar, not to a clock: some bars are given one and the same
+// bar is given it again.
+func TestSomeBarsWink(t *testing.T) {
+	var winks int
+	for bar := range int64(60) {
+		if faceWinks(bar * 7_000) {
+			winks++
+		}
+	}
+	t.Logf("%d of sixty bars wink", winks)
+	if winks == 0 || winks == 60 {
+		t.Errorf("%d of sixty bars wink, want some of them", winks)
+	}
+	// And it is the bar that decides, not the moment it is asked: two bars a
+	// second apart do not have to agree, and one bar always does with itself.
+	var same int
+	for bar := range int64(20) {
+		if faceWinks(bar*7_000) == faceWinks(bar*7_000+1_000) {
+			same++
+		}
+	}
+	if same == 20 {
+		t.Error("every neighbouring pair of bars answered alike, so nothing is being decided")
 	}
 }

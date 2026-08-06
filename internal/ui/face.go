@@ -144,16 +144,31 @@ const (
 	faceParts_
 )
 
-func (p faceParts) draw(look faceLook, light func(x, y int, part facePart)) {
+// draw lights the face. grow is how far it has arrived, 0 to 1: at anything
+// under one the face is still being drawn, stroke by stroke, the way a line of
+// type gathers out of its own dots.
+func (p faceParts) draw(look faceLook, grow float64, light func(x, y int, part facePart)) {
+	// The parts arrive in the order somebody would draw them: the eyes first,
+	// because they are the face; then the brows; then the mouth last, which is
+	// the stroke that decides what the face is doing.
 	if p.browsToo {
 		for i := range 2 {
-			p.brow(i, look, light)
+			p.brow(i, look, faceShare(grow, 0.30, 0.75), light)
 		}
 	}
 	for i := range 2 {
-		p.eye(i, look, light)
+		p.eye(i, look, faceShare(grow, 0.00, 0.70), light)
 	}
-	p.mouth(look, light)
+	p.mouth(look, faceShare(grow, 0.55, 1.00), light)
+}
+
+// faceShare is how far one part has come, given how far the whole face has: it
+// waits its turn and then arrives over the rest of the time.
+func faceShare(grow, from, to float64) float64 {
+	if grow >= 1 {
+		return 1
+	}
+	return min64(max64((grow-from)/(to-from), 0), 1)
 }
 
 // eye draws one eye: an almond outline, and inside it — while it is open
@@ -162,7 +177,7 @@ func (p faceParts) draw(look faceLook, light func(x, y int, part facePart)) {
 // The lid does not slide down over the eye like a shutter. It closes the way an
 // eye closes: the top arc comes down to meet the bottom one, so the shape stays
 // an eye all the way to the line it ends as.
-func (p faceParts) eye(i int, look faceLook, light func(int, int, facePart)) {
+func (p faceParts) eye(i int, look faceLook, grow float64, light func(int, int, facePart)) {
 	box := p.eyes[i]
 	shut := look.lid[i]
 
@@ -190,7 +205,12 @@ func (p faceParts) eye(i int, look faceLook, light func(int, int, facePart)) {
 			reach = down * 0.82 // the lower lid is the shallower of the two
 		}
 		return float64(cx) + rx*c, float64(cy) + math.Copysign(reach*faceAlmond(c), s)
-	}, int(4*(rx+ry)), facePartEye, light)
+	}, int(4*(rx+ry)), grow, facePartEye, light)
+
+	// Nothing inside until the outline has closed on itself.
+	if grow < 0.7 {
+		return
+	}
 
 	// What is inside only survives while the eye is open enough to hold it —
 	// the iris first, then the pupil, so a lid coming down takes the eye apart
@@ -215,7 +235,7 @@ func (p faceParts) eye(i int, look faceLook, light func(int, int, facePart)) {
 		fine.curve(func(t float64) (float64, float64) {
 			a := 2 * math.Pi * t
 			return lookX + iris*math.Cos(a), lookY + iris*math.Sin(a)
-		}, int(8*iris), facePartEye, light)
+		}, int(8*iris), faceShare(grow, 0.6, 1), facePartEye, light)
 	}
 
 	p.disc(lookX, lookY, pupil, facePartEye, light)
@@ -230,9 +250,10 @@ func faceAlmond(c float64) float64 {
 
 // curve walks a closed path and stamps the face's stroke along it, so the line
 // is the same weight wherever it is going.
-func (p faceParts) curve(at func(float64) (float64, float64), steps int, part facePart, light func(int, int, facePart)) {
-	for i := range max(steps, 24) {
-		x, y := at(float64(i) / float64(max(steps, 24)))
+func (p faceParts) curve(at func(float64) (float64, float64), steps int, grow float64, part facePart, light func(int, int, facePart)) {
+	steps = max(steps, 24)
+	for i := range int(float64(steps) * min64(grow, 1)) {
+		x, y := at(float64(i) / float64(steps))
 		p.stamp(x, y, part, light)
 	}
 }
@@ -266,7 +287,7 @@ func (p faceParts) disc(cx, cy, r float64, part facePart, light func(int, int, f
 
 // brow draws one brow: a tapered arc that lifts and arches together, because a
 // brow that only rises reads as a bar being dragged about.
-func (p faceParts) brow(i int, look faceLook, light func(int, int, facePart)) {
+func (p faceParts) brow(i int, look faceLook, grow float64, light func(int, int, facePart)) {
 	box := p.brows[i]
 	up := float64(look.brow[i])
 
@@ -276,6 +297,16 @@ func (p faceParts) brow(i int, look faceLook, light func(int, int, facePart)) {
 	steps := box.w * 3
 	for step := range steps {
 		t := float64(step) / float64(steps-1)
+
+		// Drawn from the outer end in, so a brow arrives as a stroke somebody
+		// pulled rather than as a bar that faded up.
+		if along := t; i == 0 {
+			if 1-along > grow {
+				continue
+			}
+		} else if along > grow {
+			continue
+		}
 
 		// The outer end of a brow is the one away from the nose, and that is
 		// where its peak sits; the inner end runs down and thin.
@@ -303,7 +334,7 @@ func (p faceParts) brow(i int, look faceLook, light func(int, int, facePart)) {
 // Level on purpose. A bowl is what makes a smiley, and a smiley is a shape with
 // no craft in it; a straight mouth with one corner lifted is a face that is
 // thinking about something.
-func (p faceParts) mouth(look faceLook, light func(int, int, facePart)) {
+func (p faceParts) mouth(look faceLook, grow float64, light func(int, int, facePart)) {
 	box := p.lip
 	open := float64(box.h-p.stroke) * float64(look.mouth)
 	turn := float64(box.h) * 0.22
@@ -319,6 +350,9 @@ func (p faceParts) mouth(look faceLook, light func(int, int, facePart)) {
 	steps := box.w * 2
 	for step := range steps {
 		t := float64(step) / float64(steps-1)
+		if t > grow {
+			break
+		}
 		x, y := lip(t)
 		p.stamp(x, y, facePartLip, light)
 
@@ -330,6 +364,13 @@ func (p faceParts) mouth(look faceLook, light func(int, int, facePart)) {
 		round := math.Sqrt(max64(1-math.Pow(2*t-1, 2), 0))
 		p.stamp(x, y+open*round, facePartLip, light)
 	}
+}
+
+func min64(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func max64(a, b float64) float64 {
@@ -368,6 +409,20 @@ const (
 
 	// faceShows is how long the face stays up when it is asked for by hand.
 	faceShows = 6 * time.Second
+
+	// faceWinkAfter is how far into a bar its wink falls — long enough in that
+	// the face has been read first.
+	faceWinkAfter = 1600 * time.Millisecond
+
+	// faceTurn is the rise in loudness the brows answer, and faceRest how long
+	// they are left alone afterwards.
+	faceTurn = 0.09
+	faceRest = 6 * time.Second
+
+	// faceDrawn is how long the face takes to draw itself on. The same order as
+	// the gathering a line of words arrives with, so the two read as one screen
+	// doing one thing.
+	faceDrawn = 520 * time.Millisecond
 )
 
 // faceDoing is what the face has started and not yet finished.
@@ -393,8 +448,18 @@ type faceState struct {
 	since time.Time
 	due   time.Time // when the next blink falls
 
-	// look and mouth follow the sound rather than a clock.
-	look, mouth float32
+	// look and mouth follow the sound rather than a clock, and wasLoud is what
+	// a turn in the music is measured against.
+	look, mouth, wasLoud float32
+
+	// winks is when this bar's wink falls, if it was given one, and rested is
+	// how long the brows are left alone after they have been up.
+	winks, rested time.Time
+
+	// came is when the face last arrived, which is what it is drawn on from,
+	// and bar is the moment of the bar it arrived for.
+	came time.Time
+	bar  int64
 
 	// shown is when the face was last asked for by hand, and stepped which
 	// expression the key has walked to.
@@ -426,16 +491,62 @@ func (m *Model) faceFlow() {
 		m.face.mouth += (loud*faceMouthMost - m.face.mouth) * faceEase
 	}
 
+	// A new bar is a new face: it draws itself on, and whether it will wink is
+	// settled there and then from the bar's own moment, so a record does the
+	// same thing twice.
+	if m.faceUp() && m.words.starts != m.face.bar {
+		m.face.bar, m.face.came = m.words.starts, now
+		m.face.winks = time.Time{}
+		if faceWinks(m.words.starts) {
+			m.face.winks = now.Add(faceWinkAfter)
+		}
+	}
+
 	if m.face.doing != faceStill {
 		if now.Sub(m.face.since) > faceDoingFor(m.face.doing) {
 			m.face.doing, m.face.since = faceStill, now
 		}
 		return
 	}
+
+	// Nothing starts while the face is still being drawn.
+	if m.faceGrown() < 1 {
+		return
+	}
+
+	// A wink, once in a bar, at the moment that bar was given.
+	if !m.face.winks.IsZero() && now.After(m.face.winks) {
+		m.face.doing, m.face.since = faceWinking, now
+		m.face.winks = time.Time{}
+		return
+	}
+
+	// The brows go up on the music turning a corner rather than on a clock: the
+	// same rise the meter throws its water on. Held off for a while afterwards,
+	// because a face that answers every bar is a face nobody reads.
+	rise := max32(m.scope.envelope-m.face.wasLoud, 0) / max32(m.scope.envelope, scopeFloor)
+	m.face.wasLoud = m.scope.envelope
+	if rise > faceTurn && now.After(m.face.rested) {
+		m.face.doing, m.face.since = faceBrowing, now
+		m.face.rested = now.Add(faceRest)
+		return
+	}
+
 	if now.After(m.face.due) {
 		m.face.doing, m.face.since = faceBlinking, now
 		m.face.due = now.Add(faceBlinkEvery + time.Duration(m.scope.roll()*float32(faceBlinkVary)))
 	}
+}
+
+// faceWinks is whether the bar starting at a given moment gets a wink. One in
+// three of the bars that get a face at all, so it is a thing that happens to
+// you rather than a thing the screen does.
+func faceWinks(starts int64) bool {
+	h := uint64(starts)*0xbf58476d1ce4e5b9 + 0x94d049bb133111eb
+	h ^= h >> 31
+	h *= 0x9e3779b97f4a7c15
+	h ^= h >> 29
+	return h%3 == 0
 }
 
 // faceDoingFor is how long each thing the face does takes, end to end.
@@ -522,6 +633,11 @@ func max32(a, b float32) float32 {
 	return b
 }
 
+// faceRide is how far a part of the face rides its own share of the sound, in
+// dots. Well under what a note is given: a face has to hold together while it
+// moves, and a brow that leaves its eye behind is not a brow.
+const faceRide = 3
+
 // faceWide is how much wider than tall the face is set. The marks it stands in
 // for run 2.6 : 1; a face is one object rather than three, so it is drawn
 // tighter than the space it is allowed.
@@ -566,8 +682,17 @@ func (m Model) faceLines(w, rows int) []string {
 		part[i] = m.wordsBeatPaint(int(i), int(faceParts_), freqs, levels)
 	}
 
-	p.draw(m.faceNow(), func(x, y int, at facePart) {
-		x, y = x+left, y+top
+	// Each part rides its own share of the sound, the way the words of a line
+	// do — the brows the bass, the eyes the middle, the mouth the top. Small:
+	// the notes are given six dots and a face wants two or three, or the parts
+	// come apart from each other.
+	var ride [faceParts_]int
+	for i := range ride {
+		ride[i] = -int(m.wordsBeatRide(int(i), int(faceParts_)) * faceRide)
+	}
+
+	p.draw(m.faceNow(), m.faceGrown(), func(x, y int, at facePart) {
+		x, y = x+left, y+top+ride[at]
 		if x < 0 || y < 0 || x >= dotsX || y >= dotsY {
 			return
 		}
@@ -585,6 +710,20 @@ func (m Model) faceLines(w, rows int) []string {
 		m.wordsUnder(grid, paint, hue, w, rows, tall, max(top-dotsPerCellY, 0))
 	}
 	return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
+}
+
+// faceGrown is how far the face has arrived, 0 to 1.
+//
+// It is drawn on rather than faded up: a stroke at a time, in the order
+// somebody would draw one. Everything else on this screen gathers out of its
+// own dots when it lands, and a face that simply appears is the one thing on it
+// that was pasted there.
+func (m Model) faceGrown() float64 {
+	since := time.Since(m.face.came)
+	if m.face.came.IsZero() || since >= faceDrawn {
+		return 1
+	}
+	return float64(since) / float64(faceDrawn)
 }
 
 // faceUp reports that a face is what should be in the slot now.
@@ -627,6 +766,7 @@ func (m *Model) faceShow() {
 		m.face.doing, m.face.since = m.face.stepped, now
 	} else {
 		m.face.stepped = faceStill
+		m.face.came = now // asked for, and so drawn on from nothing
 	}
 	m.face.shown = now
 }
