@@ -205,17 +205,24 @@ func TestTheFaceCanBeAskedFor(t *testing.T) {
 		t.Fatal("the face was asked for and did not come")
 	}
 
-	// Pressing again walks the expressions rather than putting it away.
-	seen := map[faceDoing]bool{}
-	for range int(faceDoings) + 1 {
+	// Pressing again brings on the next of them, doing the next thing, rather
+	// than the same one over again.
+	who, doing := map[string]bool{}, map[faceDoing]bool{}
+	for range len(figureCast()) + 2 {
+		was := m.faceWho()
 		m.faceShow()
-		seen[m.face.doing] = true
+		if m.faceWho() == was {
+			t.Errorf("pressing again brought %q back on", was)
+		}
+		who[m.faceWho()] = true
+		doing[m.face.doing] = true
 	}
-	t.Logf("the key walked through %d expressions", len(seen))
-	if len(seen) < int(faceDoings)-1 {
-		t.Errorf("the key showed %d of the %d expressions", len(seen), faceDoings-1)
+	t.Logf("a run of presses brought on %d of them, doing %d different things", len(who), len(doing))
+
+	if len(who) < len(figureCast()) {
+		t.Errorf("%d of the %d ever came on", len(who), len(figureCast()))
 	}
-	if seen[faceStill] {
+	if doing[faceStill] {
 		t.Error("one of the presses showed nothing at all")
 	}
 }

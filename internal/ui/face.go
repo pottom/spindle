@@ -531,6 +531,11 @@ type faceState struct {
 	bar  int64
 	was  bool
 
+	// picked is who the key has walked to, so pressing it again brings on the
+	// next of them rather than the same one over again; shown is when the face
+	// was last asked for by hand, and stepped which expression it walked to.
+	picked string
+
 	// shown is when the face was last asked for by hand, and stepped which
 	// expression the key has walked to.
 	shown   time.Time
@@ -1078,17 +1083,32 @@ func faceDealt(starts int64) bool {
 // happens once in a solo and lasts a third of a second.
 func (m *Model) faceShow() {
 	now := time.Now()
-	if !m.face.shown.IsZero() && time.Since(m.face.shown) < faceShows {
-		m.face.stepped = (m.face.stepped + 1) % faceDoings
-		if m.face.stepped == faceStill {
-			m.face.stepped = faceBlinking
+
+	// The next of them, every time. Somebody pressing the key twice is somebody
+	// who wants to see somebody else, not the same one again.
+	cast := figureCast()
+	at := 0
+	for i, who := range cast {
+		if who == m.face.picked {
+			at = i + 1
+			break
 		}
-		m.face.doing, m.face.since = m.face.stepped, now
-	} else {
-		m.face.stepped = faceStill
-		m.face.came, m.face.bar = now, 0
-		m.face.turns, m.face.did, m.face.rested = 0, false, time.Time{}
 	}
+	m.face.picked = cast[at%len(cast)]
+
+	// And the next thing for them to do, so a run of presses is a run of turns
+	// rather than the same one over and over.
+	m.face.stepped = (m.face.stepped + 1) % faceDoings
+	if m.face.stepped == faceStill {
+		m.face.stepped = faceBlinking
+	}
+	m.face.doing, m.face.since = m.face.stepped, now
+	m.face.act, m.face.actAt = figureActFor(now.UnixMilli(), int(m.face.stepped)), now
+
+	m.face.came, m.face.bar = now, 0
+	m.face.turns, m.face.did, m.face.rested = 0, false, time.Time{}
+	m.face.crumbled = 1
+	m.face.sweptLow, m.face.sweptHigh = figureUnswept, -figureUnswept
 	m.face.shown = now
 }
 

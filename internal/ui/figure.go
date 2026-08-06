@@ -348,6 +348,12 @@ func (m Model) faceWho() string {
 		return ""
 	}
 
+	// Asked for by hand: whoever the key has walked to. Pressing it again is
+	// somebody wanting to see the next one, not the same one over again.
+	if !m.face.shown.IsZero() && time.Since(m.face.shown) < faceShows {
+		return m.face.picked
+	}
+
 	// One of the drawn ones, or the one this code draws itself. He is in the
 	// set with the rest of them: he has a face that blinks and a pair of hands
 	// that answer the music, which no still drawing does, and the drawings have
@@ -689,6 +695,17 @@ const (
 	// whole screen having been walked through.
 	figureUnswept = 1 << 30
 )
+
+// figureCast is everyone who can turn up, in a settled order: the drawn ones by
+// name, and the one this code draws itself last.
+func figureCast() []string {
+	out := make([]string, 0, len(figures)+1)
+	for name := range figures {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return append(out, "")
+}
 
 // figureSweeps reports that this visit walks through the marks.
 //
