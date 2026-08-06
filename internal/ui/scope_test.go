@@ -4,6 +4,7 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -868,5 +869,82 @@ func TestTraceThrowsSparks(t *testing.T) {
 	}
 	if len(m.scope.sparks) != 0 {
 		t.Errorf("%d sparks are still in the air over a silent trace", len(m.scope.sparks))
+	}
+}
+
+// Nothing the pictures carry between frames grows without a bound.
+//
+// Everything here is a simulation: water thrown off the meter, sparks off the
+// trace, a trail of old frames for the phosphor. Each of them keeps what is
+// still alive and drops the rest, and each has a ceiling on how much can be
+// alive at once — a stuck display, a silent hour or a record that never stops
+// hitting must not turn any of them into a list that only ever gets longer.
+//
+// Driven here rather than reasoned about: a few minutes of playback at thirty
+// frames a second, through the loudest music the model can be given, with the
+// record changing under it. Measured over half an hour it settles at the same
+// numbers; what is kept here is the shortest run that reaches them.
+func TestThePicturesDoNotGrow(t *testing.T) {
+	m := scopeModel(160, 48)
+	m.stage.on = true
+
+	bands := make([]float32, 28)
+	samples := make([]float32, 2*512)
+
+	const frames = 5_000
+	for f := range frames {
+		// Loud and moving, so that every throw and every trigger fires.
+		phase := float64(f) / 7
+		for i := range bands {
+			bands[i] = float32(0.5 + 0.49*math.Sin(phase+float64(i)))
+		}
+		for i := range samples {
+			samples[i] = float32(math.Sin(phase*40 + float64(i)/9))
+		}
+
+		m.scope.frame = samples
+		m.scope.follow(samples)
+		m.scope.adoptBands(bands)
+		m.rememberScope()
+		m.throwSparks(m.width, m.height)
+		m.stageFlow(m.width, m.height)
+		m.stageFlowIn(m.width, m.height, stageThrows{
+			span: float32(m.height * dotsPerCellY), reach: 40, lift: wordsLift,
+		})
+
+		if f%1000 == 999 {
+			m.ps.TrackID = "another"
+			m.words.forced = time.Now()
+		}
+	}
+
+	t.Logf("after %d frames: %d drops (room for %d), %d sparks (room for %d), %d frames of trail (room for %d)",
+		frames, len(m.stage.drops), cap(m.stage.drops),
+		len(m.scope.sparks), cap(m.scope.sparks), len(m.scope.trail), cap(m.scope.trail))
+
+	if got := len(m.stage.drops); got > stageDrops {
+		t.Errorf("%d drops are in the air, want no more than %d", got, stageDrops)
+	}
+	if got := len(m.scope.sparks); got > sparkMost {
+		t.Errorf("%d sparks are in the air, want no more than %d", got, sparkMost)
+	}
+	if got := len(m.scope.trail); got > scopeTrail {
+		t.Errorf("the trail holds %d frames, want no more than %d", got, scopeTrail)
+	}
+
+	// The room they have taken is bounded too: a slice that is reused by
+	// keeping what is alive can still creep if it is regrown every pass.
+	for _, c := range []struct {
+		what string
+		got  int
+		most int
+	}{
+		{"drops", cap(m.stage.drops), 4 * stageDrops},
+		{"sparks", cap(m.scope.sparks), 4 * sparkMost},
+		{"trail", cap(m.scope.trail), 4 * scopeTrail},
+	} {
+		if c.got > c.most {
+			t.Errorf("the %s have grown room for %d, want no more than %d", c.what, c.got, c.most)
+		}
 	}
 }
