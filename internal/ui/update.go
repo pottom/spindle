@@ -307,6 +307,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.wordsFlow(m.width, m.height)
 			m.faceFlow()
 			m.figureSpray(m.width, m.height)
+			m.figureSweep(m.width, m.height)
 			// Thrown from the tips of the band along the foot, and given the
 			// whole terminal to cross rather than the band it came from.
 			_, tall := m.wordsRoom(m.height)

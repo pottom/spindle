@@ -167,6 +167,25 @@ func (m Model) figureLines(w, rows int) []string {
 	}
 	light := func(x, y int, at facePart) { lightAt(x, y, at, 1) }
 
+	// The marks he is walking through, if this is one of the visits where he
+	// does. What he has reached is not there any more; what he is reaching is
+	// coming apart. See figureSweeps.
+	if m.figureSweeps() {
+		count := max(m.words.where.Count, 1)
+		m.figureThrough(w, rows, func(x, y, piece int, burn float32) {
+			if x < 0 || y < 0 || x >= dotsX || y >= dotsY {
+				return
+			}
+			cell := (y/dotsPerCellY)*w + x/dotsPerCellX
+			grid[cell] |= 1 << brailleBit[x%dotsPerCellX][y%dotsPerCellY]
+
+			s := m.wordsBeatPaint(piece, count, freqs, levels)
+			if level := int8(float32(s.level) * burn); level > paint[cell] {
+				paint[cell], hue[cell] = level, s.hue
+			}
+		})
+	}
+
 	pose.draw(func(x, y int) {
 		x, y, burn, on := figureWarp(way, t, x, y, pose.wide, pose.tall, dotsY)
 		if on {
@@ -496,6 +515,72 @@ func figureSpeck(x, y int) int {
 	return int(h & 0x7fffffff)
 }
 
+// figureSweep hands the marks he has just walked into to the water.
+//
+// The same list the meter throws its drops into, so what he knocks over falls
+// through the picture on the picture's own physics. This is the whole point of
+// him sharing a frame with them: not that he is drawn beside the marks, but
+// that he does something to them.
+func (m *Model) figureSweep(w, rows int) {
+	if !m.figureSweeps() {
+		m.face.sweptLow, m.face.sweptHigh = figureUnswept, -figureUnswept
+		return
+	}
+
+	who, ok := figureFor(m.faceWho())
+	if !ok {
+		return
+	}
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+	pose, ok := who.at(int(figureTall*float64(dotsY)), m.figurePose())
+	if !ok {
+		return
+	}
+
+	room := (dotsX - pose.wide) / 2
+	left := room + int(m.faceWalk()*float64(room+pose.wide))
+	edge := m.figureEdge(left, pose.wide)
+
+	// The stretch he has walked, from one end of it to the other. It only ever
+	// grows, so a mark he has knocked over stays knocked over.
+	wasLow, wasHigh := m.face.sweptLow, m.face.sweptHigh
+	m.face.sweptLow, m.face.sweptHigh = min(wasLow, edge), max(wasHigh, edge)
+
+	g, where := m.words.have, m.words.where
+	if g.DotsX != dotsX || where.Count == 0 {
+		return
+	}
+
+	// Only the marks that came apart between the last frame and this one.
+	span := dotsX / max(where.Count, 1)
+	var n int
+	for y := range dotsY {
+		for x := range dotsX {
+			if g.Lum[y*dotsX+x] < wordsLit {
+				continue
+			}
+			piece := where.WordAt(x, y)
+			if piece < 0 {
+				continue
+			}
+			cx, _ := where.Middle(piece)
+			if figureBroken(m.face.sweptLow, m.face.sweptHigh, cx, span) < 0.5 ||
+				figureBroken(wasLow, wasHigh, cx, span) >= 0.5 {
+				continue
+			}
+			if n++; n%figureShards != 0 || len(m.stage.drops) >= stageDrops {
+				continue
+			}
+			m.stage.drops = append(m.stage.drops, stageDrop{
+				col:    x,
+				at:     float32(dotsY - 1 - y),
+				speed:  figureSprayThrow * (m.scope.roll() + 0.15),
+				bright: 0.6 + 0.4*m.scope.roll(),
+			})
+		}
+	}
+}
+
 // figureSpray hands the dots that have come loose to the water.
 //
 // This is the whole of what makes it read as sparks rather than as a picture
@@ -554,4 +639,108 @@ func (m *Model) figureSpray(w, rows int) {
 			bright: 0.5 + 0.5*m.scope.roll(),
 		})
 	})
+}
+
+// Walking through the marks.
+//
+// A bar of music is a row of marks across the screen, and a figure who walks on
+// while they are up walks into them. He does not step round them and he does
+// not stand politely beside them: what he reaches comes apart, and the pieces
+// go into the water — the same water the meter throws, so what he knocks over
+// falls through the picture and is gone.
+//
+// It is the one thing on this screen where two of its machines touch each
+// other, and it is the only reason he shares a frame with anything.
+const (
+	// figureReach is how far in front of himself he clears, as a share of how
+	// wide he is: a figure who only breaks what he is standing on looks like a
+	// figure something is happening to.
+	figureReach = 0.35
+
+	// figureBreaks is how far he has to travel past a mark to have finished
+	// breaking it, in dots. Short: a mark that takes a second to come apart is
+	// a mark being dissolved, not one being walked into.
+	figureBreaks = 26
+
+	// figureShards is one drop for every this many dots of a mark he breaks.
+	figureShards = 4
+
+	// figureUnswept is the stretch of a visit he has not walked any of yet: an
+	// empty span rather than a point, so the first frame does not read as the
+	// whole screen having been walked through.
+	figureUnswept = 1 << 30
+)
+
+// figureSweeps reports that this visit walks through the marks.
+//
+// The ones where he comes in on his feet: if he is walking on from the side
+// then the row is in his way, and going round it is not something a figure does.
+// The ones where he gathers out of specks are visits where he was never coming
+// through anything.
+func (m Model) figureSweeps() bool {
+	return m.words.beats && m.figureComesBy() == figureWalks
+}
+
+// figureEdge is the front of him, in dots across the screen.
+func (m Model) figureEdge(left, wide int) int {
+	if way, _ := m.faceGoing(); way < 0 {
+		return left
+	}
+	return left + wide
+}
+
+// figureSwept is the stretch he has walked through so far this visit.
+func (m Model) figureSwept() (int, int) { return m.face.sweptLow, m.face.sweptHigh }
+
+// figureBroken is how far a mark has come apart: nought while it is still
+// standing in front of him, one once he is well past it.
+//
+// Measured against the whole stretch he has walked, from one end of it to the
+// other, rather than against where he is standing this moment. Against the
+// moment, everything on both sides of him counted as broken before he had taken
+// a step — and worse, a mark he had already knocked over stood back up as he
+// wandered away from it. Broken is broken.
+func figureBroken(low, high, at, wide int) float64 {
+	past := min64(float64(at-low), float64(high-at)) - float64(wide)*figureReach
+	return min64(max64(past/figureBreaks, 0), 1)
+}
+
+// figureThrough draws what is left of the row he is walking into. The marks
+// keep their own light: they are the picture and he is the visitor.
+func (m Model) figureThrough(w, rows int, light func(x, y, piece int, burn float32)) {
+	low, high := m.figureSwept()
+	g, where := m.words.have, m.words.where
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+	if g.DotsX != dotsX || g.DotsY != dotsY || where.Count == 0 {
+		return
+	}
+
+	for y := range dotsY {
+		for x := range dotsX {
+			if g.Lum[y*dotsX+x] < wordsLit {
+				continue
+			}
+			piece := where.WordAt(x, y)
+			if piece < 0 {
+				continue
+			}
+
+			cx, _ := where.Middle(piece)
+			broken := figureBroken(low, high, cx, dotsX/max(where.Count, 1))
+			if broken >= 1 {
+				continue
+			}
+
+			// Standing still until he arrives, then out from its own middle.
+			at, to := x, y
+			burn := float32(1)
+			if broken > 0 {
+				mx, my := where.Middle(piece)
+				at += int(float64(x-mx) * broken * broken * wordsPopFlies)
+				to += int(float64(y-my) * broken * broken * wordsPopFlies)
+				burn = float32(1 - broken)
+			}
+			light(at, to, piece, burn)
+		}
+	}
 }

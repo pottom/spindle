@@ -514,6 +514,11 @@ type faceState struct {
 	actAt    time.Time
 	crumbled float64
 
+	// sweptLow and sweptHigh are the stretch of the screen he has walked through
+	// this visit, so a mark he has knocked over stays knocked over while he
+	// wanders about, and only what has just gone is handed to the water.
+	sweptLow, sweptHigh int
+
 	turns   int
 	did     bool
 	rested  time.Time
@@ -579,6 +584,7 @@ func (m *Model) faceFlow() {
 		m.face.turns, m.face.did = 0, false
 		m.face.rested, m.face.act = time.Time{}, ""
 		m.face.crumbled = 1
+		m.face.sweptLow, m.face.sweptHigh = figureUnswept, -figureUnswept
 
 		// Measured from where the music is as he arrives, or the first frame
 		// of every visit reads as a rise out of silence and he takes it as a

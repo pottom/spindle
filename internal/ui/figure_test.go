@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/pottom/spindle/internal/ui/cover"
 )
 
 // The figures come from drawings, converted by cmd/spindle-figures. What the
@@ -603,5 +605,99 @@ func TestComingApartHandsHimToTheWater(t *testing.T) {
 	}
 	if len(m.stage.drops) != 0 {
 		t.Errorf("walking off threw %d drops, want him leaving on his feet", len(m.stage.drops))
+	}
+}
+
+// When he walks on while a bar of marks is up, he walks into them. What he
+// reaches comes apart and goes into the water — the same water the meter
+// throws — and what he has knocked over stays knocked over while he wanders.
+//
+// It is the one place two of this screen's machines touch each other, and the
+// only reason he shares a frame with anything.
+func TestHeWalksThroughTheMarks(t *testing.T) {
+	const w, rows = 100, 30
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+
+	m := scopeModel(w, rows)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 4 * time.Minute
+
+	bands := make([]float32, 28)
+	for i := range bands {
+		bands[i] = 0.6
+	}
+	m.scope.bands = bands
+
+	// A visit that comes on from the side, with a row of marks up.
+	var found bool
+	for bar := range int64(400) {
+		m.words.starts = bar * 7_000
+		if faceDealt(m.words.starts) && m.faceWho() != "" && m.figureComesBy() == figureWalks {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Skip("no walking visit in four hundred bars")
+	}
+
+	line := wordsMarks(dotsX, dotsY)
+	img, layout, ok := wordsImage([]string{line}, dotsX, dotsY)
+	if !ok {
+		t.Fatal("the row would not draw")
+	}
+	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	m.words.where, m.words.beats, m.words.text = layout, true, line
+	m.face.sweptLow, m.face.sweptHigh = figureUnswept, -figureUnswept
+
+	if !m.figureSweeps() {
+		t.Fatal("he walked on over a row of marks and did not walk into it")
+	}
+
+	whole := func() int {
+		low, high := m.figureSwept()
+		var n int
+		for piece := range layout.Count {
+			cx, _ := layout.Middle(piece)
+			if figureBroken(low, high, cx, dotsX/layout.Count) < 1 {
+				n++
+			}
+		}
+		return n
+	}
+
+	base := time.Duration(m.words.starts) * time.Millisecond
+	was, drops := layout.Count, 0
+	for step := range 60 {
+		m.setProgress(base + faceEnters + time.Duration(float64(step)/59*float64(m.faceStay())))
+		m.faceFlow()
+		m.figureSweep(w, rows)
+
+		if now := whole(); now > was {
+			t.Errorf("step %d: %d marks are standing where %d were, want them staying down", step, now, was)
+		} else {
+			was = now
+		}
+		drops = max(drops, len(m.stage.drops))
+	}
+	t.Logf("he left %d of %d marks standing and threw %d drops into the water", was, layout.Count, drops)
+
+	if was == layout.Count {
+		t.Error("he walked the whole way and knocked nothing over")
+	}
+	if drops == 0 {
+		t.Error("what he knocked over never reached the water")
+	}
+
+	// And a visit that gathers out of specks leaves the row alone.
+	for bar := range int64(400) {
+		m.words.starts = bar * 7_000
+		if faceDealt(m.words.starts) && m.faceWho() != "" && m.figureComesBy() == figureGathers {
+			break
+		}
+	}
+	if m.figureSweeps() {
+		t.Error("he came together out of specks in the middle of the row and still knocked it over")
 	}
 }
