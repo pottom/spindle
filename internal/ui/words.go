@@ -330,8 +330,13 @@ func wordsWrapTo(line string, w, h, most int) []string {
 	return wordsSplit(line, most)
 }
 
-// wordsCardMost is the most lines one part of a card may be broken into.
-const wordsCardMost = 2
+// wordsCardMost is the most lines one part of a card may be broken into, and
+// wordsCardTries how many times a part is cut back when even that many leaves
+// it too small to read.
+const (
+	wordsCardMost  = 2
+	wordsCardTries = 6
+)
 
 // wordsCard sets out a card — what the record is called, whose it is, what it
 // came out on — breaking any part of it that is too long for the room.
@@ -364,9 +369,75 @@ func (m Model) wordsCard(parts ...string) []string {
 
 	var out []string
 	for _, part := range kept {
-		out = append(out, wordsWrapTo(part, dotsX, share, wordsCardMost)...)
+		out = append(out, m.wordsCardPart(part, dotsX, share)...)
 	}
 	return out
+}
+
+// wordsCardPart is one part of a card, broken and if need be cut back until
+// what is left can be read.
+//
+// Cut back by measuring rather than by arithmetic: how many letters a line ends
+// up with is a question about a proportional face and a greedy line breaker
+// together, and the only way to know is to break it and look at what came out.
+func (m Model) wordsCardPart(part string, dotsX, share int) []string {
+	lines := wordsWrapTo(part, dotsX, share, wordsCardMost)
+	if wordsBigEnough(lines, dotsX) {
+		return lines
+	}
+
+	// Start from what those lines could hold at a readable size, then keep
+	// taking a share off until what comes back out of the breaker fits.
+	most := wordsCardMost * int(float64(dotsX)*(1-wordsMargin)) / wordsReadable
+	for range wordsCardTries {
+		lines = wordsWrapTo(wordsShorten(part, most), dotsX, share, wordsCardMost)
+		if wordsBigEnough(lines, dotsX) {
+			break
+		}
+		most = most * 6 / 7
+	}
+	return lines
+}
+
+// wordsBigEnough reports that every line of a part gets its letters enough dots
+// to be a word rather than a texture. The same threshold a lyric is broken to.
+func wordsBigEnough(lines []string, dotsX int) bool {
+	longest := 0
+	for _, line := range lines {
+		longest = max(longest, len([]rune(line)))
+	}
+	return int(float64(dotsX)*(1-wordsMargin))/max(longest, 1) >= wordsReadable
+}
+
+// wordsShorten cuts a part of a card down to a number of letters, on a word,
+// and marks the cut.
+//
+// Breaking a long name in two is only half an answer. A podcast episode runs to
+// ninety letters, and ninety letters over two lines is forty-five to a line —
+// seven dots each on a wide terminal, which is a texture rather than a word.
+// Past the point where another line would not save it, the rest is cut off.
+//
+// A card is a name, not a paragraph. Whoever is looking at it wants to know
+// what is playing, and the first few words of a title say that.
+func wordsShorten(part string, most int) string {
+	if most < 4 || len([]rune(part)) <= most {
+		return part
+	}
+
+	var kept []string
+	var run int
+	for _, word := range strings.Fields(part) {
+		if run+len([]rune(word)) > most-1 { // room for the mark
+			break
+		}
+		kept = append(kept, word)
+		run += len([]rune(word)) + 1
+	}
+	if len(kept) == 0 {
+		// One word longer than the whole card: cut it wherever it has got to.
+		return string([]rune(part)[:max(most-1, 1)]) + "…"
+	}
+	return strings.Join(kept, " ") + "…"
 }
 
 // wordsSplit breaks a line into n roughly equal pieces, at spaces.

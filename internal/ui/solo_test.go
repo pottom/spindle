@@ -296,3 +296,66 @@ func TestARefusedPictureIsTriedAgainAtANewSize(t *testing.T) {
 		t.Error("the screen changed shape and the card was not sent for again")
 	}
 }
+
+// Whatever the name is, the card can be read.
+//
+// Breaking it in two is only half an answer: a podcast episode runs to ninety
+// letters, and ninety letters over two lines is forty-five to a line, which on
+// a wide terminal is seven dots a letter — a texture rather than a word. Past
+// what another line would save, the rest is cut off and the cut is marked.
+func TestACardIsAlwaysBigEnoughToRead(t *testing.T) {
+	names := []string{
+		"Dübörög a ház",
+		"The Lamb Lies Down On Broadway - 2007 Stereo Mix",
+		"Mikor a tű éri a lemezt, mi van Európában? Hogyan mutat a politikus // Fülelőbusz Podcast 131",
+		"Donaudampfschifffahrtselektrizitätenhauptbetriebswerkbauunterbeamtengesellschaft",
+	}
+
+	for _, size := range [][2]int{{60, 20}, {100, 30}, {180, 46}, {240, 60}} {
+		w, rows := size[0], size[1]
+		for _, name := range names {
+			m := scopeModel(100, 44)
+			m.width, m.height = w, rows
+			m.ps.Title, m.ps.Artists = name, []string{"Fülelőbusz Podcast"}
+
+			card := m.soloName()
+			if len(card) == 0 {
+				t.Fatalf("%dx%d: %q made no card", w, rows, name)
+			}
+			if !wordsBigEnough(card, w*dotsPerCellX) {
+				t.Errorf("%dx%d: %q came out too small to read: %q", w, rows, name, card)
+			}
+			if _, _, ok := wordsImage(card, w*dotsPerCellX, rows*dotsPerCellY); !ok {
+				t.Errorf("%dx%d: %q could not be set at all", w, rows, name)
+			}
+			t.Logf("%3dx%-3d %q", w, rows, card)
+		}
+	}
+}
+
+// And what was cut says so.
+func TestACutNameIsMarked(t *testing.T) {
+	const name = "Mikor a tű éri a lemezt, mi van Európában? Hogyan mutat a politikus"
+
+	if got := wordsShorten(name, 300); got != name {
+		t.Errorf("a name that fits was cut to %q", got)
+	}
+
+	got := wordsShorten(name, 30)
+	if !strings.HasSuffix(got, "…") {
+		t.Errorf("%q was cut without saying so", got)
+	}
+	if len([]rune(got)) > 30 {
+		t.Errorf("%q is %d letters, want no more than 30", got, len([]rune(got)))
+	}
+	if !strings.HasPrefix(name, strings.TrimSuffix(got, "…")) {
+		t.Errorf("%q is not the front of the name", got)
+	}
+	t.Logf("cut to thirty: %q", got)
+
+	// A single word longer than the whole card is cut wherever it has got to,
+	// there being no space to cut it on.
+	if got := wordsShorten("Donaudampfschifffahrtselektrizitäten", 12); len([]rune(got)) > 12 {
+		t.Errorf("one long word came out as %q", got)
+	}
+}
