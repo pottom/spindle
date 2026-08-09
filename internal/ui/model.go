@@ -293,6 +293,16 @@ func (m *Model) restyle() {
 // StopDaemonRequested reports whether the session ended with Q rather than q.
 func (m Model) StopDaemonRequested() bool { return m.stopDaemon }
 
+// loaded reports that there is a track on the device to say anything about.
+//
+// A device can be active with nothing on it — one just switched to, or one that
+// has been left alone — and the difference matters to everything that draws a
+// position: a bar, a clock and a length are all statements about a track, and
+// there is no track to make them about.
+func (m Model) loaded() bool {
+	return m.ps != nil && (m.ps.TrackID != "" || m.ps.Duration > 0)
+}
+
 // elapsed is where the current track has reached: the last position the backend
 // reported, carried forward by the clock.
 func (m Model) elapsed() time.Duration {
@@ -305,7 +315,7 @@ func (m Model) elapsed() time.Duration {
 	// arrived in the position was drawn as a time. What arrived after one such
 	// switch was a timestamp, and the screen said the track was fifty-six years
 	// in.
-	if m.ps.TrackID == "" && m.ps.Duration <= 0 {
+	if !m.loaded() {
 		return 0
 	}
 

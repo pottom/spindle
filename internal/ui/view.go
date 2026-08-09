@@ -228,6 +228,15 @@ func (m Model) infoBlock(w int) []string {
 		lines = append(lines, s.Album.Render(ps.Album))
 	}
 
+	// A device with nothing on it has nothing to say about where it has got to.
+	// Every other player leaves this blank rather than drawing a bar at nought
+	// against a length of nought — and a clock that runs anyway, over a track
+	// that is not there, says something that is not true. The transport stays:
+	// pressing play is how something gets loaded.
+	if !m.loaded() {
+		return append(lines, "", "", "", "", "", "", m.transportLine(w))
+	}
+
 	return append(lines,
 		"",
 		"",

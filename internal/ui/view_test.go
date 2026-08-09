@@ -424,15 +424,43 @@ func TestNothingLoadedShowsNoClock(t *testing.T) {
 		t.Errorf("with no track loaded the screen is %s in, want nothing", got)
 	}
 
-	line := ansiOff(m.progressLine(m.width))
-	if strings.Contains(line, "496195") || strings.Contains(line, ":23:") {
-		t.Errorf("the progress line reads %q", strings.TrimSpace(line))
+	// And the screen says nothing about where it has got to: no clock, no
+	// length, and no bar — all three are statements about a track. The volume
+	// keeps its own, which is a statement about the device.
+	bars := func() (times, meters int) {
+		for _, line := range m.infoBlock(m.width) {
+			if strings.Contains(ansiOff(line), ":") {
+				times++
+			}
+			if strings.Contains(ansiOff(line), knob) {
+				meters++
+			}
+		}
+		return times, meters
 	}
 
-	// And a track that is loaded still runs.
+	times, meters := bars()
+	t.Logf("with nothing loaded: %d rows of time, %d meters", times, meters)
+	if times != 0 {
+		t.Errorf("the player draws %d rows of time for a track that is not there", times)
+	}
+	if meters != 1 {
+		t.Errorf("the player draws %d meters, want the volume alone", meters)
+	}
+
+	// And a track that is loaded gets all of it back.
 	m.ps.TrackID, m.ps.Title = "t1", "a song"
 	m.ps.Duration, m.ps.Progress = 3*time.Minute, 30*time.Second
 	if got := m.elapsed(); got != 30*time.Second {
 		t.Errorf("a loaded track is %s in, want 30s", got)
+	}
+
+	times, meters = bars()
+	t.Logf("with a track on: %d rows of time, %d meters", times, meters)
+	if times != 1 {
+		t.Errorf("a loaded track has %d rows of time, want the one", times)
+	}
+	if meters != 2 {
+		t.Errorf("a loaded track has %d meters, want the progress and the volume", meters)
 	}
 }
