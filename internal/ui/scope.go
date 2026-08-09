@@ -636,6 +636,53 @@ func (m Model) beatPulse() float32 {
 	return fall * fall
 }
 
+// beatsIn is how many beats have gone by since something that began a given
+// time ago, and whether the record has a beat to count at all.
+//
+// Counted on the beat grid rather than by dividing the time: what wants the
+// number is a picture that moves on the beat, and beats that fall a fifth of a
+// period from where the arithmetic puts them are beats in the wrong place. The
+// last beat reported anchors the grid, and the count is how many of its
+// multiples fall between then and now. Measured on a half-second beat, a
+// stretch three tenths of a second long that a beat landed in counts one — and
+// dividing the time says none.
+//
+// The lead is how far past now the count runs, and it is there because what
+// asks is a picture that starts moving into a beat before it lands: beatPulse
+// spends beatRise of a period coming up to it. Counted only as far as now, that
+// rise is credited to the beat before — so whatever the last beat moved comes
+// back up to full and is cut off at the strike, and whatever this one moves
+// starts from full. Given the lead, the two change hands at the one moment they
+// are both at nothing, which is the only place a handover is invisible.
+func (m Model) beatsIn(age, lead time.Duration) (int, bool) {
+	if !m.beatKeeping() {
+		return 0, false
+	}
+	period := m.scope.beat.Period
+	if period <= 0 || age < 0 {
+		return 0, false
+	}
+
+	// How long ago the last beat the daemon reported was, brought up to date.
+	last := time.Since(m.scope.beatAt) + m.scope.beat.Since
+
+	// The grid, counted forwards from that beat: how many of them have landed by
+	// the end of the stretch, less how many had landed when it began. Floored
+	// rather than truncated, because the stretch usually began before that beat
+	// and a truncated negative would count one beat too few.
+	return int(floorDiv(int64(last+lead), int64(period)) - floorDiv(int64(last-age), int64(period))), true
+}
+
+// floorDiv divides towards minus infinity, which is what counting a grid
+// backwards through zero needs.
+func floorDiv(a, b int64) int64 {
+	q := a / b
+	if a%b != 0 && (a < 0) != (b < 0) {
+		q--
+	}
+	return q
+}
+
 const (
 	// beatRise is how much of a beat is spent coming up to it. Small: the rise
 	// is there so the strike is not a discontinuity, not so it can be watched.

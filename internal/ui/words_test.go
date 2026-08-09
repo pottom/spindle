@@ -1332,3 +1332,196 @@ func TestTheMeterDoesNotJumpBetweenPictures(t *testing.T) {
 		t.Errorf("the room over the head moved %d dots in one frame, want it eased", mostHead)
 	}
 }
+
+// The beat walks the row of marks rather than lifting all of them at once: one
+// mark struck, left to right, a step per beat, and round to the left again at
+// the end of the row.
+//
+// A bar nobody sings is where this screen has the least to say. Answered by a
+// row that leaves the ground together it says it once; struck one at a time the
+// row is a step sequencer with the record's own beat walking down it, and the
+// eye has somewhere to be. It is driven here the way the screen drives it — the
+// playback clock moving on under a beat report that keeps arriving — because a
+// walk worked out by calling the counter directly is a walk that proves nothing
+// about where the strike lands.
+func TestTheBeatWalksTheMarks(t *testing.T) {
+	const marks = 7
+	const period = 500 * time.Millisecond
+
+	m := scopeModel(160, 46)
+	m.stage.on, m.scope.modes[tabPlayer] = true, scopeWords
+	m.words.beats, m.words.text = true, wordsNotes
+
+	bands := make([]float32, 28)
+	for i := range bands {
+		bands[i] = 0.6
+	}
+	m.scope.bands = bands
+
+	// The bar goes up at the top of the record and every step moves the playback
+	// clock on by one period. The last beat was heard 60ms ago and the bar went
+	// up 30ms after it, so both ends of the stretch being counted sit well clear
+	// of the grid and no tie is ever put to the arithmetic.
+	m.words.starts = 0
+
+	var walk []int
+	for step := range marks + 2 {
+		m.scope.beat = player.Beat{Period: period, Since: 60 * time.Millisecond}
+		m.scope.beatAt = time.Now()
+		m.setProgress(time.Duration(step)*period + 30*time.Millisecond)
+
+		ride := m.wordsRiding(marks)
+		struck, deep := 0, 0
+		for i, v := range ride {
+			if v < ride[struck] {
+				struck = i
+			}
+		}
+		for _, v := range ride {
+			if v == ride[struck] {
+				deep++
+			}
+		}
+		walk = append(walk, struck)
+
+		t.Logf("%d beats into the bar the row stands at %v: mark %d struck", step, ride, struck)
+
+		if want := step % marks; struck != want {
+			t.Errorf("%d beats in, the beat is on mark %d, want mark %d", step, struck, want)
+		}
+		if deep != 1 {
+			t.Errorf("%d marks are riding highest, want the beat on one of them", deep)
+		}
+	}
+	t.Logf("over %d beats the beat walked %v", len(walk), walk)
+}
+
+// The struck mark jumps and burns whatever its own band is doing, and the rest
+// of the row goes on answering the music underneath it.
+//
+// Both halves matter. A strike that is only its own band's ride multiplied up
+// is invisible over a quiet band — which is most of the row most of the time —
+// and a row where nothing but the struck mark moves is a dead row with a cursor
+// running along it.
+func TestTheStruckMarkRidesAndBurnsHardest(t *testing.T) {
+	const marks = 7
+	const period = 500 * time.Millisecond
+	const struck = 2
+
+	m := scopeModel(160, 46)
+	m.stage.on, m.scope.modes[tabPlayer] = true, scopeWords
+	m.words.beats, m.words.text = true, wordsNotes
+
+	// Everything playing at half, except the share of the spectrum the mark the
+	// beat is about to reach answers for, which is as good as silent.
+	bands := make([]float32, 28)
+	for i := range bands {
+		bands[i] = 0.5
+	}
+	for i := struck * len(bands) / marks; i < (struck+1)*len(bands)/marks; i++ {
+		bands[i] = 0.02
+	}
+	m.scope.bands = bands
+
+	// A beat landing this instant, and a bar that went up three quarters of a
+	// second ago: two beats have fallen inside it, the second of them now, so
+	// the strike is on the third mark and at its full height.
+	m.words.starts = 0
+	m.scope.beat = player.Beat{Period: period}
+	m.scope.beatAt = time.Now()
+	m.setProgress(750 * time.Millisecond)
+
+	if got, _ := m.wordsBeatWalk(marks); got != struck {
+		t.Fatalf("the beat is on mark %d, want it on the quiet one at %d", got, struck)
+	}
+
+	freqs, levels := len(m.styles.Words), len(m.styles.Words[0])
+	ride := m.wordsRiding(marks)
+
+	var levelsAt []int8
+	for i := range marks {
+		levelsAt = append(levelsAt, m.wordsMarkPaint(i, marks, freqs, levels).level)
+	}
+	t.Logf("with mark %d over a dead band the row rides %v and burns %v (of %d levels)",
+		struck, ride, levelsAt, levels)
+
+	for i := range marks {
+		if i == struck {
+			continue
+		}
+		if ride[struck] >= ride[i] {
+			t.Errorf("the struck mark rides %d and mark %d rides %d, want the struck one further", ride[struck], i, ride[i])
+		}
+		if levelsAt[struck] <= levelsAt[i] {
+			t.Errorf("the struck mark burns at %d and mark %d at %d, want the struck one brighter", levelsAt[struck], i, levelsAt[i])
+		}
+		if ride[i] == 0 {
+			t.Errorf("mark %d stands dead still, want the row still answering the music", i)
+		}
+	}
+
+	// On the beat the strike takes the top of the palette, whatever the band
+	// under it is doing: six levels is a coarse ladder and a strike that landed
+	// a step short of the top would be a strike nobody could see.
+	if got := levelsAt[struck]; got != int8(levels-1) {
+		t.Errorf("on the beat the struck mark burns at %d, want the top of the palette at %d", got, levels-1)
+	}
+}
+
+// With the keeping turned off the row is exactly what it always was: every mark
+// on its own part of the spectrum, and nothing walking anywhere.
+//
+// This is the whole point of the key. The two ways of drawing a bar of marks
+// can only be judged against each other on one record, one press apart, and
+// that is worth nothing unless the old one comes back untouched — so it is
+// measured against the arithmetic it is made of rather than against a picture
+// somebody remembers.
+func TestTheMarksAreUntouchedWithTheKeepingOff(t *testing.T) {
+	const marks = 7
+	const period = 500 * time.Millisecond
+
+	m := scopeModel(160, 46)
+	m.stage.on, m.scope.modes[tabPlayer] = true, scopeWords
+	m.words.beats, m.words.text = true, wordsNotes
+
+	// A spectrum with something different in every share of it, so that a row
+	// drawn the same way twice is not the same row by accident.
+	bands := make([]float32, 28)
+	for i := range bands {
+		bands[i] = float32(i%9) / 8
+	}
+	m.scope.bands = bands
+
+	// A beat is there to be kept, and the bar is old enough that the walk would
+	// be well down the row if anything were walking.
+	m.words.starts = 0
+	m.scope.beat = player.Beat{Period: period, Since: 60 * time.Millisecond}
+	m.scope.beatAt = time.Now()
+	m.setProgress(3*period + 30*time.Millisecond)
+
+	kept := m.wordsRiding(marks)
+	m.stage.loose = false
+	if m.beatKeeping() {
+		t.Fatal("the key was turned off and the screen kept time anyway")
+	}
+
+	freqs, levels := len(m.styles.Words), len(m.styles.Words[0])
+	got := m.wordsRiding(marks)
+
+	// What the row did before any of this: each mark lifted by its own band,
+	// painted by its own band, and nothing else in it.
+	want := make([]int, marks)
+	for i := range want {
+		want[i] = -int(m.wordsBeatRide(i, marks) * wordsBounce)
+	}
+	t.Logf("keeping time the row rides %v; with the key off %v, against the %v it always rode", kept, got, want)
+
+	for i := range marks {
+		if got[i] != want[i] {
+			t.Errorf("with the key off mark %d rides %d, want the %d it rode before", i, got[i], want[i])
+		}
+		if p, was := m.wordsMarkPaint(i, marks, freqs, levels), m.wordsBeatPaint(i, marks, freqs, levels); p != was {
+			t.Errorf("with the key off mark %d is painted %v, want the %v it was painted before", i, p, was)
+		}
+	}
+}

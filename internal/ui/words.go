@@ -760,6 +760,19 @@ const (
 	// is a line of type that happens to twitch.
 	wordsBounce = 14
 
+	// wordsStrikeFloor is how much of a strike is the strike itself rather than
+	// the band under the mark it lands on, and wordsRestRide what a mark the
+	// beat has not reached keeps of its own band. See wordsWalking.
+	//
+	// Both are measured against wordsBounce, which is fourteen dots. A strike
+	// over a dead band still carries seven of them — near two cells, which is a
+	// jump nobody can miss — and the loudest an unstruck mark can manage is
+	// four, so the beat is never the second thing happening in the row. Under a
+	// third the unstruck marks stop reading as answering the music at all, and
+	// the row goes back to being a fence with one post moving.
+	wordsStrikeFloor = 0.55
+	wordsRestRide    = 0.3
+
 	// wordsLit is how bright a dot of the rasterised type has to be to be set.
 	// Half: type is drawn white on black and anti-aliased, so this is the edge
 	// of the letter — above it the stroke, below it the air around it.
@@ -869,7 +882,7 @@ func (m Model) wordsLines(w, rows int) []string {
 	// times it is wrong are the times you are looking straight at it.
 	paints := make([]wordPaint, m.words.where.Count)
 	for i := range paints {
-		paints[i] = m.wordsBeatPaint(i, len(paints), freqs, levels)
+		paints[i] = m.wordsMarkPaint(i, len(paints), freqs, levels)
 		if gather < 1 {
 			paints[i].level = int8(float32(paints[i].level) * gather)
 		}
@@ -1502,18 +1515,15 @@ func (m Model) wordsRiding(count int) []int {
 		// The notes: each on its own part of the sound, and further than a word
 		// would go.
 		//
-		// On the beat where there is one to keep. Each mark still rises by what
-		// its own share of the spectrum is doing — that is what makes the sound
-		// run along the row — but they all leave the ground together, which is
-		// the difference between a row of meters and a row of dancers.
-		pulse := float32(1)
-		if m.beatKeeping() {
-			pulse = beatFloor + (1-beatFloor)*m.beatPulse()
+		// Where there is a beat to keep, the beat walks the row instead: one
+		// mark struck at a time, left to right. See wordsWalking.
+		if struck, ok := m.wordsBeatWalk(count); ok {
+			return m.wordsWalking(count, struck)
 		}
 
 		out := make([]int, count)
 		for i := range out {
-			out[i] = -int(m.wordsBeatRide(i, count) * wordsBounce * pulse)
+			out[i] = -int(m.wordsBeatRide(i, count) * wordsBounce)
 		}
 		return out
 	}
@@ -1548,6 +1558,100 @@ func (m Model) wordsRiding(count int) []int {
 	}
 
 	return nil
+}
+
+// wordsBeatWalk is which mark of the row the beat has reached: nought at the
+// left when the bar goes up, one further right on every beat, and round to the
+// left again at the end of the row.
+//
+// The bar's own age is what it is counted from, on the playback clock the rest
+// of this screen reads, so every bar of marks starts its own walk rather than
+// carrying on from wherever the last one had got to. A row wider than the bar
+// has beats simply does not finish crossing, which is honest: what the row
+// shows is where the music has got to, not how long the row is.
+//
+// False when there is no beat to keep or the key has turned the keeping off,
+// and then the row is drawn exactly as it always was.
+func (m Model) wordsBeatWalk(count int) (int, bool) {
+	if count <= 0 {
+		return 0, false
+	}
+
+	// The picture is asked for a little before the bar sounds — the dots have to
+	// be in place as it begins, not after — so the age can still be negative
+	// when the row first goes up. The walk waits at the left until it is not.
+	age := max(time.Duration(m.wordsClock()-m.words.starts)*time.Millisecond, 0)
+
+	// Counted a little past now, by exactly what the pulse spends coming up to a
+	// beat: the mark that is about to be struck is the one that should be rising
+	// into it. See beatsIn.
+	lead := time.Duration(beatRise * float32(m.scope.beat.Period))
+
+	n, ok := m.beatsIn(age, lead)
+	if !ok {
+		return 0, false
+	}
+	return n % count, true
+}
+
+// wordsWalking is the row of marks with the beat walking down it: the one it
+// has reached struck, the rest left to their own part of the sound.
+//
+// A step sequencer, or a metronome that has a row to walk rather than a
+// pendulum. The struck mark jumps whatever its own band is doing — a strike
+// over a quiet band that cannot be seen is not a strike — and falls away over
+// the beat, so that by the time the next one lands it is back among the others.
+// What its band is doing is still worth something: two marks struck the same
+// way in the same bar look mechanical, and the sound is what keeps them apart.
+//
+// The rest keep a share of their ride rather than being pinned down. A row where
+// only one mark ever moves is a row of dead marks with a cursor over it; what is
+// wanted is a row that breathes with the record and is struck through by the
+// beat.
+func (m Model) wordsWalking(count, struck int) []int {
+	pulse := m.beatPulse()
+
+	out := make([]int, count)
+	for i := range out {
+		ride := m.wordsBeatRide(i, count)
+
+		lift := ride * wordsRestRide
+		if i == struck {
+			// Never below what it would have done unstruck: at the end of its
+			// beat the strike has fallen to nothing, and a mark that dropped
+			// under its own neighbours to get there would read as a hole in the
+			// row rather than as the beat having moved on.
+			lift = max(lift, (wordsStrikeFloor+(1-wordsStrikeFloor)*ride)*pulse)
+		}
+		out[i] = -int(lift * wordsBounce)
+	}
+	return out
+}
+
+// wordsMarkPaint is what one of the marks burns at: its own share of the
+// spectrum, with the strike on top of it where the beat has walked to.
+//
+// The strike is put on here rather than in wordsBeatPaint because that one is
+// shared — the face's brows and eyes and mouth are painted by it, on exactly the
+// bars where the marks would be — and a beat walking across a face is not what
+// any of this is for.
+func (m Model) wordsMarkPaint(word, count, freqs, levels int) wordPaint {
+	p := m.wordsBeatPaint(word, count, freqs, levels)
+	if !m.words.beats || levels <= 0 {
+		return p
+	}
+	if struck, ok := m.wordsBeatWalk(count); !ok || struck != word {
+		return p
+	}
+
+	// Lifted towards the top of the palette rather than scaled up. There are six
+	// levels and a mark over a quiet band sits on the first of them: multiplied
+	// by a pulse of one it is still on the first, and the strike over the part
+	// of the spectrum that most needs one would be the strike nobody saw.
+	// Rounded rather than truncated, because on a ladder of six a level thrown
+	// away is a fifth of everything the strike has to work in.
+	p.level += int8(math.Round(float64(int8(levels-1)-p.level) * float64(m.beatPulse())))
+	return p
 }
 
 // wordsSettleMarks stops a mark being carried higher than the word it hangs off.
