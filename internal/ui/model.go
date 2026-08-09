@@ -300,6 +300,15 @@ func (m Model) elapsed() time.Duration {
 		return 0
 	}
 
+	// Nothing loaded, nowhere to be. A device can be active with no track on
+	// it — one just switched to, say — and until this asked, whatever number
+	// arrived in the position was drawn as a time. What arrived after one such
+	// switch was a timestamp, and the screen said the track was fifty-six years
+	// in.
+	if m.ps.TrackID == "" && m.ps.Duration <= 0 {
+		return 0
+	}
+
 	pos := m.ps.Progress
 	if m.ps.Playing && !m.progressAt.IsZero() {
 		pos += time.Since(m.progressAt)

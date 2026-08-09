@@ -403,3 +403,36 @@ func indexOr(s, sub string) int {
 	}
 	return 1 << 20
 }
+
+// A device with nothing on it shows no clock.
+//
+// The screen is drawn from the position the backend last reported, and a device
+// just switched to has no track to report one for — so whatever was left in the
+// field went out as a time. After a transfer that carried no context, what was
+// left in it was a timestamp, and the player said the track was fifty-six years
+// in and nought long.
+func TestNothingLoadedShowsNoClock(t *testing.T) {
+	m := scopeModel(120, 40)
+	m.ps = &player.State{DeviceName: "spindle", Playing: false}
+	m.progressAt = time.Now()
+
+	// The number a timestamp read as a position comes to.
+	m.ps.Progress = time.Duration(time.Now().UnixMilli()) * time.Millisecond
+	t.Logf("the backend said the position was %s", m.ps.Progress)
+
+	if got := m.elapsed(); got != 0 {
+		t.Errorf("with no track loaded the screen is %s in, want nothing", got)
+	}
+
+	line := ansiOff(m.progressLine(m.width))
+	if strings.Contains(line, "496195") || strings.Contains(line, ":23:") {
+		t.Errorf("the progress line reads %q", strings.TrimSpace(line))
+	}
+
+	// And a track that is loaded still runs.
+	m.ps.TrackID, m.ps.Title = "t1", "a song"
+	m.ps.Duration, m.ps.Progress = 3*time.Minute, 30*time.Second
+	if got := m.elapsed(); got != 30*time.Second {
+		t.Errorf("a loaded track is %s in, want 30s", got)
+	}
+}
