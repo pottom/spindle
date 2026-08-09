@@ -19,6 +19,23 @@ const (
 	resyncEvery = 30 * time.Second
 )
 
+// dialTimeout bounds the attempt to open the stream, and silentFor how long an
+// open one may say nothing before it is treated as gone.
+//
+// A daemon that has got itself stuck still holds its port: the connection is
+// accepted and then nothing happens, so waiting on either without a deadline is
+// waiting on a process that is never going to speak — and the interface goes on
+// drawing the last thing it heard as though it were still true, which is the
+// worst thing it could do. Nothing here is chatty enough to run into them: the
+// daemon sends an event on every change, and this end asks for a fresh look on
+// a timer regardless.
+//
+// Variables, so a test does not have to wait them out.
+var (
+	dialTimeout = 5 * time.Second
+	silentFor   = 90 * time.Second
+)
+
 // Watch keeps the local snapshot current until ctx is cancelled.
 //
 // It does not parse the events. Each one only says that something happened, and
@@ -53,14 +70,22 @@ func (l *Local) listen(ctx context.Context) error {
 		return err
 	}
 
-	conn, _, err := websocket.Dial(ctx, endpoint, nil)
+	dial, cancel := context.WithTimeout(ctx, dialTimeout)
+	defer cancel()
+
+	conn, _, err := websocket.Dial(dial, endpoint, nil)
 	if err != nil {
 		return err
 	}
 	defer conn.CloseNow() //nolint:errcheck // closing a dead socket says nothing
 
 	for {
-		if _, _, err := conn.Read(ctx); err != nil {
+		// Bounded, so a stream that has gone quiet is noticed here rather than
+		// waited on: see silentFor.
+		hear, done := context.WithTimeout(ctx, silentFor)
+		_, _, err := conn.Read(hear)
+		done()
+		if err != nil {
 			return err
 		}
 		if err := l.refresh(ctx); err != nil && ctx.Err() == nil {
