@@ -1175,12 +1175,31 @@ func (m Model) faceUp() bool {
 		return true
 	}
 
-	if !faceDealt(m.words.starts) {
+	if !faceDealt(m.words.starts) || !m.faceFits() {
 		return false
 	}
 
 	since := m.wordsClock() - m.words.starts - faceEnters.Milliseconds()
 	return since >= 0 && since < m.faceStay().Milliseconds()
+}
+
+// faceFits reports that the whole visit has room before the singer comes back.
+//
+// He walks on, does a thing and walks off, and all three are the turn: a figure
+// who gets halfway across and is written over by the next line of the song is
+// worse than no figure at all, because what you saw was an interruption rather
+// than a visit. So the room is measured before he sets off — the bar he was
+// dealt has to hold his arrival, his stay and his leaving, or he stays away and
+// the marks keep the bar.
+//
+// A record with no words of its own has no line coming, and so all the room
+// there is.
+func (m Model) faceFits() bool {
+	gap, in := m.soloNow()
+	if !in {
+		return true
+	}
+	return m.words.starts+faceEnters.Milliseconds()+m.faceStay().Milliseconds() <= gap.to
 }
 
 // faceDealt is whether the bar starting at a given moment gets a face rather

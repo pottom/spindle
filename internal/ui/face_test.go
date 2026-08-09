@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/pottom/spindle/internal/player"
 )
 
 // faceDots draws a face into a plain field, for looking at and for measuring.
@@ -924,4 +926,63 @@ func TestAVisitSurvivesTheBarChangingUnderIt(t *testing.T) {
 	if m.faceUp() {
 		t.Error("he is still there long after his own stay ran out")
 	}
+}
+
+// He does not set off unless the whole visit has room.
+//
+// He walks on, does a thing and walks off, and all three are the turn. A figure
+// who gets halfway across and is written over by the next line of the song is
+// worse than no figure at all: what you saw was an interruption rather than a
+// visit.
+func TestHeStaysAwayWhenThereIsNoRoom(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.TrackID, m.ps.Duration = "song", 6*time.Minute
+	m.words.beats, m.words.text = true, wordsNotes
+	m.lyrics.synced, m.lyrics.forTrack = true, "song"
+
+	// A bar he was dealt, and a gap that is long enough to hold him.
+	var bar int64 = -1
+	for at := int64(30); at < 300; at++ {
+		if faceDealt(at * 1_000) {
+			bar = at * 1_000
+			break
+		}
+	}
+	if bar < 0 {
+		t.Fatal("no bar was dealt him")
+	}
+
+	// The line before it, and the next one far enough off that he fits.
+	roomy := bar + faceEnters.Milliseconds() + faceStayMost.Milliseconds() + 5_000
+	m.lyrics.lines = []player.Lyric{
+		{At: bar - soloHold.Milliseconds(), Words: "the line before"},
+		{At: roomy, Words: "and the singer comes back"},
+	}
+	m.words.starts = bar
+	m.setProgress(time.Duration(bar)*time.Millisecond + faceEnters + time.Second)
+
+	if !m.faceFits() {
+		t.Fatalf("he did not fit in a gap of %s", time.Duration(roomy-bar)*time.Millisecond)
+	}
+	if !m.faceUp() {
+		t.Fatal("he stayed away from a bar with room in it")
+	}
+
+	// And now the singer comes back while he would still be on. Long enough to
+	// be a gap the marks get — under that there is no bar for him to be dealt —
+	// and shorter than his arrival and his stay together.
+	tight := bar + soloLeast.Milliseconds() + time.Second.Milliseconds()
+	m.lyrics.lines[1].At = tight
+
+	if m.faceFits() {
+		t.Errorf("he set off into a gap of %s, which is not enough for a stay of %s",
+			time.Duration(tight-bar)*time.Millisecond, m.faceStay())
+	}
+	if m.faceUp() {
+		t.Error("he walked on where the next line would write over him")
+	}
+	t.Logf("with %s of room and a stay of %s, he stays away",
+		time.Duration(tight-bar)*time.Millisecond, m.faceStay())
 }
