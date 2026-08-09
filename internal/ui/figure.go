@@ -223,7 +223,7 @@ func (m Model) figureLines(w, rows int) []string {
 			cell := (y/dotsPerCellY)*w + x/dotsPerCellX
 			grid[cell] |= 1 << brailleBit[x%dotsPerCellX][y%dotsPerCellY]
 
-			s := m.wordsMarkPaint(piece, count, freqs, levels)
+			s := m.wordsBeatPaint(piece, count, freqs, levels)
 			if level := int8(float32(s.level) * burn); level > paint[cell] {
 				paint[cell], hue[cell] = level, s.hue
 			}

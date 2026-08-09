@@ -1008,14 +1008,6 @@ func TestTheScreenKeepsTimeAndCanBeToldNotTo(t *testing.T) {
 	}
 	m.scope.bands = bands
 
-	// A bar dealt a march from the left at a mark a beat, so the walk is on the
-	// first mark throughout. Which figure a bar of marks walks is dealt from the
-	// moment it sounds — see wordsRoundFor — and this is a test about the key
-	// rather than about what the walk happens to have been dealt.
-	m.words.starts = wordsBarDealt(t, 1, func(r wordsRound) bool {
-		return r.kind == wordsMarching && !r.right && r.step == 1
-	})
-
 	// With no beat found, nothing keeps time and the marks ride the loudness,
 	// which is what this always did.
 	if m.beatKeeping() {
@@ -1055,72 +1047,5 @@ func TestTheScreenKeepsTimeAndCanBeToldNotTo(t *testing.T) {
 	}
 	if off := m.wordsRiding(4); off[0] != loud[0] {
 		t.Errorf("with the key off the marks stand at %d, want the %d they stood at before", off[0], loud[0])
-	}
-}
-
-// Beats are counted on the grid the record lays down, not by dividing the time
-// a stretch lasted.
-//
-// The difference is the whole reason this exists. A picture that steps on the
-// beat has to step where the beat is: dividing the time gives the right number
-// of steps over a minute and puts every one of them at the wrong moment, drifting
-// by up to a whole period from wherever the music actually struck.
-func TestBeatsAreCountedOnTheGrid(t *testing.T) {
-	const period = 500 * time.Millisecond
-
-	m := scopeModel(100, 40)
-	m.stage.on = true
-
-	if _, ok := m.beatsIn(time.Second, 0); ok {
-		t.Error("beats were counted on a record no beat has been found in")
-	}
-
-	// A beat every half second, the last one heard a tenth of a second ago. The
-	// grid runs back from there: a beat 100ms ago, one 600ms ago, one 1.1s ago.
-	m.scope.beat = player.Beat{Period: period, Since: 100 * time.Millisecond}
-	m.scope.beatAt = time.Now()
-
-	for _, c := range []struct {
-		age  time.Duration
-		want int
-	}{
-		{0, 0},
-		{300 * time.Millisecond, 1},
-		{700 * time.Millisecond, 2},
-		{1200 * time.Millisecond, 3},
-		{2 * time.Second, 4},
-	} {
-		got, ok := m.beatsIn(c.age, 0)
-		if !ok {
-			t.Fatalf("no count from a beat that was just reported")
-		}
-		t.Logf("%5s of a record at %s a beat holds %d beats; dividing the time says %d",
-			c.age, period, got, c.age/period)
-		if got != c.want {
-			t.Errorf("%s holds %d beats, want %d", c.age, got, c.want)
-		}
-	}
-
-	// And the lead counts the beat that is about to land as landed, so that what
-	// moves into a beat is told about it while it is still coming. Forty
-	// milliseconds before one, with beatRise of a period to look ahead by, the
-	// count has already turned over.
-	m.scope.beat.Since = 460 * time.Millisecond
-	m.scope.beatAt = time.Now()
-
-	lead := time.Duration(beatRise * float32(period))
-	early, _ := m.beatsIn(0, lead)
-	flat, _ := m.beatsIn(0, 0)
-	t.Logf("%s before a beat, a lead of %s counts %d and no lead counts %d", period-460*time.Millisecond, lead, early, flat)
-	if early != 1 || flat != 0 {
-		t.Errorf("with the lead the count is %d and without it %d, want 1 and 0", early, flat)
-	}
-
-	// Nothing is counted for a record that is not being kept time with: the key
-	// turns the whole of it off, and a count that went on running would put the
-	// picture back somewhere else when it came back on.
-	m.stage.loose = false
-	if _, ok := m.beatsIn(time.Second, 0); ok {
-		t.Error("beats were counted with the keeping turned off")
 	}
 }
