@@ -128,3 +128,47 @@ func TestTheBigScreenSendsForTheWords(t *testing.T) {
 		t.Error("the lyric picture is on the big screen and the words were never sent for")
 	}
 }
+
+// Nothing is put up while the database has still to answer.
+//
+// A record whose sheet is a second late used to be taken for wordless the
+// moment it started: the marks arrived for that second, and the first line came
+// straight over them. Two changes of picture where the record had made one, and
+// the first of them lasted a second.
+func TestNothingIsPutUpOnSpec(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.TrackID, m.ps.Title = "new", "A Song"
+	m.ps.Artists = []string{"The Band"}
+	m.ps.Duration = 3 * time.Minute
+
+	// The record has just started and nothing has answered about it yet.
+	for _, at := range []time.Duration{time.Second, wordsSpell, 2 * wordsSpell} {
+		m.setProgress(at)
+		if lines, _ := m.wordsIdle(); len(lines) != 0 {
+			t.Errorf("%s in, with no answer yet, the screen was given %q", at, lines)
+		}
+		if lines, _ := m.wordsComing(); len(lines) != 0 {
+			t.Errorf("%s in, with no answer yet, the picture was asked for %q", at, lines)
+		}
+	}
+
+	// The sheet lands, a second before the first line: the line is what goes up,
+	// and the marks never had their second.
+	m.lyrics.forTrack, m.lyrics.synced = "new", true
+	m.lyrics.lines = []player.Lyric{{At: 61_000, Words: "the first line"}}
+	m.setProgress(61*time.Second - wordsGather/2)
+
+	lines, _ := m.wordsComing()
+	if len(lines) != 1 || lines[0] != "the first line" {
+		t.Errorf("with the sheet in and the singer due, the picture is %q, want the line", lines)
+	}
+
+	// And a record it has answered about and has nothing for takes its turns.
+	m.lyrics.synced, m.lyrics.missing = false, true
+	m.setProgress(wordsSpell + time.Second)
+	if lines, _ := m.wordsIdle(); len(lines) == 0 {
+		t.Error("a record known to have no words was left with nothing")
+	}
+}

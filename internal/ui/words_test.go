@@ -63,10 +63,11 @@ func TestWordsShowTheLineOrTheRecord(t *testing.T) {
 	m.width, m.height = 100, 40
 	m.ps.TrackID = "now"
 
-	// Not at the very top of it, where the record has only just changed. After
-	// that a wordless record takes turns: a card of its own for a few seconds,
-	// and the marks the rest of the time. Either way there is something. See
-	// idle.go.
+	// A record the database has answered about and has nothing for takes turns:
+	// a card of its own for a few seconds, and the marks the rest of the time.
+	// Either way there is something. Until the answer lands nothing is put up
+	// on spec — see wordsWordless.
+	m.lyrics.forTrack, m.lyrics.missing = "now", true
 	m.setProgress(wordsSpell)
 	if got := m.wordsNow(); len(got) == 0 || got[0] == "" {
 		t.Errorf("with no lyrics the picture shows %q, want something", got)

@@ -46,14 +46,19 @@ const (
 var wordsCardPool = []wordsCard{wordsCardArtist, wordsCardAlbum, wordsCardNone}
 
 // wordsWordless reports that the lyric database has nothing for what is
-// playing — or has not answered about it yet, which at the top of a record
-// looks the same from here and is exactly when the title card is due.
+// playing.
+//
+// A record it has not answered about yet is not one of them. It used to be
+// counted as wordless the moment it started, on the grounds that the two look
+// the same from here — and they do, right up until the answer lands. What that
+// produced at the top of a record whose sheet was a second late was the marks
+// arriving for that second and the first line coming straight over them: two
+// changes of picture where the record had made one. So nothing is put up on
+// spec; whatever the screen was showing keeps it until there is an answer to
+// act on.
 func (m Model) wordsWordless() bool {
-	if m.ps == nil {
+	if m.ps == nil || m.lyrics.forTrack != m.ps.TrackID {
 		return false
-	}
-	if m.lyrics.forTrack != m.ps.TrackID {
-		return true
 	}
 	return m.lyrics.missing || !m.lyrics.synced
 }
