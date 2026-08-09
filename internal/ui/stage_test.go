@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui/msg"
 )
 
@@ -418,5 +419,65 @@ func TestTheBigScreenIsAllPicture(t *testing.T) {
 	}
 	if strings.Contains(ansiOff(drawn), "/") {
 		t.Error("the clock is still on the big screen")
+	}
+}
+
+// The comet keeps time when the picture does, which is how anybody can tell
+// which of the two ways it is drawing without being told.
+func TestTheCometSaysWhichWayItIsDrawing(t *testing.T) {
+	const w, rows = 100, 40
+
+	m := scopeModel(w, rows)
+	m.stage.on = true
+	m.ps.Duration = 3 * time.Minute
+	m.setProgress(time.Minute)
+
+	lit := func() int {
+		grid := make([]uint8, w*rows)
+		paint := make([]int8, w*rows)
+		for i := range paint {
+			paint[i] = -1
+		}
+		m.stageEdge(w, rows, grid, paint, 8)
+
+		var n int
+		for _, cell := range grid {
+			if cell != 0 {
+				n++
+			}
+		}
+		return n
+	}
+
+	// Answering the loudness, the comet is the same length whenever it is
+	// looked at.
+	steady := lit()
+	if steady == 0 {
+		t.Fatal("the comet drew nothing")
+	}
+
+	// Keeping time, it draws itself out on the beat and pulls back in between.
+	m.scope.beat = player.Beat{Period: 500 * time.Millisecond}
+	m.scope.beatAt = time.Now()
+	if !m.beatKeeping() {
+		t.Fatal("a beat was found and the screen did not keep time")
+	}
+
+	m.scope.beat.Since = 0
+	m.scope.beatAt = time.Now()
+	on := lit()
+
+	m.scope.beat.Since = 250 * time.Millisecond
+	m.scope.beatAt = time.Now()
+	between := lit()
+
+	t.Logf("the comet is %d cells on the beat, %d between two, %d answering the loudness",
+		on, between, steady)
+
+	if on <= between {
+		t.Errorf("the comet is %d cells on the beat and %d between two, want it drawing out on it", on, between)
+	}
+	if between >= steady {
+		t.Errorf("between two beats the comet is %d cells against %d answering the loudness, want it shorter", between, steady)
 	}
 }

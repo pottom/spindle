@@ -72,6 +72,12 @@ const (
 	// point is that it lands with the music, not that it lands on a metronome.
 	stageOnBeat = 0.45
 
+	// stageEdgeBeatTail is how much of the comet's tail is left between two
+	// beats. It draws itself out on the beat and pulls back in after it, which
+	// is a movement rather than a flash — a flashing dot on a screen is an
+	// alarm, and this is a metronome.
+	stageEdgeBeatTail = 0.45
+
 	// stageSpray is the share of the columns that throw when they jump. All of
 	// them at once would be a curtain going up rather than water coming off,
 	// but most of them is what makes the air busy enough to watch.
@@ -503,6 +509,18 @@ func (m Model) stageEdge(w, rows int, grid []uint8, paint []int8, levels int) {
 
 	tail := max(int(stageEdgeTail*float64(round)), stageEdgeHead+1)
 	heat := max(int(stageEdgeHeat*float64(levels-1)), 1)
+
+	// The head keeps time when the picture does.
+	//
+	// Which mode the screen is in is worth knowing and not worth a caption:
+	// this is the one thing already on screen whose whole job is to be read
+	// without being looked at, so it carries the answer as well. Lit steadily,
+	// the picture is answering the loudness; beating, it knows where the beat
+	// is — and if it is beating in the wrong place, that is worth seeing too.
+	if keeping := m.beatKeeping(); keeping {
+		heat = max(int((stageEdgeHeat+(1-stageEdgeHeat)*float64(m.beatPulse()))*float64(levels-1)), 1)
+		tail = max(int(float64(tail)*(stageEdgeBeatTail+(1-stageEdgeBeatTail)*float64(m.beatPulse()))), stageEdgeHead+1)
+	}
 
 	for i := max(along-tail, 0); i < along; i++ {
 		// How far back down the tail this dot is, and so how much of it is
