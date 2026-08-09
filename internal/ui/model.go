@@ -211,6 +211,9 @@ type Model struct {
 	// lyrics is the words of the track playing, and whether they are on screen.
 	lyrics lyricsState
 
+	// refrain is which of those words are coming round again. See refrain.go.
+	refrain refrainState
+
 	// peek is the glance at what is coming, above the artwork.
 	peek peekState
 
