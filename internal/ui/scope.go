@@ -673,6 +673,34 @@ func (m Model) beatsIn(age, lead time.Duration) (int, bool) {
 	return int(floorDiv(int64(last+lead), int64(period)) - floorDiv(int64(last-age), int64(period))), true
 }
 
+// beatsAlong is the same count as beatsIn with the beat now running on the end
+// of it: how many have gone by since something began, and how far through the
+// one under way.
+//
+// What wants the fraction is a picture that has to move between the beats as
+// well as on them. A crest crossing a row of marks cannot wait for the next
+// beat to move — a thing that only ever moves on the beat is a row of lamps
+// being switched, and what is wanted is a wave.
+//
+// It is measured on the same grid as the count and against the same lead, so
+// the fraction is nought at exactly the moment the count turns over: beatsIn
+// floors that sum by the period, and this is what the flooring threw away. The
+// two together are a clock that runs smoothly and steps where the music does.
+func (m Model) beatsAlong(age, lead time.Duration) (float32, bool) {
+	n, ok := m.beatsIn(age, lead)
+	if !ok {
+		return 0, false
+	}
+	period := m.scope.beat.Period
+	if period <= 0 {
+		return 0, false
+	}
+
+	last := time.Since(m.scope.beatAt) + m.scope.beat.Since
+	over := floorMod(int64(last+lead), int64(period))
+	return float32(n) + float32(over)/float32(period), true
+}
+
 // floorDiv divides towards minus infinity, which is what counting a grid
 // backwards through zero needs.
 func floorDiv(a, b int64) int64 {
@@ -682,6 +710,10 @@ func floorDiv(a, b int64) int64 {
 	}
 	return q
 }
+
+// floorMod is what floorDiv leaves behind: never negative for a positive
+// divisor, which is what reading a position on that grid needs.
+func floorMod(a, b int64) int64 { return a - floorDiv(a, b)*b }
 
 const (
 	// beatRise is how much of a beat is spent coming up to it. Small: the rise

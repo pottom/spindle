@@ -1008,6 +1008,14 @@ func TestTheScreenKeepsTimeAndCanBeToldNotTo(t *testing.T) {
 	}
 	m.scope.bands = bands
 
+	// A bar dealt a march from the left at a mark a beat, so the walk is on the
+	// first mark throughout. Which figure a bar of marks walks is dealt from the
+	// moment it sounds — see wordsRoundFor — and this is a test about the key
+	// rather than about what the walk happens to have been dealt.
+	m.words.starts = wordsBarDealt(t, 1, func(r wordsRound) bool {
+		return r.kind == wordsMarching && !r.right && r.step == 1
+	})
+
 	// With no beat found, nothing keeps time and the marks ride the loudness,
 	// which is what this always did.
 	if m.beatKeeping() {

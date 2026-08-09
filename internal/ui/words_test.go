@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -1333,67 +1334,146 @@ func TestTheMeterDoesNotJumpBetweenPictures(t *testing.T) {
 	}
 }
 
-// The beat walks the row of marks rather than lifting all of them at once: one
-// mark struck, left to right, a step per beat, and round to the left again at
-// the end of the row.
+// wordsBarDealt finds a bar whose first rounds were dealt the figure a test
+// needs.
 //
-// A bar nobody sings is where this screen has the least to say. Answered by a
-// row that leaves the ground together it says it once; struck one at a time the
-// row is a step sequencer with the record's own beat walking down it, and the
-// eye has somewhere to be. It is driven here the way the screen drives it — the
-// playback clock moving on under a beat report that keeps arriving — because a
-// walk worked out by calling the counter directly is a walk that proves nothing
-// about where the strike lands.
-func TestTheBeatWalksTheMarks(t *testing.T) {
-	const marks = 7
-	const period = 500 * time.Millisecond
+// What a bar of marks does is dealt from the moment it sounds, so a test cannot
+// ask for a march any more than a listener can: it finds a bar that was dealt
+// one, which is what waiting through a record amounts to. The bars are tried a
+// millisecond apart, which is what a lyric sheet is written in.
+func wordsBarDealt(t *testing.T, rounds int, want func(wordsRound) bool) int64 {
+	t.Helper()
 
+	for starts := int64(1); starts < 200000; starts++ {
+		ok := true
+		for r := range rounds {
+			if !want(wordsRoundFor(starts, r)) {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			return starts
+		}
+	}
+	t.Fatal("no bar in the first two hundred seconds of a record was dealt the round this test needs")
+	return 0
+}
+
+// wordsBarAt puts a record u into a bar of marks that went up at starts, with a
+// beat of its own that landed exactly as the bar did.
+//
+// Anchoring the grid to the top of the bar is what makes the numbers here
+// readable: the walk then stands at u/period beats plus the lead it is counted
+// with, so moving the clock on by a period moves the walk on by exactly one
+// beat and every assertion below is a number a reader can work out by hand. It
+// is driven the way the screen drives it — the playback clock moving on under a
+// beat report that keeps arriving — because a walk worked out by calling the
+// counter directly proves nothing about where the strike lands.
+func wordsBarAt(m *Model, starts int64, u, period time.Duration) {
+	m.words.starts = starts
+	m.scope.beat = player.Beat{Period: period, Since: u % period}
+	m.scope.beatAt = time.Now()
+	m.setProgress(time.Duration(starts)*time.Millisecond + u)
+}
+
+// wordsMarkModel is a record playing a bar of marks, with a spectrum to ride.
+func wordsMarkModel(bands []float32) Model {
 	m := scopeModel(160, 46)
 	m.stage.on, m.scope.modes[tabPlayer] = true, scopeWords
 	m.words.beats, m.words.text = true, wordsNotes
+	m.scope.bands = bands
+	return m
+}
 
+// wordsFlat is a spectrum with the same thing everywhere in it, so that a row
+// which is not being walked is a row of identical numbers and the walk is the
+// only thing in the picture.
+func wordsFlat(at float32) []float32 {
 	bands := make([]float32, 28)
 	for i := range bands {
-		bands[i] = 0.6
+		bands[i] = at
 	}
-	m.scope.bands = bands
+	return bands
+}
 
-	// The bar goes up at the top of the record and every step moves the playback
-	// clock on by one period. The last beat was heard 60ms ago and the bar went
-	// up 30ms after it, so both ends of the stretch being counted sit well clear
-	// of the grid and no tie is ever put to the arithmetic.
-	m.words.starts = 0
+// wordsStruckAt is which mark of a drawn row the walk has, and -1 for a row
+// that nothing is walking: read off the picture rather than asked of the code
+// that made it.
+func wordsStruckAt(row []int) int {
+	at := 0
+	for i, v := range row {
+		if v < row[at] {
+			at = i
+		}
+	}
+	for _, v := range row {
+		if v != row[at] {
+			return at
+		}
+	}
+	return -1 // every mark at the same height: nothing is being struck
+}
+
+// A round of the walk is a figure with a shape — across the row, back over it,
+// and then a stretch where the row is left entirely alone — and then it comes
+// round again, dealt afresh.
+//
+// The rest is what the figure is for. A walk that never stops is a metronome in
+// the corner of the picture by the eighth beat; one that goes, comes back and
+// lets go makes the row's own riding the thing between two walks, and makes the
+// next walk arriving something that happens rather than something that is
+// always happening. The turn matters as much: coming back over the mark it has
+// just struck would read as a stutter rather than as a turn, so the ends are
+// struck once each.
+func TestTheWalkGoesAcrossBackAndThenRests(t *testing.T) {
+	const marks = 7
+	const period = 500 * time.Millisecond
+
+	// A bar dealt two marching rounds one after the other, from the left at a
+	// mark a beat: the plainest figure in the pack, and the one whose sequence
+	// can be written out here in full.
+	starts := wordsBarDealt(t, 2, func(r wordsRound) bool {
+		return r.kind == wordsMarching && r.back && !r.right && r.step == 1
+	})
+	first := wordsRoundFor(starts, 0)
+
+	// Out to the far end and back over the middle: twelve strikes for seven
+	// marks, and neither end struck twice.
+	across := []int{0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1}
+	rest := int(first.rest)
+
+	m := wordsMarkModel(wordsFlat(0.6))
 
 	var walk []int
-	for step := range marks + 2 {
-		m.scope.beat = player.Beat{Period: period, Since: 60 * time.Millisecond}
-		m.scope.beatAt = time.Now()
-		m.setProgress(time.Duration(step)*period + 30*time.Millisecond)
+	for beat := range 2*len(across) + rest + 2 {
+		wordsBarAt(&m, starts, time.Duration(beat)*period, period)
+		walk = append(walk, wordsStruckAt(m.wordsRiding(marks)))
+	}
 
-		ride := m.wordsRiding(marks)
-		struck, deep := 0, 0
-		for i, v := range ride {
-			if v < ride[struck] {
-				struck = i
-			}
-		}
-		for _, v := range ride {
-			if v == ride[struck] {
-				deep++
-			}
-		}
-		walk = append(walk, struck)
+	t.Logf("the bar at %dms was dealt a march of %d strikes and a rest of %d beats",
+		starts, first.strikes(marks), rest)
+	t.Logf("over %d beats the walk went %v, where -1 is the row left to itself", len(walk), walk)
 
-		t.Logf("%d beats into the bar the row stands at %v: mark %d struck", step, ride, struck)
-
-		if want := step % marks; struck != want {
-			t.Errorf("%d beats in, the beat is on mark %d, want mark %d", step, struck, want)
+	for beat, want := range across {
+		if walk[beat] != want {
+			t.Errorf("%d beats in the walk is on mark %d, want mark %d", beat, walk[beat], want)
 		}
-		if deep != 1 {
-			t.Errorf("%d marks are riding highest, want the beat on one of them", deep)
+		if next := beat + len(across) + rest; walk[next] != want {
+			t.Errorf("%d beats in, round again, the walk is on mark %d, want mark %d", next, walk[next], want)
 		}
 	}
-	t.Logf("over %d beats the beat walked %v", len(walk), walk)
+	for beat := len(across); beat < len(across)+rest; beat++ {
+		if walk[beat] != -1 {
+			t.Errorf("%d beats in the walk is on mark %d, want the row left to itself", beat, walk[beat])
+		}
+	}
+
+	for i := 1; i < len(walk); i++ {
+		if walk[i] >= 0 && walk[i] == walk[i-1] {
+			t.Errorf("the walk struck mark %d twice running, at beat %d and %d", walk[i], i-1, i)
+		}
+	}
 }
 
 // The struck mark jumps and burns whatever its own band is doing, and the rest
@@ -1408,31 +1488,24 @@ func TestTheStruckMarkRidesAndBurnsHardest(t *testing.T) {
 	const period = 500 * time.Millisecond
 	const struck = 2
 
-	m := scopeModel(160, 46)
-	m.stage.on, m.scope.modes[tabPlayer] = true, scopeWords
-	m.words.beats, m.words.text = true, wordsNotes
-
 	// Everything playing at half, except the share of the spectrum the mark the
 	// beat is about to reach answers for, which is as good as silent.
-	bands := make([]float32, 28)
-	for i := range bands {
-		bands[i] = 0.5
-	}
+	bands := wordsFlat(0.5)
 	for i := struck * len(bands) / marks; i < (struck+1)*len(bands)/marks; i++ {
 		bands[i] = 0.02
 	}
-	m.scope.bands = bands
+	m := wordsMarkModel(bands)
 
-	// A beat landing this instant, and a bar that went up three quarters of a
-	// second ago: two beats have fallen inside it, the second of them now, so
-	// the strike is on the third mark and at its full height.
-	m.words.starts = 0
-	m.scope.beat = player.Beat{Period: period}
-	m.scope.beatAt = time.Now()
-	m.setProgress(750 * time.Millisecond)
+	// A bar dealt a march from the left at a mark a beat, and taken to the beat
+	// where the walk has reached the quiet one: the third mark, two beats in,
+	// and the strike at its full height because the beat is landing now.
+	starts := wordsBarDealt(t, 1, func(r wordsRound) bool {
+		return r.kind == wordsMarching && !r.right && r.step == 1
+	})
+	wordsBarAt(&m, starts, struck*period, period)
 
-	if got, _ := m.wordsBeatWalk(marks); got != struck {
-		t.Fatalf("the beat is on mark %d, want it on the quiet one at %d", got, struck)
+	if got := wordsStruckAt(m.wordsRiding(marks)); got != struck {
+		t.Fatalf("the walk is on mark %d, want it on the quiet one at %d", got, struck)
 	}
 
 	freqs, levels := len(m.styles.Words), len(m.styles.Words[0])
@@ -1480,24 +1553,21 @@ func TestTheMarksAreUntouchedWithTheKeepingOff(t *testing.T) {
 	const marks = 7
 	const period = 500 * time.Millisecond
 
-	m := scopeModel(160, 46)
-	m.stage.on, m.scope.modes[tabPlayer] = true, scopeWords
-	m.words.beats, m.words.text = true, wordsNotes
-
 	// A spectrum with something different in every share of it, so that a row
 	// drawn the same way twice is not the same row by accident.
 	bands := make([]float32, 28)
 	for i := range bands {
 		bands[i] = float32(i%9) / 8
 	}
-	m.scope.bands = bands
+	m := wordsMarkModel(bands)
 
-	// A beat is there to be kept, and the bar is old enough that the walk would
-	// be well down the row if anything were walking.
-	m.words.starts = 0
-	m.scope.beat = player.Beat{Period: period, Since: 60 * time.Millisecond}
-	m.scope.beatAt = time.Now()
-	m.setProgress(3*period + 30*time.Millisecond)
+	// A bar dealt a walk, three beats in, so that something is certainly
+	// happening to the row when the key is pressed: measured against a bar in the
+	// middle of its rest this would pass without proving anything.
+	starts := wordsBarDealt(t, 1, func(r wordsRound) bool {
+		return r.kind != wordsStanding && r.travel(marks) > 4
+	})
+	wordsBarAt(&m, starts, 3*period, period)
 
 	kept := m.wordsRiding(marks)
 	m.stage.loose = false
@@ -1516,6 +1586,16 @@ func TestTheMarksAreUntouchedWithTheKeepingOff(t *testing.T) {
 	}
 	t.Logf("keeping time the row rides %v; with the key off %v, against the %v it always rode", kept, got, want)
 
+	same := true
+	for i := range marks {
+		if kept[i] != want[i] {
+			same = false
+		}
+	}
+	if same {
+		t.Error("the row keeping time is the row that is not, want a bar with a walk in it measured")
+	}
+
 	for i := range marks {
 		if got[i] != want[i] {
 			t.Errorf("with the key off mark %d rides %d, want the %d it rode before", i, got[i], want[i])
@@ -1523,5 +1603,375 @@ func TestTheMarksAreUntouchedWithTheKeepingOff(t *testing.T) {
 		if p, was := m.wordsMarkPaint(i, marks, freqs, levels), m.wordsBeatPaint(i, marks, freqs, levels); p != was {
 			t.Errorf("with the key off mark %d is painted %v, want the %v it was painted before", i, p, was)
 		}
+	}
+}
+
+// The rest between two rounds is not a quieter walk, it is no walk at all: the
+// row does exactly what it does on a record with no beat in it.
+//
+// This is what the rest is worth. A row that went on being nudged through the
+// gap would make the walk a thing that varies in strength, and the eye reads a
+// varying strength as one movement all the way through; handed back to its own
+// bands entirely, the row is a different picture for a few beats, and the walk
+// coming back is an event. So it is measured against the arithmetic the row is
+// made of rather than against a picture that looks about right.
+func TestTheRestIsTheRowWithNoBeatAtAll(t *testing.T) {
+	const marks = 7
+	const period = 500 * time.Millisecond
+
+	// Something different in every share of the spectrum, so that two rows being
+	// equal is not two rows being flat.
+	bands := make([]float32, 28)
+	for i := range bands {
+		bands[i] = float32((i*5)%11) / 10
+	}
+	m := wordsMarkModel(bands)
+
+	starts := wordsBarDealt(t, 1, func(r wordsRound) bool { return r.kind != wordsStanding })
+	round := wordsRoundFor(starts, 0)
+
+	// A beat into the rest, which is at least two beats long, so the walk has
+	// certainly finished and the next round has certainly not begun.
+	rest := time.Duration((round.travel(marks) + 1) * float32(period))
+	wordsBarAt(&m, starts, rest, period)
+	got := m.wordsRiding(marks)
+
+	// The same moment with the keeping turned off, which is the picture this
+	// screen drew before any of this existed.
+	freqs, levels := len(m.styles.Words), len(m.styles.Words[0])
+	m.stage.loose = false
+	want := m.wordsRiding(marks)
+
+	t.Logf("the bar at %dms travels for %.1f beats and rests for %.0f; a beat into the rest the row rides %v against the %v it rides with no beat kept at all",
+		starts, round.travel(marks), round.rest, got, want)
+
+	for i := range marks {
+		if got[i] != want[i] {
+			t.Errorf("resting, mark %d rides %d, want the %d it rides with nothing keeping time", i, got[i], want[i])
+		}
+	}
+
+	// And nothing is painted by the walk either: a row lit as though it were
+	// being struck is a row being struck as far as anyone watching is concerned.
+	m.stage.loose = true
+	for i := range marks {
+		if p, was := m.wordsMarkPaint(i, marks, freqs, levels), m.wordsBeatPaint(i, marks, freqs, levels); p != was {
+			t.Errorf("resting, mark %d is painted %v, want the %v its own band paints it", i, p, was)
+		}
+	}
+}
+
+// How long the row is left alone is dealt from the bar, so one gap rests longer
+// than the next — and the same gap rests the same length every time the record
+// is played.
+//
+// Both halves are the point. A rest of one fixed length is a rhythm of its own,
+// and after two gaps the walk comes back exactly when it is expected to; a rest
+// of a random length is a record that is not the same record twice, and nothing
+// a test can say anything about.
+func TestTheRestIsDealtFromTheBar(t *testing.T) {
+	// A round that walks and one that does not are counted apart: they rest out
+	// of different ranges, and added together the two would say nothing about
+	// either.
+	walked, stood := map[int]int{}, map[int]int{}
+	for i := range 200 {
+		// Bars a couple of seconds apart, as the marked lines of a sheet are.
+		round := wordsRoundFor(int64(i)*1997+431, 0)
+		if round.kind == wordsStanding {
+			stood[int(round.rest)]++
+			continue
+		}
+		walked[int(round.rest)]++
+	}
+
+	tally := func(seen map[int]int, least, spread int) ([]int, int) {
+		var out []int
+		var kinds int
+		for beats := least; beats < least+spread; beats++ {
+			out = append(out, seen[beats])
+			if seen[beats] > 0 {
+				kinds++
+			}
+		}
+		return out, kinds
+	}
+
+	rests, kinds := tally(walked, wordsRestLeast, wordsRestSpread)
+	still, stillKinds := tally(stood, wordsStillLeast, wordsStillSpread)
+	t.Logf("over 200 bars a round that walked rested %d to %d beats, %v of each; a round that did not rested %d to %d, %v of each",
+		wordsRestLeast, wordsRestLeast+wordsRestSpread-1, rests,
+		wordsStillLeast, wordsStillLeast+wordsStillSpread-1, still)
+
+	if kinds < 4 {
+		t.Errorf("the rest after a walk was dealt %d different lengths over 200 bars, want the range spread over them", kinds)
+	}
+	if stillKinds < 4 {
+		t.Errorf("a round that did not walk was dealt %d different lengths, want the range spread over them", stillKinds)
+	}
+
+	// The same bar, asked twice, is the same round down to the last field.
+	for i := range 50 {
+		starts := int64(i)*1997 + 431
+		for r := range 3 {
+			if once, twice := wordsRoundFor(starts, r), wordsRoundFor(starts, r); once != twice {
+				t.Fatalf("the bar at %dms was dealt %+v and then %+v, want the same record to play the same way twice", starts, once, twice)
+			}
+		}
+	}
+}
+
+// The wave is a crowd in a stand rather than a light being switched along a
+// row: a crest with shoulders either side of it, and it rolls between the beats
+// as well as on them.
+//
+// Rolling is the whole difference. A crest that moved a mark at a time would be
+// the march with a wider brush; what makes a stadium wave a wave is that at any
+// moment it is somewhere between two people, and the ones it is arriving at are
+// already halfway up.
+func TestTheWaveRollsRatherThanTicks(t *testing.T) {
+	const marks = 7
+	const period = 500 * time.Millisecond
+
+	// A wave from the left that goes out and comes back, crossing the row in a
+	// bar of four beats: the crest is at the far end four beats in and home
+	// again at eight.
+	starts := wordsBarDealt(t, 1, func(r wordsRound) bool {
+		return r.kind == wordsWaving && r.back && !r.right && r.cross == 4
+	})
+
+	m := wordsMarkModel(wordsFlat(0.6))
+	lead := time.Duration(beatRise * float32(period))
+
+	// What a mark the wave has not reached rides: its own band, at the share of
+	// it a row being walked keeps. Every measurement below is against this.
+	floor := make([]int, marks)
+	for i := range floor {
+		floor[i] = -int(m.wordsBeatRide(i, marks) * wordsRestRide * wordsBounce)
+	}
+
+	// Where the swell has got to, read off the picture: the middle of what the
+	// row has been lifted by, over and above what every mark is doing anyway.
+	crest := func(row []int) (float64, bool) {
+		var sum, weight float64
+		for i, v := range row {
+			if up := float64(floor[i] - v); up > 0 {
+				sum, weight = sum+float64(i)*up, weight+up
+			}
+		}
+		if weight == 0 {
+			return 0, false
+		}
+		return sum / weight, true
+	}
+
+	// Twice inside one beat: a tenth of the way through it and half of it later.
+	// The count of beats is the same at both, so whatever the crest has done it
+	// has done without a beat landing to move it.
+	var at [2]float64
+	for i, u := range [2]time.Duration{198 * period / 100, 248 * period / 100} {
+		wordsBarAt(&m, starts, u, period)
+		beats, _ := m.beatsIn(u, lead)
+
+		row := m.wordsRiding(marks)
+		where, ok := crest(row)
+		if !ok {
+			t.Fatalf("%v into the bar nothing at all is lifted, want a wave crossing the row", u)
+		}
+		at[i] = where
+		t.Logf("%v into the bar — %d beats — the row rides %v and the crest is at mark %.2f", u, beats, row, where)
+
+		if i == 1 {
+			if was, _ := m.beatsIn(198*period/100, lead); was != beats {
+				t.Fatalf("the two moments fall in beats %d and %d, want them inside one beat", was, beats)
+			}
+		}
+	}
+	if moved := at[1] - at[0]; moved < 0.3 {
+		t.Errorf("inside one beat the crest moved %.2f marks, want it rolling rather than waiting for the next beat", moved)
+	} else {
+		t.Logf("inside one beat the crest moved %.2f marks", moved)
+	}
+
+	// And it rolls at a speed a screen redrawn thirty times a second can carry.
+	// A crest that moved more than a mark between two frames would arrive at
+	// each of them out of nothing, which is a row of lamps again however smooth
+	// the arithmetic behind it is.
+	wordsBarAt(&m, starts, 198*period/100+scopeInterval, period)
+	frame, _ := crest(m.wordsRiding(marks))
+	t.Logf("one frame of %v later the crest is at mark %.2f, which is %.2f of a mark on", scopeInterval, frame, frame-at[0])
+	if frame-at[0] > 1 {
+		t.Errorf("the crest moved %.2f marks in a frame, want a swell the eye can follow", frame-at[0])
+	}
+
+	// With the crest sitting on a mark, the marks either side of it are part of
+	// the way up: a crest with nothing on its shoulders is a dot.
+	wordsBarAt(&m, starts, 188*period/100, period) // two beats in: the middle mark
+	row := m.wordsRiding(marks)
+	where, _ := crest(row)
+	t.Logf("two beats in the crest is at mark %.2f and the row rides %v against the %v it rides untouched", where, row, floor)
+
+	middle := marks / 2
+	for _, i := range []int{middle - 1, middle + 1} {
+		if row[i] >= floor[i] {
+			t.Errorf("the shoulder at mark %d rides %d, want it up on the %d of a mark the wave has not reached",
+				i, row[i], floor[i])
+		}
+		if row[i] <= row[middle] {
+			t.Errorf("the shoulder at mark %d rides %d and the crest at %d rides %d, want the crest highest",
+				i, row[i], middle, row[middle])
+		}
+	}
+
+	// And nowhere in the row is there a hole: a mark the wave has not reached
+	// rides what it would have ridden with no wave in the bar at all.
+	for beat := range 9 {
+		wordsBarAt(&m, starts, time.Duration(beat)*period, period)
+		row := m.wordsRiding(marks)
+
+		if where, _ := crest(row); wordsStruckAt(row) < 0 {
+			t.Logf("%d beats in the row is left to itself at %v", beat, row)
+		} else {
+			t.Logf("%d beats in the crest is at mark %.2f and the row rides %v", beat, where, row)
+		}
+
+		for i := range marks {
+			if row[i] > floor[i] {
+				t.Errorf("%d beats in, mark %d rides %d, under the %d it rides untouched", beat, i, row[i], floor[i])
+			}
+		}
+	}
+}
+
+// Which figure a bar of marks is dealt is arbitrary to anyone watching and
+// fixed to anyone reading: the same record plays the same way twice, and no two
+// gaps in a row do the same thing.
+//
+// A walk that is one figure with the numbers changed is a walk you can call
+// after the second gap, and a bar of marks that can be called is wallpaper. So
+// what is dealt is the whole figure — which end, which way, how fast, marching
+// or waving, how long the rest is, and whether the row walks at all — and this
+// counts what a run of bars actually got rather than trusting that it does.
+func TestEveryBarIsDealtItsOwnWalk(t *testing.T) {
+	const marks = 7
+
+	dealt := func(r wordsRound) string {
+		end, way := "the left", "and back"
+		if r.right {
+			end = "the right"
+		}
+		if !r.back {
+			way = "one way"
+		}
+		switch r.kind {
+		case wordsStanding:
+			return fmt.Sprintf("still for %.0f beats", r.rest)
+		case wordsWaving:
+			return fmt.Sprintf("wave from %s %s, crossing in %.0f, resting %.0f", end, way, r.cross, r.rest)
+		}
+		return fmt.Sprintf("march from %s %s, %.1f a mark, resting %.0f", end, way, r.step, r.rest)
+	}
+
+	const bars = 200
+	kinds := map[wordsWalkKind]int{}
+	figures := map[string]int{}
+
+	for i := range bars {
+		starts := int64(i)*1997 + 431
+		round := wordsRoundFor(starts, 0)
+		kinds[round.kind]++
+		figures[dealt(round)]++
+
+		if i < 8 {
+			t.Logf("the bar at %6dms was dealt %s, travelling for %.1f beats",
+				starts, dealt(round), round.travel(marks))
+		}
+	}
+
+	most, at := 0, ""
+	for name, n := range figures {
+		if n > most {
+			most, at = n, name
+		}
+	}
+	t.Logf("over %d bars: %d marched, %d waved, %d never walked at all — %d different figures, the commonest of them %q %d times",
+		bars, kinds[wordsMarching], kinds[wordsWaving], kinds[wordsStanding], len(figures), at, most)
+
+	for kind, name := range map[wordsWalkKind]string{
+		wordsMarching: "marched", wordsWaving: "waved", wordsStanding: "stood still",
+	} {
+		if kinds[kind] < bars/10 {
+			t.Errorf("%d bars of %d %s, want every way of travelling turning up on a record", kinds[kind], bars, name)
+		}
+	}
+	if len(figures) < 25 {
+		t.Errorf("%d bars were dealt %d different figures, want the deal spread rather than a figure with the numbers changed", bars, len(figures))
+	}
+	if most > bars/8 {
+		t.Errorf("the commonest figure was dealt %d times of %d, want no one of them the thing a bar usually does", most, bars)
+	}
+
+	// And a long gap does not walk the one figure over and over: the round it is
+	// on goes into the deal, so what a bar does is a sequence of them.
+	for i := range bars {
+		starts := int64(i)*1997 + 431
+		same := true
+		for r := 1; r < 4; r++ {
+			if wordsRoundFor(starts, r) != wordsRoundFor(starts, 0) {
+				same = false
+			}
+		}
+		if same {
+			t.Errorf("the bar at %dms was dealt the same figure four rounds running, want a gap that does not repeat itself", starts)
+		}
+	}
+}
+
+// The same bar twice is the same picture twice, and a different bar is a
+// different picture: the walk is worked out from when the bar sounds and from
+// the beat grid, with nothing kept between frames and nothing kept between
+// plays.
+//
+// It is what lets any of the rest be judged. A record watched twice is how
+// anybody decides whether a figure is worth having, and a screen that improvises
+// is a screen where that comparison means nothing.
+func TestTheSameBarWalksTheSameWayTwice(t *testing.T) {
+	const marks = 7
+	const period = 500 * time.Millisecond
+
+	// Half a minute of a solo at a mark a beat, which is more than a round and
+	// its rest whatever either was dealt.
+	walk := func(starts int64) []int {
+		m := wordsMarkModel(wordsFlat(0.6))
+		var out []int
+		for beat := range 60 {
+			wordsBarAt(&m, starts, time.Duration(beat)*period, period)
+			out = append(out, wordsStruckAt(m.wordsRiding(marks)))
+		}
+		return out
+	}
+
+	const one, other = int64(41231), int64(41232)
+	first, again := walk(one), walk(one)
+	t.Logf("the bar at %dms walked %v", one, first)
+	t.Logf("and again           %v", again)
+
+	for i := range first {
+		if first[i] != again[i] {
+			t.Fatalf("%d beats in, the bar walked to mark %d and then to mark %d, want the same record twice", i, first[i], again[i])
+		}
+	}
+
+	next := walk(other)
+	t.Logf("the bar a millisecond later walked %v", next)
+
+	var apart int
+	for i := range first {
+		if first[i] != next[i] {
+			apart++
+		}
+	}
+	t.Logf("two bars a millisecond apart differ on %d of %d beats", apart, len(first))
+	if apart == 0 {
+		t.Error("two different bars walked identically, want the figure dealt from the bar")
 	}
 }
