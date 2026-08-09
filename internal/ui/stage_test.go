@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -143,6 +144,56 @@ func TestStageThrowsWaterAndTakesItBack(t *testing.T) {
 	}
 	if len(m.stage.drops) != 0 {
 		t.Errorf("%d drops are still in the air after the music stopped jumping", len(m.stage.drops))
+	}
+}
+
+// The water is the one thing on this screen that keeping time does not touch.
+//
+// Held to the beat the drops left in ranks, which reads as a curtain rather
+// than as spray; loose, they come off wherever the music moved. Both were seen
+// on the same record and the loose one is the picture. So the same music has to
+// throw the same water whether the screen is keeping time or not.
+func TestTheWaterIgnoresTheBeat(t *testing.T) {
+	water := func(keeping bool) []stageDrop {
+		m := stageModel(100, 40)
+		if keeping {
+			m.scope.beat = player.Beat{Period: 500 * time.Millisecond}
+			m.scope.beatAt = time.Now()
+			if !m.beatKeeping() {
+				t.Fatal("a beat was found and the screen did not keep time")
+			}
+		}
+
+		bands := make([]float32, 28)
+		// Long enough that every phase of the beat is passed through several
+		// times: a gate anywhere in the throw would show up as a gap.
+		for f := range 120 {
+			for i := range bands {
+				bands[i] = float32(0.5 + 0.45*math.Sin(float64(f)/3+float64(i)))
+			}
+			m.scope.bands = bands
+			if keeping {
+				m.scope.beat.Since = time.Duration(f%15) * 33 * time.Millisecond
+				m.scope.beatAt = time.Now()
+			}
+			m.stageFlow(100, 40)
+		}
+		return m.stage.drops
+	}
+
+	loose, kept := water(false), water(true)
+	t.Logf("%d drops in the air answering the loudness, %d keeping time", len(loose), len(kept))
+
+	if len(loose) == 0 {
+		t.Fatal("the music threw no water at all")
+	}
+	if len(loose) != len(kept) {
+		t.Fatalf("%d drops keeping time against %d answering the loudness, want the beat left out of it", len(kept), len(loose))
+	}
+	for i, d := range loose {
+		if kept[i] != d {
+			t.Fatalf("drop %d is %+v keeping time and %+v answering the loudness, want the beat left out of it", i, kept[i], d)
+		}
 	}
 }
 

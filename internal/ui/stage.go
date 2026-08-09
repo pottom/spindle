@@ -67,11 +67,6 @@ const (
 	// anything at all. Below this it is the music breathing, not hitting.
 	stageJump = 0.02
 
-	// stageOnBeat is how near the beat the water has to be to be thrown at all,
-	// as a share of the pulse. Loose enough that the spray still ragged — the
-	// point is that it lands with the music, not that it lands on a metronome.
-	stageOnBeat = 0.45
-
 	// stageEdgeBeatTail is how much of the comet's tail is left between two
 	// beats. It draws itself out on the beat and pulls back in after it, which
 	// is a movement rather than a flash — a flashing dot on a screen is an
@@ -409,14 +404,11 @@ func (m *Model) stageFlowIn(w, rows int, t stageThrows) {
 	if t.lift > 0 {
 		throw *= t.lift
 	}
-	// On the beat where there is one: the water is what the picture throws when
-	// the music hits, and a beat is where it hits. Off it, the drops come from
-	// whatever rise there is, which is what this always did.
-	onBeat, keeping := float32(1), m.beatKeeping()
-	if keeping {
-		onBeat = m.beatPulse()
-	}
-
+	// The water is the one thing here that is not put on the beat. Held to it,
+	// the drops leave in ranks and the spray reads as a curtain going up; left
+	// to the rise in each column, they come off where the music actually moved,
+	// which is ragged, and ragged is what water looks like. Judged both ways on
+	// the same record with the key, and the loose one wins by a distance.
 	for x := 0; x < dotsX; x += stagePitch {
 		now := m.stageLevel(x, dotsX)
 		jump := now - m.stage.was[x]
@@ -425,11 +417,8 @@ func (m *Model) stageFlowIn(w, rows int, t stageThrows) {
 		if jump < stageJump || len(m.stage.drops) >= stageDrops {
 			continue
 		}
-		if keeping && onBeat < stageOnBeat {
-			continue
-		}
 		// Only some of the columns throw, so the spray is ragged the way water
-		// is rather than a curtain going up on every beat.
+		// is rather than a curtain going up.
 		if m.stage.roll() > stageSpray {
 			continue
 		}
@@ -437,7 +426,7 @@ func (m *Model) stageFlowIn(w, rows int, t stageThrows) {
 		m.stage.drops = append(m.stage.drops, stageDrop{
 			col:    x,
 			at:     now * reach,
-			speed:  jump * throw * (0.6 + 0.4*onBeat),
+			speed:  jump * throw,
 			bright: min(now+jump, 1),
 		})
 	}
