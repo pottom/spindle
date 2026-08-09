@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"image/draw"
 	"math"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -512,8 +513,7 @@ func (m Model) wordsComing() ([]string, int64) {
 		// the marks keep it, and once in a record the name of what is playing
 		// takes it off them for a moment. See solo.go.
 		if gap, in := m.soloNow(); in {
-			if m.soloTelling() {
-				card, _ := m.soloCard()
+			if card, ok := m.soloCard(); ok && m.soloTelling() && !m.soloSaid(card.from) {
 				return m.soloName(), card.from
 			}
 			return []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)}, gap.from
@@ -658,6 +658,12 @@ type wordsState struct {
 	// and in dots over it, eased towards what the picture actually leaves. See
 	// wordsEase.
 	band, head float32
+
+	// told is the record whose name has been said, and toldAt the moment the
+	// card that said it was stamped. A record says what it is once. See
+	// soloSaid.
+	told   string
+	toldAt int64
 }
 
 // wordPaint is a word's colour: which hue of the palette, and at what strength.
@@ -1385,7 +1391,17 @@ func (m *Model) wordsGrind() tea.Cmd {
 	was := m.words.starts
 	m.words.starts, m.words.ends = starts, m.wordsEnds(starts)
 	m.words.beats = len(lines) == 1 && wordsBeats(lines[0])
-	m.words.telling = m.soloTelling()
+	// What is going up is the record's name when it is the record's name: asked
+	// of the lines rather than of the clock, so that the one place which knows
+	// the card is on is the one that puts it there.
+	name := m.soloName()
+	m.words.telling = len(name) > 0 && slices.Equal(lines, name)
+
+	// And a record says its name once. Not the card asked for by hand, which is
+	// somebody wanting to see it and not the record's own moment. See soloSaid.
+	if m.words.telling && !m.soloForcing() && m.ps != nil {
+		m.words.told, m.words.toldAt = m.ps.TrackID, starts
+	}
 
 	text := strings.Join(lines, "\n")
 	if m.words.text == text && m.words.cellsX == m.width && m.words.cellsY == m.height {

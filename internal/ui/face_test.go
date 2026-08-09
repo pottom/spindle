@@ -867,3 +867,61 @@ func TestHisNoseFollowsHim(t *testing.T) {
 		t.Errorf("he faced the way he was going at %d of %d moments", agreed, moved)
 	}
 }
+
+// A visit that has begun runs to its end, whatever the bar underneath it does.
+//
+// The bar is what deals him, and a record with no words of its own stamps a new
+// one every half minute — so a figure who had just walked on was taken off
+// mid-stride by a stamp he had not been dealt, and the marks gathered over the
+// top of him. Which is a picture cutting to another picture, and looks like it.
+func TestAVisitSurvivesTheBarChangingUnderIt(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 20 * time.Minute
+	m.words.beats, m.words.text = true, wordsNotes
+
+	// A bar he was dealt, and the moment he is on it.
+	var bar int64 = -1
+	for at := range int64(200) {
+		if faceDealt(at * 7_000) {
+			bar = at * 7_000
+			break
+		}
+	}
+	if bar < 0 {
+		t.Fatal("no bar in two hundred was dealt him")
+	}
+	m.words.starts = bar
+	m.setProgress(time.Duration(bar)*time.Millisecond + faceEnters + time.Second)
+	m.faceFlow()
+
+	if !m.faceUp() {
+		t.Fatal("he never came on")
+	}
+	t.Logf("he is on, a second into a stay of %s", m.faceStayFor(bar))
+
+	// And now the bar changes under him, to one he was not dealt — which is
+	// what a wordless record does every half minute.
+	var other int64 = -1
+	for at := bar + 1_000; at < bar+400_000; at += 1_000 {
+		if !faceDealt(at) {
+			other = at
+			break
+		}
+	}
+	if other < 0 {
+		t.Fatal("every bar after it was dealt him")
+	}
+	m.words.starts = other
+
+	if !m.faceUp() {
+		t.Error("the bar changed under him and he vanished mid-visit")
+	}
+
+	// He goes when his own visit is over, not before.
+	m.face.came = time.Now().Add(-m.faceStayFor(bar) - time.Second)
+	if m.faceUp() {
+		t.Error("he is still there long after his own stay ran out")
+	}
+}

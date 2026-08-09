@@ -410,3 +410,96 @@ func TestACutNameIsMarked(t *testing.T) {
 		t.Errorf("one long word came out as %q", got)
 	}
 }
+
+// A record says its name once, whichever road it comes down.
+//
+// There are two: the card in the middle of a solo, and the turn a record with
+// no words of its own gives it near the top. A record can qualify for both —
+// the lyric sheet has not answered yet, so the screen takes it for wordless and
+// puts the name up; then the sheet arrives with a solo in the middle of it and
+// the name goes up again. Twice in one record is once too many.
+func TestARecordSaysItsNameOnce(t *testing.T) {
+	m := scopeModel(100, 44)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.TrackID, m.ps.Title = "late", "A Long Song"
+	m.ps.Artists, m.ps.Album = []string{"The Band"}, "An Album"
+	m.ps.Duration = 5 * time.Minute
+
+	name := strings.Join(m.soloName(), "\n")
+	said, was := 0, false
+
+	for at := time.Second; at < 5*time.Minute; at += time.Second {
+		// The sheet turns up a minute in, with a long solo after its first line.
+		if at == time.Minute {
+			m.lyrics.lines = []player.Lyric{
+				{At: 65_000, Words: "the only line"},
+				{At: 240_000, Words: "and the last"},
+			}
+			m.lyrics.forTrack, m.lyrics.synced = m.ps.TrackID, true
+		}
+
+		m.setProgress(at)
+		if cmd := m.wordsGrind(); cmd != nil {
+			if got := cmd(); got != nil {
+				tm, _ := m.Update(got)
+				m = tm.(Model)
+			}
+		}
+
+		if m.words.text == name && !was {
+			said++
+			t.Logf("%5s the record said its name", at)
+		}
+		was = m.words.text == name
+	}
+
+	if said != 1 {
+		t.Errorf("the record said its name %d times, want the once", said)
+	}
+
+	// And the key still works afterwards, because that is somebody asking.
+	m.words.forced = time.Now()
+	if !m.soloTelling() {
+		t.Error("the name could not be asked for after the record had said it")
+	}
+}
+
+// And the marks are not put up twice in a row.
+//
+// They have the rest of every turn anyway, so dealing them as the card that
+// opens one showed the same picture twice: marks arriving, and the very same
+// marks arriving again a moment later by another road.
+func TestTheMarksAreNotDealtOnTopOfThemselves(t *testing.T) {
+	for _, card := range wordsCardPool {
+		if card == wordsCardTitle {
+			t.Error("the title is in the pool, so a record could say its name twice")
+		}
+	}
+
+	m := scopeModel(100, 44)
+	m.ps.TrackID, m.ps.Title = "wordless", "An Instrumental"
+	m.ps.Artists, m.ps.Album = []string{"The Band"}, "An Album"
+	m.ps.Duration = 20 * time.Minute
+
+	// Over a long record, no turn opens with the marks: what is dealt is a name
+	// or nothing, and nothing is the marks having the whole turn.
+	for spell := range 40 {
+		lines, _ := func() ([]string, int64) {
+			m.setProgress(time.Duration(spell)*wordsSpell + time.Second)
+			return m.wordsIdle()
+		}()
+		if spell == 1 {
+			continue // the record's own name
+		}
+		if len(lines) == 1 && wordsBeats(lines[0]) {
+			// The marks, which is what a turn dealt nothing looks like — and it
+			// must be the same picture all the way through the turn.
+			m.setProgress(time.Duration(spell)*wordsSpell + wordsTitle + time.Second)
+			later, _ := m.wordsIdle()
+			if len(later) != 1 || later[0] != lines[0] {
+				t.Errorf("turn %d opened with marks and then changed to %q", spell, later)
+			}
+		}
+	}
+}

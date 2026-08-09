@@ -1162,7 +1162,20 @@ func (m Model) faceUp() bool {
 	if !m.face.shown.IsZero() && time.Since(m.face.shown) < faceShows {
 		return true
 	}
-	if !m.words.beats || !faceDealt(m.words.starts) {
+	if !m.words.beats {
+		return false
+	}
+
+	// A visit that has begun runs to its end, whatever the bar underneath it
+	// does. The bar is what deals him, and on a record with no words of its own
+	// a new one is stamped every half minute — so a figure who had just walked
+	// on was taken off mid-stride by a stamp he was not dealt, and the marks
+	// gathered over the top of him. He came on; he leaves the way he came.
+	if m.face.was && !m.face.came.IsZero() && time.Since(m.face.came) < m.faceStayFor(m.face.bar) {
+		return true
+	}
+
+	if !faceDealt(m.words.starts) {
 		return false
 	}
 

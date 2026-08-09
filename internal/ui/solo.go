@@ -156,6 +156,25 @@ func (m Model) soloTelling() bool {
 	return clock >= card.from && clock < card.to
 }
 
+// soloSaid reports that this record has already said its name, at some moment
+// other than the one being asked about.
+//
+// Once a record, and once means once. There are two ways for the name to come
+// up — the card in the middle of a solo, and the turn a record with no words of
+// its own gives it near the top — and a record can qualify for both: the lyric
+// sheet has not answered yet, so the screen takes it for wordless and puts the
+// name up, and then the sheet arrives with a solo in the middle of it and the
+// name goes up again. Twice in one record is once too many.
+//
+// Asked with the moment the card would be stamped, so that the card already on
+// screen is not taken down by the rule that put it there.
+func (m Model) soloSaid(starts int64) bool {
+	if m.ps == nil || m.words.told != m.ps.TrackID {
+		return false
+	}
+	return m.words.toldAt != starts
+}
+
 // soloName is what the record is called, as it is set: its own name and whose
 // it is, one under the other, each broken where it is too long for the room.
 func (m Model) soloName() []string {

@@ -31,13 +31,19 @@ const (
 	wordsCardTitle                   // the record saying its own name
 	wordsCardArtist                  // and whose it is
 	wordsCardAlbum                   // and what it came out on
-	wordsCardNotes                   // and three notes, for a bar with nothing to say
 )
 
 // wordsCardPool is what a turn can be dealt after the record has said its name.
+//
 // The title is not in it: a record says what it is once. See soloCard for the
 // same rule where there are words to get out of the way of.
-var wordsCardPool = []wordsCard{wordsCardArtist, wordsCardAlbum, wordsCardNotes}
+//
+// Neither are the marks. They have the rest of every turn anyway, so dealing
+// them as the thing that opens one put the same picture up twice in a row —
+// marks arriving, and then the very same marks arriving again a moment later
+// by another road. A turn dealt nothing is the music with the marks over it for
+// the whole of it, which is what that card was reaching for.
+var wordsCardPool = []wordsCard{wordsCardArtist, wordsCardAlbum, wordsCardNone}
 
 // wordsWordless reports that the lyric database has nothing for what is
 // playing — or has not answered about it yet, which at the top of a record
@@ -73,11 +79,18 @@ func (m Model) wordsIdle() ([]string, int64) {
 		return m.wordsIdleMarks(spell) // the rest of the turn keeps time on its own
 	}
 
+	starts := int64(spell) * wordsSpell.Milliseconds()
+
 	var lines []string
 	switch m.wordsCardFor(spell) {
 	case wordsCardNone:
 	case wordsCardTitle:
-		lines = m.soloName()
+		// Unless it has been said already: a record whose sheet arrived late
+		// was taken for wordless long enough to say its name, and then the
+		// sheet turned up with a solo in it to say it again. See soloSaid.
+		if !m.soloSaid(starts) {
+			lines = m.soloName()
+		}
 	case wordsCardArtist:
 		lines = m.wordsCard(strings.Join(m.ps.Artists, ", "))
 	case wordsCardAlbum:
@@ -86,14 +99,12 @@ func (m Model) wordsIdle() ([]string, int64) {
 		if m.ps.Album != m.ps.Title {
 			lines = m.wordsCard(m.ps.Album)
 		}
-	case wordsCardNotes:
-		lines = []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)}
 	}
 
 	if len(lines) == 0 || lines[0] == "" {
 		return m.wordsIdleMarks(spell)
 	}
-	return lines, int64(spell) * wordsSpell.Milliseconds()
+	return lines, starts
 }
 
 // wordsIdleMarks is what a wordless record has up the rest of the time: the
