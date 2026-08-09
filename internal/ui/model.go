@@ -233,6 +233,10 @@ func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 			tabPlayer: scopeWave,
 			tabQueue:  scopeWave,
 		}},
+		// And the picture keeps time with the record from the start: a screen
+		// that only answers the loudness is what this used to be, and it is on
+		// the key for anybody who wants to see the difference.
+		stage:   stageState{loose: true},
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
 		device:  spinner.New(spinner.WithSpinner(deviceSpinner)),
 	}

@@ -67,6 +67,11 @@ const (
 	// anything at all. Below this it is the music breathing, not hitting.
 	stageJump = 0.02
 
+	// stageOnBeat is how near the beat the water has to be to be thrown at all,
+	// as a share of the pulse. Loose enough that the spray still ragged — the
+	// point is that it lands with the music, not that it lands on a metronome.
+	stageOnBeat = 0.45
+
 	// stageSpray is the share of the columns that throw when they jump. All of
 	// them at once would be a curtain going up rather than water coming off,
 	// but most of them is what makes the air busy enough to watch.
@@ -103,6 +108,12 @@ type stageState struct {
 	// into and leave with the next key, the way turning the lights down is.
 	on bool
 
+	// loose says the picture keeps time with the record rather than only
+	// answering how loud it is. On unless the key has turned it off, because
+	// the two ways cannot be judged against each other unless both can be seen
+	// on the same record. See beatKeeping.
+	loose bool
+
 	drops []stageDrop
 
 	// was is how high every column stood last frame, which is what a jump is
@@ -136,6 +147,13 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		m.stage.drops = nil
 		return tea.Batch(m.startScope(), m.savePrefs()), true
+
+	case key.Matches(k, m.keys.Loose):
+		// The two ways of drawing, side by side on the one record: keeping time
+		// with it, or only answering how loud it is. Nothing else on this
+		// screen can be judged against its alternative, and this one has to be.
+		m.stage.loose = !m.stage.loose
+		return nil, true
 
 	case key.Matches(k, m.keys.Tell):
 		// Says what is playing, there and then. Like the picture key, it does
@@ -385,12 +403,23 @@ func (m *Model) stageFlowIn(w, rows int, t stageThrows) {
 	if t.lift > 0 {
 		throw *= t.lift
 	}
+	// On the beat where there is one: the water is what the picture throws when
+	// the music hits, and a beat is where it hits. Off it, the drops come from
+	// whatever rise there is, which is what this always did.
+	onBeat, keeping := float32(1), m.beatKeeping()
+	if keeping {
+		onBeat = m.beatPulse()
+	}
+
 	for x := 0; x < dotsX; x += stagePitch {
 		now := m.stageLevel(x, dotsX)
 		jump := now - m.stage.was[x]
 		m.stage.was[x] = now
 
 		if jump < stageJump || len(m.stage.drops) >= stageDrops {
+			continue
+		}
+		if keeping && onBeat < stageOnBeat {
 			continue
 		}
 		// Only some of the columns throw, so the spray is ragged the way water
@@ -402,7 +431,7 @@ func (m *Model) stageFlowIn(w, rows int, t stageThrows) {
 		m.stage.drops = append(m.stage.drops, stageDrop{
 			col:    x,
 			at:     now * reach,
-			speed:  jump * throw,
+			speed:  jump * throw * (0.6 + 0.4*onBeat),
 			bright: min(now+jump, 1),
 		})
 	}

@@ -1501,18 +1501,33 @@ func (m Model) wordsRiding(count int) []int {
 	if m.words.beats {
 		// The notes: each on its own part of the sound, and further than a word
 		// would go.
+		//
+		// On the beat where there is one to keep. Each mark still rises by what
+		// its own share of the spectrum is doing — that is what makes the sound
+		// run along the row — but they all leave the ground together, which is
+		// the difference between a row of meters and a row of dancers.
+		pulse := float32(1)
+		if m.beatKeeping() {
+			pulse = beatFloor + (1-beatFloor)*m.beatPulse()
+		}
+
 		out := make([]int, count)
 		for i := range out {
-			out[i] = -int(m.wordsBeatRide(i, count) * wordsBounce)
+			out[i] = -int(m.wordsBeatRide(i, count) * wordsBounce * pulse)
 		}
 		return out
+	}
+
+	pulse := float32(1)
+	if m.beatKeeping() {
+		pulse = beatFloor + (1-beatFloor)*m.beatPulse()
 	}
 
 	switch wordsRideFor(m.words.text) {
 	case wordsRideWords:
 		out := make([]int, count)
 		for i := range out {
-			out[i] = -int(m.wordsBeatRide(i, count) * wordsWordRide)
+			out[i] = -int(m.wordsBeatRide(i, count) * wordsWordRide * pulse)
 		}
 		return m.wordsSettleMarks(out)
 
@@ -1524,7 +1539,7 @@ func (m Model) wordsRiding(count int) []int {
 			loud = max(loud, v)
 		}
 
-		lift := -int(loud * wordsLineRide)
+		lift := -int(loud * wordsLineRide * pulse)
 		out := make([]int, count)
 		for i := range out {
 			out[i] = lift

@@ -44,9 +44,13 @@ type keyMap struct {
 	Scope    key.Binding
 	// Stage gives the whole terminal to the visualiser, and Tell puts the
 	// record's own name up there without waiting for a solo to make room.
-	Stage  key.Binding
-	Tell   key.Binding
-	Face   key.Binding
+	Stage key.Binding
+	Tell  key.Binding
+	Face  key.Binding
+
+	// Loose turns keeping time with the record off and on, so the two ways of
+	// drawing can be put side by side on the one record.
+	Loose  key.Binding
 	Lyrics key.Binding
 	Peek   key.Binding
 	Mute   key.Binding
@@ -206,6 +210,10 @@ func newKeyMap() keyMap {
 		Face: key.NewBinding(
 			key.WithKeys("w"),
 			key.WithHelp("w", "a face"),
+		),
+		Loose: key.NewBinding(
+			key.WithKeys("b"),
+			key.WithHelp("b", "keep time"),
 		),
 		Lyrics: key.NewBinding(
 			key.WithKeys("l"),

@@ -989,3 +989,63 @@ func TestTheBeatPhaseRunsWithTheClock(t *testing.T) {
 		t.Error("the phase was still reported from a beat nobody has confirmed for seconds")
 	}
 }
+
+// Everything that moves moves on the beat, and the key puts it back the way it
+// was.
+//
+// The two ways of drawing are the whole question — keeping time with a record
+// or answering how loud it is — and the only way to answer it is to see both on
+// the same record.
+func TestTheScreenKeepsTimeAndCanBeToldNotTo(t *testing.T) {
+	m := scopeModel(120, 44)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.words.beats, m.words.text = true, wordsNotes
+
+	bands := make([]float32, 28)
+	for i := range bands {
+		bands[i] = 0.8
+	}
+	m.scope.bands = bands
+
+	// With no beat found, nothing keeps time and the marks ride the loudness,
+	// which is what this always did.
+	if m.beatKeeping() {
+		t.Error("the screen kept time before any beat was found")
+	}
+	loud := m.wordsRiding(4)
+
+	// A beat every half second. On it and off it the marks stand differently.
+	m.scope.beat = player.Beat{Period: 500 * time.Millisecond}
+	m.scope.beatAt = time.Now()
+	if !m.beatKeeping() {
+		t.Fatal("a beat was found and the screen did not keep time")
+	}
+
+	m.scope.beat.Since = 0 // on the beat
+	m.scope.beatAt = time.Now()
+	on := m.wordsRiding(4)
+
+	m.scope.beat.Since = 250 * time.Millisecond // half way between two
+	m.scope.beatAt = time.Now()
+	between := m.wordsRiding(4)
+
+	t.Logf("the marks stand at %v on the beat and %v between two, against %v on loudness alone",
+		on, between, loud)
+
+	if on[0] >= between[0] {
+		t.Errorf("on the beat the marks are at %d and between two at %d, want them higher on it", on[0], between[0])
+	}
+	if between[0] == 0 {
+		t.Error("between two beats the marks stopped dead, want the beat under the movement rather than across it")
+	}
+
+	// And the key hands the old picture back.
+	m.stage.loose = false
+	if m.beatKeeping() {
+		t.Error("the key was turned off and the screen kept time anyway")
+	}
+	if off := m.wordsRiding(4); off[0] != loud[0] {
+		t.Errorf("with the key off the marks stand at %d, want the %d they stood at before", off[0], loud[0])
+	}
+}

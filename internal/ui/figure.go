@@ -432,7 +432,14 @@ func (m Model) figurePose() string {
 	}
 
 	if way, moving := m.faceGoing(); moving {
+		// A step on every beat where there is a beat to step on. Walking to a
+		// clock of its own, he is the one thing on the screen not in the room
+		// with the record — and feet are the part of a figure an eye checks
+		// against the music without being asked to.
 		at := int(math.Abs(math.Sin(math.Pi*faceSteps*m.faceGone()))*4) % 4
+		if phase, ok := m.beatPhase(); ok && m.stage.loose {
+			at = int(phase*4) % 4
+		}
 
 		// A moonwalk is not a pose anybody drew. It is the walk played
 		// backwards while the ground goes the other way, which is what the

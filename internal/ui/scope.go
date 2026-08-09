@@ -597,3 +597,54 @@ func (m Model) beatPhase() (float32, bool) {
 	next := m.scope.beat.Next(since)
 	return float32(1 - float64(next)/float64(m.scope.beat.Period)), true
 }
+
+// beatKeeping reports that the screen is keeping time with the record rather
+// than merely answering it.
+//
+// Both halves have to hold: there has to be a beat to keep, and the key has to
+// have left it on. Everything that moves asks this before it moves, so the two
+// ways of drawing can be put side by side on the one record and told apart —
+// which is the only way to know whether keeping time is better, rather than
+// only different.
+func (m Model) beatKeeping() bool {
+	if !m.stage.loose {
+		return false
+	}
+	_, ok := m.beatPhase()
+	return ok
+}
+
+// beatPulse is the shape a beat moves things in: full on the beat and falling
+// away before the next one, so what rides it lands rather than sways.
+//
+// Sharper than a sine on purpose. A beat is an event, not an oscillation: the
+// ear hears the strike and the decay, and a picture that spends as long rising
+// to the beat as falling from it reads as a swell in the music instead of a
+// hit on it.
+func (m Model) beatPulse() float32 {
+	phase, ok := m.beatPhase()
+	if !ok {
+		return 0
+	}
+
+	// A short rise into the beat, so nothing jumps from nothing, and a long
+	// fall out of it.
+	if phase > 1-beatRise {
+		return (phase - (1 - beatRise)) / beatRise
+	}
+	fall := 1 - phase/(1-beatRise)
+	return fall * fall
+}
+
+const (
+	// beatRise is how much of a beat is spent coming up to it. Small: the rise
+	// is there so the strike is not a discontinuity, not so it can be watched.
+	beatRise = 0.12
+
+	// beatFloor is how much of a movement survives between the beats.
+	//
+	// Not nought. What rides the music has to go on riding it off the beat as
+	// well, or the picture stops dead four times a bar — the beat is meant to
+	// be the pulse under the movement, not a gate across it.
+	beatFloor = 0.35
+)
