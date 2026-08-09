@@ -410,10 +410,6 @@ func (m *Model) adoptLyrics(res msg.LyricsFetched) {
 	m.lyrics.lines = res.Lines
 	m.lyrics.synced = res.Synced
 	m.lyrics.missing = len(res.Lines) == 0
-
-	// Which of them are coming round again, worked out here because this is the
-	// one moment the whole sheet is in hand. See refrain.go.
-	m.refrainFind()
 }
 
 // wrapWords breaks a line to fit a width, on spaces where it can and mid-word

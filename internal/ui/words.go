@@ -809,14 +809,6 @@ const (
 	wordsSpray = 0.28
 	wordsSpent = 3
 
-	// wordsShadowBurn is how brightly a line that has been sung before is drawn
-	// where it is going, as a share of the palette, while it is on its way there.
-	//
-	// Under what an unsung word is given: the imprint is the memory of a line,
-	// not the line, and anything near reading strength would be a second copy of
-	// the words on the screen at the same time as the first.
-	wordsShadowBurn = 0.22
-
 	// wordsLift is what the water's throw is multiplied by on this screen.
 	//
 	// Set so that a hard hit carries a drop the height of the terminal: a drop
@@ -885,13 +877,6 @@ func (m Model) wordsLines(w, rows int) []string {
 
 	bounce := m.wordsRiding(len(paints))
 	tilt, middle := m.wordsTilting(len(paints))
-
-	// A line the record has sung before is already faintly where it is going
-	// while its dots are still on their way there, so the chorus comes back to
-	// its own place rather than out of the dark. See refrain.go.
-	if gather < 1 && m.wordsAgain() {
-		m.wordsShadow(g, grid, paint, hue, w, rows, gather, bounce, tilt, middle, paints)
-	}
 
 	for y := range dotsY {
 		for x := range dotsX {
@@ -964,62 +949,6 @@ func (m Model) wordsLines(w, rows int) []string {
 	}
 
 	return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
-}
-
-// wordsShadow draws the line where it is going, dimly, while it is still on its
-// way there.
-//
-// Where it is going and not where it was: the destination is worked out exactly
-// as the drawing loop works it out, ride and lean and all, so the imprint sits
-// under the dots as they land rather than a few rows off them. What it leaves
-// out is the only thing that separates the two — the travel.
-//
-// It fades as the line gathers, and the line brightens as it does, so the two
-// pass through each other: at the start the shadow is all there is to see, at
-// the end there is nothing but the line. Neither of them is ever the brighter
-// picture at the same cell, which is what keeps this one picture.
-func (m Model) wordsShadow(g cover.Grain, grid []uint8, paint, hue []int8, w, rows int, gather float32,
-	bounce []int, tilt []float32, middle []int, paints []wordPaint) {
-	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
-	levels := len(m.styles.Words[0])
-
-	// Rounded rather than cut down. The palette has six steps, so a share of it
-	// that is cut down spends most of the arrival at nought — the imprint would
-	// be a flash over the first hundred milliseconds rather than something the
-	// line comes back to.
-	burn := int8(min(int(wordsShadowBurn*(1-gather)*float32(levels)+0.5), levels-1))
-	if burn <= 0 {
-		return
-	}
-
-	for y := range dotsY {
-		for x := range dotsX {
-			if g.Lum[y*dotsX+x] < wordsLit {
-				continue
-			}
-			word := m.words.where.WordAt(x, y)
-			if word < 0 || word >= len(paints) {
-				continue
-			}
-
-			at, to := x, y
-			if word < len(bounce) {
-				to += bounce[word]
-			}
-			if word < len(tilt) && tilt[word] != 0 {
-				to += int(math.Round(float64(x-middle[word]) * float64(tilt[word])))
-			}
-			if to < 0 || to >= dotsY {
-				continue
-			}
-
-			cell := (to/dotsPerCellY)*w + at/dotsPerCellX
-			grid[cell] |= 1 << brailleBit[at%dotsPerCellX][to%dotsPerCellY]
-			if burn > paint[cell] {
-				paint[cell], hue[cell] = burn, paints[word].hue
-			}
-		}
-	}
 }
 
 // wordsUnder draws the meter into the rows the words left over, and its water
