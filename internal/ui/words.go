@@ -1484,11 +1484,17 @@ func wordsRideFor(text string) wordsRide {
 // wordsRiding is how far each word of the line is lifted this frame.
 //
 // Never a dot at a time: the letters of a word move together or not at all, or
-// the word comes apart and stops being one. And never as far as a note goes —
-// a note is a mark keeping time and a word is something to read, so the words
-// are given a third of the jump and only when their own line drew it.
+// the word comes apart and stops being one. And never as far as a note goes — a
+// note is a mark keeping time and a word is something to read.
+//
+// The record's name rides with the rest of them. It used to be held still, on
+// the grounds that a card is a caption and a caption that jumps about is not
+// one; but it only ever goes up because somebody sent for it, into a screen
+// where the meter, the water and the marks are all answering the music, and the
+// one thing standing rigid in the middle of that reads as a picture that has
+// stopped rather than as a card.
 func (m Model) wordsRiding(count int) []int {
-	if count <= 0 || m.words.telling {
+	if count <= 0 {
 		return nil
 	}
 

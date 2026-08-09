@@ -63,9 +63,13 @@ func TestALineGivesWayToTheMarks(t *testing.T) {
 	}
 }
 
-// The card holds still. Everything around it is moving — the meters, the water,
-// the colour — and a title that jumps about with the rest is not a card.
-func TestTheCardHoldsStill(t *testing.T) {
+// The card keeps time with everything else, and stays upright while it does.
+//
+// It goes up into a screen where the meter, the water and the marks are all
+// answering the music, so a name standing rigid in the middle of that reads as
+// a picture that has stopped. It does not lean, though: two lines of type set
+// large are a card, and a card at an angle is a sticker.
+func TestTheCardRidesButDoesNotLean(t *testing.T) {
 	m := sung(30, 45, 90, 200, 210, 225)
 	m.setProgress(150 * time.Second)
 	m.words.forced = time.Now()
@@ -77,9 +81,22 @@ func TestTheCardHoldsStill(t *testing.T) {
 	m.scope.bands = bands
 
 	m.words.telling, m.words.text = true, strings.Join(m.soloName(), "\n")
-	if ride := m.wordsRiding(3); ride != nil {
-		t.Errorf("the card rides the music by %v, want it still", ride)
+
+	ride := m.wordsRiding(3)
+	t.Logf("the card rides by %v", ride)
+	if ride == nil {
+		t.Error("the card stood still on a loud record")
 	}
+	var moved bool
+	for _, by := range ride {
+		if by != 0 {
+			moved = true
+		}
+	}
+	if !moved {
+		t.Errorf("the card rides by %v, want it keeping time", ride)
+	}
+
 	if tilt, _ := m.wordsTilting(3); tilt != nil {
 		t.Errorf("the card leans by %v, want it upright", tilt)
 	}
