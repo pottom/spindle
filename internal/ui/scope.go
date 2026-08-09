@@ -3,6 +3,7 @@ package ui
 import (
 	"math"
 	"strings"
+	"time"
 
 	"charm.land/lipgloss/v2"
 
@@ -99,6 +100,13 @@ type scopeState struct {
 	// what gives a meter its hi-fi character.
 	bands []float32
 	peaks []float32
+
+	// beat is where the beats of what is playing are, as the daemon last
+	// reported them, and beatAt when that report arrived — the two together are
+	// what any of this can be drawn against, because the report ages between
+	// frames and a beat that is not extrapolated is a beat a frame late.
+	beat   player.Beat
+	beatAt time.Time
 
 	// trail is what the last few frames drew, newest last. A cathode ray tube
 	// leaves a glow behind the beam; without it a terminal trace looks redrawn
@@ -560,4 +568,32 @@ func (m *Model) rememberScope() {
 	}
 	grid, _ := m.scopeGrid(w, rows, m.scopeTrigger(w*dotsPerCellX))
 	m.scope.remember(grid)
+}
+
+// beatLost is how long a beat report is trusted after it arrives.
+//
+// The daemon sends one with every frame, so a gap this long means the frames
+// have stopped or the record has none — either way, whatever was keeping time
+// stops keeping it rather than keeping it to a beat that is no longer there.
+const beatLost = 2 * time.Second
+
+// beatPhase is where the music is between one beat and the next: nought on the
+// beat, rising to one just before the following one.
+//
+// Extrapolated from the last report rather than taken from it, because the
+// report ages between frames and a beat drawn a frame late is a beat drawn
+// late. False when there is no beat to keep — the first seconds of every
+// record, a recording that has none, and any time the frames stop.
+func (m Model) beatPhase() (float32, bool) {
+	if !m.scope.beat.Found() || m.scope.beatAt.IsZero() {
+		return 0, false
+	}
+
+	since := time.Since(m.scope.beatAt)
+	if since > beatLost {
+		return 0, false
+	}
+
+	next := m.scope.beat.Next(since)
+	return float32(1 - float64(next)/float64(m.scope.beat.Period)), true
 }

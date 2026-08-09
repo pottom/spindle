@@ -948,3 +948,44 @@ func TestThePicturesDoNotGrow(t *testing.T) {
 		}
 	}
 }
+
+// The phase runs from nought on the beat to one just before the next, and it is
+// worked out from the clock rather than read off the last report — a report is
+// a frame old by the time anything draws to it.
+func TestTheBeatPhaseRunsWithTheClock(t *testing.T) {
+	m := scopeModel(100, 40)
+
+	if _, ok := m.beatPhase(); ok {
+		t.Error("a phase was reported before any beat was found")
+	}
+
+	// A beat every half second, the last one heard a moment ago.
+	m.scope.beat = player.Beat{Period: 500 * time.Millisecond, Since: 100 * time.Millisecond}
+	m.scope.beatAt = time.Now()
+
+	phase, ok := m.beatPhase()
+	if !ok {
+		t.Fatal("no phase from a beat that was just reported")
+	}
+	t.Logf("a fifth of the way through a beat: phase %.2f", phase)
+	if phase < 0.15 || phase > 0.25 {
+		t.Errorf("phase %.2f, want about a fifth", phase)
+	}
+
+	// Half a period later it is round the other side, and it wraps rather than
+	// running past one.
+	m.scope.beatAt = time.Now().Add(-300 * time.Millisecond)
+	if phase, _ := m.beatPhase(); phase < 0.75 || phase > 0.85 {
+		t.Errorf("phase %.2f four fifths of the way through, want about four fifths", phase)
+	}
+	m.scope.beatAt = time.Now().Add(-450 * time.Millisecond)
+	if phase, _ := m.beatPhase(); phase > 0.2 {
+		t.Errorf("phase %.2f just past a beat, want it back near nought", phase)
+	}
+
+	// And a report that has stopped arriving stops being kept to.
+	m.scope.beatAt = time.Now().Add(-beatLost - time.Second)
+	if _, ok := m.beatPhase(); ok {
+		t.Error("the phase was still reported from a beat nobody has confirmed for seconds")
+	}
+}

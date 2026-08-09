@@ -1,5 +1,7 @@
 package player
 
+import "time"
+
 // Waveform is implemented by backends that can say what the audio actually
 // looks like, not merely what is playing. Only a local device can: the Web API
 // describes the track, never the sound.
@@ -24,6 +26,39 @@ const WaveformWindow = 256
 // device can: it has to hear the sound to measure it.
 type Spectrum interface {
 	// Bands is the current spectrum, lowest frequency first, each 0..1, or nil
-	// when nothing has played yet.
-	Bands() []float32
+	// when nothing has played yet — and the beat it was measured on.
+	Bands() ([]float32, Beat)
+}
+
+// Beat is where the beats of what is playing are: how far apart they come, and
+// how long ago the last one was heard.
+//
+// The pair is what it takes to keep time rather than to react. A picture given
+// only the rate can move at exactly the right speed all night and never once be
+// on the beat; given both, anything that draws can work out where the next one
+// falls without asking again.
+//
+// Since may be negative, meaning the last beat found has not been heard yet:
+// the daemon reads the samples on their way to the audio device. A zero Period
+// means no beat was found, which is the honest answer for a recording that has
+// none, and the answer for the first seconds of every recording.
+type Beat struct {
+	Period time.Duration
+	Since  time.Duration
+}
+
+// Found reports that there is a beat to keep.
+func (b Beat) Found() bool { return b.Period > 0 }
+
+// Next is how long until the next beat, given how long ago this was measured.
+func (b Beat) Next(since time.Duration) time.Duration {
+	if !b.Found() {
+		return 0
+	}
+
+	gone := (b.Since + since) % b.Period
+	if gone < 0 {
+		gone += b.Period
+	}
+	return b.Period - gone
 }

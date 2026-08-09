@@ -122,6 +122,11 @@ type LyricsFetched struct {
 type WaveformReady struct {
 	Samples []float32
 	Bands   []float32
+
+	// Beat is where the beats of what is playing are, as of this frame. The
+	// zero value means none was found — the first seconds of every record, and
+	// the whole of one that has no beat to find.
+	Beat player.Beat
 }
 
 // QueueFetched carries the track playing and what is lined up after it.

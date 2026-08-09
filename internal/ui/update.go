@@ -305,6 +305,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.scope.frame = message.Samples
 			m.scope.follow(message.Samples)
 			m.scope.adoptBands(message.Bands)
+			if message.Beat.Found() {
+				m.scope.beat, m.scope.beatAt = message.Beat, time.Now()
+			}
 		}
 		if m.scopeMode().wave() {
 			m.rememberScope()
