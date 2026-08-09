@@ -104,6 +104,10 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case msg.CoverReady:
+		if message.Slot == tideSlot {
+			m.tideTook(message.Art)
+			return m, nil
+		}
 		if message.Slot == nowSlot {
 			if m.nowCover.matches(message.URL, message.Width, message.Height) {
 				m.nowCover.art = message.Art.Cells
@@ -118,6 +122,10 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case msg.CoverFailed:
+		if message.Slot == tideSlot {
+			// No colour to hand over: the record changes the way it always did.
+			return m, nil
+		}
 		if message.Slot == nowSlot {
 			if m.nowCover.matches(message.URL, message.Width, message.Height) {
 				m.nowCover.failed = true
@@ -317,6 +325,11 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				m.throwSparks(m.scopeWidth(m.layout()), scopeRows)
 			}
 		}
+		// The colour of the record coming next, arriving before the sound of it.
+		// See tide.go.
+		m.tideFlow()
+		tideAsk := m.tideCmd()
+
 		if m.stage.on && m.scopeMode().words() {
 			m.wordsFlow(m.width, m.height)
 			m.faceFlow()
@@ -332,7 +345,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				lift:  wordsLift,
 			})
 			if cmd := m.wordsGrind(); cmd != nil {
-				return m, tea.Batch(cmd, scopeFrameCmd(m.player, m.frameMode()))
+				return m, tea.Batch(cmd, tideAsk, scopeFrameCmd(m.player, m.frameMode()))
 			}
 		}
 		// The water is only stirred where it is being drawn, and the big screen
@@ -343,6 +356,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.stageFlow(m.scopeWidth(m.layout()), scopeRows)
 			}
+		}
+		if tideAsk != nil {
+			return m, tea.Batch(tideAsk, scopeFrameCmd(m.player, m.frameMode()))
 		}
 		return m, scopeFrameCmd(m.player, m.frameMode())
 

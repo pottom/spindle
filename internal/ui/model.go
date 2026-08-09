@@ -204,6 +204,10 @@ type Model struct {
 	// words is the line being sung, in dots. See words.go.
 	words wordsState
 
+	// tide is the colour of the record coming next, arriving before the sound
+	// of it. See tide.go.
+	tide tideState
+
 	// lyrics is the words of the track playing, and whether they are on screen.
 	lyrics lyricsState
 
