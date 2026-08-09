@@ -152,14 +152,49 @@ func wordsDeal(track string, turn int) uint64 {
 	return h
 }
 
-// wordsIdleArt is what is drawn while nothing at all is set.
+// wordsIdleArt is what is drawn while nothing at all is set: the meter and the
+// water, with nothing in the middle for them to make room for.
 //
-// The mirrored meter, and nothing else. It used to take turns with the stack of
-// lamps, which was a different program on screen every half minute; and a
-// wordless record hardly comes here any more anyway, because the marks have the
-// screen when no card is up. What is left is the gap between two lines of a
-// song, where the meter jumping to the middle and springing apart again as the
-// next line lands is the whole of the effect.
+// It used to be the mirrored spectrum, which is a different picture from every
+// other one this screen draws — a second idiom on a screen that is supposed to
+// have one, and the moments it filled were exactly the moments a record changes
+// over. It also hid the change: its columns run to white wherever the music is
+// loud, so the accent that the rest of the screen is coloured by, and that the
+// next record's colour arrives in, had nowhere to show.
+//
+// What is left is the picture underneath every other picture here. The middle
+// is empty because there is nothing to put in it, and when there is, it lands
+// in a screen that was already its own.
 func (m Model) wordsIdleArt(w, rows int) []string {
-	return m.stageArt(w, rows)
+	if w <= 0 || rows <= 0 || len(m.styles.Words) == 0 {
+		return nil
+	}
+
+	freqs := len(m.styles.Words)
+	grid := make([]uint8, w*rows)
+	paint := make([]int8, w*rows)
+	hue := make([]int8, w*rows)
+	for i := range paint {
+		paint[i] = -1
+	}
+	for r := range rows {
+		for c := range w {
+			hue[r*w+c] = int8(min(c*freqs/w, freqs-1))
+		}
+	}
+
+	// The room a line would have left, though there is no line: the middle band
+	// stays empty rather than being filled because nothing is using it. What
+	// lands there later lands in a screen that was already its own, instead of
+	// pushing a picture out of the way.
+	tall, head := m.wordsBandNow(w, rows)
+	if tall < wordsBand {
+		dotsY := rows * dotsPerCellY
+		band := int(wordsMark * float64(dotsY))
+		tall = max((dotsY-((dotsY-band)/2+band))/dotsPerCellY, wordsBand)
+		head = max((dotsY-band)/2-dotsPerCellY, 0)
+	}
+	m.wordsUnder(grid, paint, hue, w, rows, tall, head)
+
+	return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
 }

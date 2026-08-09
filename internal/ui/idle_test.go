@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -170,5 +171,59 @@ func TestNothingIsPutUpOnSpec(t *testing.T) {
 	m.setProgress(wordsSpell + time.Second)
 	if lines, _ := m.wordsIdle(); len(lines) == 0 {
 		t.Error("a record known to have no words was left with nothing")
+	}
+}
+
+// The screen has one picture, and the moment nothing is set is not an excuse
+// for another one.
+//
+// It used to be the mirrored spectrum there — a different picture from every
+// other one this screen draws, filling exactly the moments a record changes
+// over. And it hid the change it was covering: its columns run to white
+// wherever the music is loud, so the accent everything else is coloured by had
+// nowhere to show.
+func TestNothingSetIsStillTheSamePicture(t *testing.T) {
+	const w, rows = 100, 40
+
+	m := scopeModel(w, rows)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+
+	bands := make([]float32, 28)
+	for i := range bands {
+		bands[i] = 0.9
+	}
+	m.scope.bands = bands
+
+	idle := m.wordsIdleArt(w, rows)
+	if len(idle) != rows {
+		t.Fatalf("the idle picture is %d rows, want %d", len(idle), rows)
+	}
+
+	// The meter stands on the floor and hangs from the ceiling, which is what
+	// every picture here does.
+	if strings.TrimSpace(ansiOff(idle[0])) == "" {
+		t.Error("nothing hangs from the ceiling")
+	}
+	if strings.TrimSpace(ansiOff(idle[rows-1])) == "" {
+		t.Error("nothing stands on the floor")
+	}
+
+	// And the middle is empty, because there is nothing to put in it.
+	var middle int
+	for _, line := range idle[rows/2-2 : rows/2+2] {
+		middle += len(strings.TrimSpace(ansiOff(line)))
+	}
+	t.Logf("the middle four rows carry %d cells", middle)
+
+	// It is not the mirrored spectrum, which fills the middle and leaves the
+	// edges bare — the other way round from this.
+	mirrored := m.stageArt(w, rows)
+	var was int
+	for _, line := range mirrored[rows/2-2 : rows/2+2] {
+		was += len(strings.TrimSpace(ansiOff(line)))
+	}
+	if middle >= was {
+		t.Errorf("the middle carries %d cells against the mirrored picture's %d, want it left for what goes there", middle, was)
 	}
 }
