@@ -20,9 +20,9 @@ import (
 // thing it heard as though it were still true, which is the worst thing it
 // could do: what is on the screen is wrong and nothing says so.
 func TestASilentDaemonDoesNotHoldTheInterface(t *testing.T) {
-	was, wasSilent := dialTimeout, silentFor
-	dialTimeout, silentFor = 200*time.Millisecond, 200*time.Millisecond
-	defer func() { dialTimeout, silentFor = was, wasSilent }()
+	was := dialTimeout
+	dialTimeout = 200 * time.Millisecond
+	defer func() { dialTimeout = was }()
 
 	// A listener that accepts and then leaves the caller waiting: no handshake,
 	// no answer, no close.
@@ -58,11 +58,13 @@ func TestASilentDaemonDoesNotHoldTheInterface(t *testing.T) {
 	}
 }
 
-// And one that opens the stream and then goes quiet is noticed too.
-func TestAStreamThatGoesQuietIsGivenUp(t *testing.T) {
-	was := silentFor
-	silentFor = 200 * time.Millisecond
-	defer func() { silentFor = was }()
+// And one that opens the stream and then stops answering is noticed too —
+// while one that is merely quiet is left alone, because a track playing through
+// with nothing changing says nothing for minutes at a time.
+func TestAStreamThatStopsAnsweringIsGivenUp(t *testing.T) {
+	wasEvery, wasWithin := pingEvery, pingWithin
+	pingEvery, pingWithin = 100*time.Millisecond, 200*time.Millisecond
+	defer func() { pingEvery, pingWithin = wasEvery, wasWithin }()
 
 	// A real websocket handshake, and then silence.
 	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -88,5 +90,50 @@ func TestAStreamThatGoesQuietIsGivenUp(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("a stream that went quiet was waited on forever")
+	}
+}
+
+// A stream that is merely quiet is left alone.
+//
+// The daemon speaks when something happens, and a track playing through with
+// nothing changing says nothing for minutes at a time. Treating that as a
+// daemon lost puts the whole interface into its offline state — and visibly so,
+// because the spectrum is not even asked for while the daemon is thought to be
+// gone, so the picture freezes until the next look proves it was there all
+// along.
+func TestAQuietStreamIsLeftAlone(t *testing.T) {
+	wasEvery, wasWithin := pingEvery, pingWithin
+	pingEvery, pingWithin = 100*time.Millisecond, 200*time.Millisecond
+	defer func() { pingEvery, pingWithin = wasEvery, wasWithin }()
+
+	// A daemon holding the stream open and reading it — which is all it takes
+	// to answer a ping — with nothing to say.
+	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.CloseNow() //nolint:errcheck // the test is ending
+
+		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+		defer cancel()
+		for {
+			if _, _, err := conn.Read(ctx); err != nil {
+				return
+			}
+		}
+	}))
+	defer daemon.Close()
+
+	l := NewLocal(nil, daemon.URL, daemon.Client())
+
+	done := make(chan error, 1)
+	go func() { done <- l.listen(context.Background()) }()
+
+	select {
+	case err := <-done:
+		t.Fatalf("a stream with nothing to say was given up after less than a second: %v", err)
+	case <-time.After(time.Second):
+		t.Log("still connected after ten pings' worth of silence, which is the point")
 	}
 }
