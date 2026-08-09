@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gofrs/flock"
+
 	"github.com/pottom/spindle/internal/xdg"
 )
 
@@ -75,7 +77,50 @@ func Stop(ctx context.Context) error {
 		return ErrNoDaemon
 	}
 
-	return waitGone(ctx)
+	if err := waitGone(ctx); err != nil {
+		return err
+	}
+	return waitFree(ctx)
+}
+
+// waitFree blocks until the lock a daemon holds can be taken.
+//
+// The api is the first thing to go and the lock is the last: between them the
+// process is still letting go of the audio device and the session, and a daemon
+// started in that window is refused by the one on its way out. Which is exactly
+// what restart did — stop, start, and nothing running, with "a daemon is
+// already running" as the only clue.
+func waitFree(ctx context.Context) error {
+	dir, err := xdg.ConfigDir()
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(dir, "daemon.lock")
+
+	ctx, cancel := context.WithTimeout(ctx, stopTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(readyPoll)
+	defer ticker.Stop()
+
+	for {
+		lock := flock.New(path)
+		held, err := lock.TryLock()
+		if held {
+			// Straight back, so that whoever is starting next can have it.
+			_ = lock.Unlock()
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("wait for the daemon to let go: %w", err)
+		}
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("the daemon stopped answering but did not let go within %s", stopTimeout)
+		case <-ticker.C:
+		}
+	}
 }
 
 // waitGone blocks until nothing answers on the API any more.
