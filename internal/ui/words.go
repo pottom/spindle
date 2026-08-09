@@ -510,12 +510,8 @@ func (m Model) wordsComing() ([]string, int64) {
 		at, clock := m.wordsAt(), m.wordsClock()
 
 		// A bar nobody sings, and long enough to be worth something of its own:
-		// the marks keep it, and once in a record the name of what is playing
-		// takes it off them for a moment. See solo.go.
+		// the marks keep it. See solo.go.
 		if gap, in := m.soloNow(); in {
-			if card, ok := m.soloCard(); ok && m.soloTelling() && !m.soloSaid(card.from) {
-				return m.soloName(), card.from
-			}
 			return []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)}, gap.from
 		}
 
@@ -659,12 +655,6 @@ type wordsState struct {
 	// wordsEase.
 	band, head float32
 
-	// told is the record whose name has been said, and toldAt the moment the
-	// card that said it was stamped. A record says what it is once. See
-	// soloSaid.
-	told   string
-	toldAt int64
-
 	// leanAt is the bar the picture on screen arrived under, which is what its
 	// lean is dealt from — rather than the bar playing now. The marks stay up
 	// across a change of bar, and a row that snaps to a new set of angles
@@ -751,9 +741,15 @@ const (
 
 	// wordsWordRide is how far a word rides its own part of the sound, and
 	// wordsLineRide how far a whole line nods with the loudest of it. Both well
-	// under what a note is given: these have to be read while they move.
-	wordsWordRide = 3
-	wordsLineRide = 4
+	// under what a note is given: these have to be read while they move, and a
+	// row of seven marks can throw itself about in a way a line of a dozen
+	// words cannot without coming apart.
+	//
+	// A word rides less far than a whole line nods, because the words move
+	// against each other and the line moves as one: the same travel reads as
+	// twice as much when the word beside it went the other way.
+	wordsWordRide = 6
+	wordsLineRide = 8
 
 	// wordsBounce is how far a mark rides its own part of the sound, in dots.
 	//
@@ -1404,12 +1400,6 @@ func (m *Model) wordsGrind() tea.Cmd {
 	name := m.soloName()
 	m.words.telling = len(name) > 0 && slices.Equal(lines, name)
 
-	// And a record says its name once. Not the card asked for by hand, which is
-	// somebody wanting to see it and not the record's own moment. See soloSaid.
-	if m.words.telling && !m.soloForcing() && m.ps != nil {
-		m.words.told, m.words.toldAt = m.ps.TrackID, starts
-	}
-
 	text := strings.Join(lines, "\n")
 	if m.words.text == text && m.words.cellsX == m.width && m.words.cellsY == m.height {
 		// The same words over again, a turn or a line later: nothing to draw
@@ -1464,8 +1454,13 @@ func (m *Model) wordsFlow(w, rows int) {
 type wordsRide int
 
 const (
-	wordsStill wordsRide = iota
-	wordsRideLine
+	// A line keeps time one way or the other. It used to be able to keep it not
+	// at all, and one line in three was dealt that — a caption sitting perfectly
+	// still in the middle of a screen where the meter, the water and the marks
+	// are all answering the music. Beside a line that moves, the one that does
+	// not reads as a picture that has stopped rather than as a line with a
+	// different character.
+	wordsRideLine wordsRide = iota
 	wordsRideWords
 	wordsRides
 )

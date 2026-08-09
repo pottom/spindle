@@ -63,11 +63,13 @@ func TestWordsShowTheLineOrTheRecord(t *testing.T) {
 	m.width, m.height = 100, 40
 	m.ps.TrackID = "now"
 
-	// Not at the very top of it, where the record has only just changed: the
-	// turn after that is where a wordless record says its name. See idle.go.
+	// Not at the very top of it, where the record has only just changed. After
+	// that a wordless record takes turns: a card of its own for a few seconds,
+	// and the marks the rest of the time. Either way there is something. See
+	// idle.go.
 	m.setProgress(wordsSpell)
-	if got := m.wordsNow(); len(got) == 0 || !strings.Contains(got[0], "playing") {
-		t.Errorf("with no lyrics the picture shows %q, want the record", got)
+	if got := m.wordsNow(); len(got) == 0 || got[0] == "" {
+		t.Errorf("with no lyrics the picture shows %q, want something", got)
 	}
 
 	m.lyrics.synced, m.lyrics.forTrack = true, "now"
@@ -387,13 +389,20 @@ func TestWordsGiveTheScreenBackBetweenLines(t *testing.T) {
 	// A song with no lyrics at all takes its turns instead: a card for a few
 	// seconds, and the marks the rest of the time. See idle.go.
 	m.lyrics.synced = false
-	m.setProgress(wordsSpell)
-	if lines, _ := m.wordsComing(); len(lines) != 2 {
-		t.Errorf("the turn that names a wordless record has %q", lines)
-	}
-	m.setProgress(wordsSpell + wordsTitle + time.Second)
-	if lines, _ := m.wordsComing(); len(lines) != 1 || !wordsBeats(lines[0]) {
-		t.Errorf("after the card a wordless record has %q, want the marks", lines)
+	m.ps.Artists, m.ps.Album = []string{"The Band"}, "An Album"
+	for spell := 1; spell < 12; spell++ {
+		if m.wordsCardFor(spell) == wordsCardNone {
+			continue
+		}
+		m.setProgress(time.Duration(spell) * wordsSpell)
+		if lines, _ := m.wordsComing(); len(lines) == 0 || wordsBeats(lines[0]) {
+			t.Errorf("the turn dealt a card has %q", lines)
+		}
+		m.setProgress(time.Duration(spell)*wordsSpell + wordsTitle + time.Second)
+		if lines, _ := m.wordsComing(); len(lines) != 1 || !wordsBeats(lines[0]) {
+			t.Errorf("after the card a wordless record has %q, want the marks", lines)
+		}
+		break
 	}
 }
 
@@ -796,8 +805,10 @@ func TestTheNotesRideTheBeat(t *testing.T) {
 		t.Error("the notes did not move when the music did")
 	}
 
-	// A line of words keeps time too, but only when its own line drew it, and
-	// never as far: some stand perfectly still.
+	// A line of words keeps time too, and never as far: some nod as one and
+	// some ride word by word, but none of them stands still — a caption sitting
+	// perfectly still in the middle of a screen where everything else answers
+	// the music reads as a picture that has stopped.
 	m.words.beats = false
 	kinds := map[wordsRide]int{}
 	for _, line := range []string{
@@ -807,28 +818,24 @@ func TestTheNotesRideTheBeat(t *testing.T) {
 	} {
 		kinds[wordsRideFor(line)]++
 	}
-	t.Logf("of twelve lines: %d stand still, %d nod together, %d ride word by word",
-		kinds[wordsStill], kinds[wordsRideLine], kinds[wordsRideWords])
+	t.Logf("of twelve lines: %d nod together, %d ride word by word",
+		kinds[wordsRideLine], kinds[wordsRideWords])
 
-	for kind := wordsStill; kind < wordsRides; kind++ {
+	for kind := wordsRideLine; kind < wordsRides; kind++ {
 		if kinds[kind] == 0 {
 			t.Errorf("no line of twelve got ride %d", kind)
 		}
 	}
 
-	// And a still one really is still.
+	// And every one of them moves when the music does.
 	for _, line := range []string{"better off alone", "do you think", "never gonna give you up"} {
-		if wordsRideFor(line) != wordsStill {
-			continue
-		}
 		m.words.text = line
 		m.scope.bands = quiet
 		a := rowsOf()
 		m.scope.bands = loud
-		if b := rowsOf(); !same(a, b) {
-			t.Errorf("%q was drawn still and moved anyway", line)
+		if b := rowsOf(); same(a, b) {
+			t.Errorf("%q did not move when the music did", line)
 		}
-		break
 	}
 }
 

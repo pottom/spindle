@@ -28,15 +28,15 @@ type wordsCard int
 
 const (
 	wordsCardNone   wordsCard = iota // the music, and nothing over it
-	wordsCardTitle                   // the record saying its own name
-	wordsCardArtist                  // and whose it is
+	wordsCardArtist                  // whose the record is
 	wordsCardAlbum                   // and what it came out on
 )
 
-// wordsCardPool is what a turn can be dealt after the record has said its name.
+// wordsCardPool is what a turn can be dealt.
 //
-// The title is not in it: a record says what it is once. See soloCard for the
-// same rule where there are words to get out of the way of.
+// The record's own name is not in it. It goes up when it is sent for and at no
+// other time — a name that appears on its own schedule appears twice as often
+// as anybody wants it to, and over things you were reading. See soloTelling.
 //
 // Neither are the marks. They have the rest of every turn anyway, so dealing
 // them as the thing that opens one put the same picture up twice in a row —
@@ -84,13 +84,6 @@ func (m Model) wordsIdle() ([]string, int64) {
 	var lines []string
 	switch m.wordsCardFor(spell) {
 	case wordsCardNone:
-	case wordsCardTitle:
-		// Unless it has been said already: a record whose sheet arrived late
-		// was taken for wordless long enough to say its name, and then the
-		// sheet turned up with a solo in it to say it again. See soloSaid.
-		if !m.soloSaid(starts) {
-			lines = m.soloName()
-		}
 	case wordsCardArtist:
 		lines = m.wordsCard(strings.Join(m.ps.Artists, ", "))
 	case wordsCardAlbum:
@@ -124,20 +117,16 @@ func (m Model) wordsIdleMarks(spell int) ([]string, int64) {
 // wordsCardFor is the card a turn gets.
 //
 // The first turn gets nothing: the top of a record is where it changed, and a
-// caption there is a caption on something nobody has started listening to. The
-// second is the record saying its own name, once and never again. After that
-// they are dealt from what is left, each stepping on from the last by at least
-// one, so the same card never comes up twice running.
+// caption there is a caption on something nobody has started listening to.
+// After that they are dealt from the pool, each stepping on from the last by at
+// least one, so the same card never comes up twice running.
 func (m Model) wordsCardFor(spell int) wordsCard {
-	switch spell {
-	case 0:
+	if spell <= 0 {
 		return wordsCardNone
-	case 1:
-		return wordsCardTitle
 	}
 
 	var at int
-	for turn := 2; turn <= spell; turn++ {
+	for turn := 1; turn <= spell; turn++ {
 		h := wordsDeal(m.ps.TrackID, turn)
 		at = (at + 1 + int(h%uint64(len(wordsCardPool)-1))) % len(wordsCardPool)
 	}

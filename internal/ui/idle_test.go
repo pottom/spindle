@@ -28,24 +28,17 @@ func wordless(t *testing.T) Model {
 func TestAWordlessRecordTakesTurns(t *testing.T) {
 	m := wordless(t)
 
-	// The top of a record is where it changed, so nothing is put over it; the
-	// turn after that is the one time it says its own name.
+	// The top of a record is where it changed, so nothing is put over it.
 	if got := m.wordsCardFor(0); got != wordsCardNone {
 		t.Errorf("the record opens on card %d, want the music alone", got)
 	}
-	if got := m.wordsCardFor(1); got != wordsCardTitle {
-		t.Errorf("the second turn deals %d, want the record's own name", got)
-	}
 
 	seen := map[wordsCard]int{}
-	was := wordsCardTitle
-	for spell := 2; spell < 14; spell++ {
+	was := m.wordsCardFor(0)
+	for spell := 1; spell < 14; spell++ {
 		card := m.wordsCardFor(spell)
 		if card == was {
 			t.Errorf("turn %d deals %d again, want a card it did not just show", spell, card)
-		}
-		if card == wordsCardTitle {
-			t.Errorf("turn %d says the record's name again, want it said once", spell)
 		}
 		seen[card]++
 		was = card
@@ -80,14 +73,27 @@ func TestAWordlessRecordKeepsTheMarksUp(t *testing.T) {
 		}
 	}
 
-	// And the card takes their place for its few seconds, then hands it back.
-	m.setProgress(wordsSpell + time.Second)
-	lines, card := m.wordsIdle()
-	if len(lines) != 2 || lines[0] != m.ps.Title {
-		t.Fatalf("the turn that says the record's name has %q", lines)
+	// And a card takes their place for its few seconds, then hands it back.
+	// Whichever turn is dealt one — the record's own name is not among them any
+	// more, so what comes up is whose it is or what it came out on.
+	spell := 0
+	for at := 1; at < 12; at++ {
+		if m.wordsCardFor(at) != wordsCardNone {
+			spell = at
+			break
+		}
+	}
+	if spell == 0 {
+		t.Fatal("no turn in twelve was dealt a card")
 	}
 
-	m.setProgress(wordsSpell + wordsTitle + time.Second)
+	m.setProgress(time.Duration(spell)*wordsSpell + time.Second)
+	lines, card := m.wordsIdle()
+	if len(lines) == 0 || wordsBeats(lines[0]) {
+		t.Fatalf("the turn dealt a card has %q", lines)
+	}
+
+	m.setProgress(time.Duration(spell)*wordsSpell + wordsTitle + time.Second)
 	back, marks := m.wordsIdle()
 	if len(back) != 1 || !wordsBeats(back[0]) {
 		t.Errorf("after the card the screen has %q, want the marks back", back)

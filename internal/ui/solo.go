@@ -36,12 +36,6 @@ const (
 	// than a change, and there is no room for a title card between them.
 	soloLeast = 12 * time.Second
 
-	// soloOpen is how far into a record the title may first appear, and soloTail
-	// how close to the end. The top of a track is where it was not wanted, and
-	// the end of one is where the next record is already coming up underneath.
-	soloOpen = 20 * time.Second
-	soloTail = 10 * time.Second
-
 	// soloTells is how long the record's name stands there.
 	soloTells = 4500 * time.Millisecond
 )
@@ -99,81 +93,23 @@ func (m Model) soloNow() (soloGap, bool) {
 	return soloGap{}, false
 }
 
-// soloCard is when the record says its own name: the middle of the longest bar
-// it has room for one in.
-//
-// The longest rather than the first, because the first might be twelve seconds
-// and the second forty. The longest is the one that reads as deliberate — it is
-// the solo, and it is where a film would put the title.
-func (m Model) soloCard() (soloGap, bool) {
-	var best soloGap
-	var found bool
-
-	for _, gap := range m.soloGaps() {
-		if gap.long() < soloLeast.Milliseconds() {
-			continue
-		}
-		if gap.from < soloOpen.Milliseconds() {
-			continue
-		}
-		if m.ps != nil && m.ps.Duration > 0 && gap.to > (m.ps.Duration-soloTail).Milliseconds() {
-			continue
-		}
-		if !found || gap.long() > best.long() {
-			best, found = gap, true
-		}
-	}
-	if !found {
-		return soloGap{}, false
-	}
-
-	middle, half := (best.from+best.to)/2, soloTells.Milliseconds()/2
-	return soloGap{middle - half, middle + half}, true
-}
-
-// soloForcing reports that the card was asked for by hand.
-//
-// A record's own moment comes once and may not come at all, which is the point
-// of it — but it does mean there is no way to look at the thing on purpose. The
-// key puts the same card up, drawn the same way, wherever the record is.
+// soloForcing reports that the card was asked for by hand, which is the only
+// way it is ever put up.
 func (m Model) soloForcing() bool {
 	return !m.words.forced.IsZero() && time.Since(m.words.forced) < soloTells
 }
 
-// soloTelling reports that the moment is now.
-func (m Model) soloTelling() bool {
-	if m.soloForcing() {
-		return true
-	}
-	if _, in := m.soloNow(); !in {
-		return false
-	}
-	card, ok := m.soloCard()
-	if !ok {
-		return false
-	}
-	clock := m.wordsClock()
-	return clock >= card.from && clock < card.to
-}
-
-// soloSaid reports that this record has already said its name, at some moment
-// other than the one being asked about.
+// soloTelling reports that the record's name is what is on screen.
 //
-// Once a record, and once means once. There are two ways for the name to come
-// up — the card in the middle of a solo, and the turn a record with no words of
-// its own gives it near the top — and a record can qualify for both: the lyric
-// sheet has not answered yet, so the screen takes it for wordless and puts the
-// name up, and then the sheet arrives with a solo in the middle of it and the
-// name goes up again. Twice in one record is once too many.
+// Only ever because somebody asked for it. It used to go up by itself as well,
+// once a record, in the middle of the longest solo — and by itself is exactly
+// where it went wrong: a record can be taken for wordless while its sheet is on
+// its way, say its name for that, and then say it again when the sheet turns up
+// with a solo in the middle of it. A name that appears on its own schedule is
+// also a name that appears over something you were reading.
 //
-// Asked with the moment the card would be stamped, so that the card already on
-// screen is not taken down by the rule that put it there.
-func (m Model) soloSaid(starts int64) bool {
-	if m.ps == nil || m.words.told != m.ps.TrackID {
-		return false
-	}
-	return m.words.toldAt != starts
-}
+// So it does not appear at all unless it is sent for. See stageKey.
+func (m Model) soloTelling() bool { return m.soloForcing() }
 
 // soloName is what the record is called, as it is set: its own name and whose
 // it is, one under the other, each broken where it is too long for the room.

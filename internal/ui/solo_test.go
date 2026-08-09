@@ -63,107 +63,12 @@ func TestALineGivesWayToTheMarks(t *testing.T) {
 	}
 }
 
-// The record says its own name once, in the middle of the longest bar it has
-// room for one in — not the first bar it finds, and not at the top of the track.
-func TestTheRecordSaysItsNameInTheLongestSolo(t *testing.T) {
-	// A verse, a forty second break, a verse, and then a hundred second one:
-	// the long one is the second, and it is the one the name belongs in.
-	m := sung(30, 45, 90, 200, 210, 225)
-
-	card, ok := m.soloCard()
-	if !ok {
-		t.Fatal("a record with a ninety second solo was given no moment to say its name")
-	}
-
-	// The long bar runs from 90s + the hold to 200s: its middle is about 148s.
-	middle := (card.from + card.to) / 2
-	if middle < 143_000 || middle > 153_000 {
-		t.Errorf("the name goes up at %dms, want the middle of the long bar", middle)
-	}
-	if card.to-card.from != soloTells.Milliseconds() {
-		t.Errorf("the name stands for %dms, want %s", card.to-card.from, soloTells)
-	}
-	t.Logf("the name goes up from %dms to %dms", card.from, card.to)
-
-	// And that is what is on screen there: the record and whose it is, both.
-	m.setProgress(time.Duration(middle) * time.Millisecond)
-	lines, starts := m.wordsComing()
-	if len(lines) != 2 || lines[0] != m.ps.Title || lines[1] != "The Band" {
-		t.Errorf("the screen has %q at the moment, want the record and the artist", lines)
-	}
-	if starts != card.from {
-		t.Errorf("the card is stamped %d, want the moment it went up, %d", starts, card.from)
-	}
-	if !m.soloTelling() {
-		t.Error("the model does not know it is telling")
-	}
-
-	// A moment either side of it, the marks have the bar back.
-	for _, at := range []int64{card.from - 2000, card.to + 2000} {
-		m.setProgress(time.Duration(at) * time.Millisecond)
-		if lines, _ := m.wordsComing(); len(lines) != 1 || !wordsBeats(lines[0]) {
-			t.Errorf("%dms in, the screen has %q, want the marks around the card", at, lines)
-		}
-		if m.soloTelling() {
-			t.Errorf("%dms in, the model still thinks it is telling", at)
-		}
-	}
-}
-
-// No solo, no title. A record that never stops singing for long enough has
-// nowhere to put one, and that is the whole reason it is worth seeing on a
-// record that does.
-func TestARecordWithNoSoloSaysNothing(t *testing.T) {
-	// Lines all the way through, none of them further apart than the hold.
-	var at []int
-	for s := 5; s < 280; s += 8 {
-		at = append(at, s)
-	}
-	m := sung(at...)
-
-	if card, ok := m.soloCard(); ok {
-		t.Errorf("a record that sings all the way through was given a card at %dms", card.from)
-	}
-	for s := range 280 {
-		m.setProgress(time.Duration(s) * time.Second)
-		if m.soloTelling() {
-			t.Fatalf("the name went up %ds in", s)
-		}
-	}
-}
-
-// Not at the top of the track, and not over the end of it: one is a caption on
-// something nobody has started listening to, and the other is where the next
-// record is already coming up underneath.
-func TestTheNameKeepsOffBothEnds(t *testing.T) {
-	// A long intro and a long outro, and nothing else worth having.
-	m := sung(60, 200)
-	m.ps.Duration = 205 * time.Second
-
-	if card, ok := m.soloCard(); ok {
-		t.Errorf("the name went up at %dms, want neither end of the record", card.from)
-	}
-
-	// The same record with the last line further from the end has its bar.
-	m.ps.Duration = 5 * time.Minute
-	card, ok := m.soloCard()
-	if !ok {
-		t.Fatal("with room after the last line there is still no card")
-	}
-	if card.from < soloOpen.Milliseconds() {
-		t.Errorf("the name goes up at %dms, want it after %s", card.from, soloOpen)
-	}
-}
-
 // The card holds still. Everything around it is moving — the meters, the water,
 // the colour — and a title that jumps about with the rest is not a card.
 func TestTheCardHoldsStill(t *testing.T) {
 	m := sung(30, 45, 90, 200, 210, 225)
-	card, ok := m.soloCard()
-	if !ok {
-		t.Fatal("no card")
-	}
-	m.setProgress(time.Duration((card.from+card.to)/2) * time.Millisecond)
+	m.setProgress(150 * time.Second)
+	m.words.forced = time.Now()
 
 	bands := make([]float32, 28)
 	for i := range bands {
@@ -229,27 +134,24 @@ func TestTheCardComesInTheSameWayTwice(t *testing.T) {
 		return time.Since(tm.(Model).words.since)
 	}
 
-	// The record's own moment: the picture is asked for as the card's time
-	// arrives, which is exactly where a line would have been wound back.
+	// Asked for in the middle of a solo, where the marks are up and a line's
+	// picture would have been wound back to land on the beat.
 	m := sung(30, 45, 200, 210, 225)
-	card, ok := m.soloCard()
-	if !ok {
-		t.Fatal("this record has no solo to say its name in")
-	}
-	m.setProgress(time.Duration(card.from) * time.Millisecond)
-	m.words.starts = card.from
+	m.setProgress(150 * time.Second)
+	m.words.forced = time.Now()
+	m.words.starts = 150_000
 	itself := gathering(m, true)
 
-	// And on the key, wherever the record happens to be.
+	// And asked for over a line, wherever the record happens to be.
 	m = sung(30, 45, 200, 210, 225)
 	m.setProgress(5 * time.Second)
 	m.words.forced = time.Now()
 	m.words.starts = m.words.forced.UnixMilli()
 	asked := gathering(m, true)
 
-	t.Logf("by itself the gathering was %s in, on the key %s in", itself, asked)
+	t.Logf("in a solo the gathering was %s in, over a line %s in", itself, asked)
 	if itself > wordsGather/4 {
-		t.Errorf("the card put up by itself was already %s into its arrival, want it starting", itself)
+		t.Errorf("the card was already %s into its arrival, want it starting", itself)
 	}
 	if asked > wordsGather/4 {
 		t.Errorf("the card on the key was already %s into its arrival, want it starting", asked)
@@ -411,14 +313,14 @@ func TestACutNameIsMarked(t *testing.T) {
 	}
 }
 
-// A record says its name once, whichever road it comes down.
+// The record never says its name on its own — only when it is sent for.
 //
-// There are two: the card in the middle of a solo, and the turn a record with
-// no words of its own gives it near the top. A record can qualify for both —
-// the lyric sheet has not answered yet, so the screen takes it for wordless and
-// puts the name up; then the sheet arrives with a solo in the middle of it and
-// the name goes up again. Twice in one record is once too many.
-func TestARecordSaysItsNameOnce(t *testing.T) {
+// It used to go up by itself, once a record, in the middle of the longest solo.
+// By itself is exactly where it went wrong: a record can be taken for wordless
+// while its sheet is on its way, say its name for that, and then say it again
+// when the sheet turns up with a solo in the middle of it. And a name that
+// appears on its own schedule appears over something you were reading.
+func TestTheRecordNeverSaysItsNameUnasked(t *testing.T) {
 	m := scopeModel(100, 44)
 	m.stage.on = true
 	m.scope.modes[tabPlayer] = scopeWords
@@ -427,10 +329,11 @@ func TestARecordSaysItsNameOnce(t *testing.T) {
 	m.ps.Duration = 5 * time.Minute
 
 	name := strings.Join(m.soloName(), "\n")
-	said, was := 0, false
+	said := 0
 
 	for at := time.Second; at < 5*time.Minute; at += time.Second {
-		// The sheet turns up a minute in, with a long solo after its first line.
+		// The sheet turns up a minute in, with a long solo after its first line
+		// — which is where the card used to go.
 		if at == time.Minute {
 			m.lyrics.lines = []player.Lyric{
 				{At: 65_000, Words: "the only line"},
@@ -447,21 +350,24 @@ func TestARecordSaysItsNameOnce(t *testing.T) {
 			}
 		}
 
-		if m.words.text == name && !was {
+		if lines, _ := m.wordsComing(); strings.Join(lines, "\n") == name {
 			said++
-			t.Logf("%5s the record said its name", at)
+			t.Logf("%5s the record said its name unasked", at)
 		}
-		was = m.words.text == name
 	}
 
-	if said != 1 {
-		t.Errorf("the record said its name %d times, want the once", said)
+	if said != 0 {
+		t.Errorf("the record said its name %d times without being asked", said)
 	}
 
-	// And the key still works afterwards, because that is somebody asking.
+	// And the key still puts it up, wherever the record is.
+	m.setProgress(2 * time.Minute)
 	m.words.forced = time.Now()
 	if !m.soloTelling() {
-		t.Error("the name could not be asked for after the record had said it")
+		t.Error("the name could not be asked for at all")
+	}
+	if lines, _ := m.wordsComing(); strings.Join(lines, "\n") != name {
+		t.Errorf("the key put up %q, want the record's name", lines)
 	}
 }
 
@@ -471,12 +377,6 @@ func TestARecordSaysItsNameOnce(t *testing.T) {
 // opens one showed the same picture twice: marks arriving, and the very same
 // marks arriving again a moment later by another road.
 func TestTheMarksAreNotDealtOnTopOfThemselves(t *testing.T) {
-	for _, card := range wordsCardPool {
-		if card == wordsCardTitle {
-			t.Error("the title is in the pool, so a record could say its name twice")
-		}
-	}
-
 	m := scopeModel(100, 44)
 	m.ps.TrackID, m.ps.Title = "wordless", "An Instrumental"
 	m.ps.Artists, m.ps.Album = []string{"The Band"}, "An Album"
@@ -489,9 +389,6 @@ func TestTheMarksAreNotDealtOnTopOfThemselves(t *testing.T) {
 			m.setProgress(time.Duration(spell)*wordsSpell + time.Second)
 			return m.wordsIdle()
 		}()
-		if spell == 1 {
-			continue // the record's own name
-		}
 		if len(lines) == 1 && wordsBeats(lines[0]) {
 			// The marks, which is what a turn dealt nothing looks like — and it
 			// must be the same picture all the way through the turn.
