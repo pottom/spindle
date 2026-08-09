@@ -664,6 +664,13 @@ type wordsState struct {
 	// soloSaid.
 	told   string
 	toldAt int64
+
+	// leanAt is the bar the picture on screen arrived under, which is what its
+	// lean is dealt from — rather than the bar playing now. The marks stay up
+	// across a change of bar, and a row that snaps to a new set of angles
+	// without going anywhere is a row that has been dealt again in place. See
+	// wordsLeanSeed.
+	leanAt int64
 }
 
 // wordPaint is a word's colour: which hue of the palette, and at what strength.
@@ -1409,8 +1416,18 @@ func (m *Model) wordsGrind() tea.Cmd {
 		// that is not already held, but it does have to arrive rather than
 		// simply be there — a chorus that repeats a line, and a wordless record
 		// dealt the same card twice, both come through here.
-		if starts != was {
-			m.words.since = time.Now()
+		//
+		// Except the marks. They are not a line that has come round again, they
+		// are what the screen rests on between the lines, and they are stamped
+		// afresh every time the bar under them moves — at the top of every gap,
+		// every half minute of a record with no words, and at every change of
+		// record. Made to arrive again each time, the same three notes flew
+		// apart and gathered back for no reason anybody watching could see. The
+		// worst of them was the change from one record to the next: nine
+		// hundred cells in a single frame, against ninety either side of it,
+		// for a picture that did not change at all.
+		if starts != was && !m.words.beats {
+			m.words.since, m.words.leanAt = time.Now(), starts
 		}
 		return nil
 	}
@@ -1423,6 +1440,7 @@ func (m *Model) wordsGrind() tea.Cmd {
 	}
 
 	m.words.asked, m.words.askedX, m.words.askedY = text, m.width, m.height
+	m.words.leanAt = starts
 	return wordsCmd(lines, m.width, m.height)
 }
 
@@ -1666,7 +1684,7 @@ func (m Model) wordsLeanSeed() uint64 {
 		h = (h ^ uint64(r)) * 0x100000001b3
 	}
 	if m.words.beats {
-		h ^= uint64(m.words.starts) * 0x9e3779b97f4a7c15
+		h ^= uint64(m.words.leanAt) * 0x9e3779b97f4a7c15
 	}
 
 	h ^= h >> 33

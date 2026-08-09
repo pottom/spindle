@@ -927,8 +927,10 @@ func TestSomeLinesLean(t *testing.T) {
 }
 
 // The notes are always the same three marks, so asked of their text they would
-// lean in every solo of every record or in none of them. Theirs comes from when
-// the bar is, the way their moves do.
+// lean in every solo of every record or in none of them. Theirs comes from the
+// bar they arrived under — not the bar playing now, because they stay up across
+// a change of bar and a row that snaps to new angles without going anywhere is
+// a row dealt again in place.
 func TestTheNotesLeanBySolo(t *testing.T) {
 	const w, rows = 74, 20
 	_, layout, ok := wordsImage([]string{wordsNotes}, w*dotsPerCellX, rows*dotsPerCellY)
@@ -941,7 +943,7 @@ func TestTheNotesLeanBySolo(t *testing.T) {
 
 	var leaning int
 	for at := range int64(30) {
-		m.words.starts = at * 7_000
+		m.words.starts, m.words.leanAt = at*7_000, at*7_000
 		if tilt, _ := m.wordsTilting(layout.Count); tilt != nil {
 			leaning++
 		}
@@ -957,7 +959,7 @@ func TestTheNotesLeanBySolo(t *testing.T) {
 	// itself, which is what a note with a long straight stem needs to lean at
 	// all. Anything else moves the stem without ever tipping it.
 	for at := range int64(30) {
-		m.words.starts = at * 7_000
+		m.words.starts, m.words.leanAt = at*7_000, at*7_000
 		tilt, middle := m.wordsTilting(layout.Count)
 		if tilt == nil {
 			continue
