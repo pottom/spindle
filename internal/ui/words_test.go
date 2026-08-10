@@ -388,15 +388,25 @@ func TestWordsGiveTheScreenBackBetweenLines(t *testing.T) {
 		t.Errorf("through the solo the screen has %q, want the marks", lines)
 	}
 
-	// A gap too short to be worth anything goes to the music instead.
+	// A gap too short to be worth a change of picture keeps the line before it.
+	//
+	// It used to go blank instead, and that was the rule this screen was given
+	// at the start: between two lines the music has the middle. Watched, it is
+	// not what a gap looks like — a sheet that writes its rests down blanked the
+	// screen for a second between two lines, and a sheet that leaves them out
+	// held the line up through a gap ten times as long, on the same record. The
+	// rest is the same bar written down, so it reads the same way now.
 	m.lyrics.lines = []player.Lyric{
 		{At: 20_000, Words: "one"},
 		{At: 30_000, Words: ""},
 		{At: 31_000, Words: "two"},
 	}
 	m.setProgress(30 * time.Second)
-	if !m.wordsSilent() {
-		t.Error("a one second gap was given something to look at")
+	lines, starts := m.wordsComing()
+	if len(lines) == 0 {
+		t.Error("a one second rest blanked the screen between two lines")
+	} else if lines[0] != "one" || starts != 20_000 {
+		t.Errorf("over the rest the screen has %q from %dms, want the line before it", lines, starts)
 	}
 
 	// A song with no lyrics at all is one long solo: the marks throughout, and
@@ -425,10 +435,12 @@ func TestWordsLandOnTheLine(t *testing.T) {
 		{At: 20_000, Words: "and the next"},
 	}
 
-	// Well before the line: nothing to set yet.
+	// Well before the line: the intro, which the marks keep. What matters here
+	// is that the line itself is not asked for yet — a picture built five
+	// seconds early is five seconds of a line standing still before it is sung.
 	m.setProgress(5 * time.Second)
-	if lines, _ := m.wordsComing(); len(lines) != 0 {
-		t.Errorf("the line was asked for %v early, want it left until its gathering starts", 5*time.Second)
+	if lines, _ := m.wordsComing(); len(lines) != 1 || !wordsBeats(lines[0]) {
+		t.Errorf("%v before the line the screen has %q, want the marks", 5*time.Second, lines)
 	}
 
 	// Inside the gathering's length of it: asked for, with its own timestamp so

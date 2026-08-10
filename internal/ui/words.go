@@ -523,6 +523,26 @@ func (m Model) wordsComing() ([]string, int64) {
 		}
 
 		if at >= 0 && at < len(m.lyrics.lines) {
+			// A rest the sheet writes down: an entry with no words in it, where
+			// the singer stops. It used to set nothing and be worth nothing —
+			// the screen went blank on it, for however long the sheet said
+			// nobody was singing.
+			//
+			// It is not a licence to draw nothing. A gap the sheet simply leaves
+			// blank keeps the line before it up until the next one is due, and a
+			// gap long enough to be worth a change of picture is already the
+			// marks' — see soloNow, which is asked before this. A rest is the
+			// same bar written down, so it reads the same way: step back to the
+			// last line anybody sang and carry on.
+			if strings.TrimSpace(m.lyrics.lines[at].Words) == "" {
+				for back := at - 1; back >= 0; back-- {
+					if strings.TrimSpace(m.lyrics.lines[back].Words) != "" {
+						at = back
+						break
+					}
+				}
+			}
+
 			if line := strings.TrimSpace(m.lyrics.lines[at].Words); line != "" {
 				// A bar the sheet marks rather than writes: three notes rather
 				// than the one it wrote, so the picture has the width of a line
@@ -534,16 +554,34 @@ func (m Model) wordsComing() ([]string, int64) {
 				return wordsWrap(line, m.width*dotsPerCellX, m.height*dotsPerCellY),
 					m.lyrics.lines[at].At
 			}
+
+			// A rest with nothing sung before it at all — some sheets open with
+			// one. There is no line to step back to, so it is the intro by
+			// another name and the marks keep it.
+			return []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)}, m.lyrics.lines[at].At
 		}
 
-		// A song with words that is not singing any: nothing to set, and the
-		// music has the screen until the singer comes back. A silence long
-		// enough to be worth something of its own is not this — it is a gap, and
-		// the marks keep it. See soloGaps.
-		return nil, 0
+		// The intro. A gap long enough to be worth a change of picture is
+		// already the marks' — see soloNow — and this is the same bar when it is
+		// shorter than that: the record has begun and nobody has sung yet.
+		//
+		// Stamped at nought, which is where the intro starts and what soloNow
+		// stamps it with too, so a record whose singer comes in at fourteen
+		// seconds and one whose singer comes in at seven put up the same picture
+		// in the same place rather than one of them putting up nothing.
+		return []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)}, 0
 	}
 
-	if m.ps == nil || m.ps.Title == "" {
+	// A status that names no record.
+	//
+	// The daemon carries the track it is playing and carries nothing at all
+	// while it loads the next one — no id, no title. Held on the skip key that
+	// is where the player spends most of its time, and the screen spent it with
+	// an empty band across the middle. It is not the end of the music, it is the
+	// gap between two records, so the marks keep it like any other gap.
+	//
+	// Only before anything has played is there nothing to keep.
+	if m.ps == nil || (m.ps.TrackID == "" && m.words.forTrack == "") {
 		return nil, 0
 	}
 
@@ -1406,11 +1444,24 @@ func (m *Model) wordsGrind() tea.Cmd {
 	// next one's first line arrives — and the arrival hands whatever is held to
 	// the leaving animation, so a sentence from the previous song flew out
 	// across the first line of this one. Every skip, every time.
-	if m.ps != nil && m.words.forTrack != m.ps.TrackID {
+	// A status that names no record is not a change of record. The daemon
+	// carries no track at all while it loads the next one, and read as a change
+	// that threw the picture away and put nothing back — the empty band across
+	// the middle, for as long as the load took, which on a run of skips is most
+	// of the time.
+	//
+	// And a bar of marks survives a change of record where a line of type cannot.
+	// The line was sung on the record it was set for and has no business on the
+	// next one; the marks belong to no record — they are what this screen rests
+	// on between the words — so carrying them over is the change of record
+	// costing nothing at all rather than costing a gather.
+	if m.ps != nil && m.ps.TrackID != "" && m.words.forTrack != m.ps.TrackID {
 		m.words.forTrack = m.ps.TrackID
-		m.words.have, m.words.was = cover.Grain{}, cover.Grain{}
-		m.words.where, m.words.wasWhere = msg.WordLayout{}, msg.WordLayout{}
-		m.words.text, m.words.asked = "", ""
+		if !wordsBeats(m.words.text) {
+			m.words.have, m.words.was = cover.Grain{}, cover.Grain{}
+			m.words.where, m.words.wasWhere = msg.WordLayout{}, msg.WordLayout{}
+			m.words.text, m.words.asked = "", ""
+		}
 	}
 
 	lines, starts := m.wordsComing()
