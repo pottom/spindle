@@ -1502,14 +1502,16 @@ func (m Model) wordsRiding(count int) []int {
 		// The notes: each on its own part of the sound, and further than a word
 		// would go.
 		//
-		// On the beat where there is one to keep. Each mark still rises by what
-		// its own share of the spectrum is doing — that is what makes the sound
-		// run along the row — but they all leave the ground together, which is
-		// the difference between a row of meters and a row of dancers.
-		pulse := float32(1)
-		if m.beatKeeping() {
-			pulse = beatFloor + (1-beatFloor)*m.beatPulse()
+		// On the beat where there is one to keep, and performing a figure with
+		// each other rather than merely agreeing: see crew.go. Each mark still
+		// rises by what its own share of the spectrum is doing — that is what
+		// makes the sound run along the row — and the figure says when each of
+		// them lands.
+		if fig, ok := m.crewNow(); ok {
+			return m.crewRiding(count, fig)
 		}
+
+		pulse := float32(1)
 
 		out := make([]int, count)
 		for i := range out {
