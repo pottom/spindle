@@ -683,9 +683,6 @@ type wordsState struct {
 	// rides is scratch for the sparks, kept so a frame does not allocate.
 	rides []float32
 
-	// roll is how far the colour has travelled along the line. See wordsRollOn.
-	roll float32
-
 	// forced is when the record's name was last asked for by hand, so that the
 	// one thing on this screen that happens on purpose can be seen on purpose.
 	forced time.Time
@@ -1606,33 +1603,6 @@ func (m *Model) wordsAdopt(grain cover.Grain, where msg.WordLayout, text string)
 // It is the only thing the line needs following now: where the singer has got
 // to inside it is not asked, because a lyric sheet cannot answer it, and every
 // word answers a part of the sound instead.
-// wordsRollOn is how far the colour travels along a line in a second when the
-// record is going flat out, as a share of the line.
-//
-// The meter owns up and down: a band is loud or it is not, and that is a height.
-// A line of type is a horizontal thing and this is its own axis — the colour
-// travelling along it, one way, at a pace the record sets. What matters is that
-// the eye reads a direction: every word takes its colour from where it stands
-// plus how far the wave has come, so the wave is the same wave all the way
-// along. Words coloured independently would be confetti, however lively.
-const wordsRollOn = 0.28
-
-// wordsRollFlow carries the colour along the line, faster the harder the record
-// is going.
-func (m *Model) wordsRollFlow(fps int) {
-	if fps <= 0 {
-		return
-	}
-	var loud float32
-	for _, v := range m.scope.bands {
-		loud = max(loud, v)
-	}
-	m.words.roll += wordsRollOn * loud / float32(fps)
-	for m.words.roll >= 1 {
-		m.words.roll--
-	}
-}
-
 func (m *Model) wordsFlow(w, rows int) {
 	// How hard the low end is hitting, which is how far the row may sway, and
 	// how loud the record is against itself, which is how far anything moves at
@@ -1948,12 +1918,10 @@ func (m Model) wordsPaint(word, count, freqs, levels int) wordPaint {
 	// the line is written in, not which word is brighter than which. That was
 	// the thing measured and thrown out — a line is read, and only if it is lit
 	// like one — and this leaves the brightness alone.
-	// The hue runs along the line, and travels along it: the line's own axis,
-	// moving one way at a pace the record sets. See wordsRollOn.
-	along := (float32(word)+0.5)/float32(count) + m.words.roll
-	for along >= 1 {
-		along--
-	}
+	// The hue runs along the line, low to high, which is the palette the
+	// screen is coloured in rather than anything about this moment: it holds
+	// still while the line is up, so it costs the reading nothing.
+	along := (float32(word) + 0.5) / float32(count)
 	hue := int8(min(int(along*float32(freqs)), freqs-1))
 
 	var loud float32

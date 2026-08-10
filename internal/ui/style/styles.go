@@ -435,12 +435,12 @@ func barPalette(t Theme, accent color.Color) [][]lipgloss.Style {
 // there is a floor as well as a lift. The hue is still the record's own; what
 // is taken from it is only the greyness.
 const (
-	hueLift  = 2.4
-	hueLeast = 0.75
+	hueLift  = 1.5
+	hueLeast = 0.55
 )
 
 func huePalette(t Theme, accent color.Color, arc float64) [][]lipgloss.Style {
-	base, sat, _ := toHSL(accent)
+	base, sat, light := toHSL(accent)
 	sat = max(min(sat*hueLift, 1), hueLeast)
 
 	out := make([][]lipgloss.Style, barFreqSteps)
@@ -462,16 +462,7 @@ func huePalette(t Theme, accent color.Color, arc float64) [][]lipgloss.Style {
 			// comes out washed; a meter drawn in it looks like a meter that has
 			// been left in the sun, and the dots are small enough that a weak
 			// colour reads as grey.
-			// The lightness the accent arrived with is given back here.
-			//
-			// cover.Readable pins it into a band so that text stays legible on
-			// any cover, and a colour pinned light is a colour that cannot be
-			// saturated however much it is multiplied afterwards — which is why
-			// the lift alone showed for a moment and then went. There is nothing
-			// to read on this screen but the lyric itself, in dots on a dark
-			// ground, so the pictures take their own lightness rather than the
-			// one the lists need.
-			c := fromHSL(hue, min(sat*(0.82+0.30*v), 1), min(0.30+0.62*v, 0.92))
+			c := fromHSL(hue, min(sat*(0.62+0.45*v), 1), light*(0.42+0.75*v))
 			if v > 0.86 {
 				// The last step goes toward white: a tip that only gets lighter
 				// in its own hue stops registering as hotter. Late and little,
