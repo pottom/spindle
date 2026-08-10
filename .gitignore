@@ -5,3 +5,6 @@ docs/brief.md
 .DS_Store
 .playwright-mcp/
 *.png
+
+# ...except the drawings a mark set is cut from, which are the source, not an artefact.
+!assets/marks/**/*.png

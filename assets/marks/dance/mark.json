@@ -1,16 +1,20 @@
 {
   "name": "dance",
-  "from": "drawn here",
+  "from": "drawn for spindle",
   "licence": "ours",
-  "//": "Seven dancers, drawn for this screen rather than found. The row keeps time by leaning — a shear about its middle, so the feet stay and the head travels — and that only reads as dancing on a figure planted on two feet with its arms free. Everything here stands square, stands tall, and keeps its arms up where the lean moves them most. The order is the sound: heaviest at the low end, lightest at the top of the range. Four of them make the letters, for anybody who spots it.",
+  "//": "Eight dancers, and one hand drew all eight — which is the whole point of them. A row assembled out of an icon library is eight strangers standing next to each other: different builds, different weights, some planted and some caught mid-leap, and the eye reads the differences in build instead of the differences in pose. These share a build and a pen, so the pose is all there is left to read. The row keeps time by leaning — a shear about its middle, so the feet stay and the head travels — and that reads as dancing on a figure standing on its own two feet with its arms free.",
+  "//marks": "The order is the sound: heaviest at the low end, lightest at the top of the range. The one standing square with its arms straight out takes the bass, and the one with its arms up takes the cymbals.",
   "marks": [
-    "letter-a.svg",
-    "letter-m.svg",
-    "letter-c.svg",
-    "point.svg",
-    "letter-y.svg"
+    "stand.png",
+    "groove.png",
+    "step.png",
+    "stride.png",
+    "reach.png",
+    "lean.png",
+    "raise.png",
+    "jump.png"
   ],
-  "//faces": "Not turned in: these are drawn square on, and a mirrored dancer is the same dancer.",
+  "//heights": "The dot heights a mark is baked at, and the pen it comes out with at each. A picture carries its pen baked into the pixels, so unlike a drawn stroke it cannot be set here — it is measured off the source and then taken to thick, thickened where the size has thinned it away and thinned where the picture was drawn with a heavier hand than this screen draws with. Measured on this source, whose figures are about 300 pixels tall: the pen comes out 2.5 dots at 54 and 1.1 at 24, so only the smallest size is thickened. See cmd/spindle-marks.",
   "heights": [
     {
       "tall": 24,

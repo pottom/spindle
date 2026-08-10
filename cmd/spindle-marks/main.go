@@ -48,6 +48,7 @@ import (
 	"go/format"
 	"image"
 	"image/color"
+	"image/png"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -194,6 +195,13 @@ var strokeWidth = regexp.MustCompile(`stroke-width="[^"]*"`)
 // simply the stroke wanted, in dots, times the supersampling — after the
 // averaging that is exactly thick dots, at every size.
 func convert(path string, h height, turn bool) (dots, error) {
+	if strings.EqualFold(filepath.Ext(path), ".png") {
+		return trace(path, h, turn)
+	}
+	return render(path, h, turn)
+}
+
+func render(path string, h height, turn bool) (dots, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return dots{}, err
@@ -238,15 +246,185 @@ func convert(path string, h height, turn bool) (dots, error) {
 		}
 	}
 
-	return pack(grey, h.Tall), nil
+	return pack(grey), nil
+}
+
+// trace takes a drawing that is already a picture rather than a set of paths.
+//
+// A drawing made outside this repository does not arrive as strokes, and there
+// is nothing to rewrite: what it was drawn with is baked into the pixels. So the
+// stroke is measured instead of set — the commonest run of ink across the figure
+// is how wide the pen was — and once the picture is down on the dot grid it is
+// thickened back up to the weight every other mark on this screen has.
+//
+// Measured on the row this was written for, whose figures are about 170 pixels
+// tall: the pen comes out 6.4 dots at 72, 4.8 at 54, 3.2 at 36 and 2.1 at 24. So
+// only the smallest size needs anything, and there it needs it badly — at 2 dots
+// the threshold leaves a dashed line, which is the same thing that decided the
+// stroke width for the drawn sets.
+func trace(path string, h height, turn bool) (dots, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return dots{}, err
+	}
+	defer f.Close()
+
+	pic, err := png.Decode(f)
+	if err != nil {
+		return dots{}, fmt.Errorf("%s: %w", path, err)
+	}
+	b := pic.Bounds()
+
+	ink := func(x, y int) bool {
+		r, g, bl, _ := pic.At(x, y).RGBA()
+		return (r+g+bl)/3>>8 >= lit
+	}
+
+	// What the picture actually drew. A figure is cut to its own ink so that a
+	// row of them stands on one floor whatever the file's margins were.
+	left, top, right, bottom := b.Max.X, b.Max.Y, b.Min.X-1, b.Min.Y-1
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			if !ink(x, y) {
+				continue
+			}
+			left, top = min(left, x), min(top, y)
+			right, bottom = max(right, x), max(bottom, y)
+		}
+	}
+	if right < left {
+		return dots{}, fmt.Errorf("%s: the picture is empty", path)
+	}
+	fw, fh := right-left+1, bottom-top+1
+
+	// Fitted to the height, and as wide as that leaves it: a mark keeps its own
+	// shape, and the row spaces them by what they came out as.
+	wide := max(fw*h.Tall/fh, 1)
+	on := make([]bool, wide*h.Tall)
+	for dy := range h.Tall {
+		for dx := range wide {
+			from := dx
+			if turn {
+				from = wide - 1 - dx
+			}
+			var covered, all int
+			for sy := dy * fh / h.Tall; sy < max((dy+1)*fh/h.Tall, dy*fh/h.Tall+1); sy++ {
+				for sx := from * fw / wide; sx < max((from+1)*fw/wide, from*fw/wide+1); sx++ {
+					all++
+					if ink(left+sx, top+sy) {
+						covered++
+					}
+				}
+			}
+			on[dy*wide+dx] = all > 0 && covered*2 >= all
+		}
+	}
+
+	// The pen, in dots, and taken to the weight the set asked for — thickened
+	// when the size has thinned it away, thinned when the picture was drawn with
+	// a heavier hand than this screen draws with. Both matter: a picture carries
+	// one pen for every size it is baked at, so without this a row is a hairline
+	// at the bottom of the range and a set of clubs at the top.
+	pen := float64(penOf(pic, ink, left, right, top, bottom)) * float64(h.Tall) / float64(fh)
+	for pen+1 < float64(h.Thick) {
+		on = grow(on, wide, h.Tall)
+		pen += 2
+	}
+	for pen-1 > float64(h.Thick) {
+		on = thin(on, wide, h.Tall)
+		pen -= 2
+	}
+
+	grey := image.NewGray(image.Rect(0, 0, wide, h.Tall))
+	for i, set := range on {
+		if set {
+			grey.SetGray(i%wide, i/wide, color.Gray{Y: 255})
+		}
+	}
+	return pack(grey), nil
+}
+
+// penOf is how wide the pen was, in the picture's own pixels: the commonest run
+// of ink across it.
+func penOf(pic image.Image, ink func(int, int) bool, left, right, top, bottom int) int {
+	runs := map[int]int{}
+	for y := top; y <= bottom; y++ {
+		var n int
+		for x := left; x <= right; x++ {
+			if ink(x, y) {
+				n++
+				continue
+			}
+			if n > 0 {
+				runs[n]++
+			}
+			n = 0
+		}
+		if n > 0 {
+			runs[n]++
+		}
+	}
+	best, most := 1, 0
+	for n, count := range runs {
+		if count > most || (count == most && n < best) {
+			best, most = n, count
+		}
+	}
+	return best
+}
+
+// grow thickens by one dot in every direction.
+func grow(on []bool, wide, tall int) []bool {
+	out := make([]bool, len(on))
+	for y := range tall {
+		for x := range wide {
+			if !on[y*wide+x] {
+				continue
+			}
+			for dy := -1; dy <= 1; dy++ {
+				for dx := -1; dx <= 1; dx++ {
+					ny, nx := y+dy, x+dx
+					if ny >= 0 && ny < tall && nx >= 0 && nx < wide {
+						out[ny*wide+nx] = true
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+// thin takes a dot off every edge, which is grow run backwards.
+func thin(on []bool, wide, tall int) []bool {
+	out := make([]bool, len(on))
+	for y := range tall {
+		for x := range wide {
+			if !on[y*wide+x] {
+				continue
+			}
+			keep := true
+			for dy := -1; dy <= 1 && keep; dy++ {
+				for dx := -1; dx <= 1; dx++ {
+					ny, nx := y+dy, x+dx
+					if ny < 0 || ny >= tall || nx < 0 || nx >= wide || !on[ny*wide+nx] {
+						keep = false
+						break
+					}
+				}
+			}
+			out[y*wide+x] = keep
+		}
+	}
+	return out
 }
 
 // pack trims the drawing to what it actually lit and writes the dots out a bit
 // each, so a set costs what it draws rather than what it was given.
-func pack(g *image.Gray, side int) dots {
-	left, top, right, bottom := side, side, -1, -1
-	for y := range side {
-		for x := range side {
+func pack(g *image.Gray) dots {
+	b := g.Bounds()
+	left, top, right, bottom := b.Max.X, b.Max.Y, b.Min.X-1, b.Min.Y-1
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
 			if g.GrayAt(x, y).Y < lit {
 				continue
 			}
@@ -254,7 +432,7 @@ func pack(g *image.Gray, side int) dots {
 			right, bottom = max(right, x), max(bottom, y)
 		}
 	}
-	if right < 0 {
+	if right < left {
 		return dots{}
 	}
 

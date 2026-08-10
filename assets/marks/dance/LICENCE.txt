@@ -1,2 +1,10 @@
-Drawn for spindle. Seven dancers, 2 units of stroke on a 24 unit grid, round
-caps and joins — the same hand as the percussion in the band set.
+Drawn for spindle, and ours to use.
+
+Seven dancers by one hand, which is the point of them: a row assembled out of an
+icon library is seven strangers standing next to each other, and the eye reads
+the differences in build instead of the differences in pose. These share a build
+and a pen, so the pose is all there is left to read.
+
+They arrive as pictures rather than as paths, so the pen is measured off the
+source rather than set per size. The source row is kept beside them in source.png
+— everything here is cut from it.
