@@ -873,7 +873,7 @@ func (m Model) wordsLines(w, rows int) []string {
 	// times it is wrong are the times you are looking straight at it.
 	paints := make([]wordPaint, m.words.where.Count)
 	for i := range paints {
-		paints[i] = m.wordsBeatPaint(i, len(paints), freqs, levels)
+		paints[i] = m.wordsPaint(i, len(paints), freqs, levels)
 		if gather < 1 {
 			paints[i].level = int8(float32(paints[i].level) * gather)
 		}
@@ -1524,16 +1524,15 @@ func (m Model) wordsRiding(count int) []int {
 		return out
 	}
 
-	pulse := float32(1)
-	if m.beatKeeping() {
-		pulse = beatFloor + (1-beatFloor)*m.beatPulse()
-	}
-
+	// The sound's, and only the sound's. The beat used to be multiplied in here
+	// as well, and it is the same mistake it was on the marks: a height that
+	// answers how loud a band is *and* where the beat is answers neither. The
+	// beat is the marks' to keep — a line of a song is there to be read.
 	switch wordsRideFor(m.words.text) {
 	case wordsRideWords:
 		out := make([]int, count)
 		for i := range out {
-			out[i] = -int(m.wordsBeatRide(i, count) * wordsWordRide * pulse)
+			out[i] = -int(m.wordsBeatRide(i, count) * wordsWordRide)
 		}
 		return m.wordsSettleMarks(out)
 
@@ -1545,7 +1544,7 @@ func (m Model) wordsRiding(count int) []int {
 			loud = max(loud, v)
 		}
 
-		lift := -int(loud * wordsLineRide * pulse)
+		lift := -int(loud * wordsLineRide)
 		out := make([]int, count)
 		for i := range out {
 			out[i] = lift
@@ -1755,6 +1754,47 @@ func (m Model) wordsBeatRide(word, count int) float32 {
 	}
 	return loud
 }
+
+// wordsPaint is what one piece of what is on screen burns at.
+//
+// A mark and a word want different things. A mark *is* the spectrum: it stands
+// for a part of the range and burning by what that part is doing is the whole of
+// what it says. A word is there to be read, and a line whose words are lit
+// differently from each other is a line that is harder to read for no gain —
+// measured over ninety seconds of a record, the brightest and dimmest word of a
+// six word line stood two of the palette's six steps apart at the median and
+// three in the top tenth, changing all the while, and no reader can turn that
+// into anything. Nobody can see "the third word's band is loud".
+//
+// So a line is lit evenly and breathes with the whole of the music, and what
+// each word's own part of the sound is doing shows in how far it rides. One
+// question, one movement.
+func (m Model) wordsPaint(word, count, freqs, levels int) wordPaint {
+	if m.words.beats {
+		return m.wordsBeatPaint(word, count, freqs, levels)
+	}
+
+	// The hue still runs along the line, low to high, which is the palette the
+	// screen is coloured in rather than anything about this moment: it holds
+	// still while the line is up, so it costs the reading nothing.
+	hue := int8(min(int((float32(word)+0.5)/float32(count)*float32(freqs)), freqs-1))
+
+	var loud float32
+	for _, v := range m.scope.bands {
+		loud = max(loud, v)
+	}
+	return wordPaint{
+		hue:   hue,
+		level: int8(min(int((wordsLineLit+(1-wordsLineLit)*loud)*float32(levels)), levels-1)),
+		set:   true,
+	}
+}
+
+// wordsLineLit is how much of the palette a line has when the record is silent,
+// the rest coming from how loud it is. High: what moves here is the line's
+// height, and a line of type that fades towards nothing between phrases is a
+// line somebody was reading.
+const wordsLineLit = 0.55
 
 // wordsBeatPaint is what one of the notes burns at: its own share of the
 // spectrum, low to high from left to right.

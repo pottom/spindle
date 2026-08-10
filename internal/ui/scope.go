@@ -678,10 +678,4 @@ const (
 	// is there so the strike is not a discontinuity, not so it can be watched.
 	beatRise = 0.12
 
-	// beatFloor is how much of a movement survives between the beats.
-	//
-	// Not nought. What rides the music has to go on riding it off the beat as
-	// well, or the picture stops dead four times a bar — the beat is meant to
-	// be the pulse under the movement, not a gate across it.
-	beatFloor = 0.35
 )

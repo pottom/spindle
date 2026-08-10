@@ -1324,3 +1324,66 @@ func TestTheMeterDoesNotJumpBetweenPictures(t *testing.T) {
 		t.Errorf("the room over the head moved %d dots in one frame, want it eased", mostHead)
 	}
 }
+
+// A line of a song is lit evenly, and what each word's own part of the sound is
+// doing shows in how far it rides rather than in how brightly it burns.
+//
+// Both were on the brightness before, and it cost the reading for nothing:
+// measured over ninety seconds of a record at thirty frames a second, the
+// brightest and dimmest word of a six word line stood two of the palette's six
+// steps apart at the median and three in the top tenth, changing all the while.
+// Nobody can read "the third word's band is loud" — what they can read is the
+// line, and only if it is lit like one.
+func TestALineIsLitEvenly(t *testing.T) {
+	m := scopeModel(120, 44)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.words.text = "do you think you're better off alone"
+
+	// A spectrum that leans hard on one end, which is what used to pull a line
+	// of type apart.
+	m.scope.bands = make([]float32, 28)
+	for i := range m.scope.bands {
+		m.scope.bands[i] = 0.1 + 0.9*float32(i)/float32(len(m.scope.bands)-1)
+	}
+
+	const words, freqs, levels = 7, 10, 6
+	var low, high int8 = levels, 0
+	var hues []int8
+	for i := range words {
+		p := m.wordsPaint(i, words, freqs, levels)
+		low, high = min(low, p.level), max(high, p.level)
+		hues = append(hues, p.hue)
+	}
+	t.Logf("across a line of %d words the brightness runs %d to %d of %d, and the hues %v", words, low, high, levels, hues)
+
+	if low != high {
+		t.Errorf("the line is lit from %d to %d, want every word of it at one level", low, high)
+	}
+
+	// The line still breathes with the record: quiet music, a dimmer line.
+	for i := range m.scope.bands {
+		m.scope.bands[i] = 0.05
+	}
+	quiet := m.wordsPaint(0, words, freqs, levels)
+	t.Logf("and over quiet music the same line is lit at %d against %d", quiet.level, high)
+	if quiet.level >= high {
+		t.Errorf("quiet music lit the line at %d and loud music at %d, want it breathing", quiet.level, high)
+	}
+
+	// The marks are not words: each of them is a part of the spectrum, and
+	// burning by what that part is doing is the whole of what they say.
+	m.words.beats = true
+	var marksLow, marksHigh int8 = levels, 0
+	for i := range m.scope.bands {
+		m.scope.bands[i] = 0.1 + 0.9*float32(i)/float32(len(m.scope.bands)-1)
+	}
+	for i := range words {
+		p := m.wordsPaint(i, words, freqs, levels)
+		marksLow, marksHigh = min(marksLow, p.level), max(marksHigh, p.level)
+	}
+	t.Logf("a row of marks over the same spectrum runs %d to %d", marksLow, marksHigh)
+	if marksLow == marksHigh {
+		t.Error("the marks were lit evenly, want each of them burning by its own part of the sound")
+	}
+}
