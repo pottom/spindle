@@ -680,6 +680,9 @@ type wordsState struct {
 	forTrack string
 	cast     string
 
+	// rides is scratch for the sparks, kept so a frame does not allocate.
+	rides []float32
+
 	// forced is when the record's name was last asked for by hand, so that the
 	// one thing on this screen that happens on purpose can be seen on purpose.
 	forced time.Time
@@ -1917,6 +1920,22 @@ func (m Model) wordsPaint(word, count, freqs, levels int) wordPaint {
 	// like one — and this leaves the brightness alone.
 	along := (float32(word) + 0.5) / float32(count)
 
+	// A word sits further round the palette the less of the sound it carries.
+	//
+	// A line has loud words and still ones, and the still ones are dead space
+	// the music itself made. A word riding hard is already answering and is left
+	// where it is; a word sitting still is carried, so the colours across a line
+	// are a map of where the music is in it.
+	//
+	// Put on the beat first, and it was wrong: the beat already leans this line,
+	// so the colour jumping and falling back was a second answer in the same
+	// direction — the mistake the height made — and what it looked like was
+	// flashing rather than moving. It answers its own question now, and holds
+	// still while the answer does.
+	//
+	// The word is one word throughout: the letters do not move, because a word
+	// whose letters move separately stops being a word.
+
 	// And a wave crossing it, when the record has just turned over.
 	if crest, on := m.hueWave(); on {
 		along += hueWaveMost * hueWaveOn(along, crest)
@@ -2088,8 +2107,13 @@ func (m *Model) wordsSparks(w, rows int) {
 		return
 	}
 
+	// Kept rather than made: a slice a frame is work for the collector, and its
+	// pauses fall outside the update where nothing can account for them.
 	where := m.words.where
-	rides := make([]float32, where.Count)
+	if len(m.words.rides) != where.Count {
+		m.words.rides = make([]float32, where.Count)
+	}
+	rides := m.words.rides
 	for i := range rides {
 		rides[i] = m.wordsBeatRide(i, where.Count)
 	}

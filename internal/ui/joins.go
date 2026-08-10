@@ -125,15 +125,23 @@ func (m *Model) joinsFlow(fps int) {
 	if total <= 0 {
 		return
 	}
-	shape := make([]float32, len(bands))
+	// The oldest entry of the ring is about to be dropped, so its slice is the
+	// one to write into: a frame that allocates is thirty allocations a second
+	// that the collector has to come back for, and the pauses it takes land
+	// outside the update where nothing can account for them. Measured — this is
+	// what put the dropped frames back after the daemon was fixed.
+	shape := j.ring[j.at]
+	if shape == nil {
+		shape = make([]float32, len(bands))
+	}
 	for i, v := range bands {
 		shape[i] = v / total
 	}
 
 	// Into the ring, and out of the sums at the other end.
-	if old := j.ring[j.at]; old != nil {
+	if j.fill == len(j.ring) {
 		for i := range j.far {
-			j.far[i] -= old[i]
+			j.far[i] -= shape[i]
 		}
 	}
 	j.ring[j.at] = shape
