@@ -468,3 +468,51 @@ func TestTheRunOutIsAGapLikeAnyOther(t *testing.T) {
 		t.Error("a record of unknown length was given a run-out anyway")
 	}
 }
+
+// A sheet that says the singing has stopped is not a screen with nothing on it.
+//
+// Most sheets write the end of a verse as an entry with no words in it, and
+// plenty end the song that way while the record plays on. Measured on Mike
+// Mana's "Never The Same": the last entry is an empty line at 1:44.5, and what
+// used to be on the screen from there was the picture drawn when nothing at all
+// is set — the meter above and below and an empty band across the middle.
+func TestAnEmptyLineIsKeptByTheMarks(t *testing.T) {
+	m := scopeModel(120, 44)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 2*time.Minute + 54*time.Second
+	m.lyrics.forTrack, m.lyrics.synced = m.ps.TrackID, true
+	m.lyrics.lines = []player.Lyric{
+		{At: 98_600, Words: "I'm wild and electric"},
+		{At: 102_900, Words: "I'm never the same"},
+		{At: 104_500, Words: ""},
+	}
+
+	// The line before the sheet gives up is still the line.
+	m.setProgress(103 * time.Second)
+	if lines, _ := m.wordsComing(); len(lines) == 0 || wordsBeats(lines[0]) {
+		t.Errorf("at 1:43 the screen has %q, want the line being sung", lines)
+	}
+
+	// The run-out begins at the sheet's own full stop rather than six seconds
+	// after the last line, which is where the hole was.
+	gaps := m.soloGaps()
+	last := gaps[len(gaps)-1]
+	t.Logf("the run-out runs from %.1fs to %.1fs; the last line is sung at 102.9s and the sheet stops at 104.5s",
+		float64(last.from)/1000, float64(last.to)/1000)
+	if last.from != 104_500 {
+		t.Errorf("the run-out begins at %dms, want the 104500 the sheet stops at", last.from)
+	}
+
+	// And from there to the end of the record the marks keep it.
+	for _, at := range []time.Duration{105 * time.Second, 107 * time.Second, 2 * time.Minute} {
+		m.setProgress(at)
+		lines, _ := m.wordsComing()
+		if len(lines) != 1 || !wordsBeats(lines[0]) {
+			t.Errorf("%s in the screen has %q, want the marks", at, lines)
+		}
+		if m.wordsSilent() {
+			t.Errorf("%s in the screen counts as silent, so it draws the empty picture", at)
+		}
+	}
+}

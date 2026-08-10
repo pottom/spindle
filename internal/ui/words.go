@@ -537,7 +537,9 @@ func (m Model) wordsComing() ([]string, int64) {
 		}
 
 		// A song with words that is not singing any: nothing to set, and the
-		// music has the screen until the singer comes back.
+		// music has the screen until the singer comes back. A silence long
+		// enough to be worth something of its own is not this — it is a gap, and
+		// the marks keep it. See soloGaps.
 		return nil, 0
 	}
 

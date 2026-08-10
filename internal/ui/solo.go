@@ -83,8 +83,26 @@ func (m Model) soloGaps() []soloGap {
 	// set: the meter above and below and an empty band across the middle, for
 	// the rest of the record. Watched on Mike Mana's "Never The Same", that is
 	// everything from 1:55 to the end, every time it is played.
-	if last := sung[len(sung)-1] + soloHold.Milliseconds(); m.ps != nil && m.ps.Duration.Milliseconds() > last {
-		out = append(out, soloGap{last, m.ps.Duration.Milliseconds()})
+	if m.ps != nil {
+		// Where the singing stopped. Most sheets write that down: an entry with
+		// no words in it, after the last line anybody sings. Measured on Mike
+		// Mana's "Never The Same", the last line is at 1:42.9 and the sheet's
+		// own full stop at 1:44.5 — and taking the line's six seconds instead
+		// left four and a half seconds that were neither a line nor a gap, with
+		// the empty picture in them.
+		last := sung[len(sung)-1] + soloHold.Milliseconds()
+		for _, line := range m.lyrics.lines {
+			if line.At <= sung[len(sung)-1] {
+				continue
+			}
+			if strings.TrimSpace(line.Words) == "" {
+				last = min(last, line.At)
+				break
+			}
+		}
+		if end := m.ps.Duration.Milliseconds(); end > last {
+			out = append(out, soloGap{last, end})
+		}
 	}
 	return out
 }
