@@ -89,6 +89,7 @@ type joinsState struct {
 	// forTrack the record it belongs to.
 	begins   time.Duration
 	forTrack string
+	turns    int           // how many times this record has turned over
 	heard    time.Duration // how much of this record has gone through
 }
 
@@ -201,4 +202,12 @@ func (m Model) joinsAt() time.Duration {
 		return 0
 	}
 	return m.joins.begins
+}
+
+// joinsTurns is how many times the record on screen has turned over.
+func (m Model) joinsTurns() int {
+	if m.ps == nil || m.joins.forTrack != m.ps.TrackID {
+		return 0
+	}
+	return m.joins.turns
 }

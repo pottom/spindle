@@ -1918,16 +1918,39 @@ func (m Model) wordsPaint(word, count, freqs, levels int) wordPaint {
 	// the line is written in, not which word is brighter than which. That was
 	// the thing measured and thrown out — a line is read, and only if it is lit
 	// like one — and this leaves the brightness alone.
-	// The hue runs along the line, low to high, which is the palette the
-	// screen is coloured in rather than anything about this moment: it holds
-	// still while the line is up, so it costs the reading nothing.
-	along := (float32(word) + 0.5) / float32(count)
+	// The hue runs along the line, and the beat shoves it round.
+	//
+	// The meter owns up and down: a band is loud or it is not, and that is a
+	// height. A line of type is a horizontal thing and this is its own axis —
+	// the colours stepping along it, one way, one shove a beat. Every word takes
+	// its colour from where it stands plus how far the wheel has turned, so it
+	// is one wheel all the way along; words coloured independently would be
+	// confetti, however lively.
+	//
+	// And it comes home. A whole turn is wordsRollBeats of them, and at the end
+	// of it every word is on the colour it started with.
+	along := (float32(word)+0.5)/float32(count) + m.wordsRoll()
+	for along >= 1 {
+		along--
+	}
 	hue := int8(min(int(along*float32(freqs)), freqs-1))
 
 	var loud float32
 	for _, v := range m.scope.bands {
 		loud = max(loud, v)
 	}
+
+	// Half of it from the moment, half from where the record has got to.
+	//
+	// The bands are normalised against the record's own scale, so the loudest of
+	// them reads the same in a hush as in a chorus — which is why a line used to
+	// sit at the same colour through a whole record however it built. swell is
+	// the one thing that knows the difference, and half the weight is enough
+	// that a verse and its chorus are plainly different without the line going
+	// grey when a bar happens to be quiet.
+	swell := min(max((m.swell()-swellLeast)/(swellMost-swellLeast), 0), 1)
+	loud = 0.25*loud + 0.75*swell
+
 	return wordPaint{
 		hue:   hue,
 		level: int8(min(int((wordsLineLit+(1-wordsLineLit)*loud)*float32(levels)), levels-1)),
@@ -2116,4 +2139,20 @@ func (m *Model) wordsSparks(w, rows int) {
 			bright: ride,
 		})
 	}
+}
+
+// wordsRollSteps is how many turns of the record a whole turn of the colour
+// takes. Six: a record has a handful of joins in it, so the colour comes most
+// of the way round in one and all the way in two.
+const wordsRollSteps = 6
+
+// wordsRoll is how far round the palette the record's turns have shoved the
+// colour.
+func (m Model) wordsRoll() float32 {
+	// One shove a join rather than one a beat. The beat is already answered
+	// twice over on this screen; the record turning over is a thing that
+	// happens rarely enough to be worth a step, and often enough that a whole
+	// turn comes round inside a record. See joins.go.
+	at := m.joinsTurns() % wordsRollSteps
+	return float32(at) / wordsRollSteps
 }
