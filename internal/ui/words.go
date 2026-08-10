@@ -1499,18 +1499,14 @@ func (m Model) wordsRiding(count int) []int {
 		// The notes: each on its own part of the sound, and further than a word
 		// would go.
 		//
-		// On the beat where there is one to keep. Each mark still rises by what
-		// its own share of the spectrum is doing — that is what makes the sound
-		// run along the row — but they all leave the ground together, which is
-		// the difference between a row of meters and a row of dancers.
-		pulse := float32(1)
-		if m.beatKeeping() {
-			pulse = beatFloor + (1-beatFloor)*m.beatPulse()
-		}
-
+		// The sound's, all of it, whether or not the screen is keeping time.
+		// Putting the rise on the beat as well was tried and thrown out — a
+		// height answering how loud a band is and where the beat is at the same
+		// time answers neither, and what is left is a row twitching. The beat
+		// has the lean instead: see sway.go.
 		out := make([]int, count)
 		for i := range out {
-			out[i] = -int(m.wordsBeatRide(i, count) * wordsBounce * pulse)
+			out[i] = -int(m.wordsBeatRide(i, count) * wordsBounce)
 		}
 		return out
 	}
@@ -1617,6 +1613,14 @@ func wordsBesideMark(marks []bool, at int) (int, bool) {
 // Which way each is sheared, and so what the middle it turns about means, is
 // the marks' business: see wordsSlanting.
 func (m Model) wordsTilting(count int) ([]float32, []int) {
+	if count <= 0 || m.words.telling {
+		return nil, nil
+	}
+
+	// The row keeps time by leaning, so when there is a beat to keep the lean is
+	// the beat's rather than dealt. See sway.go.
+	sway, swaying := m.wordsSway()
+
 	// Marks lean oftener as well as differently: a solo is the one place there
 	// is nothing else on the screen for it to be doing.
 	every := uint64(3)
@@ -1625,7 +1629,7 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 	}
 
 	seed := m.wordsLeanSeed()
-	if count <= 0 || m.words.telling || seed%every != 0 {
+	if !swaying && seed%every != 0 {
 		return nil, nil
 	}
 
@@ -1665,6 +1669,13 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 		middle[i] = (max(first[i], 0) + max(last[i], 0)) / 2
 		if m.words.beats {
 			lean, middle[i] = wordsTiltMark, mid[i]
+		}
+
+		// Swaying, the whole row leans the same way and the deal is not asked:
+		// what makes it a sway is that they go over together.
+		if swaying {
+			tilt[i] = sway
+			continue
 		}
 
 		// Three ways for a word: this way, that way, or flat.

@@ -1014,8 +1014,14 @@ func TestTheScreenKeepsTimeAndCanBeToldNotTo(t *testing.T) {
 		t.Error("the screen kept time before any beat was found")
 	}
 	loud := m.wordsRiding(4)
+	if _, swaying := m.wordsSway(); swaying {
+		t.Error("the row swayed before any beat was found")
+	}
 
-	// A beat every half second. On it and off it the marks stand differently.
+	// A beat every half second. What it moves is the lean, not the height: the
+	// two were put on one dimension first and it read as twitching, because a
+	// mark cannot answer how loud its band is and where the beat is with the
+	// same movement. See sway.go.
 	m.scope.beat = player.Beat{Period: 500 * time.Millisecond}
 	m.scope.beatAt = time.Now()
 	if !m.beatKeeping() {
@@ -1025,25 +1031,43 @@ func TestTheScreenKeepsTimeAndCanBeToldNotTo(t *testing.T) {
 	m.scope.beat.Since = 0 // on the beat
 	m.scope.beatAt = time.Now()
 	on := m.wordsRiding(4)
+	onLean, swaying := m.wordsSway()
+	if !swaying {
+		t.Fatal("a beat was found and the row did not sway")
+	}
 
 	m.scope.beat.Since = 250 * time.Millisecond // half way between two
 	m.scope.beatAt = time.Now()
 	between := m.wordsRiding(4)
+	betweenLean, _ := m.wordsSway()
 
-	t.Logf("the marks stand at %v on the beat and %v between two, against %v on loudness alone",
-		on, between, loud)
+	t.Logf("the marks stand at %v on the beat and %v between two, against %v on loudness alone", on, between, loud)
+	t.Logf("and the row leans %+.3f on the beat against %+.3f between two", onLean, betweenLean)
 
-	if on[0] >= between[0] {
-		t.Errorf("on the beat the marks are at %d and between two at %d, want them higher on it", on[0], between[0])
+	// The height is the sound's, and the beat does not touch it.
+	for i := range on {
+		if on[i] != loud[i] || between[i] != loud[i] {
+			t.Errorf("mark %d stands at %d on the beat and %d between two, want the %d the sound alone put it at",
+				i, on[i], between[i], loud[i])
+		}
 	}
-	if between[0] == 0 {
-		t.Error("between two beats the marks stopped dead, want the beat under the movement rather than across it")
+
+	// The lean is the beat's, and it is all the way over on it.
+	if abs32(onLean) <= abs32(betweenLean) {
+		t.Errorf("the row leans %+.3f on the beat and %+.3f between two, want it furthest over on the beat", onLean, betweenLean)
+	}
+	if abs32(onLean) < wordsSwayMost*0.9 {
+		t.Errorf("on the beat the row leans %+.3f, want most of the %.2f it has to give", onLean, wordsSwayMost)
 	}
 
-	// And the key hands the old picture back.
+	// And the key hands the old picture back: no sway at all, and the height it
+	// always had.
 	m.stage.loose = false
 	if m.beatKeeping() {
 		t.Error("the key was turned off and the screen kept time anyway")
+	}
+	if _, swaying := m.wordsSway(); swaying {
+		t.Error("the key was turned off and the row swayed anyway")
 	}
 	if off := m.wordsRiding(4); off[0] != loud[0] {
 		t.Errorf("with the key off the marks stand at %d, want the %d they stood at before", off[0], loud[0])
