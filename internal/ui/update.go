@@ -253,6 +253,12 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case msg.WaveformReady:
+		// A frame times itself from here. Only the frames the picture is drawn
+		// to are timed — a keypress that takes a millisecond is not a frame that
+		// went missing. See slow.go.
+		slowFrameBegan()
+		defer slowUpdateDone()
+
 		// The trace stops the moment it leaves the screen: a redraw every 33ms
 		// for something nobody is looking at is the whole cost of the feature.
 		if !m.scopeVisible() {
