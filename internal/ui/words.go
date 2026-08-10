@@ -611,16 +611,33 @@ const (
 	wordsMoves
 )
 
-// wordsMoveFor picks one from the line.
+// wordsMoveFor picks one from the line and from when it is sung.
+//
+// From the text alone it was the same move every time the words were, and a
+// chorus is the same words three times in four minutes: watched on Ocho Macho's
+// "Jó Nekem", where one line comes round three times and arrived identically on
+// each, which reads as a loop rather than as a chorus. When it is sung is in the
+// deal too now, so the same line comes in differently each time it comes round —
+// and a record still plays the same way twice, because the sheet says the same
+// times on a second listen.
 //
 // Popping is not among them: it is a way of leaving, and a line that arrived by
 // un-bursting would be a film run backwards.
-func wordsMoveFor(text string) wordsMove {
+func wordsMoveFor(text string, starts int64) wordsMove {
 	var h uint32 = 2166136261
 	for _, r := range text {
 		h = (h ^ uint32(r)) * 16777619
 	}
-	return wordsMove(h % uint32(wordsPopping))
+	// The moment folded in, and then the whole thing stirred. Folded in without
+	// stirring, two lines forty seconds apart came out on the same move as often
+	// as not: the top bits of a millisecond count barely move over a record, and
+	// a remainder reads the bottom ones. This avalanches, so a second's
+	// difference is a different answer.
+	x := uint64(h)*0x9e3779b97f4a7c15 + uint64(starts)*0xd6e8feb86659fd93
+	x ^= x >> 33
+	x *= 0xff51afd7ed558ccd
+	x ^= x >> 29
+	return wordsMove(x % uint64(wordsPopping))
 }
 
 // wordsState is the picture the words are drawn from, and how far it has
@@ -682,6 +699,10 @@ type wordsState struct {
 
 	// rides is scratch for the sparks, kept so a frame does not allocate.
 	rides []float32
+
+	// roll is where the colour has got to on its way to the place the record's
+	// turns have shoved it. See wordsRollEase.
+	roll float32
 
 	// forced is when the record's name was last asked for by hand, so that the
 	// one thing on this screen that happens on purpose can be seen on purpose.
@@ -1570,7 +1591,8 @@ func (m *Model) wordsAdopt(grain cover.Grain, where msg.WordLayout, text string)
 	}
 
 	m.words.have, m.words.text = grain, text
-	m.words.move = wordsMoveFor(text)
+	m.words.move = wordsMoveFor(text, m.words.starts)
+
 	if m.words.telling {
 		// The one picture that is not dealt its arrival: the record's name comes
 		// in from outside every time, and the marks it took the bar from go out
@@ -1603,6 +1625,36 @@ func (m *Model) wordsAdopt(grain cover.Grain, where msg.WordLayout, text string)
 // It is the only thing the line needs following now: where the singer has got
 // to inside it is not asked, because a lyric sheet cannot answer it, and every
 // word answers a part of the sound instead.
+// wordsRollEase is how fast the colour slides to where the join put it.
+//
+// A step and not a jump, and that is the whole of whether it can be seen. A
+// lyric line lives a few seconds and a join comes every twenty to sixty, so the
+// line that was up before a step is long gone by the time of the one after it —
+// nobody ever sees the same words in two colours. Slid over a second or so, the
+// step is movement while it happens, which is a thing to watch rather than two
+// states to compare.
+const wordsRollEase = 0.02
+
+// wordsRollFlow carries the colour toward where the record's turns have put it,
+// the shorter way round.
+func (m *Model) wordsRollFlow() {
+	want := m.wordsRollAt()
+	d := want - m.words.roll
+	for d > 0.5 {
+		d--
+	}
+	for d < -0.5 {
+		d++
+	}
+	m.words.roll += d * wordsRollEase
+	for m.words.roll >= 1 {
+		m.words.roll--
+	}
+	for m.words.roll < 0 {
+		m.words.roll++
+	}
+}
+
 func (m *Model) wordsFlow(w, rows int) {
 	// How hard the low end is hitting, which is how far the row may sway, and
 	// how loud the record is against itself, which is how far anything moves at
@@ -1929,7 +1981,7 @@ func (m Model) wordsPaint(word, count, freqs, levels int) wordPaint {
 	//
 	// And it comes home. A whole turn is wordsRollBeats of them, and at the end
 	// of it every word is on the colour it started with.
-	along := (float32(word)+0.5)/float32(count) + m.wordsRoll()
+	along := (float32(word)+0.5)/float32(count) + m.words.roll
 	for along >= 1 {
 		along--
 	}
@@ -2148,7 +2200,7 @@ const wordsRollSteps = 6
 
 // wordsRoll is how far round the palette the record's turns have shoved the
 // colour.
-func (m Model) wordsRoll() float32 {
+func (m Model) wordsRollAt() float32 {
 	// One shove a join rather than one a beat. The beat is already answered
 	// twice over on this screen; the record turning over is a thing that
 	// happens rarely enough to be worth a step, and often enough that a whole

@@ -199,7 +199,7 @@ func TestWordsGatherEveryWay(t *testing.T) {
 // come back the way it went, which is most of what the screen does with a song
 // that has one.
 func TestWordsMoveComesFromTheLine(t *testing.T) {
-	if a, b := wordsMoveFor("better off alone"), wordsMoveFor("better off alone"); a != b {
+	if a, b := wordsMoveFor("better off alone", 1000), wordsMoveFor("better off alone", 1000); a != b {
 		t.Errorf("the same line got moves %d and %d", a, b)
 	}
 
@@ -220,7 +220,7 @@ func TestWordsMoveComesFromTheLine(t *testing.T) {
 		"Is this the real life",
 		"Sultans of swing",
 	} {
-		seen[wordsMoveFor(line)] = true
+		seen[wordsMoveFor(line, 0)] = true
 	}
 	t.Logf("eight lines used %d of the %d moves", len(seen), wordsMoves)
 	if len(seen) < 3 {
