@@ -112,6 +112,58 @@ func TestTheEyeClosesToALine(t *testing.T) {
 	}
 }
 
+// Twice a record and no more, whatever the bars deal.
+//
+// A bar in three was fair to the bars and wrong about the record: an
+// instrumental stamps a fresh bar every half minute, so over four minutes he
+// walked on again and again and the visit became the furniture. What the key
+// asks for is not counted — somebody who wants to see him can have as many as
+// they like.
+func TestHeComesOnTwiceARecordAtMost(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 6 * time.Minute
+	m.words.beats, m.words.text = true, wordsNotes
+
+	// Every bar of a long instrumental, walked through as the screen would.
+	var visits int
+	for bar := range int64(12) {
+		starts := bar * wordsSpell.Milliseconds()
+		m.words.starts = starts
+		m.setProgress(time.Duration(starts)*time.Millisecond + faceEnters + time.Second)
+
+		// The bars are half a minute apart on the record, and a test runs them
+		// in microseconds: without this the visit before is still counted as
+		// running, because a visit that has begun runs to its end whatever the
+		// bar under it does.
+		m.face.came = time.Now().Add(-time.Minute)
+
+		m.faceFlow()
+
+		if m.faceUp() {
+			if m.face.bar != starts {
+				t.Fatalf("bar %d: he is up but the visit was recorded against %d", starts, m.face.bar)
+			}
+			visits++
+		}
+	}
+	t.Logf("over twelve bars of one record he came on %d times, and the count stands at %d", visits, m.face.seen)
+
+	if visits > faceVisitsMost {
+		t.Errorf("he came on %d times in one record, want at most %d", visits, faceVisitsMost)
+	}
+	if visits == 0 {
+		t.Error("he never came on at all over twelve bars, want him kept rather than banished")
+	}
+
+	// The next record starts him over.
+	m.ps.TrackID = "another"
+	if m.faceHadEnough() {
+		t.Error("the record changed and he was still counted out")
+	}
+}
+
 // He is not what a bar of music looks like — the marks are that. He turns up in
 // the middle of one, does his thing and goes, and the marks have the bar back.
 func TestHeVisitsABarRatherThanTakingIt(t *testing.T) {

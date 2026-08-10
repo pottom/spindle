@@ -402,23 +402,15 @@ func TestWordsGiveTheScreenBackBetweenLines(t *testing.T) {
 		t.Error("a one second gap was given something to look at")
 	}
 
-	// A song with no lyrics at all takes its turns instead: a card for a few
-	// seconds, and the marks the rest of the time. See idle.go.
+	// A song with no lyrics at all is one long solo: the marks throughout, and
+	// nothing written across them at any point. See idle.go.
 	m.lyrics.synced = false
 	m.ps.Artists, m.ps.Album = []string{"The Band"}, "An Album"
-	for spell := 1; spell < 12; spell++ {
-		if m.wordsCardFor(spell) == wordsCardNone {
-			continue
-		}
-		m.setProgress(time.Duration(spell) * wordsSpell)
-		if lines, _ := m.wordsComing(); len(lines) == 0 || wordsBeats(lines[0]) {
-			t.Errorf("the turn dealt a card has %q", lines)
-		}
-		m.setProgress(time.Duration(spell)*wordsSpell + wordsTitle + time.Second)
+	for spell := range 12 {
+		m.setProgress(time.Duration(spell)*wordsSpell + time.Second)
 		if lines, _ := m.wordsComing(); len(lines) != 1 || !wordsBeats(lines[0]) {
-			t.Errorf("after the card a wordless record has %q, want the marks", lines)
+			t.Errorf("spell %d of a wordless record has %q, want the marks", spell, lines)
 		}
-		break
 	}
 }
 

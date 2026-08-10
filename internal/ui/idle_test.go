@@ -23,84 +23,41 @@ func wordless(t *testing.T) Model {
 	return m
 }
 
-// A record with no words is not given one picture and left with it. It takes
-// turns: a card at the top of each one, the music for the rest, and never the
-// same card twice running.
-func TestAWordlessRecordTakesTurns(t *testing.T) {
+// A record with no words is one long solo and nothing else: the marks, from the
+// first second to the last, with nothing written across them at any point.
+//
+// It used to take turns — the artist set over one stretch of the record and the
+// album over the next. Both are gone. Nothing goes up on this screen unless it
+// is sent for, and from where anybody is sitting there is no difference between
+// the record's name and the artist's: both are writing that appeared by itself.
+func TestAWordlessRecordShowsNothingButTheMarks(t *testing.T) {
 	m := wordless(t)
 
-	// The top of a record is where it changed, so nothing is put over it.
-	if got := m.wordsCardFor(0); got != wordsCardNone {
-		t.Errorf("the record opens on card %d, want the music alone", got)
-	}
-
-	seen := map[wordsCard]int{}
-	was := m.wordsCardFor(0)
-	for spell := 1; spell < 14; spell++ {
-		card := m.wordsCardFor(spell)
-		if card == was {
-			t.Errorf("turn %d deals %d again, want a card it did not just show", spell, card)
-		}
-		seen[card]++
-		was = card
-	}
-
-	if len(seen) < 3 {
-		t.Errorf("twelve turns dealt %d different cards, want the record to keep changing", len(seen))
-	}
-	t.Logf("twelve turns dealt %v", seen)
-
-	// And the same record deals the same way twice, so a song looked at again
-	// is the song that was looked at.
-	again := wordless(t)
-	for spell := range 14 {
-		if a, b := m.wordsCardFor(spell), again.wordsCardFor(spell); a != b {
-			t.Fatalf("turn %d dealt %d one time and %d the next", spell, a, b)
-		}
-	}
-}
-
-// A wordless record is one long solo, so the marks have the screen whenever a
-// card does not — never another visualiser. Switching between two of those put
-// a different program up every half minute, and the join was what you saw.
-func TestAWordlessRecordKeepsTheMarksUp(t *testing.T) {
-	m := wordless(t)
-
-	for _, at := range []time.Duration{0, wordsTitle + time.Second, wordsSpell + 10*time.Second} {
+	for at := time.Duration(0); at < 5*time.Minute; at += 3 * time.Second {
 		m.setProgress(at)
 		lines, _ := m.wordsIdle()
 		if len(lines) != 1 || !wordsBeats(lines[0]) {
-			t.Errorf("%s in, the screen has %q, want the marks", at, lines)
+			t.Fatalf("%s into the record the screen has %q, want the marks and only the marks", at, lines)
 		}
 	}
+	t.Log("five minutes of a wordless record, sampled every three seconds: the marks throughout")
 
-	// And a card takes their place for its few seconds, then hands it back.
-	// Whichever turn is dealt one — the record's own name is not among them any
-	// more, so what comes up is whose it is or what it came out on.
-	spell := 0
-	for at := 1; at < 12; at++ {
-		if m.wordsCardFor(at) != wordsCardNone {
-			spell = at
-			break
-		}
-	}
-	if spell == 0 {
-		t.Fatal("no turn in twelve was dealt a card")
-	}
+	// The bar under them is still stamped afresh every spell, which is what deals
+	// the row a new lean and a new chance of a visitor — a long instrumental is
+	// several hands rather than one.
+	m.setProgress(time.Second)
+	_, first := m.wordsIdle()
+	m.setProgress(wordsSpell + time.Second)
+	_, second := m.wordsIdle()
+	m.setProgress(wordsSpell + 20*time.Second)
+	_, same := m.wordsIdle()
 
-	m.setProgress(time.Duration(spell)*wordsSpell + time.Second)
-	lines, card := m.wordsIdle()
-	if len(lines) == 0 || wordsBeats(lines[0]) {
-		t.Fatalf("the turn dealt a card has %q", lines)
+	t.Logf("the bar is stamped %d in the first spell and %d in the second", first, second)
+	if first == second {
+		t.Error("the second spell was stamped with the first one's bar, so the record deals itself once and never again")
 	}
-
-	m.setProgress(time.Duration(spell)*wordsSpell + wordsTitle + time.Second)
-	back, marks := m.wordsIdle()
-	if len(back) != 1 || !wordsBeats(back[0]) {
-		t.Errorf("after the card the screen has %q, want the marks back", back)
-	}
-	if marks <= card {
-		t.Errorf("the marks are stamped %d against the card's %d, want them arriving after it", marks, card)
+	if same != second {
+		t.Errorf("the bar changed inside a spell, from %d to %d", second, same)
 	}
 }
 

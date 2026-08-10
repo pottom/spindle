@@ -557,6 +557,11 @@ type faceState struct {
 	bar  int64
 	was  bool
 
+	// forTrack is the record the count below belongs to, and seen how many
+	// visits it has had. See faceVisitsMost.
+	forTrack string
+	seen     int
+
 	// picked is who the key has walked to, so pressing it again brings on the
 	// next of them rather than the same one over again; shown is when the face
 	// was last asked for by hand, and stepped which expression it walked to.
@@ -611,6 +616,14 @@ func (m *Model) faceFlow() {
 	// was on for. Both, because a bar at the very top of a record is stamped
 	// nought, which is also what the field holds before he has ever been on.
 	if up && (!was || m.words.starts != m.face.bar) {
+		// Counted per record, so that a long instrumental does not turn a visit
+		// into the furniture. A record he has not been on for yet starts the
+		// count again. See faceVisitsMost.
+		if m.ps != nil && m.face.forTrack != m.ps.TrackID {
+			m.face.forTrack, m.face.seen = m.ps.TrackID, 0
+		}
+		m.face.seen++
+
 		m.face.bar, m.face.came = m.words.starts, now
 		m.face.turns, m.face.did = 0, false
 		m.face.rested, m.face.act = time.Time{}, ""
@@ -1175,7 +1188,7 @@ func (m Model) faceUp() bool {
 		return true
 	}
 
-	if !faceDealt(m.words.starts) || !m.faceFits() {
+	if m.faceHadEnough() || !faceDealt(m.words.starts) || !m.faceFits() {
 		return false
 	}
 
@@ -1200,6 +1213,28 @@ func (m Model) faceFits() bool {
 		return true
 	}
 	return m.words.starts+faceEnters.Milliseconds()+m.faceStay().Milliseconds() <= gap.to
+}
+
+// faceVisitsMost is how many times a figure may come on during one record.
+//
+// Two. Dealing one bar in three was fair to the bars and wrong about the
+// record: an instrumental stamps a fresh bar every half minute and a song with
+// gaps in it has one every few lines, so over four minutes a figure was walking
+// on again and again, and what is meant to be a visit became the furniture. A
+// thing that happens twice in a record is a thing you look up at; a thing that
+// happens eight times is a thing you stop seeing.
+//
+// The key is not counted and is never refused: somebody who wants to see them
+// can have as many as they like. This is only about what the screen does on its
+// own. See faceShow.
+const faceVisitsMost = 2
+
+// faceHadEnough reports that this record has had its share of visitors.
+func (m Model) faceHadEnough() bool {
+	if m.ps == nil {
+		return false
+	}
+	return m.face.forTrack == m.ps.TrackID && m.face.seen >= faceVisitsMost
 }
 
 // faceDealt is whether the bar starting at a given moment gets a face rather

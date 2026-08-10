@@ -398,22 +398,21 @@ func TestTheMarksAreNotDealtOnTopOfThemselves(t *testing.T) {
 	m.ps.TrackID, m.ps.Title = "wordless", "An Instrumental"
 	m.ps.Artists, m.ps.Album = []string{"The Band"}, "An Album"
 	m.ps.Duration = 20 * time.Minute
+	m.lyrics.forTrack, m.lyrics.missing = m.ps.TrackID, true
 
-	// Over a long record, no turn opens with the marks: what is dealt is a name
-	// or nothing, and nothing is the marks having the whole turn.
+	// Over a long record every spell is the marks, and the same marks all the
+	// way through: the one picture a record with no words of its own gets.
 	for spell := range 40 {
-		lines, _ := func() ([]string, int64) {
-			m.setProgress(time.Duration(spell)*wordsSpell + time.Second)
-			return m.wordsIdle()
-		}()
-		if len(lines) == 1 && wordsBeats(lines[0]) {
-			// The marks, which is what a turn dealt nothing looks like — and it
-			// must be the same picture all the way through the turn.
-			m.setProgress(time.Duration(spell)*wordsSpell + wordsTitle + time.Second)
-			later, _ := m.wordsIdle()
-			if len(later) != 1 || later[0] != lines[0] {
-				t.Errorf("turn %d opened with marks and then changed to %q", spell, later)
-			}
+		m.setProgress(time.Duration(spell)*wordsSpell + time.Second)
+		lines, _ := m.wordsIdle()
+		if len(lines) != 1 || !wordsBeats(lines[0]) {
+			t.Fatalf("spell %d opened with %q, want the marks", spell, lines)
+		}
+
+		m.setProgress(time.Duration(spell)*wordsSpell + wordsSpell/2)
+		later, _ := m.wordsIdle()
+		if len(later) != 1 || later[0] != lines[0] {
+			t.Errorf("spell %d opened with marks and then changed to %q", spell, later)
 		}
 	}
 }

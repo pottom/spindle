@@ -773,9 +773,6 @@ const (
 	// in, as against a line of words, which is given all of it.
 	wordsMark = 0.34
 
-	// wordsTitle is how long the record's name is worth at the top of it.
-	wordsTitle = 5 * time.Second
-
 	// wordsCeiling is the row the hanging picture starts at.
 	//
 	// It used to be the third, because the track's name and the clock were set
