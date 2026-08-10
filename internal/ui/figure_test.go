@@ -1024,3 +1024,58 @@ func TestSometimesHeMoonwalks(t *testing.T) {
 		t.Error("the moonwalk is drawn exactly like the walk")
 	}
 }
+
+// Whoever came on is who is on, for the whole of the visit.
+//
+// The key's own window and the length of a visit are two different clocks, and
+// the visit is the longer of them. Asked afresh once the key's window had
+// closed, the screen handed back whoever the bar would have dealt — so a drawn
+// figure walked off and the one this code draws itself waved his way in from the
+// side to finish somebody else's visit. Nobody had asked for him, and from the
+// room it read as a second figure arriving.
+func TestOneVisitIsOneFigure(t *testing.T) {
+	m := scopeModel(160, 46)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 6 * time.Minute
+	m.words.beats, m.words.text = true, wordsNotes
+
+	// A bar the deal would give to the one this code draws itself, and a drawn
+	// figure sent for over the top of it — which is the pair that used to swap.
+	var bar int64 = -1
+	for at := range int64(400) {
+		if faceWhoFor(at*7_000) == "" {
+			bar = at * 7_000
+			break
+		}
+	}
+	if bar < 0 {
+		t.Skip("no bar in four hundred goes to the geometry")
+	}
+	m.words.starts = bar
+	m.setProgress(time.Duration(bar) * time.Millisecond)
+
+	m.faceShow()
+	who := m.faceWho()
+	if who == "" {
+		t.Skip("the key walked to the geometry as well, so there is nothing to tell apart")
+	}
+	m.faceFlow()
+	t.Logf("the bar would have dealt the geometry; the key brought %q, and the visit runs %s against the key's %s",
+		who, m.faceStayFor(bar), faceShows)
+
+	// The key's window closes while the visit is still running.
+	m.face.shown = time.Now().Add(-faceShows - time.Second)
+	if !m.faceUp() {
+		t.Fatal("the visit ended with the key's window, so there is nothing to test")
+	}
+	if got := m.faceWho(); got != who {
+		t.Errorf("the key's window closed and the figure changed from %q to %q mid-visit", who, got)
+	}
+
+	// And once the visit is over, the screen is nobody's again.
+	m.face.came = time.Now().Add(-m.faceStayFor(bar) - time.Second)
+	if m.faceUp() {
+		t.Error("the visit ran past its own stay")
+	}
+}

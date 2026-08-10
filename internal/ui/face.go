@@ -551,10 +551,11 @@ type faceState struct {
 	wasLoud float32
 
 	// came is when the face last arrived, which is what it is drawn on from,
-	// bar is the moment of the bar it arrived for, and was says it was up last
-	// frame — which is how its going is noticed.
+	// bar is the moment of the bar it arrived for, on is which of them walked
+	// on, and was says it was up last frame — which is how its going is noticed.
 	came time.Time
 	bar  int64
+	on   string
 	was  bool
 
 	// picked is who the key has walked to, so pressing it again brings on the
@@ -602,6 +603,10 @@ func (m *Model) faceFlow() {
 
 	// If he went out with both arms up, they go off as he does.
 	up, was := m.faceUp(), m.face.was
+
+	// Who is on, asked before the visit below is marked: from there on the
+	// answer is this one, and asking again would be asking it of itself.
+	who := m.faceWho()
 	if was && !up && m.face.doing == faceGaping {
 		m.faceSparks(m.width, m.height)
 	}
@@ -612,6 +617,11 @@ func (m *Model) faceFlow() {
 	// nought, which is also what the field holds before he has ever been on.
 	if up && (!was || m.words.starts != m.face.bar) {
 		m.face.bar, m.face.came = m.words.starts, now
+
+		// Who it is, kept for the whole visit rather than asked again later: the
+		// key's window is shorter than a stay, and the answer changes when it
+		// closes. See faceWho.
+		m.face.on = who
 		m.face.turns, m.face.did = 0, false
 		m.face.rested, m.face.act = time.Time{}, ""
 		m.face.crumbled = 1

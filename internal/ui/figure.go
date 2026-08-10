@@ -483,6 +483,18 @@ func (m Model) faceWho() string {
 		return ""
 	}
 
+	// Whoever came on stays the one who is on, for the whole of the visit.
+	//
+	// The key's own window and the length of a visit are two different clocks,
+	// and the visit is the longer of them. Asked afresh once the key's window
+	// had closed, this handed back whoever the bar would have dealt — so a
+	// drawn figure walked off and the one this code draws itself waved his way
+	// in from the side to finish somebody else's visit. Nobody had asked for
+	// him, and from the room it read as a second figure arriving.
+	if m.face.was && !m.face.came.IsZero() && time.Since(m.face.came) < m.faceStayFor(m.face.bar) {
+		return m.face.on
+	}
+
 	// Asked for by hand: whoever the key has walked to. Pressing it again is
 	// somebody wanting to see the next one, not the same one over again.
 	if !m.face.shown.IsZero() && time.Since(m.face.shown) < faceShows {
