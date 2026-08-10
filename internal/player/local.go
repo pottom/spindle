@@ -328,8 +328,31 @@ func (l *Local) PlayContextAt(ctx context.Context, uri string, offset int) error
 	return l.web.PlayContextAtOn(ctx, uri, offset, l.deviceID())
 }
 
+// PlayTracks starts a run of tracks that is not a list Spotify has a name for.
+//
+// One caller: liked songs, which is the only screen here whose tracks belong to
+// no context. Albums and playlists are started by naming them, and a named
+// context is what lets the music carry on past the end of it — see PlayTrack.
+//
+// So the first track is started through the daemon, which gives the run a
+// context of one track, and the rest are handed over as the queue. A bare uris
+// list over the Web API gives Spotify nothing to build a station from, and the
+// run stops dead on the last liked song.
 func (l *Local) PlayTracks(ctx context.Context, trackIDs []string, offset int) error {
-	return l.web.PlayTracksOn(ctx, trackIDs, offset, l.deviceID())
+	if offset < 0 || offset >= len(trackIDs) {
+		return l.web.PlayTracksOn(ctx, trackIDs, offset, l.deviceID())
+	}
+
+	if err := l.post(ctx, "/player/play", struct {
+		Uri string `json:"uri"`
+	}{Uri: trackURI(trackIDs[offset])}); err != nil {
+		return l.web.PlayTracksOn(ctx, trackIDs, offset, l.deviceID())
+	}
+
+	if rest := trackIDs[offset+1:]; len(rest) > 0 {
+		return l.SetQueue(ctx, rest)
+	}
+	return nil
 }
 
 // deviceID is the daemon's own Connect device, as it last reported it. Calls
