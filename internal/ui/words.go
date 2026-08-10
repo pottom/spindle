@@ -953,7 +953,7 @@ func (m Model) wordsLines(w, rows int) []string {
 		m.wordsUnder(grid, paint, hue, w, rows, tall, head)
 	}
 
-	return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
+	return m.drawCellsIn(w, rows, grid, paint, hue, m.styles.Words, m.styles.WordsSeq)
 }
 
 // wordsUnder draws the meter into the rows the words left over, and its water

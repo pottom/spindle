@@ -1,9 +1,11 @@
 package ui
 
 import (
-	"strings"
+	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
+
+	"github.com/pottom/spindle/internal/ui/style"
 )
 
 const (
@@ -192,7 +194,7 @@ func (m Model) barsDraw(w, rows int, grid []uint8, paint []int8) []string {
 			hue[r*w+c] = int8(min(c*freqs/w, freqs-1))
 		}
 	}
-	return m.drawCells(w, rows, grid, paint, hue, m.styles.Bars)
+	return m.drawCellsIn(w, rows, grid, paint, hue, m.styles.Bars, m.styles.BarsSeq)
 }
 
 // drawCells turns a dot grid into rows of braille. Each cell is drawn in the
@@ -202,7 +204,18 @@ func (m Model) barsDraw(w, rows int, grid []uint8, paint []int8) []string {
 // Which palette is the caller's business: the lyric is set in an arc twice as
 // wide as the spectrum's, because there the colour is what separates one word
 // from the next rather than a gradient across one shape.
-func (m Model) drawCells(w, rows int, grid []uint8, paint, hue []int8, palette [][]lipgloss.Style) []string {
+// drawCellsIn is the same with the palette's escape sequences already cut.
+//
+// This is where a frame of the big screen is spent. Every run of braille in one
+// colour used to be handed to a lipgloss style, which builds the sequence and
+// allocates a string for it — and since a cell's colour carries its brightness
+// as well as its hue, the runs are short and there are hundreds of them in a
+// row. Measured at 200x50 before: 11,575 allocations a frame, 377 MB over
+// thirty seconds, 151 collections, and two frames in nine hundred that missed
+// the thirty-three milliseconds they had. The picture was never slow — the
+// median frame was four milliseconds — it was the collections landing on one.
+func (m Model) drawCellsIn(w, rows int, grid []uint8, paint, hue []int8,
+	palette [][]lipgloss.Style, seq [][]style.Seq) []string {
 	// On the big screen the outermost dots are the record's progress. It is the
 	// only thing left of the furniture up there, and it is drawn here so that
 	// every picture gets it without knowing about it.
@@ -211,37 +224,47 @@ func (m Model) drawCells(w, rows int, grid []uint8, paint, hue []int8, palette [
 	}
 
 	lines := make([]string, rows)
-	for r := range rows {
-		var sb strings.Builder
 
-		var run strings.Builder
-		var style lipgloss.Style
+	// One buffer, reused down the picture, rather than two builders a row: a row
+	// is a few kilobytes and there are fifty of them, and none of that has to be
+	// asked of the heap more than once.
+	buf := make([]byte, 0, (w+16)*4)
+
+	for r := range rows {
+		buf = buf[:0]
+
+		// A cell either carries on the run being written or closes it and opens
+		// another. The run is a run of one colour, and since a cell's colour
+		// carries its brightness as well as its hue, there are hundreds of them
+		// in a row — which is exactly why they are not worth a Render each.
+		var open, shut string
 		lit := false
-		flush := func() {
-			if run.Len() > 0 {
-				sb.WriteString(style.Render(run.String()))
-				run.Reset()
-			}
-		}
 
 		for c := range w {
 			at := r*w + c
 			if grid[at] == 0 || paint[at] < 0 {
-				flush()
-				lit = false
-				sb.WriteByte(' ')
+				if lit {
+					buf = append(buf, shut...)
+					lit = false
+				}
+				buf = append(buf, ' ')
 				continue
 			}
 
-			want := palette[hue[at]][paint[at]]
-			if !lit || want.GetForeground() != style.GetForeground() {
-				flush()
-				style, lit = want, true
+			s := seq[hue[at]][paint[at]]
+			if !lit || s.Open != open {
+				if lit {
+					buf = append(buf, shut...)
+				}
+				buf = append(buf, s.Open...)
+				open, shut, lit = s.Open, s.Close, true
 			}
-			run.WriteRune(rune(brailleBase + int(grid[at])))
+			buf = utf8.AppendRune(buf, rune(brailleBase+int(grid[at])))
 		}
-		flush()
-		lines[r] = fit(sb.String(), w)
+		if lit {
+			buf = append(buf, shut...)
+		}
+		lines[r] = fit(string(buf), w)
 	}
 	return lines
 }

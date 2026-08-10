@@ -242,7 +242,7 @@ func (m Model) figureLines(w, rows int) []string {
 		if tall, head := m.wordsBandNow(w, rows); tall >= wordsBand {
 			m.wordsUnder(grid, paint, hue, w, rows, tall, head)
 		}
-		return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
+		return m.drawCellsIn(w, rows, grid, paint, hue, m.styles.Words, m.styles.WordsSeq)
 	}
 
 	// And a face, if the figure left a hole for one. A figure drawn with a face
@@ -262,7 +262,7 @@ func (m Model) figureLines(w, rows int) []string {
 	if tall, head := m.wordsBandNow(w, rows); tall >= wordsBand {
 		m.wordsUnder(grid, paint, hue, w, rows, tall, head)
 	}
-	return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
+	return m.drawCellsIn(w, rows, grid, paint, hue, m.styles.Words, m.styles.WordsSeq)
 }
 
 // figureTurned reports that the drawing has to be read the other way round.

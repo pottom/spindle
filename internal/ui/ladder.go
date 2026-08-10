@@ -1,10 +1,6 @@
 package ui
 
-import (
-	"strings"
-
-	"charm.land/lipgloss/v2"
-)
+import "unicode/utf8"
 
 // The ladder: the spectrum as a stack of lamps.
 //
@@ -85,37 +81,42 @@ func (m Model) ladderLines(w, rows int) []string {
 // ladderDraw turns the lamps into rows.
 func (m Model) ladderDraw(w, rows int, lamp []int8) []string {
 	lines := make([]string, rows)
-	for r := range rows {
-		var sb strings.Builder
 
-		var run strings.Builder
-		var style lipgloss.Style
+	// Written straight out rather than handed to a style a run at a time: see
+	// drawCellsIn, which this is the one-dimensional twin of.
+	buf := make([]byte, 0, (w+16)*4)
+
+	for r := range rows {
+		buf = buf[:0]
+
+		var open, shut string
 		lit := false
-		flush := func() {
-			if run.Len() > 0 {
-				sb.WriteString(style.Render(run.String()))
-				run.Reset()
-			}
-		}
 
 		for c := range w {
 			step := lamp[r*w+c]
 			if step < 0 {
-				flush()
-				lit = false
-				sb.WriteByte(' ')
+				if lit {
+					buf = append(buf, shut...)
+					lit = false
+				}
+				buf = append(buf, ' ')
 				continue
 			}
 
-			want := m.styles.Ladder[step]
-			if !lit || want.GetForeground() != style.GetForeground() {
-				flush()
-				style, lit = want, true
+			s := m.styles.LadderSeq[step]
+			if !lit || s.Open != open {
+				if lit {
+					buf = append(buf, shut...)
+				}
+				buf = append(buf, s.Open...)
+				open, shut, lit = s.Open, s.Close, true
 			}
-			run.WriteRune(ladderSegment)
+			buf = utf8.AppendRune(buf, ladderSegment)
 		}
-		flush()
-		lines[r] = fit(sb.String(), w)
+		if lit {
+			buf = append(buf, shut...)
+		}
+		lines[r] = fit(string(buf), w)
 	}
 	return lines
 }

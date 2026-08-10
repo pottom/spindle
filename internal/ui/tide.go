@@ -162,9 +162,11 @@ func (m *Model) tideFlow() {
 	for i := range want {
 		if i < len(m.styles.Words) && i < len(m.tide.palette.Words) {
 			m.styles.Words[i] = m.tide.palette.Words[i]
+			m.styles.WordsSeq[i] = m.tide.palette.WordsSeq[i]
 		}
 		if i < len(m.styles.Bars) && i < len(m.tide.palette.Bars) {
 			m.styles.Bars[i] = m.tide.palette.Bars[i]
+			m.styles.BarsSeq[i] = m.tide.palette.BarsSeq[i]
 		}
 	}
 }

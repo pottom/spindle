@@ -127,5 +127,5 @@ func (m Model) wordsIdleArt(w, rows int) []string {
 	}
 	m.wordsUnder(grid, paint, hue, w, rows, tall, head)
 
-	return m.drawCells(w, rows, grid, paint, hue, m.styles.Words)
+	return m.drawCellsIn(w, rows, grid, paint, hue, m.styles.Words, m.styles.WordsSeq)
 }

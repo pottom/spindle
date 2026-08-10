@@ -307,7 +307,7 @@ func (m Model) stageArt(w, rows int) []string {
 		place(d.col, int(d.at), int8(min(int(d.bright*float32(levels)), levels-1)))
 	}
 
-	return m.drawCells(w, rows, grid, paint, hue, m.styles.Bars)
+	return m.drawCellsIn(w, rows, grid, paint, hue, m.styles.Bars, m.styles.BarsSeq)
 }
 
 // stageSpan is how many dot rows a column has to rise through, and whether the

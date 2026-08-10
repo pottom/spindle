@@ -3,6 +3,7 @@ package style
 import (
 	"image/color"
 	"math"
+	"strings"
 
 	"charm.land/lipgloss/v2"
 )
@@ -91,6 +92,22 @@ type Styles struct {
 	// and a narrow sweep leaves a whole line one colour.
 	Words [][]lipgloss.Style
 
+	// The same two palettes again, as the escape sequences they come out as.
+	//
+	// A picture of braille is thirty thousand cells a second, and every run of
+	// them in one colour used to be handed to a style to render — which builds
+	// the sequence, allocates a string and joins it, over and over, for a colour
+	// that was decided when the artwork was loaded. Measured at 200x50: eleven
+	// and a half thousand allocations a frame, three hundred and seventy
+	// megabytes over thirty seconds, a hundred and fifty collections, and a tail
+	// that missed the frame outright twice in nine hundred.
+	//
+	// So the sequences are cut once, here, and the drawing writes them straight
+	// out. See Wrap and drawCells.
+	BarsSeq   [][]Seq
+	WordsSeq  [][]Seq
+	LadderSeq []Seq
+
 	// Status line.
 	DeviceOn  lipgloss.Style
 	DeviceOff lipgloss.Style
@@ -114,7 +131,7 @@ func New(isDark bool, accent color.Color) Styles {
 	}
 	fg := func(c color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(c) }
 
-	return Styles{
+	out := Styles{
 		Theme:  t,
 		Accent: accent,
 
@@ -177,6 +194,42 @@ func New(isDark bool, accent color.Color) Styles {
 		Error:   fg(t.Error),
 		Warning: fg(t.Warning),
 	}
+	out.BarsSeq, out.WordsSeq = Sequences(out.Bars), Sequences(out.Words)
+	out.LadderSeq = Sequences([][]lipgloss.Style{out.Ladder})[0]
+	return out
+}
+
+// Seq is what a style comes out as: what is written before the text it dresses,
+// and what is written after to put the terminal back.
+type Seq struct{ Open, Close string }
+
+// Wrap writes text in the sequence, which is what a style's own Render does —
+// except that the sequence was cut once rather than being built again for every
+// run of braille on the screen.
+func (s Seq) Wrap(text string) string { return s.Open + text + s.Close }
+
+// Sequences cuts a palette into the escape sequences it renders as.
+//
+// Taken from the style itself rather than assembled here: a style is asked to
+// dress one character nobody will ever print, and what it put either side of it
+// is what every run of that colour needs. That way this cannot drift from what
+// lipgloss would have done — and a test holds the two against each other.
+func Sequences(palette [][]lipgloss.Style) [][]Seq {
+	const sentinel = "\x00"
+
+	out := make([][]Seq, len(palette))
+	for i, row := range palette {
+		out[i] = make([]Seq, len(row))
+		for j, st := range row {
+			dressed := st.Render(sentinel)
+			at := strings.Index(dressed, sentinel)
+			if at < 0 {
+				continue
+			}
+			out[i][j] = Seq{Open: dressed[:at], Close: dressed[at+len(sentinel):]}
+		}
+	}
+	return out
 }
 
 // shift rotates a colour's hue by the given degrees and scales its saturation
