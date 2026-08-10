@@ -197,6 +197,10 @@ type Model struct {
 	// stage is the visualiser with the whole terminal to itself. See stage.go.
 	stage stageState
 
+	// joins is where the record changes, which is when the picture changes with
+	// it. See joins.go.
+	joins joinsState
+
 	// face is what goes in the marks' place when the record is given a face
 	// rather than three notes. See face.go.
 	face faceState

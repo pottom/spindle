@@ -65,6 +65,18 @@ func (m Model) wordsWordless() bool {
 // halves of a spell — the card and the music — are worked out from one clock.
 func (m Model) wordsSpells() (int, time.Duration) {
 	gone := max(m.elapsed(), 0)
+
+	// The record's own joins, where it has any. What this used to be was the
+	// clock: a turn every thirty seconds, landing wherever the half minute fell
+	// on a screen where everything else answers the record. Now the turn is
+	// where the record turns — see joins.go, and the measurement in it.
+	//
+	// Still a count and a distance into it, because everything downstream reads
+	// it that way: the count stamps the bar, and the distance is how far into
+	// this stretch of record the screen has got.
+	if at := m.joinsAt(); at > 0 {
+		return int(at / wordsSpell), max(gone-at, 0)
+	}
 	return int(gone / wordsSpell), gone % wordsSpell
 }
 

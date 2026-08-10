@@ -289,6 +289,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		tideAsk := m.tideCmd()
 
 		if m.stage.on && m.scopeMode().words() {
+			m.joinsFlow(int(time.Second / scopeInterval))
 			m.wordsFlow(m.width, m.height)
 			m.faceFlow()
 			m.wordsEase(m.width, m.height)
