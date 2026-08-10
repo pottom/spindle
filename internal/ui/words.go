@@ -1453,9 +1453,77 @@ func (m *Model) wordsGrind() tea.Cmd {
 		return nil
 	}
 
+	// A bar of marks may be drawn rather than set. Which it is comes from the
+	// bar, so a record shows both — see markCastFor — and when it is drawn the
+	// picture is already dots: there is nothing to send for and nothing to wait
+	// for, so it goes up in this frame rather than the next.
+	if m.words.beats {
+		if cast := markCastFor(starts); cast != "" {
+			if grain, layout, ok := markPicture(cast, m.width, m.height); ok {
+				m.wordsAdopt(grain, layout, text)
+				m.words.cellsX, m.words.cellsY = m.width, m.height
+				m.words.leanAt = starts
+				return nil
+			}
+		}
+	}
+
 	m.words.asked, m.words.askedX, m.words.askedY = text, m.width, m.height
 	m.words.leanAt = starts
 	return wordsCmd(lines, m.width, m.height)
+}
+
+// wordsAdopt puts a picture on the screen: the one that was there is given
+// notice, and this one is told how to arrive.
+//
+// Shared by the two ways a picture is made. A line of type is set by the face,
+// off this goroutine, and comes back as a message; a bar of drawn marks is
+// already dots and is put up in the frame it was asked for. What happens to it
+// once it is here is the same either way.
+func (m *Model) wordsAdopt(grain cover.Grain, where msg.WordLayout, text string) {
+	// What is on screen is given notice, and goes out the way the line before
+	// it came in.
+	if m.words.have.DotsX == grain.DotsX {
+		m.words.was, m.words.wasWhere = m.words.have, m.words.where
+		m.words.went, m.words.leave = time.Now(), m.words.move
+
+		// A row of marks goes off the way a row of anything goes when somebody
+		// walks down it: one bursts, then the next. See wordsPop.
+		//
+		// Asked of the text that is leaving rather than of the flag, which by
+		// now says what is arriving.
+		if wordsBeats(m.words.text) {
+			m.words.leave = wordsPopping
+		}
+	}
+
+	m.words.have, m.words.text = grain, text
+	m.words.move = wordsMoveFor(text)
+	if m.words.telling {
+		// The one picture that is not dealt its arrival: the record's name comes
+		// in from outside every time, and the marks it took the bar from go out
+		// the way it came. A ceremony has to be the same twice or it is just
+		// another transition.
+		m.words.move = wordsBursting
+	}
+	m.words.where = where
+
+	// Wound back so that the gathering finishes as the line is sung rather than
+	// starting then: whatever is left of the wait is taken off what the
+	// gathering costs.
+	//
+	// Except the record's name, which is not sung and so has nothing to be on
+	// time for. Its moment is when it starts arriving, not when it has to be
+	// there — wound back it would be complete before anybody saw it move, and
+	// the card that comes up on the key would be the livelier of the two for no
+	// reason anyone could name.
+	if m.words.telling {
+		m.words.since = time.Now()
+		return
+	}
+
+	wait := time.Duration(m.words.starts-m.wordsClock()) * time.Millisecond
+	m.words.since = time.Now().Add(-max(wordsGather-wait, 0))
 }
 
 // wordsFlow keeps the range of sound the colours are spread over.

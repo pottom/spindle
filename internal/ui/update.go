@@ -248,50 +248,8 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	case msg.WordsReady:
 		m.words.asked = ""
-		// What is on screen is given notice, and goes out the way the line
-		// before it came in.
-		if m.words.have.DotsX == message.Grain.DotsX {
-			m.words.was, m.words.wasWhere = m.words.have, m.words.where
-			m.words.went, m.words.leave = time.Now(), m.words.move
-
-			// A row of marks goes off the way a row of anything goes when
-			// somebody walks down it: one bursts, then the next. See wordsPop.
-			//
-			// Asked of the text that is leaving rather than of the flag, which
-			// by now says what is arriving.
-			if wordsBeats(m.words.text) {
-				m.words.leave = wordsPopping
-			}
-		}
-
-		m.words.have, m.words.text = message.Grain, message.Text
-		m.words.move = wordsMoveFor(message.Text)
-		if m.words.telling {
-			// The one picture that is not dealt its arrival: the record's name
-			// comes in from outside every time, and the marks it took the bar
-			// from go out the way it came. A ceremony has to be the same twice
-			// or it is just another transition.
-			m.words.move = wordsBursting
-		}
-		m.words.where = message.Words
+		m.wordsAdopt(message.Grain, message.Words, message.Text)
 		m.words.cellsX, m.words.cellsY = message.CellsX, message.CellsY
-
-		// Wound back so that the gathering finishes as the line is sung rather
-		// than starting then: whatever is left of the wait is taken off what the
-		// gathering costs.
-		//
-		// Except the record's name, which is not sung and so has nothing to be
-		// on time for. Its moment is when it starts arriving, not when it has to
-		// be there — wound back it would be complete before anybody saw it move,
-		// and the card that comes up on the key would be the livelier of the two
-		// for no reason anyone could name.
-		if m.words.telling {
-			m.words.since = time.Now()
-			return m, nil
-		}
-
-		wait := time.Duration(m.words.starts-m.wordsClock()) * time.Millisecond
-		m.words.since = time.Now().Add(-max(wordsGather-wait, 0))
 		return m, nil
 
 	case msg.WaveformReady:
