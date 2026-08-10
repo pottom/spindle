@@ -1,0 +1,34 @@
+{
+  "name": "dance",
+  "from": "drawn here",
+  "licence": "ours",
+  "//": "Seven dancers, drawn for this screen rather than found. The row keeps time by leaning — a shear about its middle, so the feet stay and the head travels — and that only reads as dancing on a figure planted on two feet with its arms free. Everything here stands square, stands tall, and keeps its arms up where the lean moves them most. The order is the sound: heaviest at the low end, lightest at the top of the range. Four of them make the letters, for anybody who spots it.",
+  "marks": [
+    "stomp.svg",
+    "letter-a.svg",
+    "letter-m.svg",
+    "letter-c.svg",
+    "point.svg",
+    "letter-y.svg",
+    "star.svg"
+  ],
+  "//faces": "Not turned in: these are drawn square on, and a mirrored dancer is the same dancer.",
+  "heights": [
+    {
+      "tall": 24,
+      "thick": 3
+    },
+    {
+      "tall": 36,
+      "thick": 3
+    },
+    {
+      "tall": 54,
+      "thick": 3
+    },
+    {
+      "tall": 72,
+      "thick": 3
+    }
+  ]
+}
