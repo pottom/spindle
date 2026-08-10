@@ -124,6 +124,12 @@ func scopeFrameCmd(p player.Player, mode scopeMode) tea.Cmd {
 	return func() tea.Msg {
 		time.Sleep(scopeInterval)
 
+		// How long the daemon takes to answer is timed, because a frame is the
+		// wait plus this: the picture is only as steady as the answers are. See
+		// slow.go.
+		asked := time.Now()
+		defer func() { slowAsked(time.Since(asked)) }()
+
 		// Only what is being drawn is asked for: the two measurements are
 		// independent, and fetching both would double the work for a frame
 		// that shows one.

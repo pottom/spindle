@@ -47,9 +47,11 @@ const (
 var slowState struct {
 	mu sync.Mutex
 
-	last   time.Time // when the last frame's update began
-	began  time.Time // when this frame's update began
-	update time.Duration
+	last    time.Time // when the last frame's update began
+	began   time.Time // when this frame's update began
+	update  time.Duration
+	pending bool          // a frame is open and has not been closed off yet
+	asked   time.Duration // how long the daemon took to answer for it
 
 	frames int
 	missed int
@@ -63,7 +65,17 @@ func slowFrameBegan() {
 	slowState.mu.Lock()
 	defer slowState.mu.Unlock()
 
-	slowState.began = time.Now()
+	slowState.began, slowState.pending = time.Now(), true
+}
+
+// slowAsked records how long the daemon took to answer the request this frame
+// was waiting on. The picture is driven by asking the daemon for a frame and
+// waiting, so a slow answer is a late frame however fast this program is.
+func slowAsked(d time.Duration) {
+	slowState.mu.Lock()
+	defer slowState.mu.Unlock()
+
+	slowState.asked = d
 }
 
 // slowUpdateDone is called when the update is over and the render is about to
@@ -85,6 +97,15 @@ func slowUpdateDone() {
 func slowRenderDone(m Model, render time.Duration) {
 	slowState.mu.Lock()
 	defer slowState.mu.Unlock()
+
+	// Only a frame is closed off. View runs for every message the interface
+	// takes — a keypress, a list arriving — and those are not frames; timed as
+	// if they were, the first one before any frame at all reported a gap since
+	// the zero time, which is where the nonsense in the first reading came from.
+	if !slowState.pending {
+		return
+	}
+	slowState.pending = false
 
 	began, update := slowState.began, slowState.update
 	gap := began.Sub(slowState.last)
@@ -109,6 +130,7 @@ func slowRenderDone(m Model, render time.Duration) {
 		Update int64  `json:"update_us"`
 		Render int64  `json:"render_us"`
 		Elsew  int64  `json:"elsewhere_us"`
+		Asked  int64  `json:"daemon_us"`
 		Screen string `json:"screen"`
 		Mode   int    `json:"mode"`
 		Wide   int    `json:"wide"`
@@ -123,6 +145,7 @@ func slowRenderDone(m Model, render time.Duration) {
 		Update: update.Microseconds(),
 		Render: render.Microseconds(),
 		Elsew:  (gap - update - render).Microseconds(),
+		Asked:  slowState.asked.Microseconds(),
 		Screen: slowScreen(m),
 		Mode:   int(m.scopeMode()),
 		Wide:   m.width,
@@ -162,4 +185,3 @@ func slowScreen(m Model) string {
 		return "player"
 	}
 }
-
