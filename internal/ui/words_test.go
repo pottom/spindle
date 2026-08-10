@@ -1369,3 +1369,47 @@ func TestALineIsLitEvenly(t *testing.T) {
 		t.Error("the marks were lit evenly, want each of them burning by its own part of the sound")
 	}
 }
+
+// Nothing of one record is left on the screen of the next.
+//
+// A picture is held until something replaces it, and what replaces it hands the
+// old one to the leaving animation — so the last line of the record before flew
+// out across the first line of this one, on every skip. The picture belongs to
+// the record it was made for, and goes with it.
+func TestAPictureGoesWithItsRecord(t *testing.T) {
+	const w, rows = 90, 14
+
+	m := scopeModel(100, 44)
+	m.width, m.height = w, rows
+	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
+	m.ps.Duration = 3 * time.Minute
+	m.lyrics.forTrack, m.lyrics.synced = m.ps.TrackID, true
+	m.lyrics.lines = []player.Lyric{{At: 0, Words: "the line of the record before"}}
+	m.setProgress(time.Second)
+
+	// The record before, with a line of it on the screen.
+	m.wordsGrind()
+	img, layout, ok := wordsImage([]string{"the line of the record before"}, w*dotsPerCellX, rows*dotsPerCellY)
+	if !ok {
+		t.Fatal("the line could not be drawn")
+	}
+	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	m.words.where, m.words.text = layout, "the line of the record before"
+	m.words.cellsX, m.words.cellsY = w, rows
+	if m.words.have.DotsX == 0 {
+		t.Fatal("the record before has no picture, so there is nothing to leave behind")
+	}
+
+	// And now somebody skips.
+	m.ps.TrackID = "the next record"
+	m.lyrics.forTrack, m.lyrics.lines = "", nil
+	m.wordsGrind()
+
+	t.Logf("after the skip the screen holds %q, %d dots wide", m.words.text, m.words.have.DotsX)
+	if m.words.have.DotsX != 0 || m.words.text != "" {
+		t.Errorf("the picture of the record before survived the skip: %q", m.words.text)
+	}
+	if m.words.was.DotsX != 0 {
+		t.Error("the record before is still queued up to fly out across the next one")
+	}
+}

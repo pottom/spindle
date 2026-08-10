@@ -636,6 +636,10 @@ type wordsState struct {
 	// with and it follows the music instead.
 	beats bool
 
+	// forTrack is the record the picture was made for, so that nothing of one
+	// record is left on the screen of the next. See wordsGrind.
+	forTrack string
+
 	// forced is when the record's name was last asked for by hand, so that the
 	// one thing on this screen that happens on purpose can be seen on purpose.
 	forced time.Time
@@ -1394,6 +1398,19 @@ func wordsDrift(x, y int) (float32, float32) {
 // wordsGrind builds the picture for the line now, if what is held is not it or
 // not the size of this screen.
 func (m *Model) wordsGrind() tea.Cmd {
+	// A picture belongs to the record it was made for.
+	//
+	// Without this the last line of the record before is still held when the
+	// next one's first line arrives — and the arrival hands whatever is held to
+	// the leaving animation, so a sentence from the previous song flew out
+	// across the first line of this one. Every skip, every time.
+	if m.ps != nil && m.words.forTrack != m.ps.TrackID {
+		m.words.forTrack = m.ps.TrackID
+		m.words.have, m.words.was = cover.Grain{}, cover.Grain{}
+		m.words.where, m.words.wasWhere = msg.WordLayout{}, msg.WordLayout{}
+		m.words.text, m.words.asked = "", ""
+	}
+
 	lines, starts := m.wordsComing()
 	if len(lines) == 0 {
 		return nil
