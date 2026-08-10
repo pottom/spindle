@@ -196,3 +196,50 @@ func TestTheRowLeansEveryWay(t *testing.T) {
 		}
 	}
 }
+
+// The picture grows with the record.
+//
+// Nothing in the spectrum can say whether a record is building — the daemon
+// scales the bands to their own recent loudness, so a band reads the same in a
+// hush as in a chorus, and measured over ninety seconds the mean of them moved
+// between 0.50 and 0.60 while the quietest stretch sat at the top of the range.
+// What can say it is the scale itself, in decibels, which the daemon now hands
+// out beside the bands.
+func TestThePictureGrowsWithTheRecord(t *testing.T) {
+	m := scopeModel(120, 44)
+	m.scope.bands = make([]float32, 28)
+
+	// A record that has been between two loudnesses lately.
+	at := func(db float64) float32 {
+		m.scope.beat.Loud = db
+		m.swellFlow()
+		return m.swell()
+	}
+
+	// Open the range over the two ends, the way a record does over a minute.
+	for range 100 {
+		at(-30)
+		at(-12)
+	}
+
+	quiet, loud, middle := at(-30), at(-12), at(-21)
+	t.Logf("over a record that has run from -30 to -12 dB, a word rides %.1f dots where it is quietest, %.1f in the middle and %.1f where it is loudest",
+		quiet*wordsWordRide, middle*wordsWordRide, loud*wordsWordRide)
+
+	if quiet >= middle || middle >= loud {
+		t.Errorf("the picture stands at %.2f quiet, %.2f middling and %.2f loud, want it growing with the record", quiet, middle, loud)
+	}
+	if loud/quiet < 2 {
+		t.Errorf("the loudest passage moves %.2f and the quietest %.2f, want the difference worth seeing", loud, quiet)
+	}
+	if loud <= 1 {
+		t.Errorf("at its loudest the record throws the picture %.2f of its travel, want a build to go further than its resting size", loud)
+	}
+
+	// And with nothing heard yet, everything is at its resting size rather than
+	// at nothing.
+	fresh := scopeModel(120, 44)
+	if got := fresh.swell(); got != 1 {
+		t.Errorf("before anything has played the picture moves %.2f, want its whole travel", got)
+	}
+}

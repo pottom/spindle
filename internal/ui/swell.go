@@ -31,9 +31,21 @@ const (
 	swellSpan = 9
 
 	// swellLeast is how much of its travel the picture keeps at the quietest the
-	// record has been. Not nought: a lull is a quieter passage of music, not a
-	// picture that has been switched off.
-	swellLeast = 0.55
+	// record has been, and swellMost how much it is given at the loudest.
+	//
+	// Past one on purpose. Only shrinking the quiet passages makes a record
+	// smaller than it was and never bigger, and what a build should do is throw
+	// the picture further than its resting size. The two together are what turn
+	// a difference in loudness into a difference anybody notices.
+	//
+	// Swept over a recording rather than chosen. At 0.55 and 1.0 — shrinking
+	// only — six seconds of the quietest passage of a record moved 4.2 dots
+	// against 5.1 at its loudest, which is a quarter of a character and nothing
+	// anybody would see from a sofa. At these, the same six seconds run 4.5
+	// against 6.6, and moment to moment 2.4 against 8.1: a build throws the row
+	// three times as far as a lull.
+	swellLeast = 0.40
+	swellMost  = 1.35
 )
 
 // swellFlow keeps the range of loudness the record has been moving through.
@@ -71,5 +83,5 @@ func (m Model) swell() float32 {
 
 	span := max(m.words.swellHigh-m.words.swellLow, swellSpan)
 	at := float32((db - m.words.swellLow) / span)
-	return swellLeast + (1-swellLeast)*min(max(at, 0), 1)
+	return swellLeast + (swellMost-swellLeast)*min(max(at, 0), 1)
 }
