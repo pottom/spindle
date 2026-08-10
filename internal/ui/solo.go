@@ -73,6 +73,19 @@ func (m Model) soloGaps() []soloGap {
 	for i := 1; i < len(sung); i++ {
 		out = append(out, soloGap{sung[i-1] + soloHold.Milliseconds(), sung[i]})
 	}
+
+	// And the run-out, which is a gap like any other and was missing.
+	//
+	// A sheet stops at the last line somebody sings, and plenty of records go on
+	// for a minute after it — an outro, a fade, a whole instrumental coda. With
+	// nothing after the last line to make a gap against, the screen had nothing
+	// to put up and fell through to the picture it draws when nothing at all is
+	// set: the meter above and below and an empty band across the middle, for
+	// the rest of the record. Watched on Mike Mana's "Never The Same", that is
+	// everything from 1:55 to the end, every time it is played.
+	if last := sung[len(sung)-1] + soloHold.Milliseconds(); m.ps != nil && m.ps.Duration.Milliseconds() > last {
+		out = append(out, soloGap{last, m.ps.Duration.Milliseconds()})
+	}
 	return out
 }
 

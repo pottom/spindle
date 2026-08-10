@@ -416,3 +416,55 @@ func TestTheMarksAreNotDealtOnTopOfThemselves(t *testing.T) {
 		}
 	}
 }
+
+// The run-out is a gap like any other.
+//
+// A sheet stops at the last line somebody sings, and plenty of records go on for
+// a minute after it. With nothing after that line to make a gap against, the
+// screen had nothing to put up and fell through to the picture it draws when
+// nothing at all is set — the meter above and below and an empty band across the
+// middle — for the whole rest of the record. Measured on a real one: everything
+// from 1:55 to the end.
+func TestTheRunOutIsAGapLikeAnyOther(t *testing.T) {
+	m := scopeModel(120, 44)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 2*time.Minute + 54*time.Second
+	m.lyrics.forTrack, m.lyrics.synced = m.ps.TrackID, true
+	m.lyrics.lines = []player.Lyric{
+		{At: 20_000, Words: "the first line"},
+		{At: 40_000, Words: "the second line"},
+		{At: 110_000, Words: "the last line anybody sings"},
+	}
+
+	// While the singer is still coming back, the marks keep the gaps as before.
+	m.setProgress(70 * time.Second)
+	if _, in := m.soloNow(); !in {
+		t.Error("a thirty second stretch between two lines was not a gap")
+	}
+
+	// And after the last line, all the way to the end.
+	for _, at := range []time.Duration{117 * time.Second, 2 * time.Minute, 170 * time.Second} {
+		m.setProgress(at)
+		gap, in := m.soloNow()
+		if !in {
+			t.Errorf("%s in — past the last line and the six seconds it is held — the record is not in a gap", at)
+			continue
+		}
+		lines, _ := m.wordsComing()
+		if len(lines) != 1 || !wordsBeats(lines[0]) {
+			t.Errorf("%s in the screen has %q, want the marks", at, lines)
+		}
+		if gap.to != m.ps.Duration.Milliseconds() {
+			t.Errorf("the run-out ends at %dms, want the end of the record at %dms", gap.to, m.ps.Duration.Milliseconds())
+		}
+	}
+
+	// The last moments belong to nothing: a record with no duration to speak of
+	// gets no run-out rather than one of unknown length.
+	m.ps.Duration = 0
+	m.setProgress(2 * time.Minute)
+	if _, in := m.soloNow(); in {
+		t.Error("a record of unknown length was given a run-out anyway")
+	}
+}
