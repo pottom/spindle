@@ -1,0 +1,21 @@
+The marks in this set, and where they come from.
+
+  speaker.svg     Tabler Icons, "device-speaker"   MIT
+  piano.svg       Tabler Icons, "piano"            MIT
+  microphone.svg  Tabler Icons, "microphone-2"     MIT
+  guitar.svg      Tabler Icons, "guitar-pick"      MIT
+
+Tabler Icons — https://tabler.io/icons — Copyright (c) 2020-2024 Paweł Kuna,
+under the MIT licence. The drawings are used as they were published, with two
+changes forced by the rasteriser: the comment at the top of each file is
+removed, and stroke="currentColor" is resolved to white. Neither touches a
+path.
+
+  kick.svg        drawn here
+  hihat.svg       drawn here
+  clap.svg        drawn here
+
+No free icon set carries percussion — not Tabler, not Phosphor, not Font
+Awesome — and a row of instruments with no kick at one end and no cymbal at the
+other is missing the two things it was for. These three are drawn in the same
+hand as the rest: 2 units of stroke on a 24 unit grid, round caps and joins.

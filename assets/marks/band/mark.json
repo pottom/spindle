@@ -1,0 +1,24 @@
+{
+  "name": "band",
+  "from": "Tabler Icons (tabler.io/icons), and three drawn here",
+  "licence": "MIT, and see LICENCE.txt",
+
+  "//": "The row, left to right, and that order is the whole idea: each mark rides its own slice of the spectrum, so the low end of the room is at the left and the cymbals are at the right. See wordsBeatRide.",
+  "marks": [
+    "kick.svg",
+    "speaker.svg",
+    "guitar.svg",
+    "piano.svg",
+    "microphone.svg",
+    "clap.svg",
+    "hihat.svg"
+  ],
+
+  "//heights": "The dot heights a mark is baked at, and the stroke it is drawn with at each. thick is in dots, and it is the whole reason these are drawings rather than a font: a stroke set per size comes out the same weight at every size, where a font's thins away small and fattens large. Three rather than two — measured, at two the threshold leaves a dashed line.",
+  "heights": [
+    { "tall": 24, "thick": 3 },
+    { "tall": 36, "thick": 3 },
+    { "tall": 54, "thick": 3 },
+    { "tall": 72, "thick": 3 }
+  ]
+}
