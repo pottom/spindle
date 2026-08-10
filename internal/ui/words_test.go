@@ -1406,10 +1406,14 @@ func TestAPictureGoesWithItsRecord(t *testing.T) {
 	m.wordsGrind()
 
 	t.Logf("after the skip the screen holds %q, %d dots wide", m.words.text, m.words.have.DotsX)
-	if m.words.have.DotsX != 0 || m.words.text != "" {
-		t.Errorf("the picture of the record before survived the skip: %q", m.words.text)
+	if strings.Contains(m.words.text, "record before") {
+		t.Errorf("the line of the record before survived the skip: %q", m.words.text)
 	}
+
+	// What matters is not that the screen is empty — the marks go up at the top
+	// of a record and that is the point — but that nothing of the record before
+	// is queued up to fly out across it.
 	if m.words.was.DotsX != 0 {
-		t.Error("the record before is still queued up to fly out across the next one")
+		t.Error("the record before is still waiting to leave across the next one")
 	}
 }

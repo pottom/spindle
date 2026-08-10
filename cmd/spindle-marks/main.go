@@ -67,6 +67,14 @@ type set struct {
 	Licence string   `json:"licence"`
 	Marks   []string `json:"marks"`
 	Heights []height `json:"heights"`
+
+	// Faces turns the row in on itself: with it set, everything past the middle
+	// is drawn the other way round, so the two halves look at each other rather
+	// than all one way. A row of people all facing the same direction is a queue;
+	// facing each other, it is a group. Drawings with no side to them — a face,
+	// a piano — do not care either way, which is why this is a property of the
+	// set rather than of each drawing.
+	Faces string `json:"faces"`
 }
 
 // height is one size a mark is baked at: how tall, and how wide its stroke
@@ -147,8 +155,12 @@ func emit(b *strings.Builder, dir string, s set) error {
 
 	for _, h := range s.Heights {
 		fmt.Fprintf(b, "\t\t\t{tall: %d, marks: []markDots{\n", h.Tall)
-		for _, name := range s.Marks {
-			m, err := convert(filepath.Join(dir, name), h)
+		for i, name := range s.Marks {
+			// Past the middle they turn back on the row. The middle one of an
+			// odd row is left alone: it is the one everybody else is facing.
+			turn := s.Faces == "in" && float64(i) > float64(len(s.Marks)-1)/2
+
+			m, err := convert(filepath.Join(dir, name), h, turn)
 			if err != nil {
 				return err
 			}
@@ -181,7 +193,7 @@ var strokeWidth = regexp.MustCompile(`stroke-width="[^"]*"`)
 // of a 54 pixel target and 4% of a 216 pixel one. So the width to ask for is
 // simply the stroke wanted, in dots, times the supersampling — after the
 // averaging that is exactly thick dots, at every size.
-func convert(path string, h height) (dots, error) {
+func convert(path string, h height, turn bool) (dots, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return dots{}, err
@@ -204,14 +216,21 @@ func convert(path string, h height) (dots, error) {
 	icon.Draw(rasterx.NewDasher(big, big, rasterx.NewScannerGV(big, big, rgba, rgba.Bounds())), 1)
 
 	// Averaged down to the dot grid. What is wanted is how much ink covers a
-	// dot, whatever colour it was drawn in.
+	// dot, whatever colour it was drawn in — and turned over here if the row
+	// wants it facing the other way, which is a read of the same drawing rather
+	// than a second one to keep.
 	grey := image.NewGray(image.Rect(0, 0, h.Tall, h.Tall))
 	for y := range h.Tall {
 		for x := range h.Tall {
+			from := x
+			if turn {
+				from = h.Tall - 1 - x
+			}
+
 			var sum int
 			for dy := range over {
 				for dx := range over {
-					_, _, _, a := rgba.At(x*over+dx, y*over+dy).RGBA()
+					_, _, _, a := rgba.At(from*over+dx, y*over+dy).RGBA()
 					sum += int(a >> 8)
 				}
 			}

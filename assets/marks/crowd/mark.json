@@ -1,0 +1,36 @@
+{
+  "name": "crowd",
+  "from": "Tabler Icons (tabler.io/icons)",
+  "licence": "MIT",
+  "//": "A row of people. The order is the sound: the left end is the low end, so it stands heaviest — both feet planted, slow — and the right end is the top of the range, where the movement is quick and light. The kick is a hit, which is why the one throwing a kick stands with the bass. The pair in the middle is the one everybody else is turned towards.",
+  "marks": [
+    "stretching.svg",
+    "walk.svg",
+    "karate.svg",
+    "friends.svg",
+    "reach.svg",
+    "run.svg",
+    "sprint.svg"
+  ],
+  "//heights": "The dot heights a mark is baked at, and the stroke it comes out with at each. See cmd/spindle-marks.",
+  "heights": [
+    {
+      "tall": 24,
+      "thick": 3
+    },
+    {
+      "tall": 36,
+      "thick": 3
+    },
+    {
+      "tall": 54,
+      "thick": 3
+    },
+    {
+      "tall": 72,
+      "thick": 3
+    }
+  ],
+  "//faces": "Turned in on the row: everything past the middle is drawn the other way round, so the two halves look at each other. A row of people all facing one way is a queue.",
+  "faces": "in"
+}

@@ -1,0 +1,34 @@
+{
+  "name": "moods",
+  "from": "Tabler Icons (tabler.io/icons)",
+  "licence": "MIT",
+  "//": "A row of faces, and the order is the sound again: the low end is where a record thumps, so it wears the heaviest expression, and the top of the range — the cymbals and the sparkle — wears the brightest.",
+  "marks": [
+    "angry.svg",
+    "sad.svg",
+    "neutral.svg",
+    "nerd.svg",
+    "wink.svg",
+    "happy.svg",
+    "crazy-happy.svg"
+  ],
+  "//heights": "The dot heights a mark is baked at, and the stroke it comes out with at each. See cmd/spindle-marks.",
+  "heights": [
+    {
+      "tall": 24,
+      "thick": 3
+    },
+    {
+      "tall": 36,
+      "thick": 3
+    },
+    {
+      "tall": 54,
+      "thick": 3
+    },
+    {
+      "tall": 72,
+      "thick": 3
+    }
+  ]
+}
