@@ -32,6 +32,36 @@ const (
 	// its own: this one is happening all the time, and a row permanently at the
 	// angle a type designer calls italic is a row that has fallen over.
 	wordsSwayMost = 0.16
+
+	// How hard the low end is hitting decides how far the row sways, and these
+	// are the numbers that read it.
+	//
+	// A beat is found over twelve seconds of listening, so it goes on being
+	// reported through a passage where nobody is playing it — the drums drop out
+	// for a bar and the row goes on swaying to a beat that is not being struck.
+	// What tells the difference is not how loud the bass is, because the daemon
+	// scales the spectrum to its own recent loudness and the low end reads 0.6
+	// to 0.8 either way. It is how hard the low end *jumps*: measured over ninety
+	// seconds of a record, the biggest rise in a second ran 0.30 to 0.37 where
+	// the kick was playing and 0.09 to 0.12 where it was not.
+	//
+	// swayLow is how many of the bands count as the low end — the same five the
+	// analyser itself gives the bass. swayFall is what the recent hitting keeps
+	// each frame, about a third of a second to fall by half, so it survives
+	// between two beats at any tempo worth swaying to. swaySettle is the same for
+	// the hardest it has hit lately, which is what the hitting is measured
+	// against — long, because it is the record's own scale. swayLeast is the
+	// floor under that scale, so a record with no percussion at all does not
+	// measure its own hush and call it a beat. swayGain brings what is left up
+	// to something a row can dance to.
+	//
+	// Swept over the recordings rather than chosen: at these numbers the quiet
+	// stretch of a phonk record measured 0.35 and the rest of it 0.83.
+	swayLow    = 5
+	swayFall   = 0.95
+	swaySettle = 0.9995
+	swayLeast  = 0.10
+	swayGain   = 2.0
 )
 
 // wordsSway is how far the row is leaning this frame, and whether it is swaying
@@ -69,5 +99,40 @@ func (m Model) wordsSway() (float32, bool) {
 	// between. Nothing here jumps at a beat — the cosine is already where it
 	// needs to be when the count moves on.
 	at := float64(beats) + float64(phase)
-	return wordsSwayMost * float32(math.Cos(math.Pi*at)), true
+	return wordsSwayMost * m.words.drive * float32(math.Cos(math.Pi*at)), true
+}
+
+// swayFlow follows how hard the low end is hitting, a frame at a time, which is
+// how far the row is allowed to sway. See the constants above.
+func (m *Model) swayFlow() {
+	bands := m.scope.bands
+	if len(bands) < swayLow {
+		m.words.drive, m.words.swayHit, m.words.swayCeil = 0, 0, 0
+		m.words.swayHeard = false
+		return
+	}
+
+	var low float32
+	for _, v := range bands[:swayLow] {
+		low += v
+	}
+	low /= swayLow
+
+	// The first frame is not a hit, however loud it is. Without this the low end
+	// rising from nothing to whatever it is reads as the hardest strike of the
+	// record — and since what the strikes are measured against is the hardest
+	// there has been, one frame of arithmetic held the sway down for the forty
+	// seconds that scale takes to fall.
+	if !m.words.swayHeard {
+		m.words.swayHeard, m.words.swayWas = true, low
+		return
+	}
+
+	hit := max(low-m.words.swayWas, 0)
+	m.words.swayWas = low
+
+	m.words.swayHit = max(hit, m.words.swayHit*swayFall)
+	m.words.swayCeil = max(hit, m.words.swayCeil*swaySettle)
+
+	m.words.drive = min(m.words.swayHit/max(m.words.swayCeil, swayLeast)*swayGain, 1)
 }

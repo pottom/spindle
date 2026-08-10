@@ -1028,6 +1028,14 @@ func TestTheScreenKeepsTimeAndCanBeToldNotTo(t *testing.T) {
 		t.Fatal("a beat was found and the screen did not keep time")
 	}
 
+	// A low end that is actually being struck, because the row sways to what is
+	// being played rather than to what was found — a beat nobody is hitting
+	// moves nothing. See sway.go.
+	kick(&m, 4, 0.30)
+	for i := range m.scope.bands {
+		m.scope.bands[i] = 0.8
+	}
+
 	m.scope.beat.Since = 0 // on the beat
 	m.scope.beatAt = time.Now()
 	on := m.wordsRiding(4)

@@ -655,6 +655,13 @@ type wordsState struct {
 	// wordsEase.
 	band, head float32
 
+	// drive is how far the row is allowed to sway, nought to one, worked out
+	// from how hard the low end is hitting; swayWas, swayHit and swayCeil are
+	// what that is followed with. See sway.go.
+	drive                      float32
+	swayWas, swayHit, swayCeil float32
+	swayHeard                  bool
+
 	// leanAt is the bar the picture on screen arrived under, which is what its
 	// lean is dealt from — rather than the bar playing now. The marks stay up
 	// across a change of bar, and a row that snaps to a new set of angles
@@ -1437,6 +1444,12 @@ func (m *Model) wordsGrind() tea.Cmd {
 // to inside it is not asked, because a lyric sheet cannot answer it, and every
 // word answers a part of the sound instead.
 func (m *Model) wordsFlow(w, rows int) {
+	// How hard the low end is hitting, which is how far the row may sway. Kept
+	// even while there is nothing on screen to sway, so that a bar of marks
+	// going up in the middle of a record arrives into a figure that already
+	// knows what the record is doing rather than starting from nothing.
+	m.swayFlow()
+
 	if m.words.where.Count == 0 {
 		return
 	}
