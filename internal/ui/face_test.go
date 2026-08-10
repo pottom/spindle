@@ -6,9 +6,15 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/pottom/spindle/internal/player"
 )
+
+// summon puts him on screen the way the key does, which is the only way he
+// comes on at all now — without walking his expressions on, which is the key's
+// other job and nothing to do with being there. See faceUp and faceShow.
+func summon(m *Model, bar int64) {
+	m.words.starts = bar
+	m.face.shown = time.Now()
+}
 
 // faceDots draws a face into a plain field, for looking at and for measuring.
 func faceDots(t *testing.T, w, h int, look faceLook) []string {
@@ -112,55 +118,42 @@ func TestTheEyeClosesToALine(t *testing.T) {
 	}
 }
 
-// Twice a record and no more, whatever the bars deal.
+// He never comes on by himself.
 //
-// A bar in three was fair to the bars and wrong about the record: an
-// instrumental stamps a fresh bar every half minute, so over four minutes he
-// walked on again and again and the visit became the furniture. What the key
-// asks for is not counted — somebody who wants to see him can have as many as
-// they like.
-func TestHeComesOnTwiceARecordAtMost(t *testing.T) {
+// He was dealt from the bar — one in three, then capped at twice a record — and
+// the trouble with that was never how often it fired but who decided. This
+// screen goes up in a room with people in it, and whoever is running that room
+// knows when a figure walking on is the thing and when it is an interruption.
+// So he is on a key, beside the record's name, which went the same way.
+func TestHeNeverComesOnByHimself(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
 	m.scope.modes[tabPlayer] = scopeWords
 	m.ps.Duration = 6 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
-	// Every bar of a long instrumental, walked through as the screen would.
-	var visits int
+	// Every bar of a long instrumental, walked through as the screen would, and
+	// every moment inside each of them.
 	for bar := range int64(12) {
 		starts := bar * wordsSpell.Milliseconds()
 		m.words.starts = starts
-		m.setProgress(time.Duration(starts)*time.Millisecond + faceEnters + time.Second)
 
-		// The bars are half a minute apart on the record, and a test runs them
-		// in microseconds: without this the visit before is still counted as
-		// running, because a visit that has begun runs to its end whatever the
-		// bar under it does.
-		m.face.came = time.Now().Add(-time.Minute)
+		for _, into := range []time.Duration{0, faceEnters, faceEnters + time.Second, 20 * time.Second} {
+			m.setProgress(time.Duration(starts)*time.Millisecond + into)
+			m.face.came = time.Now().Add(-time.Minute) // the visit before is over
+			m.faceFlow()
 
-		m.faceFlow()
-
-		if m.faceUp() {
-			if m.face.bar != starts {
-				t.Fatalf("bar %d: he is up but the visit was recorded against %d", starts, m.face.bar)
+			if m.faceUp() {
+				t.Fatalf("bar %d, %s in: he came on with nobody asking", starts, into)
 			}
-			visits++
 		}
 	}
-	t.Logf("over twelve bars of one record he came on %d times, and the count stands at %d", visits, m.face.seen)
+	t.Log("twelve bars of a record, four moments in each: he stayed away from all of them")
 
-	if visits > faceVisitsMost {
-		t.Errorf("he came on %d times in one record, want at most %d", visits, faceVisitsMost)
-	}
-	if visits == 0 {
-		t.Error("he never came on at all over twelve bars, want him kept rather than banished")
-	}
-
-	// The next record starts him over.
-	m.ps.TrackID = "another"
-	if m.faceHadEnough() {
-		t.Error("the record changed and he was still counted out")
+	// And the key still brings him, there and then.
+	m.faceShow()
+	if !m.faceUp() {
+		t.Error("the key was pressed and nobody came")
 	}
 }
 
@@ -173,44 +166,25 @@ func TestHeVisitsABarRatherThanTakingIt(t *testing.T) {
 	m.ps.Duration = 4 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
-	// A bar he was dealt.
-	var bar int64 = -1
-	for at := range int64(60) {
-		if faceDealt(at * 7_000) {
-			bar = at * 7_000
-			break
-		}
-	}
-	if bar < 0 {
-		t.Fatal("no bar in sixty was dealt him")
-	}
+	// Any bar, and he is sent for: there is no other way he comes on.
+	var bar int64 = 21_000
 	m.words.starts = bar
 
-	at := func(into time.Duration) bool {
-		m.setProgress(time.Duration(bar)*time.Millisecond + into)
-		return m.faceUp()
+	m.setProgress(time.Duration(bar) * time.Millisecond)
+	if m.faceUp() {
+		t.Error("he is there before anybody asked, want the marks")
 	}
 
-	if at(0) {
-		t.Error("he is there the moment the bar starts, want the marks first")
+	m.faceShow()
+	if !m.faceUp() {
+		t.Error("he was sent for and did not come")
 	}
-	if !at(faceEnters + time.Second) {
-		t.Error("he never turns up in a bar he was dealt")
-	}
-	if at(faceEnters + m.faceStay() + time.Second) {
+
+	// And he goes again: a visit is a few seconds, not the rest of the bar.
+	m.face.shown = time.Now().Add(-faceShows - time.Second)
+	m.face.came = time.Now().Add(-time.Minute)
+	if m.faceUp() {
 		t.Error("he is still there long after his turn, want the marks back")
-	}
-
-	// And the bars he was not dealt are the marks' own, all the way through.
-	for _, other := range []int64{bar + 7_000, bar + 14_000} {
-		if faceDealt(other) {
-			continue
-		}
-		m.words.starts = other
-		m.setProgress(time.Duration(other)*time.Millisecond + faceEnters + time.Second)
-		if m.faceUp() {
-			t.Error("he turned up in a bar he was not dealt")
-		}
 	}
 
 	// Never over a line that is being sung.
@@ -295,11 +269,8 @@ func TestTheFaceCanBeAskedFor(t *testing.T) {
 	m.stage.on = true
 	m.scope.modes[tabPlayer] = scopeWords
 	m.words.beats, m.words.text = true, wordsNotes
-	m.words.starts = 1 // a bar that is not dealt a face
+	m.words.starts = 1
 
-	if faceDealt(m.words.starts) {
-		t.Skip("that bar happens to be dealt a face anyway")
-	}
 	if m.faceUp() {
 		t.Fatal("the face was up before it was asked for")
 	}
@@ -804,20 +775,17 @@ func TestHeTakesHisCueFromTheMusic(t *testing.T) {
 		m.ps.Duration = 4 * time.Minute
 		m.words.beats, m.words.text = true, wordsNotes
 
-		for bar := range int64(60) {
-			if s := bar * 7_000; faceDealt(s) {
-				m.words.starts = s
-				break
-			}
-		}
-
-		// On, and standing.
+		m.words.starts = 21_000
 		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters)
+
+		// On, and standing: somebody sent for him a moment ago.
+		summon(&m, m.words.starts)
 		m.scope.envelope = 0.4
 		m.faceFlow()
 
-		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters +
-			time.Duration(gone*float64(m.faceStay())))
+		// Further into the visit. With the key it is the press that his visit is
+		// measured from, so that is what moves.
+		m.face.shown = time.Now().Add(-time.Duration(gone * float64(faceShows)))
 		if rise {
 			m.scope.envelope = 1
 		}
@@ -891,18 +859,15 @@ func TestHisNoseFollowsHim(t *testing.T) {
 	m.scope.modes[tabPlayer] = scopeWords
 	m.ps.Duration = 4 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
-	for bar := range int64(60) {
-		if at := bar * 7_000; faceDealt(at) {
-			m.words.starts = at
-			break
-		}
-	}
+	summon(&m, 21_000)
 
 	var moved, agreed int
 	for step := range 60 {
 		gone := float64(step) / 59
-		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters +
-			time.Duration(gone*float64(m.faceStay())))
+
+		// How far through the visit he is, which with the key is measured from
+		// the press rather than from the bar.
+		m.face.shown = time.Now().Add(-time.Duration(gone * float64(faceShows)))
 
 		was, is := m.faceAt(gone-0.01), m.faceAt(gone+0.01)
 		if math.Abs(is-was) < 0.01 {
@@ -935,19 +900,10 @@ func TestAVisitSurvivesTheBarChangingUnderIt(t *testing.T) {
 	m.ps.Duration = 20 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
-	// A bar he was dealt, and the moment he is on it.
-	var bar int64 = -1
-	for at := range int64(200) {
-		if faceDealt(at * 7_000) {
-			bar = at * 7_000
-			break
-		}
-	}
-	if bar < 0 {
-		t.Fatal("no bar in two hundred was dealt him")
-	}
-	m.words.starts = bar
+	// A bar, and him on it because somebody sent for him.
+	var bar int64 = 21_000
 	m.setProgress(time.Duration(bar)*time.Millisecond + faceEnters + time.Second)
+	summon(&m, bar)
 	m.faceFlow()
 
 	if !m.faceUp() {
@@ -955,86 +911,18 @@ func TestAVisitSurvivesTheBarChangingUnderIt(t *testing.T) {
 	}
 	t.Logf("he is on, a second into a stay of %s", m.faceStayFor(bar))
 
-	// And now the bar changes under him, to one he was not dealt — which is
-	// what a wordless record does every half minute.
-	var other int64 = -1
-	for at := bar + 1_000; at < bar+400_000; at += 1_000 {
-		if !faceDealt(at) {
-			other = at
-			break
-		}
-	}
-	if other < 0 {
-		t.Fatal("every bar after it was dealt him")
-	}
-	m.words.starts = other
+	// And now the bar changes under him — which is what a wordless record does
+	// every half minute, whether or not anybody has sent for a figure.
+	m.words.starts = bar + wordsSpell.Milliseconds()
 
 	if !m.faceUp() {
 		t.Error("the bar changed under him and he vanished mid-visit")
 	}
 
 	// He goes when his own visit is over, not before.
+	m.face.shown = time.Now().Add(-faceShows - time.Second)
 	m.face.came = time.Now().Add(-m.faceStayFor(bar) - time.Second)
 	if m.faceUp() {
 		t.Error("he is still there long after his own stay ran out")
 	}
-}
-
-// He does not set off unless the whole visit has room.
-//
-// He walks on, does a thing and walks off, and all three are the turn. A figure
-// who gets halfway across and is written over by the next line of the song is
-// worse than no figure at all: what you saw was an interruption rather than a
-// visit.
-func TestHeStaysAwayWhenThereIsNoRoom(t *testing.T) {
-	m := scopeModel(160, 46)
-	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
-	m.ps.TrackID, m.ps.Duration = "song", 6*time.Minute
-	m.words.beats, m.words.text = true, wordsNotes
-	m.lyrics.synced, m.lyrics.forTrack = true, "song"
-
-	// A bar he was dealt, and a gap that is long enough to hold him.
-	var bar int64 = -1
-	for at := int64(30); at < 300; at++ {
-		if faceDealt(at * 1_000) {
-			bar = at * 1_000
-			break
-		}
-	}
-	if bar < 0 {
-		t.Fatal("no bar was dealt him")
-	}
-
-	// The line before it, and the next one far enough off that he fits.
-	roomy := bar + faceEnters.Milliseconds() + faceStayMost.Milliseconds() + 5_000
-	m.lyrics.lines = []player.Lyric{
-		{At: bar - soloHold.Milliseconds(), Words: "the line before"},
-		{At: roomy, Words: "and the singer comes back"},
-	}
-	m.words.starts = bar
-	m.setProgress(time.Duration(bar)*time.Millisecond + faceEnters + time.Second)
-
-	if !m.faceFits() {
-		t.Fatalf("he did not fit in a gap of %s", time.Duration(roomy-bar)*time.Millisecond)
-	}
-	if !m.faceUp() {
-		t.Fatal("he stayed away from a bar with room in it")
-	}
-
-	// And now the singer comes back while he would still be on. Long enough to
-	// be a gap the marks get — under that there is no bar for him to be dealt —
-	// and shorter than his arrival and his stay together.
-	tight := bar + soloLeast.Milliseconds() + time.Second.Milliseconds()
-	m.lyrics.lines[1].At = tight
-
-	if m.faceFits() {
-		t.Errorf("he set off into a gap of %s, which is not enough for a stay of %s",
-			time.Duration(tight-bar)*time.Millisecond, m.faceStay())
-	}
-	if m.faceUp() {
-		t.Error("he walked on where the next line would write over him")
-	}
-	t.Logf("with %s of room and a stay of %s, he stays away",
-		time.Duration(tight-bar)*time.Millisecond, m.faceStay())
 }

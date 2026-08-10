@@ -557,11 +557,6 @@ type faceState struct {
 	bar  int64
 	was  bool
 
-	// forTrack is the record the count below belongs to, and seen how many
-	// visits it has had. See faceVisitsMost.
-	forTrack string
-	seen     int
-
 	// picked is who the key has walked to, so pressing it again brings on the
 	// next of them rather than the same one over again; shown is when the face
 	// was last asked for by hand, and stepped which expression it walked to.
@@ -616,14 +611,6 @@ func (m *Model) faceFlow() {
 	// was on for. Both, because a bar at the very top of a record is stamped
 	// nought, which is also what the field holds before he has ever been on.
 	if up && (!was || m.words.starts != m.face.bar) {
-		// Counted per record, so that a long instrumental does not turn a visit
-		// into the furniture. A record he has not been on for yet starts the
-		// count again. See faceVisitsMost.
-		if m.ps != nil && m.face.forTrack != m.ps.TrackID {
-			m.face.forTrack, m.face.seen = m.ps.TrackID, 0
-		}
-		m.face.seen++
-
 		m.face.bar, m.face.came = m.words.starts, now
 		m.face.turns, m.face.did = 0, false
 		m.face.rested, m.face.act = time.Time{}, ""
@@ -1166,11 +1153,13 @@ func (m Model) faceGone() float64 {
 
 // faceUp reports that the face is on screen now.
 //
-// He is not what a bar of music looks like — the marks are that. He is somebody
-// who turns up in the middle of one, does a thing, and goes again, and the
-// marks have the bar back afterwards. So this is a window inside a bar rather
-// than the whole of it: a few seconds, a while after the bar started, on the
-// bars that were dealt him.
+// Only when he has been sent for, and at no other time. He used to be dealt from
+// the bar — one bar in three, then capped at twice a record — and the trouble
+// with that is not how often it fired but who decided. This screen is put up in
+// a room with people in it, and whoever is running that room knows when a figure
+// walking on is the thing and when it is an interruption; the arithmetic never
+// will. So he is on a key, beside the record's name, which went the same way for
+// the same reason. See faceShow and soloTelling.
 func (m Model) faceUp() bool {
 	if !m.face.shown.IsZero() && time.Since(m.face.shown) < faceShows {
 		return true
@@ -1180,72 +1169,11 @@ func (m Model) faceUp() bool {
 	}
 
 	// A visit that has begun runs to its end, whatever the bar underneath it
-	// does. The bar is what deals him, and on a record with no words of its own
-	// a new one is stamped every half minute — so a figure who had just walked
-	// on was taken off mid-stride by a stamp he was not dealt, and the marks
-	// gathered over the top of him. He came on; he leaves the way he came.
-	if m.face.was && !m.face.came.IsZero() && time.Since(m.face.came) < m.faceStayFor(m.face.bar) {
-		return true
-	}
-
-	if m.faceHadEnough() || !faceDealt(m.words.starts) || !m.faceFits() {
-		return false
-	}
-
-	since := m.wordsClock() - m.words.starts - faceEnters.Milliseconds()
-	return since >= 0 && since < m.faceStay().Milliseconds()
-}
-
-// faceFits reports that the whole visit has room before the singer comes back.
-//
-// He walks on, does a thing and walks off, and all three are the turn: a figure
-// who gets halfway across and is written over by the next line of the song is
-// worse than no figure at all, because what you saw was an interruption rather
-// than a visit. So the room is measured before he sets off — the bar he was
-// dealt has to hold his arrival, his stay and his leaving, or he stays away and
-// the marks keep the bar.
-//
-// A record with no words of its own has no line coming, and so all the room
-// there is.
-func (m Model) faceFits() bool {
-	gap, in := m.soloNow()
-	if !in {
-		return true
-	}
-	return m.words.starts+faceEnters.Milliseconds()+m.faceStay().Milliseconds() <= gap.to
-}
-
-// faceVisitsMost is how many times a figure may come on during one record.
-//
-// Two. Dealing one bar in three was fair to the bars and wrong about the
-// record: an instrumental stamps a fresh bar every half minute and a song with
-// gaps in it has one every few lines, so over four minutes a figure was walking
-// on again and again, and what is meant to be a visit became the furniture. A
-// thing that happens twice in a record is a thing you look up at; a thing that
-// happens eight times is a thing you stop seeing.
-//
-// The key is not counted and is never refused: somebody who wants to see them
-// can have as many as they like. This is only about what the screen does on its
-// own. See faceShow.
-const faceVisitsMost = 2
-
-// faceHadEnough reports that this record has had its share of visitors.
-func (m Model) faceHadEnough() bool {
-	if m.ps == nil {
-		return false
-	}
-	return m.face.forTrack == m.ps.TrackID && m.face.seen >= faceVisitsMost
-}
-
-// faceDealt is whether the bar starting at a given moment gets a face rather
-// than the notes. One in three: often enough to be a thing the screen does,
-// seldom enough that the notes are still what a bar of music looks like.
-func faceDealt(starts int64) bool {
-	h := uint64(starts) * 0x9e3779b97f4a7c15
-	h ^= h >> 33
-	h *= 0xff51afd7ed558ccd
-	h ^= h >> 29
-	return h%3 == 0
+	// does. On a record with no words of its own a new bar is stamped every half
+	// minute — so a figure who had just walked on was taken off mid-stride, and
+	// the marks gathered over the top of him. He came on; he leaves the way he
+	// came.
+	return m.face.was && !m.face.came.IsZero() && time.Since(m.face.came) < m.faceStayFor(m.face.bar)
 }
 
 // faceShow puts the face up on demand, and walks through what it can do a press

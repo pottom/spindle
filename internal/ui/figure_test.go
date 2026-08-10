@@ -138,7 +138,7 @@ func TestADrawnFigureTakesTheSlot(t *testing.T) {
 	var found bool
 	for bar := range int64(200) {
 		m.words.starts = bar * 7_000
-		if faceDealt(m.words.starts) && m.faceWho() != "" {
+		if m.faceWho() != "" {
 			found = true
 			break
 		}
@@ -147,6 +147,10 @@ func TestADrawnFigureTakesTheSlot(t *testing.T) {
 		t.Skip("no bar in two hundred was dealt a drawn figure")
 	}
 	t.Logf("bar %d was dealt %q", m.words.starts, m.faceWho())
+
+	// And he is sent for, which is the only way he comes on: the bar decides
+	// which of them it is, the key decides whether anybody is there at all.
+	m.face.picked, m.face.shown = m.faceWho(), time.Now().Add(-faceShows/2)
 
 	m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters + m.faceStay()/2)
 
@@ -359,7 +363,7 @@ func TestTheDrawingFollowsTheAct(t *testing.T) {
 
 	// Standing in the middle of a visit, where an act is done.
 	for bar := range int64(60) {
-		if at := bar * 7_000; faceDealt(at) {
+		if at := bar * 7_000; true {
 			m.words.starts = at
 			break
 		}
@@ -555,7 +559,7 @@ func TestHeIsFainterThanTheSparks(t *testing.T) {
 	m.scope.envelope = 1
 
 	for bar := range int64(60) {
-		if at := bar * 7_000; faceDealt(at) && m.faceWho() != "" {
+		if at := bar * 7_000; faceWhoFor(at) != "" {
 			m.words.starts = at
 			break
 		}
@@ -642,7 +646,7 @@ func TestComingApartHandsHimToTheWater(t *testing.T) {
 	var found bool
 	for bar := range int64(400) {
 		m.words.starts = bar * 7_000
-		if faceDealt(m.words.starts) && m.faceWho() != "" && m.figureGoesBy() == figureCrumbles {
+		if m.faceWho() != "" && m.figureGoesBy() == figureCrumbles {
 			found = true
 			break
 		}
@@ -672,7 +676,7 @@ func TestComingApartHandsHimToTheWater(t *testing.T) {
 	m.stage.drops = nil
 	for bar := range int64(400) {
 		m.words.starts = bar * 7_000
-		if faceDealt(m.words.starts) && m.faceWho() != "" && m.figureGoesBy() == figureWalks {
+		if m.faceWho() != "" && m.figureGoesBy() == figureWalks {
 			break
 		}
 	}
@@ -712,7 +716,7 @@ func TestHeWalksThroughTheMarks(t *testing.T) {
 	var found bool
 	for bar := range int64(400) {
 		m.words.starts = bar * 7_000
-		if faceDealt(m.words.starts) && m.faceWho() != "" && m.figureComesBy() == figureWalks {
+		if m.faceWho() != "" && m.figureComesBy() == figureWalks {
 			found = true
 			break
 		}
@@ -803,7 +807,7 @@ func TestHeLeavesNoMarkStanding(t *testing.T) {
 		m.scope.modes[tabPlayer] = scopeWords
 		m.ps.Duration = 90 * time.Minute
 		m.words.starts = bar * 7_000
-		if !faceDealt(m.words.starts) || m.faceWho() == "" {
+		if m.faceWho() == "" {
 			continue
 		}
 		m.words.have, m.words.where = grain, layout
@@ -853,7 +857,7 @@ func TestTheMarksGoOnRidingWhileHeWalksIn(t *testing.T) {
 	var found bool
 	for bar := range int64(400) {
 		m.words.starts = bar * 7_000
-		if faceDealt(m.words.starts) && m.faceWho() != "" && m.figureComesBy() == figureWalks {
+		if m.faceWho() != "" && m.figureComesBy() == figureWalks {
 			found = true
 			break
 		}
@@ -925,7 +929,7 @@ func TestAHopperLeavesTheGround(t *testing.T) {
 
 	for bar := range int64(600) {
 		m.words.starts = bar * 7_000
-		if faceDealt(m.words.starts) && m.faceWho() == "bunny" && m.figureComesBy() == figureWalks {
+		if m.faceWho() == "bunny" && m.figureComesBy() == figureWalks {
 			break
 		}
 	}
@@ -995,7 +999,7 @@ func TestSometimesHeMoonwalks(t *testing.T) {
 	walking, backwards := "", ""
 	for bar := range int64(600) {
 		m.words.starts = bar * 7_000
-		if !faceDealt(m.words.starts) || m.faceWho() == "" {
+		if m.faceWho() == "" {
 			continue
 		}
 		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + faceEnters + time.Duration(faceWalkIn/2*float64(m.faceStay())))
