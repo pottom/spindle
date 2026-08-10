@@ -203,11 +203,8 @@ func TestWordsMoveComesFromTheLine(t *testing.T) {
 		t.Errorf("the same line got moves %d and %d", a, b)
 	}
 
-	// And the rest of what a line is dealt comes back with it: how it keeps
-	// time, and which of its words lean.
-	if a, b := wordsRideFor("better off alone"), wordsRideFor("better off alone"); a != b {
-		t.Errorf("the same line kept time as %d and came back as %d", a, b)
-	}
+	// And the rest of what a line is dealt comes back with it: which of its
+	// words lean.
 	if a, b := wordsLeans("better off alone"), wordsLeans("better off alone"); a != b {
 		t.Errorf("the same line leaned %v and came back %v", a, b)
 	}
@@ -813,29 +810,14 @@ func TestTheNotesRideTheBeat(t *testing.T) {
 		t.Error("the notes did not move when the music did")
 	}
 
-	// A line of words keeps time too, and never as far: some nod as one and
-	// some ride word by word, but none of them stands still — a caption sitting
-	// perfectly still in the middle of a screen where everything else answers
-	// the music reads as a picture that has stopped.
+	// A line of words moves too, and never as far: every word of it on its own
+	// part of the sound. It used to be dealt — some lines nodding as one block
+	// on the loudest thing playing — and the block is gone: watched against each
+	// other, words that each live on their own part of the sound beat a line
+	// moving as a slab.
 	m.words.beats = false
-	kinds := map[wordsRide]int{}
-	for _, line := range []string{
-		"better off alone", "do you think", "never gonna give you up", "so close no matter how far",
-		"hello darkness my old friend", "is this the real life", "sultans of swing", "arra gondolok",
-		"we are the champions", "another one bites the dust", "under pressure", "life on mars",
-	} {
-		kinds[wordsRideFor(line)]++
-	}
-	t.Logf("of twelve lines: %d nod together, %d ride word by word",
-		kinds[wordsRideLine], kinds[wordsRideWords])
 
-	for kind := wordsRideLine; kind < wordsRides; kind++ {
-		if kinds[kind] == 0 {
-			t.Errorf("no line of twelve got ride %d", kind)
-		}
-	}
-
-	// And every one of them moves when the music does.
+	// Every one of them moves when the music does.
 	for _, line := range []string{"better off alone", "do you think", "never gonna give you up"} {
 		m.words.text = line
 		m.scope.bands = quiet

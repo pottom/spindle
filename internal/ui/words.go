@@ -746,17 +746,13 @@ const (
 	// three notes leaning are meant to be noticed and a lower case l is not.
 	wordsTiltMark = 0.22
 
-	// wordsWordRide is how far a word rides its own part of the sound, and
-	// wordsLineRide how far a whole line nods with the loudest of it. Both well
-	// under what a note is given: these have to be read while they move, and a
-	// row of seven marks can throw itself about in a way a line of a dozen
-	// words cannot without coming apart.
-	//
-	// A word rides less far than a whole line nods, because the words move
-	// against each other and the line moves as one: the same travel reads as
-	// twice as much when the word beside it went the other way.
+	// wordsWordRide is how far a word rides its own part of the sound. Well under
+	// what a note is given: a lyric has to be read while it moves, and a row of
+	// seven marks can throw itself about in a way a line of a dozen words cannot
+	// without coming apart. Less again because the words move against each other
+	// — the same travel reads as twice as much when the word beside it went the
+	// other way.
 	wordsWordRide = 6
-	wordsLineRide = 8
 
 	// wordsBounce is how far a mark rides its own part of the sound, in dots.
 	//
@@ -1459,37 +1455,20 @@ func (m *Model) wordsFlow(w, rows int) {
 	}
 }
 
-// wordsRide is how a line keeps time: not at all, all of it together, or a word
-// at a time.
-type wordsRide int
-
-const (
-	// A line keeps time one way or the other. It used to be able to keep it not
-	// at all, and one line in three was dealt that — a caption sitting perfectly
-	// still in the middle of a screen where the meter, the water and the marks
-	// are all answering the music. Beside a line that moves, the one that does
-	// not reads as a picture that has stopped rather than as a line with a
-	// different character.
-	wordsRideLine wordsRide = iota
-	wordsRideWords
-	wordsRides
-)
-
-// wordsRideFor decides which a line gets, from the line itself — so a song plays
-// the same way twice, and a record is not either all bobbing or all rigid.
-func wordsRideFor(text string) wordsRide {
-	var h uint64 = 0xcbf29ce484222325
-	for _, r := range text {
-		h = (h ^ uint64(r)) * 0x100000001b3
-	}
-	// Mixed properly before it is divided: the low bits of a rolling hash are
-	// not spread evenly enough to answer a question with three answers, and a
-	// record where nothing ever nods is a record with a bug in it.
-	h ^= h >> 30
-	h *= 0xbf58476d1ce4e5b9
-	h ^= h >> 27
-	return wordsRide(h % uint64(wordsRides))
-}
+// How a line keeps time has been narrowed twice, and both are worth keeping
+// written down because both were dealt from the line and looked like variety.
+//
+// One line in three used to keep it not at all — a caption sitting perfectly
+// still in the middle of a screen where the meter, the water and the marks are
+// all answering the music. Beside a line that moves, the one that does not reads
+// as a picture that has stopped rather than as a line with a different
+// character.
+//
+// Half of what was left nodded as one block, on the loudest thing playing. That
+// is gone too: watched against each other, a line whose words each live on their
+// own part of the sound is better than the same line moving as a slab, and a
+// slab is what a whole line lifted together is. What is left is the one way, and
+// the variety comes from the music rather than from a deal.
 
 // wordsRiding is how far each word of the line is lifted this frame.
 //
@@ -1528,31 +1507,11 @@ func (m Model) wordsRiding(count int) []int {
 	// as well, and it is the same mistake it was on the marks: a height that
 	// answers how loud a band is *and* where the beat is answers neither. The
 	// beat is the marks' to keep — a line of a song is there to be read.
-	switch wordsRideFor(m.words.text) {
-	case wordsRideWords:
-		out := make([]int, count)
-		for i := range out {
-			out[i] = -int(m.wordsBeatRide(i, count) * wordsWordRide)
-		}
-		return m.wordsSettleMarks(out)
-
-	case wordsRideLine:
-		// All of it together, on the loudest thing playing: the line nods with
-		// the song rather than rippling through it.
-		var loud float32
-		for _, v := range m.scope.bands {
-			loud = max(loud, v)
-		}
-
-		lift := -int(loud * wordsLineRide)
-		out := make([]int, count)
-		for i := range out {
-			out[i] = lift
-		}
-		return out
+	out := make([]int, count)
+	for i := range out {
+		out[i] = -int(m.wordsBeatRide(i, count) * wordsWordRide)
 	}
-
-	return nil
+	return m.wordsSettleMarks(out)
 }
 
 // wordsSettleMarks stops a mark being carried higher than the word it hangs off.
