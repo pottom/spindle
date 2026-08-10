@@ -45,6 +45,14 @@ type Spectrum interface {
 type Beat struct {
 	Period time.Duration
 	Since  time.Duration
+
+	// Loud is where the top of the spectrum's own scale sits, in decibels: -55
+	// with nothing playing, up towards nought as the record gets louder, and
+	// nought before anything has been heard. It rides along here because the
+	// bands cannot say it — every one of them is measured against it, so a band
+	// reads the same in a hush as in a chorus. Without it nothing drawn from the
+	// spectrum can tell a build from a lull.
+	Loud float64
 }
 
 // Found reports that there is a beat to keep.

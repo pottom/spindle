@@ -655,6 +655,11 @@ type wordsState struct {
 	// wordsEase.
 	band, head float32
 
+	// swellLow and swellHigh are the range of loudness, in decibels, the record
+	// has been moving through lately, which is what the size of every movement
+	// is read against. See swell.go.
+	swellLow, swellHigh float64
+
 	// drive is how far the row is allowed to sway, nought to one, worked out
 	// from how hard the low end is hitting; swayWas, swayHit and swayCeil are
 	// what that is followed with. See sway.go.
@@ -1440,11 +1445,13 @@ func (m *Model) wordsGrind() tea.Cmd {
 // to inside it is not asked, because a lyric sheet cannot answer it, and every
 // word answers a part of the sound instead.
 func (m *Model) wordsFlow(w, rows int) {
-	// How hard the low end is hitting, which is how far the row may sway. Kept
-	// even while there is nothing on screen to sway, so that a bar of marks
-	// going up in the middle of a record arrives into a figure that already
-	// knows what the record is doing rather than starting from nothing.
+	// How hard the low end is hitting, which is how far the row may sway, and
+	// how loud the record is against itself, which is how far anything moves at
+	// all. Both kept even while there is nothing on screen, so that a bar of
+	// marks going up in the middle of a record arrives into a picture that
+	// already knows what the record is doing rather than starting from nothing.
 	m.swayFlow()
+	m.swellFlow()
 
 	if m.words.where.Count == 0 {
 		return
@@ -1496,9 +1503,12 @@ func (m Model) wordsRiding(count int) []int {
 		// height answering how loud a band is and where the beat is at the same
 		// time answers neither, and what is left is a row twitching. The beat
 		// has the lean instead: see sway.go.
+		//
+		// How far they go at all grows with the record: see swell.go.
+		travel := wordsBounce * m.swell()
 		out := make([]int, count)
 		for i := range out {
-			out[i] = -int(m.wordsBeatRide(i, count) * wordsBounce)
+			out[i] = -int(m.wordsBeatRide(i, count) * travel)
 		}
 		return out
 	}
@@ -1507,9 +1517,10 @@ func (m Model) wordsRiding(count int) []int {
 	// as well, and it is the same mistake it was on the marks: a height that
 	// answers how loud a band is *and* where the beat is answers neither. The
 	// beat is the marks' to keep — a line of a song is there to be read.
+	travel := wordsWordRide * m.swell()
 	out := make([]int, count)
 	for i := range out {
-		out[i] = -int(m.wordsBeatRide(i, count) * wordsWordRide)
+		out[i] = -int(m.wordsBeatRide(i, count) * travel)
 	}
 	return m.wordsSettleMarks(out)
 }
