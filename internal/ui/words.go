@@ -1485,7 +1485,7 @@ func (m *Model) wordsGrind() tea.Cmd {
 	// taken for the picture already held and never asked for. Over a whole
 	// wordless record that is one deal rather than one every half minute.
 	cast := ""
-	if m.words.beats {
+	if m.words.beats && marksDrawn {
 		cast = markCastFor(m.words.forTrack, starts)
 	}
 

@@ -140,6 +140,9 @@ func TestADrawnRowReadsLikeAnyOther(t *testing.T) {
 // there is nothing to send for and nothing to wait for. A line of type is set
 // by the face off this goroutine and comes back as a message.
 func TestADrawnRowNeedsNoRoundTrip(t *testing.T) {
+	if !marksDrawn {
+		t.Skip("the drawn sets are not being dealt — see marksDrawn")
+	}
 	m := scopeModel(160, 44)
 	m.stage.on = true
 	m.scope.modes[tabPlayer] = scopeWords
@@ -229,6 +232,9 @@ func TestADrawnRowStandsWhereTypeWould(t *testing.T) {
 // minute. Which set is up is part of what is on screen, so it belongs in that
 // test.
 func TestTheCastIsDealtEveryBar(t *testing.T) {
+	if !marksDrawn {
+		t.Skip("the drawn sets are not being dealt — see marksDrawn")
+	}
 	m := scopeModel(160, 44)
 	m.stage.on = true
 	m.scope.modes[tabPlayer] = scopeWords

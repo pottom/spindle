@@ -30,6 +30,24 @@ type markSet struct {
 	sizes         []markSize
 }
 
+// marksDrawn is whether a bar of marks may be dealt a set of drawings at all.
+//
+// Off, for now, and nothing below it is off with it. The drawings, the two ways
+// of baking them and everything the row is built out of all stay exactly as they
+// are — what is switched off is the deal, and it is one word.
+//
+// The sets that exist read well as pictures and did not read as marks on the
+// running screen. That is not a fault in any one of them and it is not fixed by
+// swapping a figure: a bar of marks is watched for half a minute at a time while
+// something else is what the screen is about, and the notes carry that better
+// than a row of people does. They are also the only set that has ever had a
+// reason to be seven of the same thing.
+//
+// It comes back when there is a set with a reason of its own — instruments that
+// jump where the record jumps, faces that mime it — drawn by one hand the way
+// the dancers were. Until then the notes have the bar.
+const marksDrawn = false
+
 // markCastFor is which marks a bar of them is dealt: the notes the face carries,
 // or one of the drawn sets.
 //
