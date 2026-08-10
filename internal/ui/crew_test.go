@@ -110,14 +110,14 @@ func TestTheFigureIsHeldForAPhrase(t *testing.T) {
 	var figs []crewFigure
 	var sb strings.Builder
 	for beat := range 3 * crewPhrase {
-		fig, ok := crewAt(m, beat, 0).crewNow()
+		c, ok := crewAt(m, beat, 0).crewNow()
 		if !ok {
 			t.Fatalf("beat %d: the row was not performing at all", beat)
 		}
-		figs = append(figs, fig)
-		fmt.Fprintf(&sb, "%d ", fig)
+		figs = append(figs, c.fig)
+		fmt.Fprintf(&sb, "%d ", c.fig)
 	}
-	t.Logf("over %d beats the row danced %s(0 is unison, 1 alternating)", len(figs), sb.String())
+	t.Logf("over %d beats the row danced %s", len(figs), sb.String())
 
 	for beat, fig := range figs {
 		if want := figs[beat/crewPhrase*crewPhrase]; fig != want {
@@ -149,6 +149,120 @@ func TestTheFiguresAreDealtFromTheBar(t *testing.T) {
 			if a, b := crewFor(starts, phrase), crewFor(starts, phrase); a != b {
 				t.Fatalf("the bar at %dms danced %d and then %d", starts, a, b)
 			}
+		}
+	}
+}
+
+// The two halves of the row talk to each other: the left lands on the beat and
+// the right answers between two. Where the see-saw ripples along the row, this
+// splits it in two.
+func TestTheTwoHalvesOfTheRowTalk(t *testing.T) {
+	m := crewModel(t)
+	m.words.starts = crewBarDealt(crewCall)
+	if m.words.starts < 0 {
+		t.Fatal("no bar was dealt the call and its answer")
+	}
+
+	on, off := crewAt(m, 0, 0).wordsRiding(6), crewAt(m, 0, 0.5).wordsRiding(6)
+	t.Logf("on the beat the row stands at %v, half a beat later at %v", on, off)
+
+	for i := range on {
+		if i < 3 && on[i] >= off[i] {
+			t.Errorf("mark %d of the left half is at %d on the beat and %d off it, want it up on the beat", i, on[i], off[i])
+		}
+		if i >= 3 && off[i] >= on[i] {
+			t.Errorf("mark %d of the right half is at %d off the beat and %d on it, want it answering", i, off[i], on[i])
+		}
+	}
+}
+
+// The bow: the whole row sinks together on the first beat of the phrase, which
+// is the one movement on this screen that goes downwards — and then it dances
+// the rest of the phrase.
+func TestTheRowBows(t *testing.T) {
+	m := crewModel(t)
+	m.words.starts = crewBarDealt(crewBow)
+	if m.words.starts < 0 {
+		t.Fatal("no bar was dealt the bow")
+	}
+
+	bowing := crewAt(m, 0, 0).wordsRiding(6)
+	after := crewAt(m, 1, 0).wordsRiding(6)
+	t.Logf("on the first beat of the phrase the row stands at %v, on the next at %v", bowing, after)
+
+	// Down is a larger number: every dot row below the line the marks are set on.
+	for i, at := range bowing {
+		if at <= 0 {
+			t.Errorf("mark %d is at %d while the row bows, want it below the line", i, at)
+		}
+		if at != bowing[0] {
+			t.Errorf("mark %d bows to %d and mark 0 to %d, want the row bowing as one", i, at, bowing[0])
+		}
+	}
+	for i, at := range after {
+		if at > 0 {
+			t.Errorf("mark %d is still down at %d a beat after the bow, want it back up dancing", i, at)
+		}
+	}
+}
+
+// The huddle leans the row instead of lifting it: the two halves lean at each
+// other on the beat and straighten between two. A body leaning is a different
+// thing from a body jumping, and every other figure jumps.
+func TestTheRowHuddles(t *testing.T) {
+	m := crewModel(t)
+	m.words.starts = crewBarDealt(crewHuddle)
+	if m.words.starts < 0 {
+		t.Fatal("no bar was dealt the huddle")
+	}
+
+	// The layout the marks were set with, so the lean has words to hang on.
+	const w, rows = 120, 44
+	line := wordsMarks(w*dotsPerCellX, rows*dotsPerCellY)
+	_, layout, ok := wordsImage([]string{line}, w*dotsPerCellX, rows*dotsPerCellY)
+	if !ok {
+		t.Fatalf("the row %q could not be drawn", line)
+	}
+	m.words.where, m.words.text = layout, line
+	count := layout.Count
+
+	on, _ := crewAt(m, 0, 0).wordsTilting(count)
+	between, _ := crewAt(m, 0, 0.5).wordsTilting(count)
+	if on == nil {
+		t.Fatal("the row huddled and nothing leaned")
+	}
+	t.Logf("%d marks lean %v on the beat and %v between two", count, on, between)
+
+	if on[0]*on[count-1] >= 0 {
+		t.Errorf("the ends lean %v and %v, want them leaning at each other", on[0], on[count-1])
+	}
+	for i := range on {
+		if abs32(between[i]) > abs32(on[i]) {
+			t.Errorf("mark %d leans %v between two beats and %v on one, want it straightening between", i, between[i], on[i])
+		}
+	}
+}
+
+// A phrase of nobody keeping time, which is what makes the next figure arriving
+// an event. It is the same picture the row has with the key off, so it is worth
+// nothing new to be sure it looks right.
+func TestTheRowIsLetOffForAPhrase(t *testing.T) {
+	m := crewModel(t)
+	m.words.starts = crewBarDealt(crewFree)
+	if m.words.starts < 0 {
+		t.Fatal("no bar was dealt a free phrase")
+	}
+
+	free := crewAt(m, 0, 0.5).wordsRiding(6)
+
+	loose := m
+	loose.stage.loose = false
+	alone := loose.wordsRiding(6)
+
+	t.Logf("free the row stands at %v, and with the key off at %v", free, alone)
+	for i := range free {
+		if free[i] != alone[i] {
+			t.Errorf("free, mark %d stands at %d; with nobody keeping time it stands at %d", i, free[i], alone[i])
 		}
 	}
 }

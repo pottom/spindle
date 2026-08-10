@@ -1002,6 +1002,12 @@ func TestTheScreenKeepsTimeAndCanBeToldNotTo(t *testing.T) {
 	m.scope.modes[tabPlayer] = scopeWords
 	m.words.beats, m.words.text = true, wordsNotes
 
+	// A bar dealt a figure the row lands on the beat in. Not every figure is
+	// one: the row is dealt a phrase now and then with nobody keeping time at
+	// all, and one of those would pass this test while proving nothing. See
+	// crew.go.
+	m.words.starts = crewBarDealt(crewUnison)
+
 	bands := make([]float32, 28)
 	for i := range bands {
 		bands[i] = 0.8

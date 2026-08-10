@@ -1507,8 +1507,8 @@ func (m Model) wordsRiding(count int) []int {
 		// rises by what its own share of the spectrum is doing — that is what
 		// makes the sound run along the row — and the figure says when each of
 		// them lands.
-		if fig, ok := m.crewNow(); ok {
-			return m.crewRiding(count, fig)
+		if c, ok := m.crewNow(); ok {
+			return m.crewRiding(count, c)
 		}
 
 		pulse := float32(1)
@@ -1622,6 +1622,18 @@ func wordsBesideMark(marks []bool, at int) (int, bool) {
 // Which way each is sheared, and so what the middle it turns about means, is
 // the marks' business: see wordsSlanting.
 func (m Model) wordsTilting(count int) ([]float32, []int) {
+	if count <= 0 || m.words.telling {
+		return nil, nil
+	}
+
+	// One figure the row can be dancing leans it rather than lifting it, and
+	// when it is dancing that one the lean is the figure's rather than dealt.
+	// See crew.go.
+	huddle := false
+	if c, ok := m.crewNow(); ok && c.fig == crewHuddle {
+		huddle = true
+	}
+
 	// Marks lean oftener as well as differently: a solo is the one place there
 	// is nothing else on the screen for it to be doing.
 	every := uint64(3)
@@ -1630,7 +1642,7 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 	}
 
 	seed := m.wordsLeanSeed()
-	if count <= 0 || m.words.telling || seed%every != 0 {
+	if !huddle && seed%every != 0 {
 		return nil, nil
 	}
 
@@ -1659,6 +1671,14 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 		}
 	}
 
+	// Huddling, the whole row leans together and the deal is not consulted at
+	// all: what makes it a huddle is that the two halves lean at each other, and
+	// three ways dealt a mark at a time would be a row of italics.
+	var leaning []float32
+	if huddle {
+		leaning = m.crewLeaning(count, wordsTiltMark)
+	}
+
 	for i := range tilt {
 		wide := max(last[i]-first[i]+1, 1)
 
@@ -1670,6 +1690,11 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 		middle[i] = (max(first[i], 0) + max(last[i], 0)) / 2
 		if m.words.beats {
 			lean, middle[i] = wordsTiltMark, mid[i]
+		}
+
+		if leaning != nil {
+			tilt[i] = leaning[i]
+			continue
 		}
 
 		// Three ways for a word: this way, that way, or flat.
