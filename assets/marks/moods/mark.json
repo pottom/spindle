@@ -2,11 +2,11 @@
   "name": "moods",
   "from": "Tabler Icons (tabler.io/icons)",
   "licence": "MIT",
-  "//": "A row of faces, and the order is the sound again: the low end is where a record thumps, so it wears the heaviest expression, and the top of the range — the cymbals and the sparkle — wears the brightest.",
+  "//": "A row of faces, and the order is the sound: the low end is where a record thumps, so it wears the heaviest expression, and the top of the range — the cymbals and the sparkle — wears the brightest. The one in the middle used to have no mouth at all, which at this size reads as a face with something missing rather than as a face keeping its counsel.",
   "marks": [
     "angry.svg",
     "sad.svg",
-    "neutral.svg",
+    "puzzled.svg",
     "nerd.svg",
     "wink.svg",
     "happy.svg",
