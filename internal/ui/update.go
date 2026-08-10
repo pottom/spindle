@@ -279,6 +279,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.scope.adoptBands(message.Bands)
 			if message.Beat.Found() {
 				m.scope.beat, m.scope.beatAt = message.Beat, time.Now()
+				m.hueFlow(message.Beat.Notes)
 			}
 		}
 		if m.scopeMode().wave() {
@@ -301,6 +302,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.wordsEase(m.width, m.height)
 			m.figureSpray(m.width, m.height)
 			m.figureSweep(m.width, m.height)
+			m.wordsSparks(m.width, m.height)
 			// Thrown from the tips of the band along the foot, and given the
 			// whole terminal to cross rather than the band it came from.
 			_, tall := m.wordsRoom(m.height)

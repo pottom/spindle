@@ -53,6 +53,18 @@ type Beat struct {
 	// reads the same in a hush as in a chorus. Without it nothing drawn from the
 	// spectrum can tell a build from a lull.
 	Loud float64
+
+	// Notes is which of the twelve pitch classes are sounding, C first, each
+	// 0..1, or nil while nothing has been heard. It rides here for the same
+	// reason Loud does: whatever draws to it is already asking for the spectrum
+	// thirty times a second, and a second request on its own schedule would
+	// arrive a frame out from the one it belongs to.
+	//
+	// The bands cannot say it. Two neighbouring semitones fall in one band
+	// until well above where a tune lives, so the meter's window is too short to
+	// tell a note from its neighbour; this comes off a window four times as
+	// long. See the analyser in the fork.
+	Notes []float32
 }
 
 // Found reports that there is a beat to keep.

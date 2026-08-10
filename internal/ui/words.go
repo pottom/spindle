@@ -803,7 +803,7 @@ const (
 	// without coming apart. Less again because the words move against each other
 	// — the same travel reads as twice as much when the word beside it went the
 	// other way.
-	wordsWordRide = 6
+	wordsWordRide = 12
 
 	// wordsBounce is how far a mark rides its own part of the sound, in dots.
 	//
@@ -1908,10 +1908,27 @@ func (m Model) wordsPaint(word, count, freqs, levels int) wordPaint {
 		return m.wordsBeatPaint(word, count, freqs, levels)
 	}
 
-	// The hue still runs along the line, low to high, which is the palette the
-	// screen is coloured in rather than anything about this moment: it holds
-	// still while the line is up, so it costs the reading nothing.
-	hue := int8(min(int((float32(word)+0.5)/float32(count)*float32(freqs)), freqs-1))
+	// The hue runs along the line, and where along the palette it starts is
+	// where the harmony has carried it. See hue.go.
+	//
+	// The whole line together, always: what moves is which part of the palette
+	// the line is written in, not which word is brighter than which. That was
+	// the thing measured and thrown out — a line is read, and only if it is lit
+	// like one — and this leaves the brightness alone.
+	along := (float32(word) + 0.5) / float32(count)
+
+	// And a wave crossing it, when the record has just turned over.
+	if crest, on := m.hueWave(); on {
+		along += hueWaveMost * hueWaveOn(along, crest)
+	}
+
+	if along += m.hueTurn(); along >= 1 {
+		along--
+	}
+	for along >= 1 {
+		along--
+	}
+	hue := int8(min(int(along*float32(freqs)), freqs-1))
 
 	var loud float32
 	for _, v := range m.scope.bands {
@@ -2030,5 +2047,74 @@ func (m *Model) wordsFollowCentre(centre float32) {
 		m.words.high = centre
 	} else {
 		m.words.high += (centre - m.words.high) * wordsRangeClose
+	}
+}
+
+// Sparks off the words that are being thrown hardest.
+//
+// The water already comes off this screen, but it comes off the sound: a column
+// throws when the level in it rises, wherever the letters happen to be. This
+// throws from the words themselves, and only from the ones going — so the line
+// sheds where it is moving rather than where the spectrum is.
+//
+// It is not a second question. What lifts a word is its own slice of the
+// spectrum, and what throws the spark is the same slice: the spark is where the
+// lift already is, made visible. The mistake to avoid here is the one the height
+// made with the beat — two answers in one direction — and this is one answer
+// drawn twice.
+const (
+	// wordsSparkLeast is how hard a word has to be going before anything comes
+	// off it. High: everything is always moving a little, and a line shedding
+	// all the time is a line on fire rather than a line being played.
+	wordsSparkLeast = 0.62
+
+	// wordsSparkThrow is what the ride past that is worth in speed.
+	wordsSparkThrow = 0.9
+
+	// wordsSparkSpray is the share of the chances that come to anything, so what
+	// comes off is ragged the way the rest of the water is.
+	wordsSparkSpray = 0.10
+
+	// wordsSparkPitch is how far apart the columns that may throw are, in dots.
+	wordsSparkPitch = 6
+)
+
+func (m *Model) wordsSparks(w, rows int) {
+	if !m.stage.on || m.words.have.DotsX == 0 || m.words.where.Count == 0 {
+		return
+	}
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+	if dotsX <= 0 || dotsY <= 0 {
+		return
+	}
+
+	where := m.words.where
+	rides := make([]float32, where.Count)
+	for i := range rides {
+		rides[i] = m.wordsBeatRide(i, where.Count)
+	}
+
+	span, _ := stageSpan(dotsY)
+	for x := 0; x < dotsX; x += wordsSparkPitch {
+		if len(m.stage.drops) >= stageDrops {
+			return
+		}
+
+		// Which word owns this column, asked at the row the words stand on.
+		word := where.WordAt(x, where.Tops[0])
+		if word < 0 || word >= len(rides) {
+			continue
+		}
+		ride := rides[word]
+		if ride < wordsSparkLeast || m.stage.roll() > wordsSparkSpray {
+			continue
+		}
+
+		m.stage.drops = append(m.stage.drops, stageDrop{
+			col:    x,
+			at:     1,
+			speed:  (ride - wordsSparkLeast) / (1 - wordsSparkLeast) * wordsSparkThrow * float32(math.Sqrt(float64(span))),
+			bright: ride,
+		})
 	}
 }
