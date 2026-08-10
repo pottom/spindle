@@ -621,25 +621,10 @@ func (m Model) beatKeeping() bool {
 // ear hears the strike and the decay, and a picture that spends as long rising
 // to the beat as falling from it reads as a swell in the music instead of a
 // hit on it.
-func (m Model) beatPulse() float32 { return m.beatPulseAt(0) }
-
-// beatPulseAt is the same shape for something that keeps time somewhere other
-// than on the beat: a share of a beat behind it.
-//
-// Half a beat behind is the off-beat, which is what half a row of dancers does
-// while the other half is on it. The two are the same movement — nothing here
-// swings gentler or harder for being off the beat — because what makes a row
-// read as a group rather than as a wobble is that everybody moves the same way
-// and lands at different moments.
-func (m Model) beatPulseAt(behind float32) float32 {
+func (m Model) beatPulse() float32 {
 	phase, ok := m.beatPhase()
 	if !ok {
 		return 0
-	}
-
-	phase -= behind
-	for phase < 0 {
-		phase++
 	}
 
 	// A short rise into the beat, so nothing jumps from nothing, and a long
@@ -649,49 +634,6 @@ func (m Model) beatPulseAt(behind float32) float32 {
 	}
 	fall := 1 - phase/(1-beatRise)
 	return fall * fall
-}
-
-// beatsIn is how many beats have gone by since something that began a given
-// time ago, and whether the record has a beat to count at all.
-//
-// Counted on the beat grid rather than by dividing the time: what wants the
-// number is a picture that changes on the beat, and beats that fall a fifth of
-// a period from where the arithmetic puts them are beats in the wrong place.
-// The last beat reported anchors the grid, and the count is how many of its
-// multiples fall between then and now.
-//
-// The lead is how far past now the count runs, and it is there because what
-// asks is a picture that starts moving into a beat before it lands: the pulse
-// spends beatRise of a period coming up to it. Counted only as far as now, that
-// rise belongs to the beat before, and anything that changes on the count would
-// change in the middle of a movement rather than between two.
-func (m Model) beatsIn(age, lead time.Duration) (int, bool) {
-	if !m.beatKeeping() {
-		return 0, false
-	}
-	period := m.scope.beat.Period
-	if period <= 0 || age < 0 {
-		return 0, false
-	}
-
-	// How long ago the last beat the daemon reported was, brought up to date.
-	last := time.Since(m.scope.beatAt) + m.scope.beat.Since
-
-	// The grid, counted forwards from that beat: how many have landed by the end
-	// of the stretch, less how many had landed when it began. Floored rather
-	// than truncated, because the stretch usually began before that beat and a
-	// truncated negative would count one beat too few.
-	return int(floorDiv(int64(last+lead), int64(period)) - floorDiv(int64(last-age), int64(period))), true
-}
-
-// floorDiv divides towards minus infinity, which is what counting a grid
-// backwards through zero needs.
-func floorDiv(a, b int64) int64 {
-	q := a / b
-	if a%b != 0 && (a < 0) != (b < 0) {
-		q--
-	}
-	return q
 }
 
 const (

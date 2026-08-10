@@ -655,10 +655,6 @@ type wordsState struct {
 	// wordsEase.
 	band, head float32
 
-	// standing is where each mark of the row actually stands, in dots, eased
-	// towards where the figure it is dancing calls it. See crew.go.
-	standing []float32
-
 	// leanAt is the bar the picture on screen arrived under, which is what its
 	// lean is dealt from — rather than the bar playing now. The marks stay up
 	// across a change of bar, and a row that snaps to a new set of angles
@@ -1445,10 +1441,6 @@ func (m *Model) wordsFlow(w, rows int) {
 		return
 	}
 
-	// The row of marks moves towards what it is dancing rather than standing
-	// where the arithmetic puts it. See crew.go.
-	m.crewFlow(m.words.where.Count)
-
 	if centre, _ := wordsCentre(m.scope.bands); len(m.scope.bands) > 0 {
 		m.wordsFollowCentre(centre)
 	}
@@ -1507,16 +1499,14 @@ func (m Model) wordsRiding(count int) []int {
 		// The notes: each on its own part of the sound, and further than a word
 		// would go.
 		//
-		// On the beat where there is one to keep, and performing a figure with
-		// each other rather than merely agreeing: see crew.go. Each mark still
-		// rises by what its own share of the spectrum is doing — that is what
-		// makes the sound run along the row — and the figure says when each of
-		// them lands.
-		if c, ok := m.crewNow(); ok {
-			return m.crewRiding(count, c)
-		}
-
+		// On the beat where there is one to keep. Each mark still rises by what
+		// its own share of the spectrum is doing — that is what makes the sound
+		// run along the row — but they all leave the ground together, which is
+		// the difference between a row of meters and a row of dancers.
 		pulse := float32(1)
+		if m.beatKeeping() {
+			pulse = beatFloor + (1-beatFloor)*m.beatPulse()
+		}
 
 		out := make([]int, count)
 		for i := range out {
@@ -1627,18 +1617,6 @@ func wordsBesideMark(marks []bool, at int) (int, bool) {
 // Which way each is sheared, and so what the middle it turns about means, is
 // the marks' business: see wordsSlanting.
 func (m Model) wordsTilting(count int) ([]float32, []int) {
-	if count <= 0 || m.words.telling {
-		return nil, nil
-	}
-
-	// One figure the row can be dancing leans it rather than lifting it, and
-	// when it is dancing that one the lean is the figure's rather than dealt.
-	// See crew.go.
-	huddle := false
-	if c, ok := m.crewNow(); ok && c.fig == crewHuddle {
-		huddle = true
-	}
-
 	// Marks lean oftener as well as differently: a solo is the one place there
 	// is nothing else on the screen for it to be doing.
 	every := uint64(3)
@@ -1647,7 +1625,7 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 	}
 
 	seed := m.wordsLeanSeed()
-	if !huddle && seed%every != 0 {
+	if count <= 0 || m.words.telling || seed%every != 0 {
 		return nil, nil
 	}
 
@@ -1676,14 +1654,6 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 		}
 	}
 
-	// Huddling, the whole row leans together and the deal is not consulted at
-	// all: what makes it a huddle is that the two halves lean at each other, and
-	// three ways dealt a mark at a time would be a row of italics.
-	var leaning []float32
-	if huddle {
-		leaning = m.crewLeaning(count, wordsTiltMark)
-	}
-
 	for i := range tilt {
 		wide := max(last[i]-first[i]+1, 1)
 
@@ -1695,11 +1665,6 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 		middle[i] = (max(first[i], 0) + max(last[i], 0)) / 2
 		if m.words.beats {
 			lean, middle[i] = wordsTiltMark, mid[i]
-		}
-
-		if leaning != nil {
-			tilt[i] = leaning[i]
-			continue
 		}
 
 		// Three ways for a word: this way, that way, or flat.
