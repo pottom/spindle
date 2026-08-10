@@ -11,6 +11,8 @@ require (
 	github.com/coder/websocket v1.8.15
 	github.com/devgianlu/go-librespot v0.8.0
 	github.com/gofrs/flock v0.13.0
+	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c
+	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef
 	github.com/zmb3/spotify/v2 v2.4.3
 	golang.org/x/image v0.44.0
 	golang.org/x/oauth2 v0.36.0
@@ -40,8 +42,6 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
-	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/xlab/vorbis-go v0.0.0-20210911202351-b5b85f1ec645 // indirect
@@ -57,4 +57,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/devgianlu/go-librespot => github.com/pottom/go-librespot v0.8.1-0.20260810110547-03453a6488b4
+replace github.com/devgianlu/go-librespot => github.com/pottom/go-librespot v0.8.1-0.20260810161049-2c5a5570fd38
