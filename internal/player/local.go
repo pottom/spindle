@@ -272,8 +272,33 @@ func (l *Local) PlayNow(ctx context.Context, trackID string) error {
 	return l.PlayFrom(ctx, trackID)
 }
 
+// PlayTrack starts one track, through the daemon rather than through Spotify.
+//
+// The difference is the context, and it decides what happens when the track
+// ends. Spotify's own clients never run dry because every play they make is
+// inside something — a playlist, an album, a station — and when that something
+// runs out the client asks Spotify for a station built from what was just
+// heard. go-librespot does the same, and we have it on.
+//
+// A play sent over the Web API as a bare uris list carries no context at all,
+// and measured on this account, twice, with the same track: started through the
+// daemon it ran out and autoplay carried it on to the next record; started over
+// the Web API it ran out and stopped dead, paused at position nought, with
+// "failed resolving station for" and a 400 in the daemon's log — the context uri
+// in that message empty. The request Spotify refuses is the one asking for a
+// station to follow nothing.
+//
+// So this goes to the daemon whether or not it is already playing. Only when
+// there is no daemon answering does it fall back to asking Spotify to route the
+// track, which is better than not playing at all.
 func (l *Local) PlayTrack(ctx context.Context, trackID string) error {
-	return l.web.PlayTrackOn(ctx, trackID, l.deviceID())
+	if err := l.post(ctx, "/player/play", struct {
+		Uri    string `json:"uri"`
+		Paused bool   `json:"paused"`
+	}{Uri: trackURI(trackID)}); err != nil {
+		return l.web.PlayTrackOn(ctx, trackID, l.deviceID())
+	}
+	return nil
 }
 
 // PlayFrom brings an upcoming track to the front and starts it. Everything else
