@@ -32,19 +32,31 @@ import "time"
 const wordsSpell = 30 * time.Second
 
 // wordsWordless reports that the lyric database has nothing for what is
-// playing.
+// playing, or has not answered yet.
 //
-// A record it has not answered about yet is not one of them. It used to be
-// counted as wordless the moment it started, on the grounds that the two look
-// the same from here — and they do, right up until the answer lands. What that
-// produced at the top of a record whose sheet was a second late was the marks
-// arriving for that second and the first line coming straight over them: two
-// changes of picture where the record had made one. So nothing is put up on
-// spec; whatever the screen was showing keeps it until there is an answer to
-// act on.
+// The waiting used to count as neither, and the reasoning was that nothing
+// should be put up on spec: at the top of a record whose sheet was a second
+// late, the marks would arrive for that second and the first line would come
+// straight over them, which is two changes of picture where the record made
+// one.
+//
+// It was the wrong way round, and what was on the screen instead settled it.
+// Nothing to put up meant the picture drawn when nothing is set — the meter
+// above and below and an empty band across the middle — for as long as the
+// answer took. Watched at the top of every record: the marks of the record
+// before, then a hole, then the marks again. A hole is a change of picture too,
+// and a worse one.
+//
+// And the marks are not a guess. Nearly every record opens with a stretch
+// nobody sings — the intro is a gap like any other, and the marks keep it — so
+// putting them up while the answer is on its way is putting up what is about to
+// be there anyway.
 func (m Model) wordsWordless() bool {
-	if m.ps == nil || m.lyrics.forTrack != m.ps.TrackID {
+	if m.ps == nil {
 		return false
+	}
+	if m.lyrics.forTrack != m.ps.TrackID {
+		return true // no answer yet: the marks keep it until there is one
 	}
 	return m.lyrics.missing || !m.lyrics.synced
 }

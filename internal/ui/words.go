@@ -637,8 +637,10 @@ type wordsState struct {
 	beats bool
 
 	// forTrack is the record the picture was made for, so that nothing of one
-	// record is left on the screen of the next. See wordsGrind.
+	// record is left on the screen of the next, and cast which set of marks is
+	// up — empty for the notes the face carries. See wordsGrind.
 	forTrack string
+	cast     string
 
 	// forced is when the record's name was last asked for by hand, so that the
 	// one thing on this screen that happens on purpose can be seen on purpose.
@@ -1425,7 +1427,18 @@ func (m *Model) wordsGrind() tea.Cmd {
 	m.words.telling = len(name) > 0 && slices.Equal(lines, name)
 
 	text := strings.Join(lines, "\n")
-	if m.words.text == text && m.words.cellsX == m.width && m.words.cellsY == m.height {
+
+	// Which marks a bar is dealt is part of what is on screen, so it belongs in
+	// the test below. Without it the row went up once and stayed: every bar of
+	// marks is the same string of notes, so a later bar dealt the drawings was
+	// taken for the picture already held and never asked for. Over a whole
+	// wordless record that is one deal rather than one every half minute.
+	cast := ""
+	if m.words.beats {
+		cast = markCastFor(starts)
+	}
+
+	if m.words.text == text && m.words.cast == cast && m.words.cellsX == m.width && m.words.cellsY == m.height {
 		// The same words over again, a turn or a line later: nothing to draw
 		// that is not already held, but it does have to arrive rather than
 		// simply be there — a chorus that repeats a line, and a wordless record
@@ -1445,27 +1458,32 @@ func (m *Model) wordsGrind() tea.Cmd {
 		}
 		return nil
 	}
+	// A bar of marks may be drawn rather than set. Which it is comes from the
+	// bar, so a record shows both — see markCastFor — and when it is drawn the
+	// picture is already dots: there is nothing to send for and nothing to wait
+	// for, so it goes up in this frame rather than the next.
+	//
+	// Before the guard below, not after it. That one remembers what was asked of
+	// the setter and refuses to ask twice, and every bar of marks asks for the
+	// same string of notes — so once a row of notes had been sent for, the
+	// drawings were never reached again for the rest of the record.
+	if cast != "" {
+		if grain, layout, ok := markPicture(cast, m.width, m.height); ok {
+			m.wordsAdopt(grain, layout, text)
+			m.words.cast = cast
+			m.words.cellsX, m.words.cellsY = m.width, m.height
+			m.words.leanAt = starts
+			return nil
+		}
+	}
+	m.words.cast = ""
+
 	// A picture that could not be built is not asked for again — the face has
 	// no glyph for it, or there is no room to set it — but only at the size it
 	// failed at. Without the size in the test, one refusal held for the rest of
 	// the record and a window that had since been made wider changed nothing.
 	if m.words.asked == text && m.words.askedX == m.width && m.words.askedY == m.height {
 		return nil
-	}
-
-	// A bar of marks may be drawn rather than set. Which it is comes from the
-	// bar, so a record shows both — see markCastFor — and when it is drawn the
-	// picture is already dots: there is nothing to send for and nothing to wait
-	// for, so it goes up in this frame rather than the next.
-	if m.words.beats {
-		if cast := markCastFor(starts); cast != "" {
-			if grain, layout, ok := markPicture(cast, m.width, m.height); ok {
-				m.wordsAdopt(grain, layout, text)
-				m.words.cellsX, m.words.cellsY = m.width, m.height
-				m.words.leanAt = starts
-				return nil
-			}
-		}
 	}
 
 	m.words.asked, m.words.askedX, m.words.askedY = text, m.width, m.height

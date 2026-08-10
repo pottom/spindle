@@ -198,3 +198,31 @@ func TestADrawnRowStandsWhereTypeWould(t *testing.T) {
 		t.Errorf("the row sits at %d, want it about the middle at %d", at, middle)
 	}
 }
+
+// The cast is dealt afresh every bar, not once a record.
+//
+// Every bar of marks is the same string of notes, so a picture already held was
+// taken for the picture wanted and the row went up once and stayed — over a
+// wordless record that is one deal in four minutes rather than one every half
+// minute. Which set is up is part of what is on screen, so it belongs in that
+// test.
+func TestTheCastIsDealtEveryBar(t *testing.T) {
+	m := scopeModel(160, 44)
+	m.stage.on = true
+	m.scope.modes[tabPlayer] = scopeWords
+	m.ps.Duration = 6 * time.Minute
+	m.lyrics.forTrack, m.lyrics.missing = m.ps.TrackID, true
+	m.words.forTrack = m.ps.TrackID
+
+	seen := map[string]int{}
+	for spell := range int64(12) {
+		m.setProgress(time.Duration(spell)*wordsSpell + time.Second)
+		m.wordsGrind()
+		seen[m.words.cast]++
+	}
+	t.Logf("over twelve spells of one record the row was dealt %v (the empty one is the notes)", seen)
+
+	if len(seen) < 2 {
+		t.Errorf("twelve spells of one record only ever showed %v — the deal is being asked once", seen)
+	}
+}

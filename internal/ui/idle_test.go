@@ -87,13 +87,20 @@ func TestTheBigScreenSendsForTheWords(t *testing.T) {
 	}
 }
 
-// Nothing is put up while the database has still to answer.
+// The marks keep the screen while the database has still to answer.
 //
-// A record whose sheet is a second late used to be taken for wordless the
-// moment it started: the marks arrived for that second, and the first line came
-// straight over them. Two changes of picture where the record had made one, and
-// the first of them lasted a second.
-func TestNothingIsPutUpOnSpec(t *testing.T) {
+// This went the other way first, and the reasoning was that nothing should be
+// put up on spec: a record whose sheet is a second late would get the marks for
+// that second and the first line straight over them.
+//
+// What settled it was watching the alternative. Nothing to put up meant the
+// picture drawn when nothing is set — the meter above and below and an empty
+// band across the middle — for as long as the answer took, so the top of every
+// record read as the marks of the record before, then a hole, then the marks
+// again. A hole is a change of picture too, and a worse one. And the marks are
+// barely a guess: nearly every record opens with a stretch nobody sings, and
+// the intro is a gap the marks would keep anyway.
+func TestTheMarksKeepTheScreenUntilTheSheetLands(t *testing.T) {
 	m := scopeModel(100, 44)
 	m.stage.on = true
 	m.scope.modes[tabPlayer] = scopeWords
@@ -104,16 +111,16 @@ func TestNothingIsPutUpOnSpec(t *testing.T) {
 	// The record has just started and nothing has answered about it yet.
 	for _, at := range []time.Duration{time.Second, wordsSpell, 2 * wordsSpell} {
 		m.setProgress(at)
-		if lines, _ := m.wordsIdle(); len(lines) != 0 {
-			t.Errorf("%s in, with no answer yet, the screen was given %q", at, lines)
+		lines, _ := m.wordsComing()
+		if len(lines) != 1 || !wordsBeats(lines[0]) {
+			t.Errorf("%s in, with no answer yet, the screen has %q, want the marks", at, lines)
 		}
-		if lines, _ := m.wordsComing(); len(lines) != 0 {
-			t.Errorf("%s in, with no answer yet, the picture was asked for %q", at, lines)
+		if m.wordsSilent() {
+			t.Errorf("%s in the screen counts as silent, so it draws the empty picture", at)
 		}
 	}
 
-	// The sheet lands, a second before the first line: the line is what goes up,
-	// and the marks never had their second.
+	// The sheet lands, a second before the first line: the line is what goes up.
 	m.lyrics.forTrack, m.lyrics.synced = "new", true
 	m.lyrics.lines = []player.Lyric{{At: 61_000, Words: "the first line"}}
 	m.setProgress(61*time.Second - wordsGather/2)
@@ -123,7 +130,7 @@ func TestNothingIsPutUpOnSpec(t *testing.T) {
 		t.Errorf("with the sheet in and the singer due, the picture is %q, want the line", lines)
 	}
 
-	// And a record it has answered about and has nothing for takes its turns.
+	// And a record it has answered about and has nothing for keeps them too.
 	m.lyrics.synced, m.lyrics.missing = false, true
 	m.setProgress(wordsSpell + time.Second)
 	if lines, _ := m.wordsIdle(); len(lines) == 0 {
