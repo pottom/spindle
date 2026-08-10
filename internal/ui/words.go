@@ -655,6 +655,10 @@ type wordsState struct {
 	// wordsEase.
 	band, head float32
 
+	// standing is where each mark of the row actually stands, in dots, eased
+	// towards where the figure it is dancing calls it. See crew.go.
+	standing []float32
+
 	// leanAt is the bar the picture on screen arrived under, which is what its
 	// lean is dealt from — rather than the bar playing now. The marks stay up
 	// across a change of bar, and a row that snaps to a new set of angles
@@ -1440,6 +1444,10 @@ func (m *Model) wordsFlow(w, rows int) {
 	if m.words.where.Count == 0 {
 		return
 	}
+
+	// The row of marks moves towards what it is dancing rather than standing
+	// where the arithmetic puts it. See crew.go.
+	m.crewFlow(m.words.where.Count)
 
 	if centre, _ := wordsCentre(m.scope.bands); len(m.scope.bands) > 0 {
 		m.wordsFollowCentre(centre)

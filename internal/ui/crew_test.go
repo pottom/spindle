@@ -267,6 +267,78 @@ func TestTheRowIsLetOffForAPhrase(t *testing.T) {
 	}
 }
 
+// The row moves like bodies rather than like a meter.
+//
+// This is the complaint that was made of it in the room, and it is measurable:
+// what a picture looks like frame by frame is how far anything on it moves
+// between two frames. Standing exactly where the arithmetic put it, a mark went
+// from the floor to the top of its jump in a single frame, and the whole row
+// shook rather than danced — the spectrum it rides moves thirty times a second
+// and every wobble in it went straight onto the screen.
+//
+// So the row is measured here as it is watched: thirty frames a second of real
+// music, through a change of figure, counting the biggest step any one mark
+// takes between two frames.
+func TestTheRowMovesLikeBodies(t *testing.T) {
+	m := crewModel(t)
+	m.words.starts = crewBarDealt(crewUnison)
+	m.words.where.Count = 6
+
+	const frames = 90 // three seconds
+	period := m.scope.beat.Period
+
+	var worst, called int
+	was, wasCalled := make([]int, 6), make([]int, 6)
+	for f := range frames {
+		// A spectrum that shakes the way a real one does, so what is being
+		// measured is whether the row passes that shake on.
+		for i := range m.scope.bands {
+			m.scope.bands[i] = 0.5 + 0.4*float32(((f*7+i*13)%11))/10
+		}
+
+		into := time.Duration(f) * (33 * time.Millisecond)
+		m.scope.beat.Since = into % period
+		m.scope.beatAt = time.Now()
+		m.setProgress(time.Duration(m.words.starts)*time.Millisecond + into)
+
+		// Where the figure is calling the row this frame, which is where every
+		// mark used to stand outright, and where it has actually got to.
+		c, ok := m.crewNow()
+		if !ok {
+			t.Fatalf("frame %d: the row was not performing", f)
+		}
+		calls := m.crewCalls(6, c)
+
+		m.crewFlow(6)
+		now := m.wordsRiding(6)
+
+		if f > 0 {
+			for i := range now {
+				if step := abs(now[i] - was[i]); step > worst {
+					worst = step
+				}
+				if step := abs(int(calls[i]) - wasCalled[i]); step > called {
+					called = step
+				}
+			}
+		}
+		copy(was, now)
+		for i := range calls {
+			wasCalled[i] = int(calls[i])
+		}
+	}
+
+	t.Logf("over %d frames of a shaking spectrum the figure called for steps of up to %d dots between two frames; the row took at most %d",
+		frames, called, worst)
+
+	// A body moving across a screen at thirty frames a second covers a few dots
+	// a frame. Anything much past that is a jump cut with nothing in between,
+	// which is what the row used to do on every beat.
+	if worst > 6 {
+		t.Errorf("a mark moved %d dots in one frame, want it moving rather than jumping", worst)
+	}
+}
+
 // With keeping time turned off the row is exactly what it was before any of
 // this: every mark on its own part of the sound, nobody performing anything.
 func TestTheRowStopsPerformingWhenTheKeyIsOff(t *testing.T) {

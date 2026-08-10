@@ -158,22 +158,22 @@ func crewBehind(fig crewFigure, mark, count int) float32 {
 	return 0
 }
 
-// crewRiding is how far each mark of the row is lifted this frame, with the row
-// performing a figure.
+// crewCalls is where the figure asks each mark to stand this frame, in dots,
+// up being positive — which is the opposite way round from how the picture is
+// drawn, and the right way round for thinking about dancers.
 //
 // What a mark rides is still its own part of the spectrum — that is what puts
 // the sound in the row, and it is not the figure's to take away. The figure
 // says when each of them lands, and in one case which way.
-func (m Model) crewRiding(count int, c crew) []int {
-	out := make([]int, count)
+func (m Model) crewCalls(count int, c crew) []float32 {
+	out := make([]float32, count)
 
 	// The bow: the whole row down together on the first beat of the phrase, and
 	// the same for all of them, because a group bowing by different amounts is a
 	// group that has not rehearsed.
 	if c.fig == crewBow && c.inPhrase() == 0 {
-		dip := int(crewBowDip * m.beatPulse())
 		for i := range out {
-			out[i] = dip
+			out[i] = -crewBowDip * m.beatPulse()
 		}
 		return out
 	}
@@ -185,12 +185,76 @@ func (m Model) crewRiding(count int, c crew) []int {
 		// anything to say about when a mark rises, so both ride the sound the
 		// way the row does with no beat at all.
 		if c.fig == crewFree || c.fig == crewHuddle {
-			out[i] = -int(ride * wordsBounce)
+			out[i] = ride * wordsBounce
 			continue
 		}
 
 		pulse := beatFloor + (1-beatFloor)*m.beatPulseAt(crewBehind(c.fig, i, count))
-		out[i] = -int(ride * wordsBounce * pulse)
+		out[i] = ride * wordsBounce * pulse
+	}
+	return out
+}
+
+const (
+	// crewRise and crewFall are how much of the way a mark travels towards
+	// where the figure is calling it, each frame, going up and coming back.
+	//
+	// This is what a body has and a meter does not: mass. Without it every mark
+	// stands exactly where the arithmetic says it should this frame — and since
+	// what feeds that arithmetic is a spectrum that moves at thirty frames a
+	// second, the row shook rather than danced, and a change of figure was a
+	// jump rather than a movement into it. With it, what a dancer is asked to do
+	// is a place to get to.
+	//
+	// Up fast and down slow, because that is what a jump is: the push is quick
+	// and the fall is gravity. At thirty frames a second the rise is most of the
+	// way there in three frames — a tenth of a second, which still reads as a
+	// hit — and the fall takes about a third of a second, which is most of a
+	// beat at a hundred and twenty.
+	crewRise = 0.45
+	crewFall = 0.12
+)
+
+// crewFlow moves the row towards where the figure is calling it, a frame at a
+// time. It is the only part of this that is not worked out fresh every frame,
+// and the reason is the whole point: a dancer who is somewhere has to have been
+// on the way there.
+func (m *Model) crewFlow(count int) {
+	c, ok := m.crewNow()
+	if !ok || count <= 0 {
+		m.words.standing = nil
+		return
+	}
+
+	want := m.crewCalls(count, c)
+	if len(m.words.standing) != count {
+		// A row that has just changed size starts where it is called rather
+		// than climbing from the floor, which would read as the whole row
+		// growing out of the ground every time the terminal is resized.
+		m.words.standing = want
+		return
+	}
+
+	for i, at := range want {
+		ease := float32(crewFall)
+		if at > m.words.standing[i] {
+			ease = crewRise
+		}
+		m.words.standing[i] += (at - m.words.standing[i]) * ease
+	}
+}
+
+// crewRiding is how far each mark of the row is lifted this frame: where it has
+// got to, rather than where it was last called.
+func (m Model) crewRiding(count int, c crew) []int {
+	standing := m.words.standing
+	if len(standing) != count {
+		standing = m.crewCalls(count, c)
+	}
+
+	out := make([]int, count)
+	for i, at := range standing {
+		out[i] = -int(at)
 	}
 	return out
 }
