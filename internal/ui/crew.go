@@ -27,6 +27,18 @@ const (
 	// long enough that the change to the next one is an event.
 	crewPhrase = 4
 
+	// crewLevel is where a mark stands when nothing is timing it: the height the
+	// timed figures average out at over a beat.
+	//
+	// This is the one number that keeps the figures from giving themselves away.
+	// A row that lands on the beat spends most of the beat coming down again, so
+	// over a beat it averages a little over half its travel; a row that is not
+	// keeping time at all used to sit at the whole of it. The movement was the
+	// same either side of the change and the *height* was not, so what a change
+	// of figure read as was the picture being handed to a different program.
+	// Measured over a beat rather than reasoned: see TestEveryFigureStandsAsTall.
+	crewLevel = 0.56
+
 	// crewBowDip is how far the row sinks when it bows, in dots.
 	//
 	// Down, which nothing else on this screen does — every other movement here
@@ -168,29 +180,27 @@ func crewBehind(fig crewFigure, mark, count int) float32 {
 func (m Model) crewCalls(count int, c crew) []float32 {
 	out := make([]float32, count)
 
-	// The bow: the whole row down together on the first beat of the phrase, and
-	// the same for all of them, because a group bowing by different amounts is a
-	// group that has not rehearsed.
+	// The bow: the whole row sinks together on the first beat of the phrase.
+	// Laid over whatever the row is dancing rather than replacing it, so that
+	// the dancers go on dancing while they go down — a group that stops moving
+	// to bow has not bowed, it has sat down.
+	var dip float32
 	if c.fig == crewBow && c.inPhrase() == 0 {
-		for i := range out {
-			out[i] = -crewBowDip * m.beatPulse()
-		}
-		return out
+		dip = crewBowDip * m.beatPulse()
 	}
 
 	for i := range out {
 		ride := m.wordsBeatRide(i, count)
 
 		// Free, and the huddle, which leans instead of landing: neither has
-		// anything to say about when a mark rises, so both ride the sound the
-		// way the row does with no beat at all.
-		if c.fig == crewFree || c.fig == crewHuddle {
-			out[i] = ride * wordsBounce
-			continue
+		// anything to say about when a mark rises, so both stand at the height
+		// the others average out at. That last part is what stops a change of
+		// figure being visible as a change of figure — see crewLevel.
+		level := float32(crewLevel)
+		if c.fig != crewFree && c.fig != crewHuddle {
+			level = beatFloor + (1-beatFloor)*m.beatPulseAt(crewBehind(c.fig, i, count))
 		}
-
-		pulse := beatFloor + (1-beatFloor)*m.beatPulseAt(crewBehind(c.fig, i, count))
-		out[i] = ride * wordsBounce * pulse
+		out[i] = ride*wordsBounce*level - dip
 	}
 	return out
 }

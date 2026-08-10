@@ -190,18 +190,21 @@ func TestTheRowBows(t *testing.T) {
 	after := crewAt(m, 1, 0).wordsRiding(6)
 	t.Logf("on the first beat of the phrase the row stands at %v, on the next at %v", bowing, after)
 
-	// Down is a larger number: every dot row below the line the marks are set on.
-	for i, at := range bowing {
-		if at <= 0 {
-			t.Errorf("mark %d is at %d while the row bows, want it below the line", i, at)
-		}
-		if at != bowing[0] {
-			t.Errorf("mark %d bows to %d and mark 0 to %d, want the row bowing as one", i, at, bowing[0])
+	// Up is a smaller number, so a row that has gone down stands at a larger
+	// one. The dip is laid over the dance rather than replacing it — a group
+	// that stops moving to bow has not bowed, it has sat down — so what is
+	// asked of it is that the row is markedly lower, not that it is below the
+	// line it dances on.
+	for i := range bowing {
+		if bowing[i] <= after[i] {
+			t.Errorf("mark %d stands at %d bowing and %d a beat later, want it lower while it bows", i, bowing[i], after[i])
 		}
 	}
-	for i, at := range after {
-		if at > 0 {
-			t.Errorf("mark %d is still down at %d a beat after the bow, want it back up dancing", i, at)
+
+	// And it is one movement: the whole row goes down by the same amount.
+	for i, at := range bowing {
+		if at != bowing[0] {
+			t.Errorf("mark %d bows to %d and mark 0 to %d, want the row bowing as one", i, at, bowing[0])
 		}
 	}
 }
@@ -255,15 +258,73 @@ func TestTheRowIsLetOffForAPhrase(t *testing.T) {
 
 	free := crewAt(m, 0, 0.5).wordsRiding(6)
 
-	loose := m
-	loose.stage.loose = false
-	alone := loose.wordsRiding(6)
-
-	t.Logf("free the row stands at %v, and with the key off at %v", free, alone)
-	for i := range free {
-		if free[i] != alone[i] {
-			t.Errorf("free, mark %d stands at %d; with nobody keeping time it stands at %d", i, free[i], alone[i])
+	// Nothing times it: over a whole beat the row stands where it stood at the
+	// start of it, which is what none of the other figures do.
+	for _, phase := range []float64{0, 0.25, 0.75} {
+		if at := crewAt(m, 0, phase).wordsRiding(6); at[0] != free[0] {
+			t.Errorf("a quarter of the way through the beat the free row moved from %d to %d", free[0], at[0])
 		}
+	}
+
+	// And it stands at the height the timed figures average out at, rather than
+	// at the top of the travel — which is what used to give a change of figure
+	// away. See crewLevel.
+	timed := crewAt(withBar(m, crewBarDealt(crewUnison)), 0, 0.5).wordsRiding(6)
+	t.Logf("free the row stands at %v, and a timed figure halfway through its beat at %v", free, timed)
+	if free[0] > timed[0] {
+		t.Errorf("free the row stands at %d and a timed one at %d halfway through a beat, want them near each other", free[0], timed[0])
+	}
+}
+
+// withBar is the same model over a different bar, which is what decides what it
+// was dealt.
+func withBar(m Model, starts int64) Model {
+	m.words.starts = starts
+	return m
+}
+
+// Every figure stands the row at the same height.
+//
+// This is the second complaint that was made of it in the room, and it is the
+// sharper of the two: over one figure the marks were let a long way up and down
+// and over the next only a little, so what you could see was not a group
+// changing what it was doing but a program being changed. The movement is the
+// figure's to decide; how high the row stands is not.
+func TestEveryFigureStandsAsTall(t *testing.T) {
+	m := crewModel(t)
+	period := m.scope.beat.Period
+
+	// Averaged over two beats, sampled as the screen draws them, with every
+	// band going equally hard so that what is left is the figure.
+	height := func(fig crewFigure) float32 {
+		var sum float32
+		var n int
+		for f := range 60 {
+			into := time.Duration(f) * (33 * time.Millisecond)
+			m.scope.beat.Since = into % period
+			m.scope.beatAt = time.Now()
+
+			for _, at := range m.crewCalls(6, crew{fig: fig, beat: 1}) {
+				sum += at
+				n++
+			}
+		}
+		return sum / float32(n)
+	}
+
+	tallest, shortest := height(crewUnison), height(crewUnison)
+	for fig := crewUnison; fig < crewFigures; fig++ {
+		at := height(fig)
+		t.Logf("dancing figure %d the row stands %.2f dots up on average", fig, at)
+		tallest, shortest = max(tallest, at), min(shortest, at)
+	}
+
+	// Within a tenth of each other. Not identical: the bow spends one beat of
+	// its phrase going down on purpose, and a figure that could not do anything
+	// of its own would not be a figure.
+	t.Logf("the tallest figure stands %.2f and the shortest %.2f", tallest, shortest)
+	if tallest > shortest*1.1 {
+		t.Errorf("one figure stands the row at %.2f dots and another at %.2f, want them level", tallest, shortest)
 	}
 }
 
