@@ -32,21 +32,23 @@ type markSet struct {
 
 // marksDrawn is whether a bar of marks may be dealt a set of drawings at all.
 //
-// Off, for now, and nothing below it is off with it. The drawings, the two ways
-// of baking them and everything the row is built out of all stay exactly as they
-// are — what is switched off is the deal, and it is one word.
+// On, and it was off, and what changed is not the drawings.
 //
-// The sets that exist read well as pictures and did not read as marks on the
-// running screen. That is not a fault in any one of them and it is not fixed by
-// swapping a figure: a bar of marks is watched for half a minute at a time while
-// something else is what the screen is about, and the notes carry that better
-// than a row of people does. They are also the only set that has ever had a
-// reason to be seven of the same thing.
+// They were switched off because a row of dancers did nothing the notes were not
+// already doing: a bar of marks was watched for half a minute at a time while
+// something else was what the screen was about, and a set that arrived because
+// thirty seconds had passed is a set that arrived for no reason. The note then
+// was that they would come back when there was a set with a reason of its own.
 //
-// It comes back when there is a set with a reason of its own — instruments that
-// jump where the record jumps, faces that mime it — drawn by one hand the way
-// the dancers were. Until then the notes have the bar.
-const marksDrawn = false
+// The reason turned out not to be in the sets. It was in the deal. The row is
+// now dealt at the record's own joins rather than off a clock — see joins.go —
+// so a change of set is the record changing, and the same drawings that read as
+// arbitrary read as the record turning over. Watched on Mindblow's "Don't Let Me
+// Go", where it is unmistakable.
+//
+// Still one word, and it still turns everything off without taking anything
+// out.
+const marksDrawn = true
 
 // markCastFor is which marks a bar of them is dealt: the notes the face carries,
 // or one of the drawn sets.
