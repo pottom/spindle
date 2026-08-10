@@ -37,7 +37,14 @@ type markSet struct {
 // here from the start, and a row of instruments is another way of saying the
 // same thing rather than a better one — so they take turns, dealt from the bar
 // the way a visiting figure is. The empty string is the notes.
-func markCastFor(starts int64) string {
+//
+// Dealt from the record as well as from the bar, and that was watched rather
+// than reasoned. A wordless bar is stamped at the top of the spell it is in, so
+// the first half minute of every record in the world is stamped nought and every
+// one of them was dealt the same set. Skipping through a list, that is the same
+// row over and over — the deal only ever moved on for anybody who let a record
+// run past thirty seconds.
+func markCastFor(record string, starts int64) string {
 	sets := make([]string, 0, len(markSets)+1)
 	sets = append(sets, "") // the notes
 	for name := range markSets {
@@ -46,6 +53,9 @@ func markCastFor(starts int64) string {
 	sort.Strings(sets)
 
 	h := uint64(starts)*0x94d049bb133111eb + 0xd6e8feb86659fd93
+	for _, c := range []byte(record) {
+		h = (h ^ uint64(c)) * 0x100000001b3
+	}
 	h ^= h >> 30
 	h *= 0x9e3779b97f4a7c15
 	h ^= h >> 27

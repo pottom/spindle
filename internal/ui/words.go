@@ -1486,7 +1486,7 @@ func (m *Model) wordsGrind() tea.Cmd {
 	// wordless record that is one deal rather than one every half minute.
 	cast := ""
 	if m.words.beats {
-		cast = markCastFor(starts)
+		cast = markCastFor(m.words.forTrack, starts)
 	}
 
 	if m.words.text == text && m.words.cast == cast && m.words.cellsX == m.width && m.words.cellsY == m.height {

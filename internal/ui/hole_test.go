@@ -39,8 +39,10 @@ func TestTheDaemonNamingNoRecordIsNotAHole(t *testing.T) {
 	m := stageWords("a")
 	m.lyrics.forTrack, m.lyrics.missing = "a", true
 	m.setProgress(20 * time.Second)
-	m.wordsGrind()
-	if m.wordsSilent() {
+	if cmd := m.wordsGrind(); cmd != nil {
+		m.wordsTake(cmd)
+	}
+	if m.wordsSilent() || m.words.have.DotsX == 0 {
 		t.Fatal("the record playing has nothing up before the skip even starts")
 	}
 	had := m.words.have

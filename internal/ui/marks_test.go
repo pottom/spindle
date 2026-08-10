@@ -15,7 +15,7 @@ import (
 func TestTheNotesKeepTheirTurn(t *testing.T) {
 	seen := map[string]int{}
 	for starts := int64(0); starts < 4000; starts += 10 {
-		seen[markCastFor(starts)]++
+		seen[markCastFor("one", starts)]++
 	}
 	t.Logf("over 400 bars the casts came up %v (the empty one is the notes)", seen)
 
@@ -28,11 +28,33 @@ func TestTheNotesKeepTheirTurn(t *testing.T) {
 		}
 	}
 
-	// And the deal is a deal: the same bar gets the same cast twice.
+	// And the deal is a deal: the same bar of the same record gets the same cast
+	// twice.
 	for starts := int64(0); starts < 500; starts += 70 {
-		if a, b := markCastFor(starts), markCastFor(starts); a != b {
+		if a, b := markCastFor("one", starts), markCastFor("one", starts); a != b {
 			t.Fatalf("the bar at %dms was dealt %q and then %q", starts, a, b)
 		}
+	}
+}
+
+// The opening bar of one record is not the opening bar of the next.
+//
+// A wordless bar is stamped at the top of the spell it is in, so the first half
+// minute of every record is stamped nought. Dealt from the bar alone that is one
+// cast for the opening of every record ever played — watched by skipping through
+// a list, which is the same row over and over. The record is in the deal too.
+func TestEveryRecordOpensWithItsOwnCast(t *testing.T) {
+	seen := map[string]int{}
+	records := []string{"3n3Ppam7vgaVa1iaRUc9Lp", "1301WleyT98MSxVHPZCA6M", "5ChkMS8OtdzJeqyybCc9R5",
+		"7ouMYWpwJ422jRcDASZB7P", "0eGsygTp906u18L0Oimnem", "1lDWb6b6ieDQ2xT7ewTC3G",
+		"2takcwOaAZWiXQijPHIx7B", "6habFhsOp2NvshLv26DqMb", "4u7EnebtmKWzUH433cf5Qv"}
+	for _, id := range records {
+		seen[markCastFor(id, 0)]++
+	}
+	t.Logf("the opening bar of nine records was dealt %v (the empty one is the notes)", seen)
+
+	if len(seen) < 3 {
+		t.Errorf("nine records opened with only %d casts between them: %v", len(seen), seen)
 	}
 }
 
@@ -128,7 +150,7 @@ func TestADrawnRowNeedsNoRoundTrip(t *testing.T) {
 	// A spell whose bar is dealt a drawn set.
 	var spell int64 = -1
 	for at := range int64(200) {
-		if markCastFor(at*wordsSpell.Milliseconds()) != "" {
+		if markCastFor(m.ps.TrackID, at*wordsSpell.Milliseconds()) != "" {
 			spell = at
 			break
 		}
@@ -148,7 +170,7 @@ func TestADrawnRowNeedsNoRoundTrip(t *testing.T) {
 		t.Errorf("the row has %d marks in its layout", m.words.where.Count)
 	}
 	t.Logf("the bar at %s was dealt %q and went up with %d marks in the frame it was asked in",
-		time.Duration(spell)*wordsSpell, markCastFor(spell*wordsSpell.Milliseconds()), m.words.where.Count)
+		time.Duration(spell)*wordsSpell, markCastFor(m.ps.TrackID, spell*wordsSpell.Milliseconds()), m.words.where.Count)
 
 	// And it still counts as a bar of marks, which is what everything else on
 	// the screen asks.
@@ -159,7 +181,7 @@ func TestADrawnRowNeedsNoRoundTrip(t *testing.T) {
 	// The notes still go through the face, and that costs a command.
 	var notes int64 = -1
 	for at := range int64(200) {
-		if markCastFor(at*wordsSpell.Milliseconds()) == "" {
+		if markCastFor(m.ps.TrackID, at*wordsSpell.Milliseconds()) == "" {
 			notes = at
 			break
 		}
