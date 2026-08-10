@@ -31,7 +31,7 @@ const (
 	// its own height. A shade under what a mark leans when it is dealt a lean of
 	// its own: this one is happening all the time, and a row permanently at the
 	// angle a type designer calls italic is a row that has fallen over.
-	wordsSwayMost = 0.16
+	wordsSwayMost = 0.31
 
 	// How hard the low end is hitting decides how far the row sways, and these
 	// are the numbers that read it.

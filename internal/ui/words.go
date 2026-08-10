@@ -812,7 +812,7 @@ const (
 	// fairground; a row of seven across the width is a different picture — there
 	// the travel is what makes the sound run along the row, and too little of it
 	// is a line of type that happens to twitch.
-	wordsBounce = 14
+	wordsBounce = 28
 
 	// wordsLit is how bright a dot of the rasterised type has to be to be set.
 	// Half: type is drawn white on black and anti-aliased, so this is the edge
@@ -1661,10 +1661,17 @@ func (m Model) wordsRiding(count int) []int {
 		// has the lean instead: see sway.go.
 		//
 		// How far they go at all grows with the record: see swell.go.
+		// Centred on the line the row was set on, rather than hanging off it.
+		//
+		// The ride only ever goes one way — a band is loud or it is not — so the
+		// whole row rises as the travel does, and at a travel worth watching it
+		// had climbed clear of where the picture put it. Half the travel down
+		// puts the middle of the movement back on the line: a quiet band rests a
+		// little below it, a loud one goes as far above.
 		travel := wordsBounce * m.swell()
 		out := make([]int, count)
 		for i := range out {
-			out[i] = -int(m.wordsBeatRide(i, count) * travel)
+			out[i] = int(travel/2) - int(m.wordsBeatRide(i, count)*travel)
 		}
 		return out
 	}
