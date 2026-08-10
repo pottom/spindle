@@ -279,7 +279,6 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.scope.adoptBands(message.Bands)
 			if message.Beat.Found() {
 				m.scope.beat, m.scope.beatAt = message.Beat, time.Now()
-				m.hueFlow(message.Beat.Notes)
 			}
 		}
 		if m.scopeMode().wave() {

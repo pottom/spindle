@@ -1918,35 +1918,10 @@ func (m Model) wordsPaint(word, count, freqs, levels int) wordPaint {
 	// the line is written in, not which word is brighter than which. That was
 	// the thing measured and thrown out — a line is read, and only if it is lit
 	// like one — and this leaves the brightness alone.
+	// The hue runs along the line, low to high, which is the palette the
+	// screen is coloured in rather than anything about this moment: it holds
+	// still while the line is up, so it costs the reading nothing.
 	along := (float32(word) + 0.5) / float32(count)
-
-	// A word sits further round the palette the less of the sound it carries.
-	//
-	// A line has loud words and still ones, and the still ones are dead space
-	// the music itself made. A word riding hard is already answering and is left
-	// where it is; a word sitting still is carried, so the colours across a line
-	// are a map of where the music is in it.
-	//
-	// Put on the beat first, and it was wrong: the beat already leans this line,
-	// so the colour jumping and falling back was a second answer in the same
-	// direction — the mistake the height made — and what it looked like was
-	// flashing rather than moving. It answers its own question now, and holds
-	// still while the answer does.
-	//
-	// The word is one word throughout: the letters do not move, because a word
-	// whose letters move separately stops being a word.
-
-	// And a wave crossing it, when the record has just turned over.
-	if crest, on := m.hueWave(); on {
-		along += hueWaveMost * hueWaveOn(along, crest)
-	}
-
-	if along += m.hueTurn(); along >= 1 {
-		along--
-	}
-	for along >= 1 {
-		along--
-	}
 	hue := int8(min(int(along*float32(freqs)), freqs-1))
 
 	var loud float32

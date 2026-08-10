@@ -188,9 +188,6 @@ func (m *Model) joinsFlow(fps int) {
 	if (j.watch > 0 && nov > j.watch*joinEdge) || j.heard-j.begins > joinMost {
 		j.begins = j.heard
 
-		// And the colour crosses the line, so a turn is something seen rather
-		// than only something the deal knows about. See hue.go.
-		m.hueWaveAt()
 	}
 }
 

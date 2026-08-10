@@ -197,9 +197,6 @@ type Model struct {
 	// stage is the visualiser with the whole terminal to itself. See stage.go.
 	stage stageState
 
-	// hue is where the harmony has carried the colour. See hue.go.
-	hue hueState
-
 	// joins is where the record changes, which is when the picture changes with
 	// it. See joins.go.
 	joins joinsState
