@@ -80,11 +80,107 @@ func (m Model) wordsSway() (float32, bool) {
 		return 0, false
 	}
 
-	// How long the bar has been up, on the clock everything else on this screen
-	// reads. The picture is asked for a little before the bar sounds, so the age
-	// can still be negative when the row first goes up.
-	age := max(time.Duration(m.wordsClock()-m.words.starts)*time.Millisecond, 0)
+	// Where the sway has got to, counted in beats and carried through the one
+	// being played: a whole number on every beat, and everything between them in
+	// between. Nothing here jumps at a beat — the cosine is already where it
+	// needs to be when the count moves on.
+	at, ok := m.swayAt()
+	if !ok {
+		return 0, false
+	}
+	return wordsSwayMost * m.words.drive * float32(math.Cos(math.Pi*at)), true
+}
 
+// How a bar of marks sways: the same beat, and not the same way twice running.
+//
+// One way is right some of the time and wrong the rest, which is the argument
+// for dealing it rather than choosing it. A row all leaning together is a crowd;
+// a row leaning at itself is a conversation; a row where every other one goes
+// the other way is a zigzag that turns over on each beat; and a lean that
+// arrives a little later the further along the row it is rolls, which a body
+// does and a rank does not.
+//
+// Nothing here is a mark being singled out — that was tried, and a lone thing
+// moving on a still row reads as a mechanism. Whichever of these is dealt,
+// every mark in the row is leaning.
+type swayFigure int
+
+const (
+	swayTogether   swayFigure = iota // all of them the same way
+	swayFacing                       // the two halves at each other
+	swayAlternating                  // every other one the other way
+	swayTrailing                     // later the further along the row
+	swayFigures
+)
+
+// swayTrail is how much of a beat further behind each mark is than the one
+// before it, when the row is dealt the rolling one.
+//
+// Small on purpose. Across eight marks this puts a third of a beat between the
+// two ends — enough that the lean visibly travels, little enough that the row is
+// still one body leaning rather than a queue of separate things.
+const swayTrail = 0.045
+
+// swayFor is the figure a bar of marks was dealt, mixed the way a visiting
+// figure is: the same bar sways the same way twice, and nobody can call it.
+func swayFor(starts int64) swayFigure {
+	h := uint64(starts)*0x94d049bb133111eb + 0x9e3779b97f4a7c15
+	h ^= h >> 30
+	h *= 0xbf58476d1ce4e5b9
+	h ^= h >> 27
+	return swayFigure(h % uint64(swayFigures))
+}
+
+// wordsSwaying is how far each mark of the row leans this frame.
+func (m Model) wordsSwaying(count int) ([]float32, bool) {
+	lean, ok := m.wordsSway()
+	if !ok || count <= 0 {
+		return nil, false
+	}
+
+	out := make([]float32, count)
+	fig := swayFor(m.words.starts)
+
+	// The rolling one is not a scaling of the row's lean but a lean of its own
+	// per mark, because what makes it roll is when each of them gets there.
+	if fig == swayTrailing {
+		at, ok := m.swayAt()
+		if !ok {
+			return nil, false
+		}
+		for i := range out {
+			out[i] = wordsSwayMost * m.words.drive *
+				float32(math.Cos(math.Pi*(at-float64(i)*swayTrail)))
+		}
+		return out, true
+	}
+
+	middle := float32(count-1) / 2
+	for i := range out {
+		switch fig {
+		case swayFacing:
+			// Nought in the middle of the row and one at either end, so the two
+			// halves lean at each other and the mark between them barely moves.
+			if middle > 0 {
+				out[i] = lean * (middle - float32(i)) / middle
+			}
+		case swayAlternating:
+			if i%2 == 1 {
+				out[i] = -lean
+				continue
+			}
+			out[i] = lean
+		default:
+			out[i] = lean
+		}
+	}
+	return out, true
+}
+
+// swayAt is where the sway has got to, counted in beats and carried through the
+// one being played.
+func (m Model) swayAt() (float64, bool) {
+	age := max(time.Duration(m.wordsClock()-m.words.starts)*time.Millisecond, 0)
 	beats, ok := m.beatsIn(age)
 	if !ok {
 		return 0, false
@@ -93,13 +189,7 @@ func (m Model) wordsSway() (float32, bool) {
 	if !ok {
 		return 0, false
 	}
-
-	// Where the sway has got to, counted in beats and carried through the one
-	// being played: a whole number on every beat, and everything between them in
-	// between. Nothing here jumps at a beat — the cosine is already where it
-	// needs to be when the count moves on.
-	at := float64(beats) + float64(phase)
-	return wordsSwayMost * m.words.drive * float32(math.Cos(math.Pi*at)), true
+	return float64(beats) + float64(phase), true
 }
 
 // swayFlow follows how hard the low end is hitting, a frame at a time, which is

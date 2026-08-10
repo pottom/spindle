@@ -135,3 +135,64 @@ func TestTheSwayIsAPendulum(t *testing.T) {
 		t.Errorf("the lean moved %.4f in one frame against a travel of %.2f, want it swinging rather than snapping", worst, wordsSwayMost)
 	}
 }
+
+// The same beat, and not the same way twice running: which way each mark leans
+// is dealt from the bar. One way is right some of the time and wrong the rest,
+// which is the argument for dealing it — and whichever is dealt, every mark in
+// the row is leaning. A lone thing moving on a still row was tried and thrown
+// out.
+func TestTheRowLeansEveryWay(t *testing.T) {
+	m := swayModel(t)
+	kick(&m, 6, 0.30)
+
+	seen := map[swayFigure]int{}
+	for starts := int64(0); starts < 4000; starts += 10 {
+		seen[swayFor(starts)]++
+	}
+	t.Logf("over 400 bars the four figures came up %v", seen)
+	for fig := swayTogether; fig < swayFigures; fig++ {
+		if seen[fig] == 0 {
+			t.Errorf("figure %d was never dealt", fig)
+		}
+	}
+
+	// What each of them does to a row of eight, on the beat.
+	const count = 8
+	names := []string{"together", "facing", "alternating", "trailing"}
+	for fig := swayTogether; fig < swayFigures; fig++ {
+		var bar int64 = -1
+		for starts := int64(0); starts < 10_000; starts += 10 {
+			if swayFor(starts) == fig {
+				bar = starts
+				break
+			}
+		}
+		if bar < 0 {
+			t.Fatalf("no bar was dealt figure %d", fig)
+		}
+
+		m.words.starts = bar
+		m.setProgress(time.Duration(bar) * time.Millisecond)
+		m.scope.beat.Since = 0
+		m.scope.beatAt = time.Now()
+
+		lean, ok := m.wordsSwaying(count)
+		if !ok {
+			t.Fatalf("%s: the row was not swaying", names[fig])
+		}
+		t.Logf("%-11s %v", names[fig], lean)
+
+		// Nobody stands upright while the rest lean: whatever the figure, the
+		// row is one body doing something.
+		for i, at := range lean {
+			if at > -0.01 && at < 0.01 {
+				// The middle of a row leaning at itself is allowed to be
+				// upright — it is the hinge.
+				if fig == swayFacing && i*2 >= count-2 && i*2 <= count {
+					continue
+				}
+				t.Errorf("%s: mark %d stands at %+.3f while the row leans", names[fig], i, at)
+			}
+		}
+	}
+}

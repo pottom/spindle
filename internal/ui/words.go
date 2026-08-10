@@ -1590,7 +1590,7 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 
 	// The row keeps time by leaning, so when there is a beat to keep the lean is
 	// the beat's rather than dealt. See sway.go.
-	sway, swaying := m.wordsSway()
+	sway, swaying := m.wordsSwaying(count)
 
 	// Marks lean oftener as well as differently: a solo is the one place there
 	// is nothing else on the screen for it to be doing.
@@ -1642,10 +1642,11 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 			lean, middle[i] = wordsTiltMark, mid[i]
 		}
 
-		// Swaying, the whole row leans the same way and the deal is not asked:
-		// what makes it a sway is that they go over together.
+		// Swaying, the lean is the beat's and the deal is not asked. Which way
+		// each of them goes is the figure the bar was dealt — together, at each
+		// other, every other one the other way, or rolling along the row.
 		if swaying {
-			tilt[i] = sway
+			tilt[i] = sway[i]
 			continue
 		}
 
