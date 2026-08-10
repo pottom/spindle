@@ -463,12 +463,13 @@ func huePalette(t Theme, accent color.Color, arc float64) [][]lipgloss.Style {
 			// been left in the sun, and the dots are small enough that a weak
 			// colour reads as grey.
 			c := fromHSL(hue, min(sat*(0.62+0.45*v), 1), light*(0.42+0.75*v))
-			if v > 0.86 {
-				// The last step goes toward white: a tip that only gets lighter
-				// in its own hue stops registering as hotter. Late and little,
-				// or the top of every bar is a white smear.
-				c = blend(c, t.Text, (v-0.86)/0.14*0.42)
-			}
+			// No whitening at the top, and that is where a line of type parts
+			// company with a meter. A bar's tip goes toward white because a tip
+			// that only gets lighter in its own hue stops reading as hotter — but
+			// a line reaches that step whenever the record is loud, so the same
+			// rule washed the colour out of it at exactly the moments it should
+			// have been strongest. Watched as a line going colourful and then
+			// paling back, over and over.
 			out[f][l] = lipgloss.NewStyle().Foreground(c)
 		}
 	}
