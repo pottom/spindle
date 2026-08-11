@@ -543,6 +543,21 @@ func (m Model) wordsComing() ([]string, int64) {
 		}
 	}
 
+	// Silenced, and the row keeps the screen — over a line being sung as much as
+	// over a bar of music.
+	//
+	// Before the lyric rather than after it. A record with a sheet is words for
+	// most of its length, and the deal that puts the hush up only runs on a bar
+	// with no words in it — so on anything anybody actually sings, muting
+	// changed nothing. Read straight off the screen with the bar printed on it:
+	// "line, cast notes, MUTED", which is three facts and one of them wrong.
+	//
+	// Stamped at the moment the room went quiet, so the company is dealt once
+	// and stays rather than being dealt afresh every frame.
+	if m.muted() {
+		return []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)}, m.mutedAt.UnixMilli()
+	}
+
 	// And the marks, when they are asked for by hand. A set of them arrives on
 	// the record's own turns, which is right for listening and useless for
 	// looking: on a record with words they may not arrive at all. Asked for,

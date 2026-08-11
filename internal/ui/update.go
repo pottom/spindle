@@ -835,7 +835,7 @@ func (m *Model) toggleMute() tea.Cmd {
 		return nil
 	}
 
-	m.mutedFrom = m.ps.Volume
+	m.mutedFrom, m.mutedAt = m.ps.Volume, time.Now()
 	return m.setVolume(0)
 }
 
@@ -855,7 +855,7 @@ func (m *Model) setVolume(pct int) tea.Cmd {
 		// Turned all the way down with the arrows rather than muted with the
 		// key. It is the same silence, and it is written down the same way, so
 		// that one reading answers "is this room quiet" — see muted.
-		m.mutedFrom = m.ps.Volume
+		m.mutedFrom, m.mutedAt = m.ps.Volume, time.Now()
 	}
 	m.ps.Volume = min(max(pct, 0), 100)
 	m.hold()

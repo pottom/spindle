@@ -114,6 +114,11 @@ type Model struct {
 	// chosen is worth keeping, and the music keeps playing either way.
 	mutedFrom int
 
+	// mutedAt is when the room went quiet, which is what the row of marks that
+	// says so is stamped with — so the company is dealt once rather than afresh
+	// on every frame. See wordsComing.
+	mutedAt time.Time
+
 	// rateLimitedUntil suspends polling. Spotify asked to be left alone, and
 	// carrying on regardless is how a short throttle becomes a long one.
 	rateLimitedUntil time.Time
