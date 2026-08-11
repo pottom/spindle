@@ -105,20 +105,39 @@ func (m *Model) splashFlow() {
 
 // splashWanted is whether the wait it belongs to is on.
 //
-// The player screen with nothing playing anywhere, which is where spindle spends
-// the second or two after it is started and every second of a longer wait. Not
-// while the device picker is open over it: somebody choosing a device is past
-// looking at a logo.
+// Two screens, and the first of them is the one that matters. Before any state
+// has arrived the player is a single line reading "Connecting…", and that is
+// where spindle spends the second after it is started — or the twenty, after the
+// machine has been asleep. The other is the player with nothing playing
+// anywhere, which is the same wait gone long.
+//
+// It was on the second only, which is why it never showed: on a machine whose
+// daemon answers, the state arrives with a device in it and the first screen is
+// the only one anybody sees.
+//
+// Not while the device picker is open over it: somebody choosing a device is
+// past looking at a logo.
 func (m Model) splashWanted() bool {
-	return m.covers != nil && m.tab == tabPlayer && m.noDevice && !m.devices.open
+	if m.covers == nil || m.tab != tabPlayer || m.devices.open {
+		return false
+	}
+	return m.ps == nil || m.noDevice
 }
 
-// splashRoom is the box the logo is given: everything the panel has, less the
-// rows its words and its device list want.
+// splashRoom is the box the logo is given: everything the screen has, less what
+// the words under it want.
+//
+// The connecting screen has one line under it and the device screen has a list,
+// so they are not given the same room — the picture is as large as what is left
+// allows, and on the connecting screen almost nothing is left over.
 func (m Model) splashRoom() (w, rows int) {
 	l := m.layout()
+	keeps := splashKeeps
+	if m.ps == nil {
+		keeps = 2
+	}
 	return l.interior - leftMargin - rightMargin,
-		max(l.bodyHeight-1-splashKeeps, 0)
+		max(l.bodyHeight-1-keeps, 0)
 }
 
 // splashRows is what was rendered, ready to put in the panel.

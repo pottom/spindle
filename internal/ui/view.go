@@ -121,7 +121,8 @@ func (m Model) body(l layout) []string {
 		block = m.noDevicePanel(l, max(l.bodyHeight-1, 1))
 
 	case m.tab == tabPlayer && m.ps == nil:
-		block = []string{m.styles.Detail.Render("Connecting…")}
+		// The picture, while there is nothing else to look at. See splash.go.
+		block = append(m.splashRows(), "", m.styles.Detail.Render("Connecting…"))
 
 	case m.tab == tabSettings && !m.devices.open:
 		block = m.settingsPanel(l, max(l.bodyHeight, 1))

@@ -13,7 +13,28 @@ import (
 	"github.com/pottom/spindle/internal/ui/msg"
 )
 
+// Update answers a message, and then makes sure the program's own picture is in
+// step with what the answer left behind.
+//
+// The picture belongs to a wait about a second long, and it used to be brought
+// up to date on the tick — which fires once a second. So the first tick that
+// could have drawn it arrived after the state it was waiting for, and it was
+// cleared in the same breath it was made. Following the model rather than a
+// clock is the only way a picture about waiting can be right: the wait is over
+// when a message says it is, not when a second has gone by.
+//
+// It costs a comparison a message. Nothing is rendered unless the box or the
+// state has actually changed.
 func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
+	out, cmd := m.answer(message)
+	if got, ok := out.(Model); ok {
+		got.splashFlow()
+		return got, cmd
+	}
+	return out, cmd
+}
+
+func (m Model) answer(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch message := message.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = message.Width, message.Height
@@ -392,12 +413,6 @@ func (m Model) handleTick() (tea.Model, tea.Cmd) {
 	m.tickCount++
 	cmds := []tea.Cmd{tickCmd()}
 
-	// The program's own picture, while the device is being waited for.
-	//
-	// On the ordinary tick rather than on a frame of the visualiser. It was on
-	// the frame, and that branch leaves at once when the trace is not on screen
-	// — which is exactly the case the picture exists for, so it never ran once.
-	m.splashFlow()
 	if cmd := m.spinDevice(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}

@@ -1,9 +1,12 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
 	"github.com/pottom/spindle/internal/player"
@@ -43,9 +46,11 @@ func TestTheLogoFillsTheWait(t *testing.T) {
 		}
 	}
 
-	// The device arrives: it goes, and it goes properly rather than being left
-	// in the terminal for whatever comes next to draw over.
+	// The device arrives with a record on it: the wait is over and the picture
+	// goes, properly rather than being left in the terminal for whatever comes
+	// next to draw over.
 	m.noDevice = false
+	m.ps = &player.State{TrackID: "one", Title: "x", Duration: time.Minute}
 	m.splashFlow()
 	if len(m.splashRows()) != 0 {
 		t.Error("the logo stayed after the device arrived")
@@ -91,5 +96,42 @@ func TestTheLogoIsDrawnByTheTick(t *testing.T) {
 	}
 	if len(got.splashRows()) == 0 {
 		t.Error("a tick on the screen the logo is for drew nothing")
+	}
+}
+
+// The picture is on screen in the second the program starts, not a second later.
+//
+// It is brought up to date after every message rather than on the tick, and this
+// is why: the tick fires once a second and the wait is about a second long, so
+// the first tick that could have drawn it arrived after the state it was waiting
+// for. This test does what a real start does — a size, and then nothing — and
+// looks at what View actually put out.
+func TestTheLogoIsUpBeforeTheFirstTick(t *testing.T) {
+	m := New(player.NewMock(), cover.NewLoader(cover.NewHalfblock(defaultTestCell), nil), defaultTestCell)
+	m.tab = tabPlayer
+
+	out, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	got, ok := out.(Model)
+	if !ok {
+		t.Fatal("the update did not hand back a model")
+	}
+	if got.ps != nil {
+		t.Fatal("this test wants the moment before any state has arrived")
+	}
+	if n := len(got.splashRows()); n == 0 {
+		t.Fatal("the size arrived and nothing was rendered")
+	}
+
+	// And it is in what the screen actually shows, not only in the model.
+	screen := fmt.Sprint(got.View())
+	first := got.splashRows()[len(got.splashRows())/2]
+	if strings.TrimSpace(first) == "" {
+		t.Fatal("the middle row of the logo is blank")
+	}
+	if !strings.Contains(screen, strings.TrimSpace(first)) {
+		t.Error("the logo was rendered but never reached the screen")
+	}
+	if !strings.Contains(screen, "Connecting") {
+		t.Error("the screen stopped saying what it is waiting for")
 	}
 }
