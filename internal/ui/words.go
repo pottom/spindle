@@ -977,6 +977,7 @@ func (m Model) wordsLines(w, rows int) []string {
 
 	bounce := m.wordsRiding(len(paints))
 	tilt, middle := m.wordsTilting(len(paints))
+	turned := m.wordsTurning(len(paints))
 
 	for y := range dotsY {
 		for x := range dotsX {
@@ -995,6 +996,13 @@ func (m Model) wordsLines(w, rows int) []string {
 			if word := m.words.where.WordAt(x, y); word >= 0 {
 				if word < len(bounce) {
 					to += bounce[word]
+				}
+				// Turned round on the spot, about its own ink rather than about
+				// the space it stands in — mirrored about the middle of its
+				// column and the gap beside it, a mark slides half a gap
+				// sideways every time it turns, which reads as a shuffle.
+				if word < len(turned) && turned[word] {
+					at = m.words.where.Lefts[word] + m.words.where.Rights[word] - x
 				}
 				if word < len(tilt) && tilt[word] != 0 {
 					// A shear rather than a turn. At these angles the two look

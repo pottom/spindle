@@ -55,6 +55,12 @@ type WordLayout struct {
 
 	// Tops and Bottoms are the dot rows each line of type covers.
 	Tops, Bottoms []int
+
+	// Lefts and Rights are the dot columns each mark of a row covers, its own
+	// ink and not the air beside it. Only a row of marks fills them: a word of
+	// type has no use for them, and what they are for is turning one mark round
+	// on the spot without it sliding sideways as it goes.
+	Lefts, Rights []int
 }
 
 // Middle is the dot in the middle of a word, which is what a piece bursting

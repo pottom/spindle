@@ -64,6 +64,10 @@ import (
 // set is a manifest: the drawings, in the order they stand in the row, and the
 // sizes they are baked at.
 type set struct {
+	// Turns says the drawings have a front, so the screen may turn one round on
+	// the beat. Anything with feet has; a drum seen head on has not.
+	Turns bool `json:"turns"`
+
 	Name    string   `json:"name"`
 	From    string   `json:"from"`
 	Licence string   `json:"licence"`
@@ -370,7 +374,8 @@ func read(path string) (set, error) {
 }
 
 func emit(b *strings.Builder, dir string, s set) error {
-	fmt.Fprintf(b, "\t%q: {\n\t\tfrom: %q,\n\t\tlicence: %q,\n\t\tsizes: []markSize{\n", s.Name, s.From, s.Licence)
+	fmt.Fprintf(b, "\t%q: {\n\t\tfrom: %q,\n\t\tlicence: %q,\n\t\tturns: %v,\n\t\tsizes: []markSize{\n",
+		s.Name, s.From, s.Licence, s.Turns)
 
 	for _, h := range s.Heights {
 		fmt.Fprintf(b, "\t\t\t{tall: %d, marks: []markDots{\n", h.Tall)

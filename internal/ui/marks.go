@@ -29,6 +29,11 @@ import (
 type markSet struct {
 	from, licence string
 	sizes         []markSize
+
+	// turns says the drawings have a front, so a mark may be turned round on
+	// the beat. A drum seen head on has no front and turning it does nothing;
+	// anything with feet does. See wordsTurning.
+	turns bool
 }
 
 // marksDrawn is whether a bar of marks may be dealt a set of drawings at all.
@@ -218,6 +223,8 @@ func markPicture(name string, w, rows int) (cover.Grain, msg.WordLayout, bool) {
 		At:      make([]int16, dotsX),
 		Tops:    []int{top},
 		Bottoms: []int{top + size.tall - 1},
+		Lefts:   make([]int, len(row)),
+		Rights:  make([]int, len(row)),
 	}
 	for i := range layout.At {
 		layout.At[i] = -1
@@ -237,6 +244,7 @@ func markPicture(name string, w, rows int) (cover.Grain, msg.WordLayout, bool) {
 			x0 += before.wide + gap
 		}
 		y0 := top + size.tall - m.tall
+		layout.Lefts[i], layout.Rights[i] = x0, x0+m.wide-1
 
 		for y := range m.tall {
 			for x := range m.wide {
@@ -301,3 +309,52 @@ func (m Model) marksForcing() bool {
 
 // marksShows is how long a set stays when it is asked for.
 const marksShows = 12 * time.Second
+
+// wordsTurning is which marks of a row are facing the other way this frame.
+//
+// A mark with feet that never turns round is a mark standing on a stage; one
+// that turns is somebody dancing on it. So each of them turns on its own count
+// of beats, dealt when the row arrives, and the whole row is dealt again the
+// next time one comes up: the same record twice over is the same dance twice
+// over, and two records are not.
+//
+// Only on the beat, and only where there is a beat to take it from. A turn that
+// happens on a clock of its own is the one movement on this screen that would
+// not be answering the music, and there are already enough of those elsewhere.
+func (m Model) wordsTurning(count int) []bool {
+	if count == 0 || !m.words.beats || len(m.words.where.Lefts) < count {
+		return nil
+	}
+
+	// Every mark of a set turns, or none of them does. Which it is belongs to
+	// the drawings — a hi-hat has no front — and is said in the manifest.
+	set, ok := markSets[m.words.cast]
+	if !ok || !set.turns {
+		return nil
+	}
+
+	age := max(time.Duration(m.wordsClock()-m.words.leanAt)*time.Millisecond, 0)
+	beats, ok := m.beatsIn(age)
+	if !ok {
+		return nil
+	}
+
+	out := make([]bool, count)
+	for i := range out {
+		// Its own count, from the bar it arrived under: two beats is a fidget
+		// and sixteen is a statue, so the deal is somewhere between.
+		h := uint64(m.words.leanAt)*0x9e3779b97f4a7c15 + uint64(i)*0xbf58476d1ce4e5b9
+		h ^= h >> 31
+		every := marksTurnLeast + int(h%uint64(marksTurnMost-marksTurnLeast+1))
+		out[i] = (beats/every)%2 == 1
+	}
+	return out
+}
+
+// marksTurnLeast and marksTurnMost are the fewest and the most beats a mark
+// keeps facing one way. Swept by eye against a row of eight: under three the
+// row twitches, over ten nothing appears to happen while anybody is watching.
+const (
+	marksTurnLeast = 3
+	marksTurnMost  = 10
+)
