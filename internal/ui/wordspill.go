@@ -177,31 +177,3 @@ func wordsSpillsNow(text string, starts int64) bool {
 	x ^= x >> 29
 	return x%wordsSpillEvery == 0
 }
-
-// wordsLetGo drops the line that is on screen and brings the same one back.
-//
-// What the hatch on keys.Spill does. It goes through wordsAdopt rather than
-// setting the state here, so what is watched is the path a real line change
-// takes and not a second one built to look like it — the leaving, the gathering
-// and the overlap between them are all the ones that ship.
-func (m *Model) wordsLetGo() {
-	if m.words.have.DotsX == 0 {
-		return
-	}
-	m.wordsAdopt(m.words.have, m.words.where, m.words.text)
-	m.words.leave = wordsSpilling
-	m.words.went = time.Now()
-
-	// And gathering from scratch, which wordsAdopt will not do here.
-	//
-	// It winds the gathering back so a line finishes arriving as it is sung, and
-	// takes the wait from the sheet: at the moment this hatch is pressed that
-	// line was sung some time ago, so the wait is negative and the wind-back is
-	// longer than the gathering itself. The line came back already whole.
-	//
-	// Which looked like nothing happening. The same line, complete and at full
-	// light, stood exactly where the falling copy had started, so what reached
-	// the screen was a line sitting still with a few dim sparks coming off it —
-	// the fall, drawn behind the thing it was falling away from.
-	m.words.since = time.Now()
-}

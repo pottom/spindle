@@ -143,62 +143,14 @@ func TestOnlyTheFallIsGivenLonger(t *testing.T) {
 	}
 }
 
-// The hatch drops the line and brings it back.
-//
-// It is not in the help and it is not meant to be, so this is the only thing
-// that says it still works. A hatch nobody tests is a hatch that has quietly
-// stopped working by the time it is next wanted.
-func TestTheHatchLetsTheLineGo(t *testing.T) {
-	const w, rows = 90, 14
-
-	m := scopeModel(100, 44)
-	m.width, m.height = w, rows
-	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
-
-	img, layout, ok := wordsImage([]string{"jaj de jo"}, w*dotsPerCellX, rows*dotsPerCellY)
-	if !ok {
-		t.Fatal("the face could not draw the line")
-	}
-	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
-	m.words.cellsX, m.words.cellsY, m.words.text = w, rows, "jaj de jo"
-	m.words.where = layout
-	m.words.since = time.Now().Add(-5 * time.Second)
-
-	m.wordsLetGo()
-
-	if m.words.leave != wordsSpilling {
-		t.Errorf("the line is leaving as %d rather than falling", m.words.leave)
-	}
-	if m.words.was.DotsX == 0 {
-		t.Error("nothing was given notice, so there is nothing to fall")
-	}
-	if m.words.have.DotsX == 0 {
-		t.Error("the line did not come back")
-	}
-	if time.Since(m.words.went) > time.Second {
-		t.Error("the leaving did not start now")
-	}
-
-	// And the line that comes back has to gather, or it stands there whole in
-	// front of the copy falling away from it and nothing appears to happen. The
-	// wind-back that puts a real line on time for its own singing is a wind-back
-	// past the end here, because the line was sung a while ago.
-	if since := time.Since(m.words.since); since > wordsGather/4 {
-		t.Errorf("the line came back %v into its gathering, so it is already whole", since)
-	}
-
-	// And with no line up it does nothing rather than falling over.
-	var empty Model
-	empty.wordsLetGo()
-}
-
 // Ink appears below where the line stood, on the screen rather than in the
 // arithmetic.
 //
-// The fall was right and invisible: the line that came back stood whole in front
-// of the copy falling away, so all that reached the screen was a few dim sparks
-// off something sitting still. Nothing measured on wordsSpill alone could have
-// caught that — it takes drawing the frames the way the screen draws them.
+// Worth drawing the frames for, because everything measured on wordsSpill alone
+// can be right while nothing reaches the screen: when this was driven by hand
+// from a key, the line came back whole and stood in front of the copy falling
+// away from it, so all that showed was a little dust coming off something
+// sitting still.
 func TestTheLineIsSeenToFall(t *testing.T) {
 	const w, rows = 90, 30
 
@@ -210,17 +162,21 @@ func TestTheLineIsSeenToFall(t *testing.T) {
 	if !ok {
 		t.Fatal("the face could not draw the line")
 	}
-	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	grain := cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	m.words.have, m.words.was = grain, grain
+	m.words.where, m.words.wasWhere = layout, layout
 	m.words.cellsX, m.words.cellsY, m.words.text = w, rows, "jaj de jo"
-	m.words.where = layout
-	m.words.since = time.Now().Add(-5 * time.Second)
+	m.words.leave = wordsSpilling
 
 	foot := layout.Bottoms[0] / dotsPerCellY
-	m.wordsLetGo()
-	went, since := m.words.went, m.words.since
+	// The line that is arriving is left finished and still, so that everything
+	// that moves below the foot is the copy falling away and nothing else. Part
+	// way through its gathering it is scattered over the whole picture, which is
+	// ink below the line that has nothing to do with the fall.
+	m.words.since = time.Now().Add(-5 * time.Second)
 
 	below := func(at time.Duration) int {
-		m.words.went, m.words.since = went.Add(-at), since.Add(-at)
+		m.words.went = time.Now().Add(-at)
 		n := 0
 		for i, line := range m.wordsLines(w, rows) {
 			if i > foot {
@@ -230,10 +186,9 @@ func TestTheLineIsSeenToFall(t *testing.T) {
 		return n
 	}
 
-	if n := below(0); n != 0 {
-		t.Errorf("something was already below the line before it let go: %d cells", n)
-	}
-	was := 0
+	// The meter's band sits under the type and is always there, so what is
+	// measured is the growth over it rather than ink appearing from nothing.
+	was := below(0)
 	for _, at := range []time.Duration{100, 300, 600} {
 		n := below(at * time.Millisecond)
 		if n <= was {
