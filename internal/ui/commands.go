@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -122,7 +123,7 @@ func lyricsCmd(source player.LyricSource, trackID string) tea.Cmd {
 // slow backend from queueing up requests nobody will draw.
 func scopeFrameCmd(p player.Player, mode scopeMode) tea.Cmd {
 	return func() tea.Msg {
-		time.Sleep(scopeInterval)
+		scopeWait()
 
 		// How long the daemon takes to answer is timed, because a frame is the
 		// wait plus this: the picture is only as steady as the answers are. See
@@ -146,6 +147,44 @@ func scopeFrameCmd(p player.Player, mode scopeMode) tea.Cmd {
 		}
 		return out
 	}
+}
+
+// scopePace is when the next frame is due. Package state, because the frames
+// are a cadence rather than a property of any one model.
+var scopePace struct {
+	mu  sync.Mutex
+	due time.Time
+}
+
+// scopeWait sleeps until the next frame is due, rather than for a whole frame.
+//
+// The command is issued at the end of an update, so a whole frame's sleep starts
+// from after the work rather than from where the last frame did: the period
+// becomes the frame plus the fetch plus the update plus the draw. Measured off
+// the running interface at 28.1 frames a second against the 30 this is set to —
+// two a second going missing, steadily, with nothing reporting them late because
+// each one was only two milliseconds over. Sleeping to a deadline puts them back
+// on the grid.
+func scopeWait() {
+	if wait := time.Until(scopeDue(time.Now())); wait > 0 {
+		time.Sleep(wait)
+	}
+}
+
+// scopeDue moves the grid on and hands back when this frame should be drawn.
+func scopeDue(now time.Time) time.Time {
+	scopePace.mu.Lock()
+	defer scopePace.mu.Unlock()
+
+	// A frame late by more than a frame is the picture having been away —
+	// stopped, off screen, or the machine busy elsewhere. Carrying the old grid
+	// through that would fire the frames it missed back to back to catch up,
+	// which is a burst of work for pictures nobody saw. It starts again here.
+	if scopePace.due.IsZero() || now.After(scopePace.due.Add(scopeInterval)) {
+		scopePace.due = now
+	}
+	scopePace.due = scopePace.due.Add(scopeInterval)
+	return scopePace.due
 }
 
 // wordsCmd sets a line in dots, off the update loop: it rasterises type and
