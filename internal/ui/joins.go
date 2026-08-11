@@ -85,6 +85,10 @@ type joinsState struct {
 	watch float32   // the typical novelty of this record
 	seen  bool      // and whether it has been given its first value
 
+	// nov is what the last frame measured, kept only so the bar on ctrl+shift+d
+	// can put it beside the line it has to cross. Nothing draws from it.
+	nov float32
+
 	// begins is where the section on screen started, on the playback clock, and
 	// forTrack the record it belongs to.
 	begins   time.Duration
@@ -171,6 +175,7 @@ func (m *Model) joinsFlow(fps int) {
 		sum += d * d
 	}
 	nov := float32(math.Sqrt(sum))
+	j.nov = nov
 
 	// The scale starts at the first thing measured rather than at nothing.
 	// Easing up from zero, the first novelty after the windows fill stands
@@ -188,7 +193,7 @@ func (m *Model) joinsFlow(fps int) {
 	}
 	if (j.watch > 0 && nov > j.watch*joinEdge) || j.heard-j.begins > joinMost {
 		j.begins = j.heard
-
+		j.turns++
 	}
 }
 

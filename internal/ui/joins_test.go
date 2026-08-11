@@ -108,6 +108,44 @@ func TestARecordThatNeverChangesStillTurnsOver(t *testing.T) {
 	}
 }
 
+// A join counted is a join the colour is shoved by.
+//
+// The count was written down and never incremented, so joinsTurns answered nought
+// for the whole of every record and wordsRollAt — which is nothing but that count
+// over six — answered nought with it. The colour was built to travel round the
+// palette as the record turned over, and it stood still instead; watched on
+// screen, reported as "I cannot see it changing", and looked for everywhere but
+// in the counter. This is the assertion that would have said so.
+func TestATurnCountedIsATurnTheColourTakes(t *testing.T) {
+	quiet := make([]float32, 28)
+	for i := range quiet {
+		quiet[i] = 0.2
+	}
+	loud := make([]float32, 28)
+	for i := range loud {
+		loud[i] = 0.2
+		if i < 6 {
+			loud[i] = 1
+		}
+	}
+
+	m := stageWords("e")
+	if got := m.wordsRollAt(); got != 0 {
+		t.Fatalf("the colour had moved before the record had: %v", got)
+	}
+	feedShape(t, &m, []struct {
+		secs  float64
+		shape []float32
+	}{{40, quiet}, {40, loud}})
+
+	if m.joinsTurns() == 0 {
+		t.Fatal("the record turned over and nothing counted it")
+	}
+	if got := m.wordsRollAt(); got == 0 {
+		t.Errorf("the record turned over %d times and the colour has not moved", m.joinsTurns())
+	}
+}
+
 // Two joins are never closer together than a section is allowed to be.
 func TestSectionsAreNotShorterThanTheyMayBe(t *testing.T) {
 	m := stageWords("d")
