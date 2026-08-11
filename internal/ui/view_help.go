@@ -63,7 +63,7 @@ func helpGroups() []helpGroup {
 		title: "Playing",
 		keys: [][2]string{
 			{"space", "play or pause"},
-			{"^n / ^p", "next or previous track"},
+			{"n / p", "next or previous track"},
 			{"← / →", "seek five seconds"},
 			{"↑ / ↓", "the music's volume, by five"},
 			{"m", "mute, and back to where it was"},
@@ -83,7 +83,7 @@ func helpGroups() []helpGroup {
 		title: "On the full screen",
 		keys: [][2]string{
 			{"space ← → ↑ ↓", "the transport, without leaving"},
-			{"^n / ^p", "next or previous track"},
+			{"n / p", "next or previous track"},
 			{"d", "another company of dancers"},
 			{"t", "what is playing, said there and then"},
 			{"any other key", "back"},
@@ -96,7 +96,7 @@ func helpGroups() []helpGroup {
 			{"^u / ^d", "half a screenful"},
 			{"g / G", "the top, the end"},
 			{"/", "find in this list"},
-			{"n / N", "the next match, the one before"},
+			{"; / ,", "the next match, the one before"},
 			{"enter", "play it, or open it"},
 			{"o", "play only this one"},
 			{"a", "add it to the queue"},

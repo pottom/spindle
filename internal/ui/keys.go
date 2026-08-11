@@ -93,9 +93,13 @@ type keyMap struct {
 	Restart key.Binding
 
 	// FindNext and FindPrev walk the rows a search inside the list matched.
-	// They took n and N from the transport, which moved to ctrl+n and ctrl+p:
-	// a list you are reading is what those keys are for in every program that
-	// has both, and the transport has the space bar and the arrows besides.
+	//
+	// They had n and N, and the transport had ctrl+n and ctrl+p for it. That was
+	// the wrong way round in use: skipping a track is wanted on every screen
+	// there is and is the most pressed key after play, while walking matches is
+	// wanted in a list that has just been searched. So the plain keys go to the
+	// transport and these take semicolon and comma — which is what vim repeats a
+	// search with, so the hand already knows them.
 	FindNext key.Binding
 	FindPrev key.Binding
 }
@@ -107,10 +111,13 @@ func newKeyMap() keyMap {
 			key.WithHelp("space", "play / pause"),
 		),
 		Next: key.NewBinding(
-			key.WithKeys("ctrl+n"),
-			key.WithHelp("ctrl+n / ctrl+p", "next / previous"),
+			// Plain, and the control ones kept beside them. Skipping is the most
+			// pressed key on the transport after play, and it was the only one
+			// asking for two fingers.
+			key.WithKeys("n", "ctrl+n"),
+			key.WithHelp("n / p", "next / previous"),
 		),
-		Prev: key.NewBinding(key.WithKeys("ctrl+p")),
+		Prev: key.NewBinding(key.WithKeys("p", "ctrl+p")),
 		SeekFwd: key.NewBinding(
 			key.WithKeys("right"),
 			key.WithHelp("← / →", "seek ∓5s"),
@@ -169,10 +176,14 @@ func newKeyMap() keyMap {
 			key.WithHelp("R", "restart the device"),
 		),
 		FindNext: key.NewBinding(
-			key.WithKeys("n"),
-			key.WithHelp("n / N", "next / previous match"),
+			// Semicolon and comma, which is what vim repeats a search with, and
+			// what n and N were before skipping a track wanted them. A list is
+			// the only place these mean anything, and skipping a track is
+			// wanted in every place there is.
+			key.WithKeys(";"),
+			key.WithHelp("; / ,", "next / previous match"),
 		),
-		FindPrev: key.NewBinding(key.WithKeys("N")),
+		FindPrev: key.NewBinding(key.WithKeys(",")),
 		First: key.NewBinding(
 			key.WithKeys("home"),
 			key.WithHelp("home / end", "first / last"),
@@ -381,7 +392,7 @@ func (k keyMap) forReadOnlyQueue() tabKeys {
 func (k keyMap) forPlayer(scope, lyrics, peek bool) tabKeys {
 	short := []key.Binding{
 		hint("space", "play/pause"),
-		hint("^n/^p", "track"),
+		hint("n/p", "track"),
 		hint("←→", "seek"),
 	}
 	switch {
