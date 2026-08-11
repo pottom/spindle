@@ -1614,6 +1614,13 @@ func (m *Model) wordsGrind() tea.Cmd {
 		if m.words.picked != "" && m.marksForcing() {
 			cast = m.words.picked
 		}
+
+		// Silenced, and the row says so: the same company with their fingers in
+		// their ears, for as long as it lasts. Last, because it is a state
+		// rather than a request — whatever else was up, this is what is true.
+		if m.muted() {
+			cast = markHush
+		}
 	}
 
 	if m.words.text == text && m.words.cast == cast && m.words.cellsX == m.width && m.words.cellsY == m.height {

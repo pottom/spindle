@@ -34,6 +34,10 @@ type markSet struct {
 	// the beat. A drum seen head on has no front and turning it does nothing;
 	// anything with feet does. See wordsTurning.
 	turns bool
+
+	// apart keeps the set out of the deal and out of the key's walk: it is only
+	// ever put up by something asking for it by name. See markEveryone.
+	apart bool
 }
 
 // marksDrawn is whether a bar of marks may be dealt a set of drawings at all.
@@ -94,6 +98,24 @@ type markSize struct {
 	marks []markDots
 }
 
+// markHush is the set that stands in while the room is silenced: the same faces
+// as the rest of them, with their fingers in their ears.
+//
+// It is a set rather than a badge in a corner because the row is what a bar of
+// music looks like here, and a bar with nothing coming out of it should look
+// like something. Kept apart from the deal — see markSets — so it only ever
+// means the one thing.
+const markHush = "hush"
+
+// muted is whether the room has been silenced from here.
+//
+// What the key remembered, and not the reading. A reading of nothing is not the
+// same fact: a device that has not yet said how loud it is says nothing, and a
+// picture that took that for silence would put the hush up over every record
+// that had just started. Taking the volume to nothing with the arrows counts,
+// because setVolume writes it down the same way the key does.
+func (m Model) muted() bool { return m.mutedFrom > 0 }
+
 // markMixed is the cast that is everybody at once, rather than one set.
 //
 // Every drawing on the screen now dances, stands on the same floor and is drawn
@@ -123,6 +145,9 @@ func markEveryone(tall int) []markDots {
 
 	var out []markDots
 	for _, name := range names {
+		if markSets[name].apart {
+			continue
+		}
 		for _, size := range markSets[name].sizes {
 			if size.tall != tall {
 				continue
@@ -473,7 +498,10 @@ func markPicture(name string, w, rows int, seed int64) (cover.Grain, msg.WordLay
 // order they are named, and one more press hands the row back to the deal.
 func (m *Model) marksWalk() {
 	sets := make([]string, 0, len(markSets)+1)
-	for name := range markSets {
+	for name, set := range markSets {
+		if set.apart {
+			continue // only ever put up by something asking for it by name
+		}
 		sets = append(sets, name)
 	}
 	sort.Strings(sets)

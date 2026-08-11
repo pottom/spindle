@@ -84,7 +84,7 @@ func helpGroups() []helpGroup {
 		keys: [][2]string{
 			{"space ← → ↑ ↓", "the transport, without leaving"},
 			{"^n / ^p", "next or previous track"},
-			{"m", "another set of marks"},
+			{"c", "another company of marks"},
 			{"t", "what is playing, said there and then"},
 			{"any other key", "back"},
 		},

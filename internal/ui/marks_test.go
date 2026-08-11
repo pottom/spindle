@@ -283,3 +283,58 @@ func TestTheCastIsDealtEveryBar(t *testing.T) {
 		t.Errorf("twelve spells of one record only ever showed %v — the deal is being asked once", seen)
 	}
 }
+
+// Silence the room and the row says so.
+//
+// A bar of marks is what a bar of music looks like here, so a bar with nothing
+// coming out of it has to look like something — the same company with their
+// fingers in their ears. It is a set kept out of the deal, so it can only ever
+// mean the one thing.
+func TestSilencingTheRoomPutsTheirFingersInTheirEars(t *testing.T) {
+	if set, ok := markSets[markHush]; !ok {
+		t.Fatal("there is no hush set")
+	} else if !set.apart {
+		t.Error("the hush is in the deal, so it can arrive when nothing is muted")
+	}
+
+	// Not dealt to a record, at any size, ever.
+	for _, tall := range markHeights() {
+		for _, one := range markEveryone(tall) {
+			if one.set == markHush {
+				t.Fatalf("%q was in the pool at %d dots", one.name, tall)
+			}
+		}
+	}
+
+	// Nor walked to by the key.
+	m := New(player.NewMock(), nil, defaultTestCell)
+	for range len(markSets) + 2 {
+		m.marksWalk()
+		if m.words.picked == markHush {
+			t.Fatal("the key walked to the hush")
+		}
+	}
+
+	// And put up by silence, however it was reached.
+	m.ps = &player.State{TrackID: "one", Duration: time.Minute, Playing: true, Volume: 60}
+	if m.muted() {
+		t.Error("a room at sixty reads as silenced")
+	}
+	m.toggleMute()
+	if !m.muted() {
+		t.Error("the mute key did not silence the room")
+	}
+	m.toggleMute()
+	if m.muted() {
+		t.Error("unmuting left the room silenced")
+	}
+	// The arrows all the way down are the same silence.
+	m.setVolume(0)
+	if !m.muted() {
+		t.Error("turning it down to nothing did not read as silenced")
+	}
+	m.setVolume(20)
+	if m.muted() {
+		t.Error("turning it back up left the room silenced")
+	}
+}

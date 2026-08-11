@@ -851,6 +851,11 @@ func (m *Model) setVolume(pct int) tea.Cmd {
 		// Reaching for the volume is a decision about the level, so there is
 		// nothing left to come back to.
 		m.mutedFrom = 0
+	} else if m.mutedFrom == 0 && m.ps.Volume > 0 {
+		// Turned all the way down with the arrows rather than muted with the
+		// key. It is the same silence, and it is written down the same way, so
+		// that one reading answers "is this room quiet" — see muted.
+		m.mutedFrom = m.ps.Volume
 	}
 	m.ps.Volume = min(max(pct, 0), 100)
 	m.hold()

@@ -104,6 +104,12 @@ type set struct {
 	// the beat. Anything with feet has; a drum seen head on has not.
 	Turns bool `json:"turns"`
 
+	// Apart keeps the set out of the deal: it is never dealt to a record and
+	// never walked to by the key, and only comes up when something asks for it
+	// by name. A set that means one particular thing — the room being silenced —
+	// would say that thing wrongly if it could arrive by chance.
+	Apart bool `json:"apart"`
+
 	// Least is the smallest baked height these drawings still read at, in dots.
 	//
 	// It is measured, not guessed: bake the set and look at it with -show at
@@ -422,8 +428,8 @@ func read(path string) (set, error) {
 }
 
 func emit(b *strings.Builder, dir string, s set) error {
-	fmt.Fprintf(b, "\t%q: {\n\t\tfrom: %q,\n\t\tlicence: %q,\n\t\tturns: %v,\n\t\tsizes: []markSize{\n",
-		s.Name, s.From, s.Licence, s.Turns)
+	fmt.Fprintf(b, "\t%q: {\n\t\tfrom: %q,\n\t\tlicence: %q,\n\t\tturns: %v,\n\t\tapart: %v,\n\t\tsizes: []markSize{\n",
+		s.Name, s.From, s.Licence, s.Turns, s.Apart)
 
 	for _, h := range s.Heights {
 		fmt.Fprintf(b, "\t\t\t{tall: %d, marks: []markDots{\n", h.Tall)

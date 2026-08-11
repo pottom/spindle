@@ -1,0 +1,22 @@
+{
+  "name": "hush",
+  "from": "drawn for spindle",
+  "licence": "ours",
+  "turns": true,
+  "apart": true,
+  "marks": [
+    {"file": "happy.png",  "pitch": 0.00},
+    {"file": "grin.png",   "pitch": 0.17},
+    {"file": "wink.png",   "pitch": 0.33},
+    {"file": "amazed.png", "pitch": 0.50},
+    {"file": "cool.png",   "pitch": 0.67},
+    {"file": "cross.png",  "pitch": 0.83},
+    {"file": "teeth.png",  "pitch": 1.00}
+  ],
+  "heights": [
+    {"tall": 24, "thick": 2},
+    {"tall": 36, "thick": 2},
+    {"tall": 54, "thick": 2},
+    {"tall": 72, "thick": 2}
+  ]
+}
