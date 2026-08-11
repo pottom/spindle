@@ -357,7 +357,15 @@ func look(dirs []string, want, poseName string, only int) {
 			if only > 0 && h.Tall != only {
 				continue
 			}
-			p, err := convert(filepath.Join(filepath.Dir(path), poseName+".png"), poseName, h, f)
+			// Through the manifest, which is where a pose's file is said. Half
+			// the poses of a walk are the other half over again — idle is
+			// walk0 — so building the name from the pose asks for files that
+			// were never meant to exist.
+			file := f.Poses[poseName]
+			if file == "" {
+				file = poseName + ".png"
+			}
+			p, err := convert(filepath.Join(filepath.Dir(path), file), poseName, h, f)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s at %d: %v\n", f.Name, h.Tall, err)
 				continue
