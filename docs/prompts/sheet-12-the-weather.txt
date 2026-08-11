@@ -33,7 +33,15 @@ STYLE
 - Pure black background (#000000). All drawing in pure white (#FFFFFF).
 - No grey, no fills, no shading, no gradients, no glow, no colour.
 - Outline strokes ONLY. Nothing is filled in. No solid shapes, no silhouettes.
-- ONE constant stroke weight everywhere, rounded caps and rounded joins.
+- ONE constant stroke weight everywhere, rounded caps and rounded joins, and
+  that weight is VERY HEAVY: one eighth of the subject's own height. On a
+  subject 240 pixels tall the lines are 30 pixels thick. Think of a broad marker
+  pen, or the strokes of a bold pictogram — not a fine liner, and heavier than
+  looks right on the sheet. Thin elegant lines cannot be used at all: the
+  drawings are reduced to about 36 dots tall, where a line a fortieth of the
+  height is a fifth of a dot and disappears entirely. Asked for a twelfth, one
+  sheet came back at a twentieth, which is why the number here is larger than
+  the one wanted.
 - Simple enough to survive being reduced to a 24 by 24 grid of dots: no fine
   detail, no hatching, no small features, no textures, no thin decoration.
   Any feature smaller than a tenth of the subject's height will be lost.

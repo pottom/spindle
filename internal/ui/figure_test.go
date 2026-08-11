@@ -80,9 +80,13 @@ func TestAFigureArrivesAsALineDrawing(t *testing.T) {
 	}
 
 	// The nearest size is the one that comes back, whatever is asked for.
+	tallest := 0
+	for _, size := range d.sizes {
+		tallest = max(tallest, size.tall)
+	}
 	p, _ := d.at(1000, "idle")
-	if p.tall != 100 {
-		t.Errorf("asked for a figure 1000 dots tall and got %d, want the tallest there is", p.tall)
+	if p.tall != tallest {
+		t.Errorf("asked for a figure 1000 dots tall and got %d, want the tallest there is (%d)", p.tall, tallest)
 	}
 }
 

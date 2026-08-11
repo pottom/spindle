@@ -104,8 +104,9 @@ const (
 )
 
 func main() {
-	show := flag.String("show", "", "after baking, draw the sets named here in the terminal, or all of them for \"all\"")
+	show := flag.String("show", "", "after baking, draw these sets in the terminal — a name, several separated by commas, or \"all\"")
 	only := flag.Int("size", 0, "with -show, draw only this baked height in dots")
+	into := flag.String("png", "", "with -show, also write the rows to this file as a picture, blown up to look at")
 	flag.Parse()
 
 	paths, err := filepath.Glob(filepath.Join(assets, "*", "mark.json"))
@@ -141,7 +142,7 @@ func main() {
 	fmt.Printf("wrote %s (%d bytes)\n", out, len(src))
 
 	if *show != "" {
-		draw(paths, *show, *only)
+		draw(paths, *show, *only, *into)
 	}
 }
 
@@ -157,14 +158,15 @@ func main() {
 //
 // Braille, because that is what the screen draws in: two dots across and four
 // down in every cell, so what comes out here is exactly what goes up there.
-func draw(paths []string, want string, only int) {
+func draw(paths []string, want string, only int, into string) {
+	var shot []row
 	var found bool
 	for _, path := range paths {
 		s, err := read(path)
 		if err != nil {
 			fail(err)
 		}
-		if want != "all" && s.Name != want {
+		if !wanted(want, s.Name) {
 			continue
 		}
 		found = true
@@ -205,7 +207,14 @@ func draw(paths []string, want string, only int) {
 			for _, line := range braille(row) {
 				fmt.Println(line)
 			}
+			shot = append(shot, rowOf(s.Name, h.Tall, row))
 		}
+	}
+	if into != "" && len(shot) > 0 {
+		if err := picture(into, shot); err != nil {
+			fail(err)
+		}
+		fmt.Printf("\nwrote %s\n", into)
 	}
 	if !found {
 		// A tool that answers nothing is a tool that has been misread. There is
@@ -220,6 +229,77 @@ func draw(paths []string, want string, only int) {
 			want, strings.Join(names, ", "))
 		os.Exit(1)
 	}
+}
+
+// wanted reports whether a set was asked for: all of them, one of them, or one
+// of a list — so two ways of drawing the same row can be put on the screen one
+// under the other and told apart by eye, which is the only way this is decided.
+func wanted(want, name string) bool {
+	if want == "all" {
+		return true
+	}
+	for _, one := range strings.Split(want, ",") {
+		if strings.TrimSpace(one) == name {
+			return true
+		}
+	}
+	return false
+}
+
+// row is one baked size of one set, kept for the picture.
+type row struct {
+	name string
+	tall int
+	of   []dots
+}
+
+func rowOf(name string, tall int, of []dots) row { return row{name, tall, of} }
+
+// picture writes the rows out blown up, because a dot is judged by eye and the
+// eye wants it larger than a terminal cell.
+func picture(path string, rows []row) error {
+	const zoom, gap = 8, 6
+	var wide, tall int
+	for _, r := range rows {
+		w := 0
+		for _, m := range r.of {
+			w += m.wide + gap
+		}
+		wide = max(wide, w)
+		tall += r.tall + gap*2
+	}
+	img := image.NewGray(image.Rect(0, 0, wide*zoom, tall*zoom))
+	y0 := gap
+	for _, r := range rows {
+		x0 := gap
+		for _, m := range r.of {
+			raw, err := base64.StdEncoding.DecodeString(m.bits)
+			if err != nil {
+				return err
+			}
+			for y := range m.tall {
+				for x := range m.wide {
+					i := y*m.wide + x
+					if i/8 >= len(raw) || raw[i/8]&(1<<(i%8)) == 0 {
+						continue
+					}
+					for zy := range zoom {
+						for zx := range zoom {
+							img.SetGray((x0+x)*zoom+zx, (y0+y+r.tall-m.tall)*zoom+zy, color.Gray{Y: 255})
+						}
+					}
+				}
+			}
+			x0 += m.wide + gap
+		}
+		y0 += r.tall + gap*2
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return png.Encode(f, img)
 }
 
 // braille lays a row of drawings out side by side in braille cells.
@@ -464,9 +544,14 @@ func trace(path string, h height, turn bool) (dots, error) {
 	// one pen for every size it is baked at, so without this a row is a hairline
 	// at the bottom of the range and a set of clubs at the top.
 	pen := float64(penOf(pic, ink, left, right, top, bottom)) * float64(h.Tall) / float64(fh)
-	for pen+1 < float64(h.Thick) {
-		on = grow(on, wide, h.Tall)
-		pen += 2
+	// A dot at a time, and to one side. Grown the obvious way — a ring of eight
+	// neighbours — a pen goes 1, 3, 5: there is no even weight to be had, and a
+	// set asked for 2 came out at 3 with nothing to show for the asking. Adding
+	// a dot below and to the right instead moves it a whole dot at a time, which
+	// is the difference between a row that reads and a row of clubs.
+	for pen+0.5 < float64(h.Thick) {
+		on = fatten(on, wide, h.Tall)
+		pen++
 	}
 	for pen-1 > float64(h.Thick) {
 		on = thin(on, wide, h.Tall)
@@ -512,20 +597,24 @@ func penOf(pic image.Image, ink func(int, int) bool, left, right, top, bottom in
 }
 
 // grow thickens by one dot in every direction.
-func grow(on []bool, wide, tall int) []bool {
+// fatten adds one dot below and to the right of everything set, which takes a
+// pen up by exactly one.
+func fatten(on []bool, wide, tall int) []bool {
 	out := make([]bool, len(on))
 	for y := range tall {
 		for x := range wide {
 			if !on[y*wide+x] {
 				continue
 			}
-			for dy := -1; dy <= 1; dy++ {
-				for dx := -1; dx <= 1; dx++ {
-					ny, nx := y+dy, x+dx
-					if ny >= 0 && ny < tall && nx >= 0 && nx < wide {
-						out[ny*wide+nx] = true
-					}
-				}
+			out[y*wide+x] = true
+			if x+1 < wide {
+				out[y*wide+x+1] = true
+			}
+			if y+1 < tall {
+				out[(y+1)*wide+x] = true
+			}
+			if x+1 < wide && y+1 < tall {
+				out[(y+1)*wide+x+1] = true
 			}
 		}
 	}

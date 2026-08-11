@@ -1,5 +1,19 @@
 # The drawings, and how to ask for them
 
+> **Where this got to.** The sheets below are for the row of marks, and the row
+> was measured to its limit: on an ordinary terminal a mark is baked 24 to 36
+> dots tall, which is eight pen-widths, and eight of them have to fit across the
+> screen. Four sheets were asked for, cut and baked, and the answer each time was
+> the same — the drawings were good and the room was not. A drum kit does not fit
+> in eight pen-widths however well it is drawn.
+>
+> A figure, by contrast, stands 90 dots tall on the same terminal: two and a half
+> times the height, and one at a time rather than eight across. That is where the
+> work went next, and there is already a pipeline for it — `cmd/spindle-figures`,
+> a `figure.json` of poses, a one-dot pen. What is below is kept because the
+> measurements in it are true of anything that has to survive being reduced, and
+> because the row still exists; it is not where the next drawing should go.
+
 The wordless screen puts up a row of marks. Each mark rides its own slice of the
 spectrum — the lowest at the left, the cymbals at the right — so the row is a
 picture of the sound rather than an ornament beside it. The marks are drawings,
@@ -37,9 +51,27 @@ black and 4% of it was ink.
 three dots wide — the type, the meters, the water. A filled shape among them
 reads as a hole punched in the picture.
 
-**One pen for the whole sheet.** The pen is measured off the drawing and then
-taken to three dots at every baked size. A sheet drawn with three different
-weights bakes into a row that looks like three different sets.
+**One pen for the whole sheet, and a heavy one.** The pen is measured off the
+drawing and taken to the weight the set asks for, a dot at a time. That is a
+repair, not a feature: it dilates whatever line is there, which closes small
+gaps, fattens junctions and turns a fine drawing into a row of clubs.
+
+The repair is only needed because the sheets come back with hairlines. Measured
+on the kit: the stroke ran 0.4% to 0.8% of the subject's height, which at 36 dots
+is between a fifth and a third of one dot. Nothing of it would survive, so the
+pipeline invents a stroke instead of baking the one that was drawn.
+
+Ask for a heavy pen and none of that happens: the pen lands near 3 dots on its
+own and the drawing bakes as it was drawn. Measured across three sheets:
+
+	asked for          came back at      at 36 dots       reads at 24 dots
+	nothing said       0.4% - 0.8%       a fifth of a dot  no
+	a twelfth (8%)     5.1%              1.8 dots          yes
+	an eighth (12%)    — to be measured
+
+So ask for more than is wanted: it draws lighter than it is told, every time.
+This is the single most useful thing to get right on a sheet, and it is worth
+saying twice.
 
 **It is baked as small as 24 dots tall.** The sizes are 24, 36, 54 and 72 dots,
 and the largest that fits the whole row across the screen wins — on a normal
@@ -113,7 +145,15 @@ STYLE
 - Pure black background (#000000). All drawing in pure white (#FFFFFF).
 - No grey, no fills, no shading, no gradients, no glow, no colour.
 - Outline strokes ONLY. Nothing is filled in. No solid shapes, no silhouettes.
-- ONE constant stroke weight everywhere, rounded caps and rounded joins.
+- ONE constant stroke weight everywhere, rounded caps and rounded joins, and
+  that weight is VERY HEAVY: one eighth of the subject's own height. On a
+  subject 240 pixels tall the lines are 30 pixels thick. Think of a broad marker
+  pen, or the strokes of a bold pictogram — not a fine liner, and heavier than
+  looks right on the sheet. Thin elegant lines cannot be used at all: the
+  drawings are reduced to about 36 dots tall, where a line a fortieth of the
+  height is a fifth of a dot and disappears entirely. Asked for a twelfth, one
+  sheet came back at a twentieth, which is why the number here is larger than
+  the one wanted.
 - Simple enough to survive being reduced to a 24 by 24 grid of dots: no fine
   detail, no hatching, no small features, no textures, no thin decoration.
   Any feature smaller than a tenth of the subject's height will be lost.

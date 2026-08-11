@@ -129,7 +129,17 @@ func abs(v int) int {
 // figureTall is how much of the screen a figure stands in, as a share of its
 // height. Taller than the marks he stands in for: he is a whole person rather
 // than a line of type, and the meters take what he leaves.
-const figureTall = 0.55
+//
+// Eight tenths, and it used to be a little over a half. He was covering the top
+// of the picture anyway — the water and the meter run behind him, and a screen
+// with somebody standing in the middle of it is his screen while he is on it —
+// so the room he was leaving was not being used for anything, it was being hidden.
+//
+// It also buys the one thing this screen never has enough of. At eight tenths he
+// stands 131 dots tall on an ordinary terminal against the 90 he did, and against
+// the 36 a mark gets: the difference between a drawing that survives being
+// reduced and one that does not is mostly this number.
+const figureTall = 0.8
 
 // figureRoom is the room a drawn figure leaves the meter: the rows under his
 // feet, and the dots over his head. Nought and false when the one on is not a
