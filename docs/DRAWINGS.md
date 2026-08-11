@@ -18,6 +18,8 @@ each sheet below go into an image generator as they stand, one sheet at a time.
    those frames play — struck, swung, cycled or once. See below.
 4. `go run ./cmd/spindle-marks` bakes every mark at every size into
    `internal/ui/marks_gen.go`. Nothing is rasterised at playback time.
+5. `go run ./cmd/spindle-marks -show <set>` bakes and then prints the row in the
+   terminal, in the same braille the screen draws in. `-size 24` for one height.
 
 The judging happens in dots, not on the sheet. A drawing that reads beautifully
 at 300 pixels and turns to porridge at 24 dots is a drawing that failed, and the
@@ -288,7 +290,31 @@ drawing about eight pen-widths tall. That is the whole budget.
 	a short motion line    1-2 dots           gone
 	hatching, texture      under a dot        gone
 
-Two rules come out of that, and they are the ones to check a sheet against:
+**And a mark must be taller than it is wide.** This is the one nobody would
+guess, and it decided a whole sheet. The row is fitted across the terminal at the
+largest baked size that holds all of it, so the *width* of the marks decides the
+*height* they are drawn at. Measured on a 167 by 41 terminal, where the band has
+55 dots of height to play with and so 36 would fit:
+
+	set      mean width, as a share of the height     baked at
+	dance    0.62                                     36 dots
+	band     0.75                                     36 dots
+	moods    0.84                                     36 dots
+	a kit drawn wide, with pedals and sticks
+	         0.95, and one mark at 1.7                24 dots
+
+The kit lost a whole size step — from 36, where it reads, to 24, where it is a
+scatter of dots — for being wide. Not for being detailed: for being wide. A kick
+drum with its pedal sticking out to one side, a stick lying across a rim, a
+cymbal drawn as a wide flat plate; each of them costs the entire row.
+
+So: **no drawing wider than three quarters of its height, and none wider than
+its height at all.** Where a thing is naturally wide, turn it: a cymbal seen at
+a steeper angle, a pedal tucked under rather than beside, a stick coming in from
+above rather than across.
+
+Two more rules come out of the same arithmetic, and they are the ones to check a
+sheet against:
 
 - **Nothing smaller than a tenth of the subject's height.** Below that it is not
   simplified, it is absent.
@@ -296,6 +322,10 @@ Two rules come out of that, and they are the ones to check a sheet against:
   pen on both sides of a small circle leaves no hole in the middle: the eye of a
   face, the sound hole of a guitar and the gap inside a small loop all fill in
   and become blobs.
+- **No repeated small features.** The lugs around a snare, the tension rods on a
+  drum, the spokes of a wheel, the teeth of a comb: eight of anything around a
+  24-dot shape is eight things a third of a dot apart. They do not simplify —
+  they merge into a band of solid ink and the shape underneath is lost.
 
 And one test worth applying to every drawing before it is asked for: would it
 still be recognisable as a solid black shape, with all its inside detail thrown
@@ -817,6 +847,12 @@ costs an afternoon.
 - Grey. There is no grey in the pipeline: it is ink or it is not.
 - Subjects drawn at their real relative sizes rather than all to one height.
 
-Then cut, bake, and look at the row on screen at the size a normal terminal
-actually gives it — which is usually 24 or 36 dots, not the 72 it would flatter
-the drawing to be judged at. That is the only judgement that counts.
+Then cut the cells, put them under `assets/marks/<set>/` with a manifest, and:
+
+	go run ./cmd/spindle-marks -show <set>
+	go run ./cmd/spindle-marks -show <set> -size 24
+
+which bakes them and prints the row in the terminal, in the braille the screen
+itself draws in. That is the only judgement that counts, and the size to judge
+at is the one a normal terminal actually gives the row — usually 24 or 36 dots,
+not the 72 it would flatter the drawing to be seen at.

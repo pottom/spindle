@@ -44,6 +44,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"go/format"
 	"image"
@@ -103,6 +104,10 @@ const (
 )
 
 func main() {
+	show := flag.String("show", "", "after baking, draw the sets named here in the terminal, or all of them for \"all\"")
+	only := flag.Int("size", 0, "with -show, draw only this baked height in dots")
+	flag.Parse()
+
 	paths, err := filepath.Glob(filepath.Join(assets, "*", "mark.json"))
 	if err != nil || len(paths) == 0 {
 		fail(fmt.Errorf("no marks under %s", assets))
@@ -134,7 +139,106 @@ func main() {
 		fail(err)
 	}
 	fmt.Printf("wrote %s (%d bytes)\n", out, len(src))
+
+	if *show != "" {
+		draw(paths, *show, *only)
+	}
 }
+
+// draw prints the baked marks in the terminal, in the dots they will be drawn
+// in and nothing else.
+//
+// It is here rather than in a test because of what it is for. A drawing is
+// judged at the size it is seen at, and the size it is seen at is usually the
+// smallest one baked — a sheet that is beautiful at 300 pixels can be a scatter
+// of dots at 24, and that has now happened twice. Every other way of finding
+// out involves opening a picture in something, which is a step nobody takes
+// while they are still deciding.
+//
+// Braille, because that is what the screen draws in: two dots across and four
+// down in every cell, so what comes out here is exactly what goes up there.
+func draw(paths []string, want string, only int) {
+	for _, path := range paths {
+		s, err := read(path)
+		if err != nil {
+			fail(err)
+		}
+		if want != "all" && s.Name != want {
+			continue
+		}
+		dir := filepath.Dir(path)
+		for _, h := range s.Heights {
+			if only > 0 && h.Tall != only {
+				continue
+			}
+			var row []dots
+			for i, name := range s.Marks {
+				turn := s.Faces == "in" && float64(i) > float64(len(s.Marks)-1)/2
+				m, err := convert(filepath.Join(dir, name), h, turn)
+				if err != nil {
+					fail(err)
+				}
+				row = append(row, m)
+			}
+			fmt.Printf("\n%s at %d dots, pen %d — %d marks\n", s.Name, h.Tall, h.Thick, len(row))
+			for _, line := range braille(row) {
+				fmt.Println(line)
+			}
+		}
+	}
+}
+
+// braille lays a row of drawings out side by side in braille cells.
+func braille(row []dots) []string {
+	var tall int
+	for _, m := range row {
+		tall = max(tall, m.tall)
+	}
+	rows := (tall + dotsPerCellY - 1) / dotsPerCellY
+
+	// The dot each bit of a braille cell stands for, which is not the order the
+	// cell is written in: the eighth and seventh dots are the bottom row, added
+	// to the six of the original.
+	bit := [dotsPerCellX][dotsPerCellY]uint8{{0, 1, 2, 6}, {3, 4, 5, 7}}
+
+	out := make([]string, rows)
+	for _, m := range row {
+		raw, err := base64.StdEncoding.DecodeString(m.bits)
+		if err != nil {
+			fail(err)
+		}
+		on := func(x, y int) bool {
+			if x < 0 || y < 0 || x >= m.wide || y >= m.tall {
+				return false
+			}
+			i := y*m.wide + x
+			return i/8 < len(raw) && raw[i/8]&(1<<(i%8)) != 0
+		}
+		// Sat on the floor, so a row of them stands on one line.
+		lift := tall - m.tall
+		for r := range rows {
+			var b strings.Builder
+			for x := 0; x < m.wide; x += dotsPerCellX {
+				var cell rune
+				for dx := range dotsPerCellX {
+					for dy := range dotsPerCellY {
+						if on(x+dx, r*dotsPerCellY+dy-lift) {
+							cell |= 1 << bit[dx][dy]
+						}
+					}
+				}
+				b.WriteRune(0x2800 + cell)
+			}
+			out[r] += b.String() + "  "
+		}
+	}
+	return out
+}
+
+const (
+	dotsPerCellX = 2
+	dotsPerCellY = 4
+)
 
 func read(path string) (set, error) {
 	raw, err := os.ReadFile(path)
