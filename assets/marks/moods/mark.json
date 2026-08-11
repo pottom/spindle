@@ -1,34 +1,36 @@
 {
   "name": "moods",
-  "from": "Tabler Icons (tabler.io/icons)",
-  "licence": "MIT",
-  "//": "A row of faces, and the order is the sound: the low end is where a record thumps, so it wears the heaviest expression, and the top of the range — the cymbals and the sparkle — wears the brightest. The one in the middle used to have no mouth at all, which at this size reads as a face with something missing rather than as a face keeping its counsel.",
+  "from": "written as SVG rather than drawn",
+  "licence": "ours",
   "marks": [
-    "angry.svg",
-    "sad.svg",
-    "puzzled.svg",
-    "nerd.svg",
-    "wink.svg",
     "happy.svg",
-    "crazy-happy.svg"
+    "grin.svg",
+    "wink.svg",
+    "amazed.svg",
+    "cool.svg",
+    "cross.svg",
+    "teeth.svg",
+    "asleep.svg"
   ],
-  "//heights": "The dot heights a mark is baked at, and the stroke it comes out with at each. See cmd/spindle-marks.",
   "heights": [
     {
       "tall": 24,
-      "thick": 3
+      "thick": 2
     },
     {
       "tall": 36,
-      "thick": 3
+      "thick": 2
     },
     {
       "tall": 54,
-      "thick": 3
+      "thick": 2
     },
     {
       "tall": 72,
-      "thick": 3
+      "thick": 2
     }
-  ]
+  ],
+  "//": "Eight faces, written as SVG and baked, in place of a set taken from an icon library. What made the difference is the brief rather than the drawing: a circle of ten, few features and big ones, nothing under two units, no enclosed shape under five, and eyes as dots or short strokes and never as small circles \u2014 a small circle at 24 dots is a blot. Then eyebrows on every one of them, which is where the expression actually lives: two thick strokes well clear of the eyes, angled, and the biggest features after the mouth.",
+  "//marks": "No sad one. Eight marks that jump on the beat are a room enjoying itself, and a long face in the middle of the row is somebody who has had bad news.",
+  "//heights": "Two dots of pen rather than three. These are written rather than traced, so nothing needs thickening, and at three the features inside the circle close up."
 }
