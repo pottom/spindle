@@ -1,0 +1,40 @@
+{
+  "name": "dancer",
+  "from": "drawn for spindle",
+  "licence": "ours",
+  "fill": true,
+  "gate": 0.5,
+  "heights": [
+    {
+      "tall": 62,
+      "thick": 1
+    },
+    {
+      "tall": 100,
+      "thick": 2
+    },
+    {
+      "tall": 140,
+      "thick": 2
+    }
+  ],
+  "head": 0.3,
+  "face": 0,
+  "poses": {
+    "idle": "walk0.png",
+    "walk0": "walk0.png",
+    "walk1": "walk1.png",
+    "walk2": "walk2.png",
+    "walk3": "walk3.png",
+    "walk4": "walk0.png",
+    "walk5": "walk1.png",
+    "walk6": "walk2.png",
+    "walk7": "walk3.png",
+    "cheer0": "cheer0.png",
+    "cheer1": "cheer1.png",
+    "duck": "duck.png",
+    "jump": "jump.png",
+    "wide": "wide.png"
+  },
+  "//": "Six dance poses of one stick figure, cut from one sheet so they are one hand. He does not walk on: he dances across, which is what the four walk frames are \u2014 the poses in a round rather than a stride. Drawn thick on purpose: at the size a figure is seen, a line a fortieth of the height is a fifth of a dot."
+}

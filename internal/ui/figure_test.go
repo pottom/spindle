@@ -14,9 +14,9 @@ import (
 // generator has to hand over is a line drawing — the strokes are the figure —
 // and, if the manifest asked for one, a hollow head for a face to go in.
 func TestAFigureArrivesAsALineDrawing(t *testing.T) {
-	d, ok := figureFor("robot")
+	d, ok := figureFor("ranger")
 	if !ok {
-		t.Fatal("the robot was not generated — run go run ./cmd/spindle-figures")
+		t.Fatal("the ranger was not generated — run go run ./cmd/spindle-figures")
 	}
 	if d.licence == "" || d.from == "" {
 		t.Error("a figure was generated without saying where it came from")
@@ -70,8 +70,10 @@ func TestAFigureArrivesAsALineDrawing(t *testing.T) {
 			t.Errorf("walk frame %d is missing", i)
 		}
 	}
-	// And every drawing the acts call for. See figureActs.
-	for _, act := range figureActNames {
+	// And every drawing the acts it can do call for. Only those it can do: a
+	// figure is not asked for a pose it was never drawn in — see figureActsFor —
+	// and the cast is not all drawn from the same sheet.
+	for _, act := range figureActsFor("ranger") {
 		for _, f := range figureActs[act] {
 			if _, ok := d.at(100, f.pose); !ok {
 				t.Errorf("the %s act wants the %s pose, which is missing", act, f.pose)
@@ -92,7 +94,7 @@ func TestAFigureArrivesAsALineDrawing(t *testing.T) {
 
 // And it draws where it is put.
 func TestAFigureDrawsWhereItIsPut(t *testing.T) {
-	d, _ := figureFor("robot")
+	d, _ := figureFor("ranger")
 	p, ok := d.at(100, "walk2")
 	if !ok {
 		t.Fatal("no pose")
@@ -115,7 +117,7 @@ func TestAFigureDrawsWhereItIsPut(t *testing.T) {
 			rows++
 		}
 	}
-	t.Logf("the walking robot covers %d of its %d rows", rows, p.tall)
+	t.Logf("the walking ranger covers %d of its %d rows", rows, p.tall)
 	if rows < p.tall/2 {
 		t.Errorf("the figure covers %d of %d rows, want it filling its own box", rows, p.tall)
 	}
@@ -206,14 +208,16 @@ func TestADrawnFigureTakesTheSlot(t *testing.T) {
 // second is a figure showing you something; two or three in a row is somebody
 // doing something, which is the reason he walked on.
 func TestHisActsAreRunsOfDrawings(t *testing.T) {
-	d, ok := figureFor("robot")
+	d, ok := figureFor("ranger")
 	if !ok {
-		t.Fatal("no robot")
+		t.Fatal("no ranger")
 	}
 
 	// Every act is made of poses the figure actually has, and every one of them
 	// is more than a single held picture.
-	for _, name := range figureActNames {
+	// The acts this one can do, rather than all of them: what a figure is dealt
+	// is filtered by the poses it was drawn in. See figureActsFor.
+	for _, name := range figureActsFor("ranger") {
 		act, ok := figureActs[name]
 		if !ok {
 			t.Fatalf("%q is dealt but has no drawings", name)
@@ -222,7 +226,7 @@ func TestHisActsAreRunsOfDrawings(t *testing.T) {
 		was := ""
 		for _, f := range act {
 			if _, ok := d.at(100, f.pose); !ok {
-				t.Errorf("%q wants the pose %q, which the robot has not got", name, f.pose)
+				t.Errorf("%q wants the pose %q, which the ranger has not got", name, f.pose)
 			}
 			if f.pose != was {
 				seen++
@@ -240,16 +244,19 @@ func TestHisActsAreRunsOfDrawings(t *testing.T) {
 
 	// And which one he does is the bar's business, so a record plays the same
 	// way twice and a long visit is not the same trick over and over.
+	// Over a visit's worth of turns rather than a handful: this one was drawn in
+	// fewer poses than the set it came from, so it has four acts to deal from
+	// and a short run of them can come up twice.
 	seen := map[string]bool{}
-	for turn := range 6 {
-		seen[figureActFor("robot", 7_000, turn)] = true
+	for turn := range 12 {
+		seen[figureActFor("ranger", 7_000, turn)] = true
 	}
-	t.Logf("over six turns he does %d different acts", len(seen))
+	t.Logf("over twelve turns he does %d different acts", len(seen))
 	if len(seen) < 3 {
 		t.Error("he does the same act every time in one visit")
 	}
-	once := figureActFor("robot", 12_345, 0)
-	if again := figureActFor("robot", 12_345, 0); again != once {
+	once := figureActFor("ranger", 12_345, 0)
+	if again := figureActFor("ranger", 12_345, 0); again != once {
 		t.Errorf("one turn was dealt %q and then %q", once, again)
 	}
 }
@@ -465,7 +472,7 @@ func TestEveryFigureIsWhole(t *testing.T) {
 // every one of him is a dot, and a dot can be sent anywhere — or handed to the
 // water.
 func TestHeComesAndGoesTwoWays(t *testing.T) {
-	d, _ := figureFor("robot")
+	d, _ := figureFor("ranger")
 	p, ok := d.at(100, "idle")
 	if !ok {
 		t.Fatal("no pose")
@@ -593,7 +600,7 @@ func TestHeIsFainterThanTheSparks(t *testing.T) {
 // wall does, and each dot on its own moment, because a shape that comes apart
 // in rows is a shape being wiped.
 func TestHeComesApartOutOfSpecks(t *testing.T) {
-	d, _ := figureFor("robot")
+	d, _ := figureFor("ranger")
 	p, _ := d.at(100, "idle")
 
 	there := func(at float64) int {
@@ -908,11 +915,11 @@ func TestAHopperLeavesTheGround(t *testing.T) {
 	if !ok {
 		t.Fatal("no bunny — run go run ./cmd/spindle-figures")
 	}
-	robot, _ := figureFor("robot")
+	ranger, _ := figureFor("ranger")
 
-	t.Logf("the bunny rises %d dots as it goes, the robot %d", bunny.bob, robot.bob)
-	if bunny.bob <= robot.bob {
-		t.Errorf("the bunny rises %d and the robot %d, want the hopper the higher", bunny.bob, robot.bob)
+	t.Logf("the bunny rises %d dots as it goes, the ranger %d", bunny.bob, ranger.bob)
+	if bunny.bob <= ranger.bob {
+		t.Errorf("the bunny rises %d and the ranger %d, want the hopper the higher", bunny.bob, ranger.bob)
 	}
 
 	// And it is on the screen: the top of him moves as he goes.
@@ -942,7 +949,7 @@ func TestAHopperLeavesTheGround(t *testing.T) {
 	}
 
 	// And it happens as he crosses: over the middle of the visit, where he is
-	// all the way on and on the move, the rabbit leaves the floor and the robot
+	// all the way on and on the move, the rabbit leaves the floor and the ranger
 	// hardly does.
 	base := time.Duration(m.words.starts) * time.Millisecond
 	hop, walk, moved := 0, 0, false
@@ -953,9 +960,9 @@ func TestAHopperLeavesTheGround(t *testing.T) {
 			continue
 		}
 		moved = true
-		hop, walk = max(hop, m.figureLift(bunny)), max(walk, m.figureLift(robot))
+		hop, walk = max(hop, m.figureLift(bunny)), max(walk, m.figureLift(ranger))
 	}
-	t.Logf("crossing the screen the rabbit rose %d dots, the robot %d", hop, walk)
+	t.Logf("crossing the screen the rabbit rose %d dots, the ranger %d", hop, walk)
 	if !moved {
 		t.Fatal("he never moved, so there was nothing to measure")
 	}

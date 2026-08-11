@@ -141,6 +141,21 @@ func abs(v int) int {
 // reduced and one that does not is mostly this number.
 const figureTall = 0.8
 
+// figureWants is how tall a figure may be drawn on a screen of this height.
+//
+// He stands on the line the marks stand on, which is not the bottom of the
+// screen: the room above it is what he has, and it is less than the screen.
+// Asked for eight tenths of the whole thing, he came out taller than the floor
+// is high and his head went off the top — measured on a 41 row terminal, 131
+// dots wanted against 109 there are.
+//
+// So the share is a ceiling rather than a size, and the floor decides.
+func figureWants(dotsY int) int {
+	band := int(wordsMark * float64(dotsY))
+	floor := (dotsY-band)/2 + band
+	return min(int(figureTall*float64(dotsY)), floor)
+}
+
 // figureRoom is the room a drawn figure leaves the meter: the rows under his
 // feet, and the dots over his head. Nought and false when the one on is not a
 // drawn figure at all.
@@ -151,7 +166,7 @@ func (m Model) figureRoom(w, rows int) (tall, head int, ok bool) {
 	}
 
 	dotsY := rows * dotsPerCellY
-	pose, there := who.at(int(figureTall*float64(dotsY)), m.figurePose())
+	pose, there := who.at(figureWants(dotsY), m.figurePose())
 	if !there {
 		return 0, 0, false
 	}
@@ -175,7 +190,7 @@ func (m Model) figureLines(w, rows int) []string {
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
 	levels, freqs := len(m.styles.Words[0]), len(m.styles.Words)
 
-	pose, ok := who.at(int(figureTall*float64(dotsY)), m.figurePose())
+	pose, ok := who.at(figureWants(dotsY), m.figurePose())
 	if !ok {
 		return nil
 	}
@@ -674,7 +689,7 @@ func (m *Model) figureSweep(w, rows int) {
 		return
 	}
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
-	pose, ok := who.at(int(figureTall*float64(dotsY)), m.figurePose())
+	pose, ok := who.at(figureWants(dotsY), m.figurePose())
 	if !ok {
 		return
 	}
@@ -748,7 +763,7 @@ func (m *Model) figureSpray(w, rows int) {
 	}
 
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
-	pose, ok := who.at(int(figureTall*float64(dotsY)), m.figurePose())
+	pose, ok := who.at(figureWants(dotsY), m.figurePose())
 	if !ok {
 		return
 	}
