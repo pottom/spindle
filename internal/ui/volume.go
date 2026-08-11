@@ -253,19 +253,24 @@ func (m Model) volumeDraw(w, rows int, grid []uint8, paint, hue []int8, levels, 
 		}
 	}
 
-	// The record's own colour, all the way up.
+	// The colour of the column it stands in, which is the colour the water has
+	// there.
 	//
-	// It climbed with the height first, the way the segmented meter's does, and
-	// that is the meter's answer to a different question: there the colour is
-	// the reading, because a lamp on its own has to say how high the stack has
-	// got. Here the stack is right there to be looked at, so the colour saying
-	// it again is one question with two movements. What it says instead is whose
-	// screen this is — the middle of the palette, which is the artwork's own
-	// accent.
-	accent := (freqs - 1) / 2
+	// Two other answers were tried. Climbing through the palette with the height
+	// is the segmented meter's answer to a different question — there a lamp on
+	// its own has to say how high the stack has got, so the colour is the
+	// reading; here the stack is right there to be looked at. The accent flat
+	// all the way up said whose screen this is, which the whole screen was
+	// already saying.
+	//
+	// Taking the hue from where it stands puts it in the world instead of on top
+	// of it: this picture is coloured across its width, bass at one end and
+	// cymbals at the other, and anything at that column is that colour. It also
+	// falls out right — a lamp that has let go drifts across the picture and
+	// changes colour as it crosses, like everything else that travels here.
 	lamp := func(x, y float32, bright float32) {
 		step := int8(min(int((0.55+0.45*float64(bright))*float64(levels-1)), levels-1))
-		band := accent
+		band := min(int(x)/dotsPerCellX*freqs/w, freqs-1)
 		for dy := range volumeTall {
 			for dx := range volumeWide {
 				light(int(x)+dx, int(y)+dy, step, band)
