@@ -38,6 +38,10 @@ type markSet struct {
 	// apart keeps the set out of the deal and out of the key's walk: it is only
 	// ever put up by something asking for it by name. See markEveryone.
 	apart bool
+
+	// fills says this is a picture rather than a row of marks: it takes the
+	// whole screen instead of the band the words are set in. See markPicture.
+	fills bool
 }
 
 // marksDrawn is whether a bar of marks may be dealt a set of drawings at all.
@@ -454,7 +458,15 @@ func markPicture(name string, w, rows int, seed int64) (cover.Grain, msg.WordLay
 	}
 
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
-	size, row, gap, ok := markCrowdFor(set, int(wordsMark*float64(dotsY)), dotsX, seed)
+
+	// A row of marks stands in the band the words would be set in. A picture
+	// takes the screen: it is one drawing with a scene in it, and squeezed into
+	// a band it would be a postage stamp of a scene.
+	band := int(wordsMark * float64(dotsY))
+	if set.fills {
+		band = dotsY
+	}
+	size, row, gap, ok := markCrowdFor(set, band, dotsX, seed)
 	if !ok || len(row) == 0 {
 		return cover.Grain{}, msg.WordLayout{}, false
 	}

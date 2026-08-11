@@ -2,15 +2,16 @@
   "name": "held",
   "from": "drawn for spindle",
   "licence": "ours",
-  "turns": true,
   "apart": true,
+  "fills": true,
   "marks": [
-    {"file": "cross.png", "pitch": 0.5}
+    {"file": "walk.png", "pitch": 0.5}
   ],
   "heights": [
-    {"tall": 24, "thick": 2},
-    {"tall": 36, "thick": 2},
-    {"tall": 54, "thick": 2},
-    {"tall": 72, "thick": 2}
+    {"tall": 72,  "thick": 2},
+    {"tall": 108, "thick": 2},
+    {"tall": 144, "thick": 2},
+    {"tall": 180, "thick": 2},
+    {"tall": 216, "thick": 2}
   ]
 }

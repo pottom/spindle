@@ -56,6 +56,22 @@ func TestAStoppedRecordLooksStopped(t *testing.T) {
 		t.Errorf("stopped and silenced at once was drawn as %q", m.words.cast)
 	}
 
+	// It takes the screen rather than the band the words stand in: it is a
+	// scene with a character in it, and squeezed into a band it would be a
+	// postage stamp of a scene.
+	set, ok := markCastSet(markHeld)
+	if !ok {
+		t.Fatal("no held set")
+	}
+	dotsY := m.height * dotsPerCellY
+	got, _, _, ok := markCrowdFor(set, dotsY, m.width*dotsPerCellX, 1)
+	if !ok {
+		t.Fatal("the picture did not fit")
+	}
+	if band := int(float64(wordsMark) * float64(dotsY)); got.tall <= band {
+		t.Errorf("the scene was drawn at %d dots, no bigger than the %d dot band", got.tall, band)
+	}
+
 	// And a device that has said nothing yet is not a stopped record.
 	m.ps = &player.State{}
 	if m.held() {

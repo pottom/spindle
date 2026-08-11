@@ -104,6 +104,12 @@ type set struct {
 	// the beat. Anything with feet has; a drum seen head on has not.
 	Turns bool `json:"turns"`
 
+	// Fills says this is a picture rather than a mark: it is given the whole
+	// screen instead of the band a row of marks stands in, and it is drawn
+	// whole rather than dealt from. A scene with a character in it has to keep
+	// its character.
+	Fills bool `json:"fills"`
+
 	// Apart keeps the set out of the deal: it is never dealt to a record and
 	// never walked to by the key, and only comes up when something asks for it
 	// by name. A set that means one particular thing — the room being silenced —
@@ -428,8 +434,8 @@ func read(path string) (set, error) {
 }
 
 func emit(b *strings.Builder, dir string, s set) error {
-	fmt.Fprintf(b, "\t%q: {\n\t\tfrom: %q,\n\t\tlicence: %q,\n\t\tturns: %v,\n\t\tapart: %v,\n\t\tsizes: []markSize{\n",
-		s.Name, s.From, s.Licence, s.Turns, s.Apart)
+	fmt.Fprintf(b, "\t%q: {\n\t\tfrom: %q,\n\t\tlicence: %q,\n\t\tturns: %v,\n\t\tapart: %v,\n\t\tfills: %v,\n\t\tsizes: []markSize{\n",
+		s.Name, s.From, s.Licence, s.Turns, s.Apart, s.Fills)
 
 	for _, h := range s.Heights {
 		fmt.Fprintf(b, "\t\t\t{tall: %d, marks: []markDots{\n", h.Tall)
