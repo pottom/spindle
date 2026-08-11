@@ -1,6 +1,0 @@
-The drawings in this set come from Tabler Icons — https://tabler.io/icons —
-Copyright (c) 2020-2024 Paweł Kuna, under the MIT licence.
-
-Used as published, with two changes forced by the rasteriser: the comment at
-the top of each file is removed, and stroke="currentColor" is resolved to
-white. Neither touches a path.

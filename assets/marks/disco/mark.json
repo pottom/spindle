@@ -1,0 +1,35 @@
+{
+  "name": "disco",
+  "from": "drawn for spindle",
+  "licence": "ours",
+  "marks": [
+    "hat.png",
+    "skirt.png",
+    "ponytail.png",
+    "belly.png",
+    "spikes.png",
+    "glasses.png",
+    "bowtie.png",
+    "scarf.png"
+  ],
+  "heights": [
+    {
+      "tall": 24,
+      "thick": 2
+    },
+    {
+      "tall": 36,
+      "thick": 2
+    },
+    {
+      "tall": 54,
+      "thick": 2
+    },
+    {
+      "tall": 72,
+      "thick": 2
+    }
+  ],
+  "//": "Eight people on a dance floor, in place of two sets that were people: a crowd taken from an icon library and eight dancers drawn as one hand but standing still. These dance, and every one of them is somebody \u2014 told apart by one bold mark and by the dance, and by nothing else. Two different builds read as two different sets at this size; a hat reads as a person in a hat.",
+  "//marks": "The order is the sound, so the row runs from the one with both feet on the floor to the one in the air. Narrow, which is why eight of them fit where eight faces did not: 0.57 of the height against 0.89, and 138 cells at 36 dots against 184."
+}
