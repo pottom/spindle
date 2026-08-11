@@ -74,6 +74,10 @@ type mark struct {
 	File  string
 	Pitch float64
 	Fixed bool
+
+	// Least is the smallest baked height this drawing still reads at, in dots,
+	// overriding the set's. Nought takes the set's.
+	Least int
 }
 
 func (m *mark) UnmarshalJSON(raw []byte) error {
@@ -83,11 +87,12 @@ func (m *mark) UnmarshalJSON(raw []byte) error {
 	var was struct {
 		File  string   `json:"file"`
 		Pitch *float64 `json:"pitch"`
+		Least int      `json:"least"`
 	}
 	if err := json.Unmarshal(raw, &was); err != nil {
 		return err
 	}
-	m.File = was.File
+	m.File, m.Least = was.File, was.Least
 	if was.Pitch != nil {
 		m.Pitch, m.Fixed = *was.Pitch, true
 	}
@@ -98,6 +103,18 @@ type set struct {
 	// Turns says the drawings have a front, so the screen may turn one round on
 	// the beat. Anything with feet has; a drum seen head on has not.
 	Turns bool `json:"turns"`
+
+	// Least is the smallest baked height these drawings still read at, in dots.
+	//
+	// It is measured, not guessed: bake the set and look at it with -show at
+	// every size. An animal is a closed body a few dots across inside and turns
+	// to mush at 36 where a face on a stick body is still legible at 24. Nought
+	// means every size baked.
+	//
+	// It earns its keep now that a company can be dealt across sets: without it
+	// a row at 36 dots would put a bear next to a smiley and only one of them
+	// would be a drawing.
+	Least int `json:"least"`
 
 	Name    string   `json:"name"`
 	From    string   `json:"from"`
@@ -427,8 +444,16 @@ func emit(b *strings.Builder, dir string, s set) error {
 			if !one.Fixed && len(s.Marks) > 1 {
 				pitch = float64(i) / float64(len(s.Marks)-1)
 			}
-			fmt.Fprintf(b, "\t\t\t\t{name: %q, pitch: %.3f, wide: %d, tall: %d, bits: %q},\n",
-				strings.TrimSuffix(name, filepath.Ext(name)), pitch, m.wide, m.tall, m.bits)
+			// The smallest height it reads at, and whether it has a front,
+			// travel with the drawing rather than with the set it came on —
+			// a company dealt across sets has to know both about each of its
+			// members separately.
+			least := one.Least
+			if least == 0 {
+				least = s.Least
+			}
+			fmt.Fprintf(b, "\t\t\t\t{name: %q, pitch: %.3f, least: %d, turns: %v, wide: %d, tall: %d, bits: %q},\n",
+				strings.TrimSuffix(name, filepath.Ext(name)), pitch, least, s.Turns, m.wide, m.tall, m.bits)
 		}
 		fmt.Fprintf(b, "\t\t\t}},\n")
 	}

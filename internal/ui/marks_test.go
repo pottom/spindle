@@ -1,9 +1,12 @@
 package ui
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/pottom/spindle/internal/ui/msg"
 	"github.com/pottom/spindle/internal/player"
 )
 
@@ -20,12 +23,10 @@ func TestTheNotesKeepTheirTurn(t *testing.T) {
 	t.Logf("over 400 bars the casts came up %v (the empty one is the notes)", seen)
 
 	if seen[""] == 0 {
-		t.Error("the notes were never dealt, so a set of drawings has replaced them")
+		t.Error("the notes were never dealt, so the drawings have replaced them")
 	}
-	for name := range markSets {
-		if seen[name] == 0 {
-			t.Errorf("the %q set was never dealt", name)
-		}
+	if seen[markMixed] == 0 {
+		t.Error("the drawings were never dealt, so only the notes are left")
 	}
 
 	// And the deal is a deal: the same bar of the same record gets the same cast
@@ -41,21 +42,49 @@ func TestTheNotesKeepTheirTurn(t *testing.T) {
 //
 // A wordless bar is stamped at the top of the spell it is in, so the first half
 // minute of every record is stamped nought. Dealt from the bar alone that is one
-// cast for the opening of every record ever played — watched by skipping through
+// row for the opening of every record ever played — watched by skipping through
 // a list, which is the same row over and over. The record is in the deal too.
-func TestEveryRecordOpensWithItsOwnCast(t *testing.T) {
-	seen := map[string]int{}
+//
+// What varies is the company rather than the cast. There are two casts now, the
+// notes and everybody, and the crowd is dealt out of a pool of every drawing —
+// so this asks the question where the answer lives, which is who came up.
+func TestEveryRecordOpensWithItsOwnCompany(t *testing.T) {
+	const w, rows = 200, 44
 	records := []string{"3n3Ppam7vgaVa1iaRUc9Lp", "1301WleyT98MSxVHPZCA6M", "5ChkMS8OtdzJeqyybCc9R5",
 		"7ouMYWpwJ422jRcDASZB7P", "0eGsygTp906u18L0Oimnem", "1lDWb6b6ieDQ2xT7ewTC3G",
 		"2takcwOaAZWiXQijPHIx7B", "6habFhsOp2NvshLv26DqMb", "4u7EnebtmKWzUH433cf5Qv"}
-	for _, id := range records {
-		seen[markCastFor(id, 0)]++
-	}
-	t.Logf("the opening bar of nine records was dealt %v (the empty one is the notes)", seen)
 
-	if len(seen) < 3 {
-		t.Errorf("nine records opened with only %d casts between them: %v", len(seen), seen)
+	// The bar is stamped nought for all of them, so the record is the only thing
+	// left to tell them apart.
+	seen := map[string]int{}
+	for i, id := range records {
+		cast := markCastFor(id, 0)
+		if cast == "" {
+			continue // the notes, which have no company
+		}
+		_, layout, ok := markPicture(cast, w, rows, int64(i))
+		if !ok {
+			t.Fatalf("no row for %q", id)
+		}
+		seen[companyOf(layout)]++
 	}
+	t.Logf("the opening bar of nine records put up %d companies: %v", len(seen), seen)
+
+	if len(seen) < 4 {
+		t.Errorf("nine records opened with only %d companies between them: %v", len(seen), seen)
+	}
+}
+
+// companyOf names a dealt row by where its marks stand, which is enough to tell
+// one company from another without reaching into the drawings.
+func companyOf(l msg.WordLayout) string {
+	var b strings.Builder
+	for i := range l.Count {
+		if i < len(l.Lefts) && i < len(l.Rights) {
+			fmt.Fprintf(&b, "%d-%d ", l.Lefts[i], l.Rights[i])
+		}
+	}
+	return b.String()
 }
 
 // The whole row at a smaller size beats part of it at a larger one.

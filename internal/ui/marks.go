@@ -71,12 +71,12 @@ const marksDrawn = true
 // row over and over — the deal only ever moved on for anybody who let a record
 // run past thirty seconds.
 func markCastFor(record string, starts int64) string {
-	sets := make([]string, 0, len(markSets)+1)
-	sets = append(sets, "") // the notes
-	for name := range markSets {
-		sets = append(sets, name)
-	}
-	sort.Strings(sets)
+	// The notes, or everybody. Not one set at a time any more: every drawing
+	// dances, stands on the same floor and is drawn with the same hand, so a
+	// company dealt across the lot is a different crowd on every record where
+	// picking a room only ever had five answers. The rooms are still there for
+	// the m key — see marksWalk.
+	sets := []string{"", markMixed}
 
 	h := uint64(starts)*0x94d049bb133111eb + 0xd6e8feb86659fd93
 	for _, c := range []byte(record) {
@@ -94,12 +94,97 @@ type markSize struct {
 	marks []markDots
 }
 
+// markMixed is the cast that is everybody at once, rather than one set.
+//
+// Every drawing on the screen now dances, stands on the same floor and is drawn
+// with the same hand — so keeping them in the rooms they were drawn in buys
+// nothing. A company of a bear, a television, a smiley and a guitar reads as one
+// crowd, and there are more crowds in fifty drawings dealt five at a time than
+// there are sets to walk through.
+//
+// The sets are still there and the m key still walks them, for anyone who wants
+// a pure one.
+const markMixed = "everyone"
+
+// markEveryone is the whole pool at a height: every set's drawings, minus the
+// ones that do not survive being baked that small.
+//
+// The filter is the whole reason a drawing carries a least of its own. Dealt
+// blind, a row at 36 dots would put a bear beside a smiley, and only one of them
+// would still be a drawing — see the measurements beside each set's manifest.
+func markEveryone(tall int) []markDots {
+	names := make([]string, 0, len(markSets))
+	for name := range markSets {
+		names = append(names, name)
+	}
+	// Sorted, so the pool is the same pool on every run and a seed means the
+	// same company twice.
+	sort.Strings(names)
+
+	var out []markDots
+	for _, name := range names {
+		for _, size := range markSets[name].sizes {
+			if size.tall != tall {
+				continue
+			}
+			for _, one := range size.marks {
+				if one.least > 0 && tall < one.least {
+					continue
+				}
+				out = append(out, one)
+			}
+		}
+	}
+	return out
+}
+
+// markCastSet is the set a cast names, or the whole crowd assembled for
+// markMixed. Assembled here rather than baked, because which drawings are
+// allowed at a height is a filter and a filter belongs next to the reason for
+// it.
+func markCastSet(name string) (markSet, bool) {
+	if name != markMixed {
+		set, ok := markSets[name]
+		return set, ok
+	}
+	out := markSet{from: "every set", licence: "see each set", turns: true}
+	for _, tall := range markHeights() {
+		if pool := markEveryone(tall); len(pool) > 0 {
+			out.sizes = append(out.sizes, markSize{tall: tall, marks: pool})
+		}
+	}
+	return out, len(out.sizes) > 0
+}
+
+// markHeights is every height anything is baked at, largest first.
+func markHeights() []int {
+	seen := map[int]bool{}
+	var out []int
+	for _, set := range markSets {
+		for _, size := range set.sizes {
+			if !seen[size.tall] {
+				seen[size.tall] = true
+				out = append(out, size.tall)
+			}
+		}
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(out)))
+	return out
+}
+
 // markDots is one drawing: its own size in dots, and a bit per dot.
 type markDots struct {
 	// pitch is where this one stands between the low end of the room and the
 	// top of it. It is what keeps the row meaning something now that the crowd
 	// is dealt rather than listed: whoever is picked, they line up by it.
 	pitch float64
+
+	// least is the smallest baked height this drawing still reads at, and turns
+	// whether it has a front to turn round. Both belong to the drawing rather
+	// than to the set it arrived on, because a company is dealt across sets:
+	// see markEveryone.
+	least int
+	turns bool
 
 	name       string
 	wide, tall int
@@ -244,7 +329,7 @@ const (
 // markPicture builds the field of dots a row of marks is drawn from, and the
 // layout the rest of the screen reads it through.
 func markPicture(name string, w, rows int, seed int64) (cover.Grain, msg.WordLayout, bool) {
-	set, ok := markSets[name]
+	set, ok := markCastSet(name)
 	if !ok || w <= 0 || rows <= 0 {
 		return cover.Grain{}, msg.WordLayout{}, false
 	}
@@ -277,6 +362,7 @@ func markPicture(name string, w, rows int, seed int64) (cover.Grain, msg.WordLay
 		Bottoms: []int{top + size.tall - 1},
 		Lefts:   make([]int, len(row)),
 		Rights:  make([]int, len(row)),
+		Turns:   make([]bool, len(row)),
 	}
 	for i := range layout.At {
 		layout.At[i] = -1
@@ -297,6 +383,7 @@ func markPicture(name string, w, rows int, seed int64) (cover.Grain, msg.WordLay
 		}
 		y0 := top + size.tall - m.tall
 		layout.Lefts[i], layout.Rights[i] = x0, x0+m.wide-1
+		layout.Turns[i] = m.turns
 
 		for y := range m.tall {
 			for x := range m.wide {
@@ -378,10 +465,18 @@ func (m Model) wordsTurning(count int) []bool {
 		return nil
 	}
 
-	// Every mark of a set turns, or none of them does. Which it is belongs to
-	// the drawings — a hi-hat has no front — and is said in the manifest.
-	set, ok := markSets[m.words.cast]
-	if !ok || !set.turns {
+	// Whether a mark turns belongs to the drawing — a hi-hat has no front — and
+	// travels with it, because a company may be dealt across sets and hold a
+	// dancer and a drum at once.
+	turns := m.words.where.Turns
+	if len(turns) < count {
+		return nil
+	}
+	var any bool
+	for _, one := range turns[:count] {
+		any = any || one
+	}
+	if !any {
 		return nil
 	}
 
@@ -418,7 +513,7 @@ func (m Model) wordsTurning(count int) []bool {
 		// not eight people dancing, it is a row being flipped.
 		side := int(h >> 8 & 1)
 		shift := int(h >> 16 % uint64(every))
-		out[i] = ((beats+shift)/every+side)%2 == 1
+		out[i] = turns[i] && ((beats+shift)/every+side)%2 == 1
 	}
 	return out
 }

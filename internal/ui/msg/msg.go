@@ -61,6 +61,12 @@ type WordLayout struct {
 	// type has no use for them, and what they are for is turning one mark round
 	// on the spot without it sliding sideways as it goes.
 	Lefts, Rights []int
+
+	// Turns says, mark by mark, whether it has a front that may be turned round
+	// on the beat. A drum seen head on has none; anything with feet has. It is
+	// per mark rather than per row because a company is dealt across the sets
+	// and may hold both at once. A line of type leaves it empty.
+	Turns []bool
 }
 
 // Middle is the dot in the middle of a word, which is what a piece bursting
