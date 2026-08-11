@@ -9,3 +9,6 @@ docs/brief.md
 # ...except the drawings a mark set is cut from, which are the source, not an artefact.
 !assets/marks/**/*.png
 !assets/signs/*.png
+
+# ...and the logo, which the README shows and the binary carries.
+!internal/logo/*.png

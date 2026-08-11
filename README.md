@@ -1,39 +1,54 @@
-# spindle
+<p align="center">
+  <img src="internal/logo/spindle.png" alt="spindle" width="620">
+</p>
 
-A Spotify player for the terminal that plays the audio itself.
+<p align="center">
+  <b>The best-looking Spotify player in a terminal — and it plays the music itself.</b>
+</p>
 
-Not a remote control: spindle registers as a Spotify Connect device and decodes
-the stream in its own process. That is what lets it show you a waveform of the
-music actually leaving the speakers, measure the tempo of what is playing, and
-edit the queue as one list rather than asking a server to do it.
+<p align="center">
+  <img alt="licence GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-blue">
+  <img alt="Go 1.26" src="https://img.shields.io/badge/go-1.26-00ADD8">
+  <img alt="macOS and Linux" src="https://img.shields.io/badge/macOS%20%C2%B7%20Linux-333">
+  <img alt="Spotify Premium required" src="https://img.shields.io/badge/Spotify-Premium-1DB954">
+</p>
 
-    ┌ screenshot: the player screen with a cover, the waveform and lyrics ┐
-    └ screenshot: the queue screen mid-reorder                            ┘
+---
 
-Requires a Spotify **Premium** account.
+Most terminal Spotify clients are remote controls: they ask a server what is
+playing and draw the answer. spindle registers as a Spotify Connect device and
+**decodes the stream in its own process**, which changes what it is able to show
+you.
+
+|  |  |
+|---|---|
+| **A real waveform** | Not a bar meter fed by a guess — the audio actually leaving the speakers, trigger-synced so it holds still, drawn in braille and coloured from the album cover's own accent. |
+| **The tempo, measured** | Spotify's audio-features endpoint is closed to applications registered today. spindle finds the beat in the audio as it plays, remembers it per track, and shows a bpm column. |
+| **A queue you can edit** | One list of what is coming, whether a track was queued by hand or came from the album. Move it, drop it, or bring it forward to play now — and everything else keeps its place. |
+| **A full screen worth looking at** | Water that falls on the beat, a row of drawn characters that dance to it, the lyric set as type and swept as it is sung. Press `f`. |
+
+Closing the interface leaves the music playing. There is a separate key for
+taking it with you.
 
 ## What it does
 
 **Plays.** Its own Connect device, named `spindle`, at up to 320 kbps, with an
-optional crossfade. Quitting the interface leaves the music playing; there is a
-separate key for taking it with you.
+optional crossfade.
 
-**Shows the music.** A trigger-synced waveform or a spectrum with peak markers,
-drawn in braille and coloured from the album cover's own accent. Album art
-through the kitty graphics protocol where the terminal has it, half blocks
-everywhere else.
-
-**Knows the tempo.** The beat rate is measured from the audio as it plays and
-remembered per track, so the queue can show a bpm column. Spotify's own
-audio-features endpoint is closed to applications registered today; this is the
-way round it.
+**Shows the music.** A trigger-synced waveform or a spectrum with peak markers.
+Album art through the kitty graphics protocol where the terminal has it, half
+blocks everywhere else.
 
 **Reads the words.** Synced lyrics, faded either side of the line being sung and
-swept across as it goes.
+swept across as it goes. Where a sheet has no timings — which is most of them —
+it says so rather than guessing.
 
-**Lets you rearrange.** One list of what is coming, whether a track was queued
-by hand or came from the album. Remove a track, move it a place at a time, or
-bring it forward to play now — and everything else keeps its place.
+**Answers the beat.** On the full screen the picture keeps time with the record:
+the marks turn on it, a line of the lyric sparks on it, and `b` turns keeping
+time off so the two can be put side by side on the same song.
+
+**Goes where you point it.** Liked songs, albums, artists, recently played, your
+playlists and a search across all of them, with vim motions, counts and paging.
 
 ## Keys
 
@@ -45,11 +60,11 @@ bottom. The ones worth knowing:
 | `space` | play / pause |
 | `n` / `p` | next / previous track |
 | `←` `→` | seek ∓5s |
-| `↑` `↓` | volume ±5 (on the player screen) |
+| `↑` `↓` | volume ±5 |
 | `m` | mute, remembering the level |
 | `s` `r` | shuffle, cycle repeat |
+| `f` | the visualiser, full screen |
 | `v` | waveform → spectrum → mirrored, with water → lamps → off |
-| `f` | the visualiser, full screen — `v` switches it there (the record and the words in dots are only offered here), any other key comes back |
 | `l` | lyrics |
 | `u` | a glance at what is next |
 | `d` | devices |
@@ -108,6 +123,22 @@ running, `4` the daemon is running but nothing is playing. They read the daemon
 on this machine and nothing else, so music coming out of a phone is silence as
 far as they are concerned — which is what exit `4` means by "on this machine".
 
+### In a status bar
+
+A bar wants a sentence rather than a field per line, and wants it without
+spawning `jq` every second:
+
+    spindle status --line                ▶ Sultans of Swing — Dire Straits
+    spindle status --format '{title}'    the fields, arranged your way
+    spindle status --follow --line       a fresh line whenever something changes
+
+The fields are `{icon}`, `{state}`, `{title}`, `{artist}`, `{album}`,
+`{position}`, `{duration}`, `{volume}` and `{device}`; anything else is left as
+it was written, so a typo says where to look. `--follow` holds the daemon's
+event stream open and prints only when something actually happens, which costs
+nothing while nothing does — and prints an empty line, rather than an error,
+while the daemon is away.
+
 ### From the keyboard
 
 The hardware play, next and previous keys drive spindle while it is the player
@@ -124,22 +155,6 @@ macOS asks for permission the first time: allow the terminal under System
 Settings › Privacy & Security › Input Monitoring, then start the daemon again.
 The keys are answered on macOS only; Linux has MPRIS, which is a different piece
 of work.
-
-### In a status bar
-
-A bar wants a sentence rather than a field per line, and wants it without
-spawning `jq` every second:
-
-    spindle status --line                ▶ Sultans of Swing — Dire Straits
-    spindle status --format '{title}'    the fields, arranged your way
-    spindle status --follow --line       a fresh line whenever something changes
-
-The fields are `{icon}`, `{state}`, `{title}`, `{artist}`, `{album}`,
-`{position}`, `{duration}`, `{volume}` and `{device}`; anything else is left as
-it was written, so a typo says where to look. `--follow` holds the daemon's
-event stream open and prints only when something actually happens, which costs
-nothing while nothing does — and prints an empty line, rather than an error,
-while the daemon is away.
 
 ## What it needs
 
@@ -162,6 +177,10 @@ machine, and only the process holding it can rewrite it correctly.
 The daemon is [go-librespot](https://github.com/devgianlu/go-librespot), forked
 to add what a controller needs from it: queue editing, a tap on the audio for
 the waveform and the tempo, and lyrics.
+
+Everything drawn on the full screen — the characters, the marks, the placards —
+is a drawing cut from a sheet and baked into dots at build time by the tools in
+`cmd/`. Nothing is rendered from a font except the lyric itself.
 
 ## Licence
 
