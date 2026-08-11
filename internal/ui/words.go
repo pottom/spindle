@@ -755,7 +755,7 @@ const (
 	// wordsGather is how long the dots take to come together. A lyric line
 	// stands for two or three seconds, so anything slower would leave the
 	// picture permanently half made.
-	wordsGather = 420 * time.Millisecond
+	wordsGather = 650 * time.Millisecond
 
 	// wordsScatter is how far a dot starts from where it belongs, in dot rows
 	// and columns.
