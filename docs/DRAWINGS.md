@@ -397,33 +397,70 @@ frames of it. All eight are STRUCK or SWUNG: they return to where they started.
    Hanging almost straight / half out with one wave / fully out with two waves.
 ```
 
-## Sheet 4 — the mouth, the kiss, and being asleep
+## Sheet 4 — the mouth: singing, and blowing a kiss
 
-The mouth mimes the record. The kiss is what the screen does back when somebody
-presses a key. The sleeping row is for the quiet: a paused player that keeps
-moving is a player that has not noticed.
+Three separate things that all happen to be a mouth, so they are drawn by one
+hand on one sheet.
+
+The **singing** row is not an animation. It is an alphabet: the shape is chosen
+every frame from what is being sung, so any shape may follow any other, and that
+is what makes them hard to draw. They have to be interchangeable — the same
+width, the same centre, the same weight — or the mouth appears to jump about the
+screen while it sings.
+
+The **kiss** is an animation, played once, and it is what the screen does back
+when somebody presses the key for it. Nothing else on this screen is addressed
+to the person watching.
+
+The **sleeping** row is for a paused player. A picture that carries on moving
+while the music has stopped is a picture that has not noticed.
 
 ```
-Grid: 6 columns by 3 rows. Row 1 is six separate mouth shapes rather than an
-animation. Row 2 is ONE animation of six frames, played once. Row 3 is one
-animation of six frames, played once. Every mouth is drawn at the same width and
-in the same position in its cell. Mouths are outlines only: no teeth, no tongue, no
-lips, no face around them.
+Grid: 8 columns by 3 rows, so 24 drawings.
 
-ROW 1, six mouth shapes for miming a song, one per cell:
-   a closed straight line / a small round o / a tall narrow o / a wide flat
-   lens shape / a large wide-open oval / a smile curving upwards.
+THIS SHEET IS LAID OUT IN ROWS, NOT COLUMNS. Each row is its own set of eight
+drawings, read left to right. The columns mean nothing here.
 
-ROW 2, blowing a kiss: six frames of ONE mouth, played once, left to right:
-   mouth relaxed / mouth pursed and small / pursed with a tiny heart touching
-   it / the heart just clear of the mouth, small / the heart further away and
-   larger / the heart largest at the edge of the cell with two short motion
-   lines behind it.
+Every drawing on the sheet is an outline only: no teeth, no tongue, no lips
+drawn as separate shapes, no shading. No face is drawn around any mouth — the
+mouth is the whole drawing.
 
-ROW 3, six drawings of the same cat, one per cell:
-   curled up asleep, seen from the side / the same with one Z above it / with
-   two Z's, the second larger / with three Z's rising / stretching with the
-   front legs forward / sitting up awake with the ears up.
+ROW 1, eight mouth shapes for miming a song. Every one of them is exactly the
+same width, centred at exactly the same point in its cell, and drawn with the
+same weight, so that any one may be swapped for any other without the mouth
+appearing to move. They differ only in shape:
+   1. closed: a single straight horizontal line
+   2. barely open: a very shallow lens shape
+   3. a small round o
+   4. a tall narrow oval
+   5. a wide flat lens, the corners drawn out sideways
+   6. a large wide-open oval, taller than it is wide
+   7. an open mouth pushed to one side, wider on the right
+   8. a smile: an upward curve with the ends turned up
+
+ROW 2, blowing a kiss: eight frames of ONE mouth, played once, left to right.
+The moving part is the mouth's shape and then the heart's position and size.
+   1. mouth relaxed, a shallow lens
+   2. mouth gathering, narrower
+   3. mouth pursed to a small round o
+   4. pursed, with a small heart outline touching the mouth
+   5. the heart just clear of the mouth, still small
+   6. the heart a third of the way across the cell, larger
+   7. the heart two thirds across, larger again
+   8. the heart at the far edge of the cell, largest
+No motion lines behind the heart at any point: the heart moving IS the motion,
+and short lines behind it disappear when the drawing is reduced.
+
+ROW 3, falling asleep: eight frames of ONE cat, seen from the side, played once.
+The cat is drawn identically in every frame apart from what is named:
+   1. sitting up, ears up, eyes open
+   2. sitting, eyes half closed
+   3. curling, head lowered
+   4. curled up, eyes closed
+   5. curled up, one small Z above it
+   6. curled up, two Z's, the second larger
+   7. curled up, three Z's rising and growing
+   8. stretching awake, front legs pushed forward, ears up
 ```
 
 ## Sheet 5 — the dancers, animated
@@ -714,8 +751,9 @@ this machine has measured, and a mouse on the fastest. A balloon that rises with
 the swell and is gone on the drop. None of it is drawn — it is where and when,
 which is code, and it is the part worth arguing about once the drawings exist.
 
-**The screen answering the person at it.** The figure blows a kiss when a key is
-pressed — the kiss is on sheet 4, the reason for it is not built. Waving as
+**The screen answering the person at it.** The kiss is drawn on sheet 4; what is
+not built is the key that asks for it, and the rule that the mouth is only ever
+up on a record with no words of its own. Waving as
 spindle closes. Leaving footprints across the floor it walks over. Carrying the
 record's title card on rather than having it appear.
 
