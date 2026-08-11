@@ -11,6 +11,7 @@ import (
 	"github.com/devgianlu/go-librespot/daemon"
 	"github.com/gofrs/flock"
 
+	"github.com/pottom/spindle/internal/build"
 	"github.com/pottom/spindle/internal/xdg"
 )
 
@@ -91,6 +92,10 @@ func Run(ctx context.Context, opts Options) error {
 		quality = DefaultQuality
 	}
 	log := newLogger(out)
+	// Which spindle is playing. The daemon outlives the interface that started
+	// it, so the two can be different builds, and this is the only place that
+	// says so.
+	log.Infof("spindle %s starting", build.Version())
 
 	cacheDir, err := xdg.CacheDir()
 	if err != nil {

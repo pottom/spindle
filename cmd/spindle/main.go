@@ -13,6 +13,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/auth"
+	"github.com/pottom/spindle/internal/build"
 	"github.com/pottom/spindle/internal/daemon"
 	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui"
@@ -57,10 +58,11 @@ var otherCommands = map[string]bool{
 // the default help listed three options and none of the eight things the
 // program actually does, which reads as a program that does almost nothing.
 func usage() {
-	fmt.Fprint(os.Stderr, `spindle — a Spotify player for the terminal
-
+	fmt.Fprintf(os.Stderr, "spindle %s — a Spotify player for the terminal\n", build.Version())
+	fmt.Fprint(os.Stderr, `
     spindle                              open the interface
     spindle login [client id]            authorise, once
+    spindle version                      which build this is
 
   The playback device, which keeps playing after the interface is closed:
 
@@ -129,6 +131,11 @@ func main() {
 		// interface is a poor joke.
 		case "help", "--help", "-h":
 			usage()
+			return
+		// Which spindle this is. It answers to the word and to the flag,
+		// because whoever is asking has been surprised by a build already.
+		case "version", "--version", "-v":
+			fmt.Println("spindle", build.Version())
 			return
 		case "login":
 			if err := runLogin(context.Background(), os.Args[2:]); err != nil {

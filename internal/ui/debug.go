@@ -11,6 +11,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/pottom/spindle/internal/build"
 	"github.com/pottom/spindle/internal/xdg"
 )
 
@@ -156,6 +157,10 @@ func (m Model) debugSelf() []debugField {
 	b.put("", "%dx%d", m.width, m.height)
 	b.put("", "%s", map[bool]string{true: "dark", false: "light"}[m.isDark])
 	b.put("tab", "%s", m.tab)
+	// Which build is drawing this. A picture that is wrong and a build old
+	// enough to still draw it that way are indistinguishable by eye, and an
+	// hour has gone on that already.
+	b.put("", "%s", build.Version())
 
 	t := slowNow()
 	b.put("fps", "%.1f", t.fps)
