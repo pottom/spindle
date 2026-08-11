@@ -1469,3 +1469,52 @@ func TestALineOfTypeHasAMeasure(t *testing.T) {
 		t.Errorf("twelve letters were broken into %d lines: %q", len(got), got)
 	}
 }
+
+// A long word full of hyphens is broken at them.
+//
+// "You got me like whoa-whoa-whoa-whoa-whoa-whoa-whoa-whoa-whoa" is four words
+// to a reader and five to strings.Fields, and the fifth is forty-four letters
+// long. With spaces as the only place to break, the line could not be broken at
+// all: it was set on one line at whatever size that took, which on a screen two
+// thousand pixels across came to nine dots a letter — a ribbon of specks rather
+// than a lyric.
+//
+// Breaking after a hyphen is what type has always done, and it takes as many of
+// them as it needs: one break still leaves twenty-two letters here.
+func TestALineOfHyphensIsBrokenAtThem(t *testing.T) {
+	const line = "You got me like whoa-whoa-whoa-whoa-whoa-whoa-whoa-whoa-whoa"
+
+	lines := wordsWrap(line, 360, 120)
+	if len(lines) < 3 {
+		t.Errorf("the line came out on %d lines: %q", len(lines), lines)
+	}
+	longest := 0
+	for _, l := range lines {
+		longest = max(longest, len([]rune(l)))
+	}
+	if longest > wordsMeasure {
+		t.Errorf("the longest line is %d letters, past the measure of %d: %q",
+			longest, wordsMeasure, lines)
+	}
+
+	// The hyphen stays on the line it was on, which is where a hyphen goes.
+	for i, l := range lines[:len(lines)-1] {
+		if !strings.HasSuffix(l, "-") {
+			t.Errorf("line %d does not end on its hyphen: %q", i, l)
+		}
+	}
+
+	// Nothing invented and nothing dropped: what was set is what came in.
+	if got := strings.Join(lines, ""); got != line {
+		t.Errorf("the lines put together are %q, not the line that came in", got)
+	}
+}
+
+// And an ordinary line is not broken at every hyphen it happens to contain.
+func TestAShortLineKeepsItsHyphensToItself(t *testing.T) {
+	for _, line := range []string{"well-known and much-loved", "Sultans of Swing"} {
+		if lines := wordsWrap(line, 360, 120); len(lines) != 1 {
+			t.Errorf("%q was broken into %q with room to spare", line, lines)
+		}
+	}
+}

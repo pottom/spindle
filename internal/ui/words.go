@@ -517,34 +517,73 @@ func wordsShorten(part string, most int) string {
 	return strings.Join(kept, " ") + "…"
 }
 
-// wordsSplit breaks a line into n roughly equal pieces, at spaces.
+// wordsBreaks cuts a line into the runs it may be broken between, each carrying
+// whatever followed it — the space, or the hyphen.
+//
+// Spaces alone are not enough. "whoa-whoa-whoa-whoa-whoa-whoa-whoa-whoa-whoa" is
+// one word to strings.Fields, so a chorus that is nothing else could not be
+// broken at all and was set on one line at whatever size that took: measured on
+// "You got me like whoa-whoa-…", nine dots a letter on a two thousand pixel
+// screen, which is a ribbon of specks rather than a lyric. Breaking after a
+// hyphen is what type has always done, and the hyphen stays on the line it was
+// on, which is also what type has always done.
+//
+// Each run keeps its own trailing character, so nothing is invented and nothing
+// is lost: a line that breaks after a hyphen keeps the hyphen, and one that
+// breaks at a space loses only that space. The layout finds where each word
+// lands by measuring prefixes of the line as the face draws them, line by line,
+// so what has to be exact is each line rather than the join between two.
+func wordsBreaks(line string) []string {
+	var out []string
+	var run []rune
+	for _, r := range line {
+		run = append(run, r)
+		if r == ' ' || r == '-' || r == '\u2013' || r == '\u2014' {
+			// A run of spaces belongs to the break before it rather than starting
+			// one of its own.
+			if r == ' ' && len(run) == 1 && len(out) > 0 {
+				out[len(out)-1] += string(run)
+				run = nil
+				continue
+			}
+			out = append(out, string(run))
+			run = nil
+		}
+	}
+	if len(run) > 0 {
+		out = append(out, string(run))
+	}
+	return out
+}
+
+// wordsSplit breaks a line into n roughly equal pieces, where it may be broken.
 func wordsSplit(line string, n int) []string {
-	words := strings.Fields(line)
-	if n <= 1 || len(words) <= 1 {
+	runs := wordsBreaks(line)
+	if n <= 1 || len(runs) <= 1 {
 		return []string{line}
 	}
-	n = min(n, len(words))
+	n = min(n, len(runs))
 
-	// Greedy by length: each line takes words until it has its share of the
+	// Greedy by length: each line takes runs until it has its share of the
 	// letters, which keeps the block square rather than leaving a stray word.
 	total := len([]rune(line))
 	want := total / n
 
 	var out []string
-	var cur []string
+	var cur string
 	var run int
-	for i, word := range words {
-		cur = append(cur, word)
-		run += len([]rune(word)) + 1
+	for i, piece := range runs {
+		cur += piece
+		run += len([]rune(piece))
 
-		left := len(words) - i - 1
+		left := len(runs) - i - 1
 		if run >= want && len(out) < n-1 && left >= n-len(out)-1 {
-			out = append(out, strings.Join(cur, " "))
-			cur, run = nil, 0
+			out = append(out, strings.TrimRight(cur, " "))
+			cur, run = "", 0
 		}
 	}
-	if len(cur) > 0 {
-		out = append(out, strings.Join(cur, " "))
+	if strings.TrimSpace(cur) != "" {
+		out = append(out, strings.TrimRight(cur, " "))
 	}
 	return out
 }
