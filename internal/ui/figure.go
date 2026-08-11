@@ -559,9 +559,15 @@ func faceWhoFor(starts int64) string {
 
 	names := make([]string, 0, len(figures))
 	for name := range figures {
+		if figureErrand(name) {
+			continue // he comes when he is sent for, not when a bar deals him
+		}
 		names = append(names, name)
 	}
 	sort.Strings(names)
+	if len(names) == 0 {
+		return ""
+	}
 	return names[int(h>>8)%len(names)]
 }
 
@@ -841,11 +847,27 @@ const (
 func figureCast() []string {
 	out := make([]string, 0, len(figures)+1)
 	for name := range figures {
+		if figureErrand(name) {
+			continue
+		}
 		out = append(out, name)
 	}
 	sort.Strings(out)
 	return append(out, "")
 }
+
+// figureErrand is a drawing that comes on to say something rather than to be
+// watched: it is never dealt to a record and never walked to by the key, and
+// turns up only when something asks for it by name.
+//
+// The marks have the same idea and the same reason — see markSets and its apart
+// flag. The difference is only where the flag lives: a set of marks is written
+// down in a manifest, and there is one of these.
+func figureErrand(name string) bool { return name == figureSigner }
+
+// figureSigner is the one who carries a placard across the screen with whatever
+// the picture has to say about a switch written on it.
+const figureSigner = "signer"
 
 // figureSweeps reports that this visit walks through the marks.
 //

@@ -333,6 +333,11 @@ func TestASideOnFigureTurnsAround(t *testing.T) {
 // be dealt out of what that figure can do.
 func TestEachFigureIsOnlyAskedForWhatItCanDo(t *testing.T) {
 	for name := range figures {
+		if figureErrand(name) {
+			// He is not a visitor. He comes on to say one thing and walks off
+			// with it, so a walk is the whole of what he can do.
+			continue
+		}
 		can := figureActsFor(name)
 		t.Logf("%-9s %d acts: %v", name, len(can), can)
 		if len(can) < 3 {
@@ -458,9 +463,23 @@ func TestEveryFigureIsWhole(t *testing.T) {
 		m.words.starts = bar * 7_000
 		seen[m.faceWho()]++
 	}
+	// The ones a bar can deal, which is everybody except whoever comes on an
+	// errand: the one with the placard is sent for by a key and would never be
+	// dealt. See figureErrand.
+	visiting := 0
+	for _, name := range names {
+		if !figureErrand(name) {
+			visiting++
+		}
+	}
 	t.Logf("over a hundred and twenty bars: %v (the empty one is the geometry)", seen)
-	if len(seen) < len(names)+1 {
-		t.Errorf("only %d of the %d figures and the geometry ever came on", len(seen), len(names))
+	if len(seen) < visiting+1 {
+		t.Errorf("only %d of the %d figures and the geometry ever came on", len(seen), visiting)
+	}
+	for _, name := range names {
+		if figureErrand(name) && seen[name] > 0 {
+			t.Errorf("%s was dealt to a bar %d times, and he only comes when he is sent for", name, seen[name])
+		}
 	}
 	if seen[""] == 0 {
 		t.Error("the one this code draws itself never came on")
