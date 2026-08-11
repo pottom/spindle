@@ -209,12 +209,18 @@ func newKeyMap() keyMap {
 			key.WithHelp("t", "what is playing"),
 		),
 		Marks: key.NewBinding(
-			// c for the company. It was m, which is mute everywhere else in the
+			// d for the dancers. It was m, which is mute everywhere else in the
 			// program — and on the big screen it won, so the one screen where
 			// you most want to silence the room was the one screen that could
 			// not.
-			key.WithKeys("c"),
-			key.WithHelp("c", "the company"),
+			//
+			// d is the device picker everywhere else, and up here it is not
+			// reachable. That trade is the opposite of the one it replaces:
+			// silencing the room is something you do while watching, and
+			// choosing which speakers to play through is something you go to the
+			// player for.
+			key.WithKeys("d"),
+			key.WithHelp("d", "the dancers"),
 		),
 		Face: key.NewBinding(
 			key.WithKeys("w"),
