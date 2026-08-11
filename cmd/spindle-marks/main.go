@@ -158,6 +158,7 @@ func main() {
 // Braille, because that is what the screen draws in: two dots across and four
 // down in every cell, so what comes out here is exactly what goes up there.
 func draw(paths []string, want string, only int) {
+	var found bool
 	for _, path := range paths {
 		s, err := read(path)
 		if err != nil {
@@ -166,6 +167,7 @@ func draw(paths []string, want string, only int) {
 		if want != "all" && s.Name != want {
 			continue
 		}
+		found = true
 		dir := filepath.Dir(path)
 		for _, h := range s.Heights {
 			if only > 0 && h.Tall != only {
@@ -204,6 +206,19 @@ func draw(paths []string, want string, only int) {
 				fmt.Println(line)
 			}
 		}
+	}
+	if !found {
+		// A tool that answers nothing is a tool that has been misread. There is
+		// no set by that name, and saying so beats printing an empty screen.
+		var names []string
+		for _, path := range paths {
+			if s, err := read(path); err == nil {
+				names = append(names, s.Name)
+			}
+		}
+		fmt.Fprintf(os.Stderr, "spindle-marks: no set called %q. There is %s.\n",
+			want, strings.Join(names, ", "))
+		os.Exit(1)
 	}
 }
 

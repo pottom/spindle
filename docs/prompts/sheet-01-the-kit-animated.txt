@@ -98,12 +98,20 @@ of hands. The four rows are four frames of a single strike, read downwards:
   row 4  recoiling: the stick or beater lifting away again, the surface still
          slightly out of shape
 
+Nothing on this sheet is wider than three quarters of its own height. A drum kit
+is full of things that stick out sideways — pedals, sticks lying flat, cymbals
+as wide plates — and each of them costs the whole row a size when it is drawn.
+Turn them: pedals under, sticks from above, cymbals at a steeper angle.
+
 The stick or beater is the part that moves. In rows 1, 2 and 4 the drum itself
 is drawn identically; only in row 3 does its struck surface change shape, and
 only slightly.
 
-1. Kick drum: a large circle seen from the front, standing on two short legs,
-   with a pedal and a beater to one side.
+1. Kick drum: a large circle seen from the front, standing on two short legs.
+   The pedal is tucked UNDER the drum, in front of it, not out to one side, and
+   the beater comes down onto the head from above. Drawn with the pedal beside
+   it this mark measured 1.17 of its height in width and cost the whole row a
+   size; it has to be no wider than the drum itself.
 2. Snare drum: a shallow cylinder seen from the side, on a stand, with one
    stick above it.
 3. A pair of hands clapping, seen from the front, fingers up. Here the two
@@ -115,8 +123,11 @@ only slightly.
    pushed against the bottom one / open a little again.
 5. Open hi-hat: the same two cymbals already parted, with a stick above the top
    one. The stick moves; the top cymbal tilts when it is struck.
-6. Rim shot: a shallow drum seen from above as an ellipse, with one stick
-   lying across its rim.
+6. Rim shot: a shallow drum seen FROM THE FRONT, as the snare in column 2 is,
+   with one stick coming down onto its near rim from above. Not seen from
+   above: drawn as a wide ellipse with a stick lying across it, this mark
+   measured 1.44 of its height in width, which is the widest thing on the sheet
+   and on its own enough to drop the row a size.
 7. Floor tom: a deep cylinder seen from the side, standing on three legs, with
    one stick above it.
 8. Ride cymbal: a wide shallow cymbal on a stand seen from the side, with one
