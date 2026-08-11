@@ -6,11 +6,8 @@
     "speaker.png",
     "snare.png",
     "guitar.png",
-    "vinyl.png",
     "mic.png",
-    "note.png",
-    "headphones.png",
-    "wave.png"
+    "note.png"
   ],
   "heights": [
     {
@@ -20,10 +17,18 @@
     {
       "tall": 36,
       "thick": 3
+    },
+    {
+      "tall": 54,
+      "thick": 3
+    },
+    {
+      "tall": 72,
+      "thick": 3
     }
   ],
   "turns": true,
   "//turns": "These have feet, so they turn round on the beat, each on its own count. See wordsTurning.",
   "//": "Eight instruments with arms and legs, dancing, in place of a set assembled out of an icon library. The idea is the listener's and it is what made the set work: a row of instruments standing still is a shop window, and the same instruments dancing are a band. Every one of them has feet, so every one of them turns round on the beat.",
-  "//marks": "The order is the sound, low at the left and high at the right, and the row comes to 164 cells at 36 dots \u2014 which an ordinary terminal holds, so all eight are drawn large."
+  "//marks": "Five rather than eight, so that they are drawn large. The size a row gets is decided by its width: eight at 54 dots come to 240 cells across, and an ordinary terminal is 167, so the whole row fell to 36 and every instrument with it \u2014 small enough that the listener called them dwarves. Five hold 145 cells at 54, which is half again as tall. The order is still the sound, low at the left.\nThe three that went are the ones that are not instruments: the record, the headphones and the waveform."
 }
