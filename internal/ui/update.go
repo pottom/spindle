@@ -294,6 +294,14 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				m.throwSparks(m.scopeWidth(m.layout()), scopeRows)
 			}
 		}
+		// The head on the edge walks to wherever the record has been moved to,
+		// so a seek is watched rather than reported. Every picture on the big
+		// screen carries the edge — see drawCellsIn — so this runs for all of
+		// them rather than inside one of their branches.
+		if m.stage.on {
+			m.stageEdgeFlow()
+		}
+
 		// The colour of the record coming next, arriving before the sound of it.
 		// See tide.go.
 		m.tideFlow()

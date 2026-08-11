@@ -532,3 +532,74 @@ func TestTheCometSaysWhichWayItIsDrawing(t *testing.T) {
 		t.Errorf("between two beats the comet is %d cells against %d answering the loudness, want it shorter", between, steady)
 	}
 }
+
+// A seek is a run round the edge, not a jump to the far side.
+//
+// The big screen has no clock and no progress bar. The head on the edge is the
+// only thing on it that says where the record is, so it is the only thing that
+// can say you have moved it — and it can only say how far by taking time over
+// it. Moved instantly it would be indistinguishable from the picture being
+// redrawn.
+func TestSeekingRunsTheHeadRoundTheEdge(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.width, m.height = 60, 20
+	m.stage.on = true
+	m.ps = &player.State{TrackID: "one", Duration: 4 * time.Minute, Playing: true}
+	m.setProgress(2 * time.Minute)
+
+	// Settled where the record is.
+	m.stageEdgeFlow()
+	if off := m.elapsed() - m.stage.edgeAt; off > time.Millisecond || off < -time.Millisecond {
+		t.Fatalf("the head sat at %s with the record at %s", m.stage.edgeAt, m.elapsed())
+	}
+
+	// Seek forward, and watch it walk rather than arrive.
+	was := m.elapsed()
+	m.setProgress(was + 30*time.Second)
+
+	var frames int
+	for m.stage.edgeAt < m.elapsed()-stageEdgeSnap {
+		before := m.stage.edgeAt
+		m.stageEdgeFlow()
+		if m.stage.edgeAt <= before {
+			t.Fatalf("the head stopped at %s, short of %s", m.stage.edgeAt, m.elapsed())
+		}
+		if frames++; frames > 200 {
+			t.Fatal("the head never got there")
+		}
+	}
+	t.Logf("a thirty second seek took %d frames to walk", frames)
+	if frames < 3 {
+		t.Errorf("the head crossed thirty seconds in %d frames, which is a jump", frames)
+	}
+
+	// And back the other way.
+	m.stageEdgeFlow()
+	m.setProgress(m.elapsed() - 30*time.Second)
+	before := m.stage.edgeAt
+	m.stageEdgeFlow()
+	if m.stage.edgeAt >= before {
+		t.Errorf("seeking back walked the head forward, from %s to %s", before, m.stage.edgeAt)
+	}
+}
+
+// A record that has just changed starts where it starts.
+//
+// Without this the head would sprint the whole way round on every skip, saying
+// that somebody had seeked to the top of a track they had simply arrived at.
+func TestANewRecordDoesNotRunTheHead(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.width, m.height = 60, 20
+	m.stage.on = true
+	m.ps = &player.State{TrackID: "one", Duration: 4 * time.Minute, Playing: true}
+	m.setProgress(3 * time.Minute)
+	m.stageEdgeFlow()
+
+	m.ps = &player.State{TrackID: "two", Duration: 3 * time.Minute, Playing: true}
+	m.setProgress(0)
+	m.stageEdgeFlow()
+
+	if m.stage.edgeAt > time.Millisecond {
+		t.Errorf("the new record's head started at %s rather than at the top", m.stage.edgeAt)
+	}
+}

@@ -80,6 +80,15 @@ func helpGroups() []helpGroup {
 			{"u", "what is coming next"},
 		},
 	}, {
+		title: "On the full screen",
+		keys: [][2]string{
+			{"space ← → ↑ ↓", "the transport, without leaving"},
+			{"^n / ^p", "next or previous track"},
+			{"m", "another set of marks"},
+			{"t", "what is playing, said there and then"},
+			{"any other key", "back"},
+		},
+	}, {
 		title: "In a list",
 		keys: [][2]string{
 			{"↑ ↓", "move"},

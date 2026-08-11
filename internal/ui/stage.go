@@ -67,6 +67,33 @@ const (
 	// anything at all. Below this it is the music breathing, not hitting.
 	stageJump = 0.02
 
+	// stageEdgeSnap is how far the head may be from the playhead before it
+	// stops keeping up and starts travelling.
+	//
+	// A third of a second. Ordinary playback moves the head by a frame at a
+	// time and the poll that corrects the clock moves it by a few tens of
+	// milliseconds; the smallest seek anybody can ask for is five seconds. There
+	// is nothing in between to get wrong.
+	stageEdgeSnap = 350 * time.Millisecond
+
+	// stageEdgeRun is how much of the distance to the playhead is left after a
+	// frame of travelling. Tuned at 30 fps and converted for the rate actually
+	// drawn at — see pace.go.
+	//
+	// Eight tenths, which crosses a five second seek in about a quarter of a
+	// second: long enough to be a movement and short enough that holding the key
+	// does not leave the head a second behind your finger.
+	stageEdgeRun = 0.80
+
+	// stageEdgeRunTail is how many times its own length the tail grows to while
+	// the head is travelling, at the moment the run begins.
+	//
+	// A comet is a comet because of what it drags. Running with the same short
+	// tail it keeps at rest, the head reads as a dot that has been moved rather
+	// than one that went — and which way it went is exactly what has to be
+	// legible.
+	stageEdgeRunTail = 4.0
+
 	// stageEdgeBeatTail is how much of the comet's tail is left between two
 	// beats. It draws itself out on the beat and pulls back in after it, which
 	// is a movement rather than a flash — a flashing dot on a screen is an
@@ -121,7 +148,49 @@ type stageState struct {
 	// measured against.
 	was []float32
 
+	// edgeAt is where the head running round the edge is showing, and edgeFor
+	// the record that is. It follows the playhead rather than being it, so that
+	// a jump is something you watch happen. See stageEdgeFlow.
+	edgeAt  time.Duration
+	edgeFor string
+
 	seed uint32
+}
+
+// stageEdgeFlow walks the head round the edge toward where the record actually
+// is, so a seek is a run rather than a jump.
+//
+// The big screen has no progress bar and no clock — the head on the edge is the
+// only thing on it that says where the record has got to, so it is also the only
+// thing that can say you have moved. Made to travel, it says how far as well:
+// five seconds is a nudge, holding the key is a sprint round the picture.
+//
+// It follows the playhead rather than the key, which means it answers a seek
+// from the command line, from a phone, or from Spotify itself, and not only from
+// this keyboard. Ordinary playback never triggers it because ordinary playback
+// never moves faster than stageEdgeSnap in a frame.
+func (m *Model) stageEdgeFlow() {
+	if m.ps == nil {
+		return
+	}
+	now := m.elapsed()
+
+	// A different record starts where it starts. Nothing is being seeked and a
+	// head sprinting round the edge would say something untrue.
+	if m.stage.edgeFor != m.ps.TrackID {
+		m.stage.edgeFor, m.stage.edgeAt = m.ps.TrackID, now
+		return
+	}
+
+	off := now - m.stage.edgeAt
+	if off < 0 {
+		off = -off
+	}
+	if off < stageEdgeSnap {
+		m.stage.edgeAt = now
+		return
+	}
+	m.stage.edgeAt += time.Duration(float64(now-m.stage.edgeAt) * (1 - float64(paceKeep(stageEdgeRun))))
 }
 
 // stageKey answers while the big screen is up, which it mostly does by leaving.
@@ -176,7 +245,13 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	case key.Matches(k, m.keys.PlayPause),
 		key.Matches(k, m.keys.VolUp), key.Matches(k, m.keys.VolDown),
 		key.Matches(k, m.keys.Mute),
-		key.Matches(k, m.keys.Next), key.Matches(k, m.keys.Prev):
+		key.Matches(k, m.keys.Next), key.Matches(k, m.keys.Prev),
+		key.Matches(k, m.keys.SeekFwd), key.Matches(k, m.keys.SeekBack):
+		// The transport, which belongs to whatever is playing rather than to
+		// whichever screen is up. Everything not named here closes the picture,
+		// which is what makes it a picture rather than a screen with a way out:
+		// any key gets you back. Seeking was missing from the list, so the two
+		// keys nearest to hand did the one thing nobody wanted.
 		return nil, false
 	}
 
@@ -499,11 +574,34 @@ func (m Model) stageEdge(w, rows int, grid []uint8, paint []int8, levels int) {
 		ends -= fade
 	}
 
-	gone := float64(m.elapsed()) / float64(ends)
+	// Where the head is showing, which is where the record is except while it
+	// is travelling to a place somebody has just seeked to. See stageEdgeFlow.
+	//
+	// A record the head has not been walked for yet is drawn at the playhead
+	// rather than at nought: the first frame after a change of record has to be
+	// right on its own, without waiting for anything to have run.
+	at := m.elapsed()
+	if m.stage.edgeFor == m.ps.TrackID {
+		at = m.stage.edgeAt
+	}
+	gone := float64(at) / float64(ends)
 	along := int(min(max(gone, 0), 1) * float64(round))
 
 	tail := max(int(stageEdgeTail*float64(round)), stageEdgeHead+1)
 	heat := max(int(stageEdgeHeat*float64(levels-1)), 1)
+
+	// How far it still has to run, as a share of the way round: the tail is
+	// drawn out by it, and drawn on the side it came from — which is behind the
+	// head going forward and in front of it going back, the way a comet's tail
+	// is always away from where it is heading.
+	behind := 1
+	if left := float64(m.elapsed()-at) / float64(ends); left != 0 {
+		reach := min(math.Abs(left)/stageEdgeTail, 1)
+		tail = max(int(float64(tail)*(1+(stageEdgeRunTail-1)*reach)), stageEdgeHead+1)
+		if left < 0 {
+			behind = -1
+		}
+	}
 
 	// The head keeps time when the picture does.
 	//
@@ -517,10 +615,13 @@ func (m Model) stageEdge(w, rows int, grid []uint8, paint []int8, levels int) {
 		tail = max(int(float64(tail)*(stageEdgeBeatTail+(1-stageEdgeBeatTail)*float64(m.beatPulse()))), stageEdgeHead+1)
 	}
 
-	for i := max(along-tail, 0); i < along; i++ {
+	for back := 1; back <= tail; back++ {
 		// How far back down the tail this dot is, and so how much of it is
 		// left: the head's own strength, then falling away to nothing behind it.
-		back := along - i
+		i := along - back*behind
+		if i < 0 || i >= round {
+			continue
+		}
 
 		step := int8(heat)
 		if back > stageEdgeHead {
