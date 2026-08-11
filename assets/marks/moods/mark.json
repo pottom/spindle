@@ -9,8 +9,7 @@
     "amazed.svg",
     "cool.svg",
     "cross.svg",
-    "teeth.svg",
-    "asleep.svg"
+    "teeth.svg"
   ],
   "heights": [
     {
@@ -31,6 +30,6 @@
     }
   ],
   "//": "Eight faces, written as SVG and baked, in place of a set taken from an icon library. What made the difference is the brief rather than the drawing: a circle of ten, few features and big ones, nothing under two units, no enclosed shape under five, and eyes as dots or short strokes and never as small circles \u2014 a small circle at 24 dots is a blot. Then eyebrows on every one of them, which is where the expression actually lives: two thick strokes well clear of the eyes, angled, and the biggest features after the mouth.",
-  "//marks": "No sad one. Eight marks that jump on the beat are a room enjoying itself, and a long face in the middle of the row is somebody who has had bad news.",
+  "//marks": "Seven rather than eight, and no sad one. Eight faces are a circle each, which is the widest a mark gets, and eight of them at 36 dots come to 184 cells \u2014 past an ordinary terminal, so the whole row fell to 24 and every face with it. Seven come to 160 and it holds. The sleeping one went: a row that jumps on the beat has no use for somebody asleep in the middle of it.",
   "//heights": "Two dots of pen rather than three. These are written rather than traced, so nothing needs thickening, and at three the features inside the circle close up."
 }
