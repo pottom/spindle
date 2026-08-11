@@ -1434,3 +1434,38 @@ func TestAPictureGoesWithItsRecord(t *testing.T) {
 		t.Error("the record before is still waiting to leave across the next one")
 	}
 }
+
+// A line of type has a measure, and it is not the width of the screen.
+//
+// The only rule was a floor — at least nine dots a letter, or break — which on a
+// wide terminal is never reached, so every lyric that fitted was set on one line
+// however long it was. Watched on the same words at two font sizes: forty-two
+// letters across is a thin strip a third of the height it could be, and the same
+// words broken in two at twenty-one fill the screen.
+//
+// What the measure buys is the thing the wrapping was worth having for: a
+// sheet's lines are not all the same length, so some come up as one line and
+// some as two, and the picture changes shape as the song goes.
+func TestALineOfTypeHasAMeasure(t *testing.T) {
+	const long = "Ami jól jött az a kis lé, és nem is féltem"
+
+	// The same words, on a wide screen and a wider one: the same picture.
+	wide, wider := wordsWrap(long, 300, 200), wordsWrap(long, 440, 200)
+	if len(wide) != len(wider) {
+		t.Errorf("the same line came out %d lines at 150 cells and %d at 220", len(wide), len(wider))
+	}
+	if len(wider) < 2 {
+		t.Errorf("forty-two letters were set on %d line(s) across a wide screen", len(wider))
+	}
+	for _, l := range wider {
+		if n := len([]rune(l)); n > wordsMeasure {
+			t.Errorf("a line ran to %d letters, past the measure of %d: %q", n, wordsMeasure, l)
+		}
+	}
+
+	// And a short line is left alone: the measure breaks what is too long, it
+	// does not chop everything into halves.
+	if got := wordsWrap("She's a lady", 440, 200); len(got) != 1 {
+		t.Errorf("twelve letters were broken into %d lines: %q", len(got), got)
+	}
+}

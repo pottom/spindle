@@ -59,6 +59,23 @@ const (
 	// dithered.
 	wordsReadable = 9
 
+	// wordsMeasure is the most letters a line may run to before it is broken,
+	// however much room there is beside it.
+	//
+	// A line of type has a measure, and it is not "as wide as the paper". The
+	// only rule here was a floor — at least nine dots a letter, or break — which
+	// on a wide terminal is never reached, so every lyric that fitted was set on
+	// one line however long it was. Watched on the same words at two font sizes:
+	// at forty-two letters across it is a thin strip a third of the height it
+	// could be, and broken in two at twenty-one it fills the screen. The second
+	// is the picture; the first is what happens to it on a big monitor.
+	//
+	// It also buys the thing the wrapping was worth having for. A sheet's lines
+	// are not all the same length, so with a measure some come up as one line
+	// and some as two, and the picture changes shape as the song goes — where
+	// everything fitting on one line is the same strip for three minutes.
+	wordsMeasure = 28
+
 	// wordsMostLines is how many lines a lyric may be broken into. More than
 	// this and the letters are too small anyway, and the picture is a page
 	// rather than a phrase.
@@ -360,7 +377,12 @@ func wordsWrapTo(line string, w, h, most int) []string {
 			for _, l := range lines {
 				longest = max(longest, len([]rune(l)))
 			}
-			if int(float64(w)*(1-wordsMargin))/max(longest, 1) >= wordsReadable || n == most {
+			// Both, and they pull opposite ways: the floor says a letter needs
+			// dots to survive being dithered, the measure says a line needs to
+			// be a line rather than a ribbon. Whichever is not met, another line
+			// is worth trying.
+			letters := int(float64(w)*(1-wordsMargin)) / max(longest, 1)
+			if (letters >= wordsReadable && longest <= wordsMeasure) || n == most {
 				return lines
 			}
 		}
