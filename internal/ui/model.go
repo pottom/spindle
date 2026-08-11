@@ -117,6 +117,10 @@ type Model struct {
 	// run is the record's beats, counted forwards. See beatrun.go.
 	run beatRun
 
+	// helpAt is how far the help screen's keys have been scrolled under its
+	// head. See view_help.go.
+	helpAt int
+
 	// splash is the program's own picture, up while the device is awaited.
 	// See splash.go.
 	splash splashState

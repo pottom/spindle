@@ -44,15 +44,14 @@ const (
 	// as large as the screen allows.
 	splashKeeps = 9
 
-	// splashAbout is how many rows the help screen keeps for its keys and its
-	// heading. They are the page and the picture only heads it, so on a
-	// terminal with no room to spare the picture is what goes.
+	// splashAboutShare is how much of the help screen the picture heading it
+	// takes, as a percentage of the body.
 	//
-	// Measured: the keys lay out in 36 rows at anything from 120 cells wide,
-	// and in 68 at 80 — where they do not fit the screen at all and a logo
-	// would be the least of it. Six more for the name, the version and the air
-	// around them.
-	splashAbout = 42
+	// Half. The keys are a page that scrolls under it, so this is a choice
+	// about how the screen looks rather than a fight over rows: half leaves
+	// most of a group of keys showing under the picture, which says the page
+	// goes on without having to say so.
+	splashAboutShare = 50
 )
 
 var (
@@ -149,10 +148,11 @@ func (m Model) splashRoom() (w, rows int) {
 	l := m.layout()
 	w = l.interior - leftMargin - rightMargin
 	if m.tab == tabHelp {
-		// Whatever the keys do not want. They are the page; this heads it, and
-		// on a short terminal it does not appear at all rather than pushing a
-		// key off the bottom.
-		return w, max(l.bodyHeight-splashAbout, 0)
+		// Half the page. The keys scroll under it now rather than sharing the
+		// rows with it, so the picture no longer has to be whatever was left
+		// over — and what it was left over was nothing at all on any terminal
+		// under about eighty rows.
+		return w, max(l.bodyHeight*splashAboutShare/100, 0)
 	}
 	keeps := splashKeeps
 	if m.ps == nil {

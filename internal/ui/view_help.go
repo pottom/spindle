@@ -1,6 +1,9 @@
 package ui
 
 import (
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/pottom/spindle/internal/build"
 	"strings"
 )
@@ -91,6 +94,13 @@ func helpGroups() []helpGroup {
 			{"any other key", "back"},
 		},
 	}, {
+		title: "On this page",
+		keys: [][2]string{
+			{"pgup/pgdn", "the keys scroll under the head"},
+			{"^u / ^d", "half a screenful"},
+			{"g / G", "the top, the end"},
+		},
+	}, {
 		title: "In a list",
 		keys: [][2]string{
 			{"↑ ↓", "move"},
@@ -145,30 +155,74 @@ func helpGroups() []helpGroup {
 // helpPanel draws the screen.
 func (m Model) helpPanel(l layout, rows int) []string {
 	w := l.interior - leftMargin - rightMargin
+	head := m.helpHead(w)
 
-	// What this is, above what its keys do. The picture heads it where there is
-	// room and is simply absent where there is not — see splashRoom, which
-	// gives the keys their rows first.
-	head := m.splashRows()
-	if len(head) > 0 {
-		head = append(head, strings.Repeat(" ", w))
-	}
-	head = append(head,
-		fit(m.styles.Title.Render("spindle "+build.Version()), w),
-		fit(m.styles.Album.Render("a Spotify player that plays the music itself — GPL-3.0"), w),
-		strings.Repeat(" ", w),
-		fit(m.styles.Title.Render("Keys"), w),
-		fit(m.styles.Album.Render("and what they are for"), w),
-		strings.Repeat(" ", w),
-	)
+	// The keys are a page under a fixed head rather than part of one long page.
+	//
+	// Because the head has a picture in it, and a picture put into the terminal
+	// by the kitty protocol is placed on the screen rather than in the text: it
+	// stays where it was put while whatever is under it moves. Scrolling both
+	// would slide the words out from under the logo. A letterhead does not
+	// scroll anyway.
+	body := max(rows-len(head), 0)
+	keys := m.helpColumns(helpGroups(), w, helpKeyRows(w))
+	keys = keys[min(m.helpAt, max(len(keys)-body, 0)):]
 
-	// Set from the top rather than centred: this is a page to read, and a page
-	// that floats in the middle of the screen reads as a dialogue box.
-	lines := append(head, m.helpColumns(helpGroups(), w, max(rows-len(head), 0))...)
+	lines := append(head, keys...)
 	for len(lines) < rows {
 		lines = append(lines, strings.Repeat(" ", w))
 	}
 	return lines[:rows]
+}
+
+// helpHead is what the page is headed by: the program's own picture where there
+// is room for one, its name, the build it was made from and its licence.
+func (m Model) helpHead(w int) []string {
+	head := m.splashRows()
+	if len(head) > 0 {
+		head = append(head, strings.Repeat(" ", w))
+	}
+	return append(head,
+		fit(m.styles.Title.Render("spindle "+build.Version()), w),
+		fit(m.styles.Album.Render("the best-looking Spotify player in a terminal — GPL-3.0"), w),
+		strings.Repeat(" ", w),
+	)
+}
+
+// helpKeyRows is how many rows to lay the keys out in before any of it is
+// windowed: all of them, since the page scrolls.
+//
+// Measured, so the number is not a guess that quietly cuts a group off: the
+// groups come to 36 rows at anything from 120 cells wide and 68 at 80, because
+// a narrow terminal gets fewer columns. Twice the widest measured is room to
+// grow into.
+func helpKeyRows(w int) int { return 140 }
+
+// helpScroll moves the keys under the head, and reports whether the key was one
+// of the ones that do.
+func (m *Model) helpScroll(k tea.KeyPressMsg, page int) bool {
+	switch {
+	case key.Matches(k, m.keys.Down):
+		m.helpAt++
+	case key.Matches(k, m.keys.Up):
+		m.helpAt--
+	case key.Matches(k, m.keys.PageDown):
+		m.helpAt += page
+	case key.Matches(k, m.keys.PageUp):
+		m.helpAt -= page
+	case key.Matches(k, m.keys.HalfDown):
+		m.helpAt += max(page/2, 1)
+	case key.Matches(k, m.keys.HalfUp):
+		m.helpAt -= max(page/2, 1)
+	case key.Matches(k, m.keys.First), key.Matches(k, m.keys.FirstVim):
+		m.helpAt = 0
+	case key.Matches(k, m.keys.Last), key.Matches(k, m.keys.LastVim):
+		m.helpAt = helpKeyRows(0)
+	default:
+		return false
+	}
+	m.helpAt = max(m.helpAt, 0)
+	return true
 }
 
 // helpColumns lays the groups out side by side.

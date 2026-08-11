@@ -615,6 +615,11 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if cmd, handled := m.deviceKey(k); handled {
 		return m, cmd
 	}
+	// The help page scrolls under its head, so the movement keys belong to it
+	// while it is up rather than to whatever list is behind it.
+	if m.tab == tabHelp && !m.devices.open && m.helpScroll(k, max(m.layout().bodyHeight-1, 1)) {
+		return m, nil
+	}
 	if cmd, handled := m.browseKey(k); handled {
 		return m, cmd
 	}
