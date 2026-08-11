@@ -28,14 +28,18 @@ import (
 // when something is worth writing to it.
 
 const (
-	// slowBudget is how long a frame has. The interface asks the daemon for a
-	// frame every 33ms, so anything past this has already cost a frame.
-	slowBudget = 33 * time.Millisecond
+	// slowBudget is how long a frame has: whatever the interface set out to
+	// draw at. Anything past it has already cost a frame.
+	slowBudget = scopeInterval
 
 	// slowGap is how far apart two frames have to land before the gap is worth
 	// writing down. A frame and a half: a frame that merely ran late is not a
 	// frame that went missing.
-	slowGap = 50 * time.Millisecond
+	//
+	// Both are taken from the rate rather than written down beside it. Left as
+	// the numbers that suited thirty a second, a run at sixty would have called
+	// every frame on time whatever it did.
+	slowGap = scopeInterval * 3 / 2
 
 	slowFile = "frames.jsonl"
 )
@@ -91,6 +95,15 @@ func slowNow() slowRead {
 	}
 }
 
+// slowResume says the frame loop has just been started again after being off,
+// so the next frame is not measured against the last one before it stopped.
+func slowResume() {
+	slowState.mu.Lock()
+	defer slowState.mu.Unlock()
+
+	slowState.last = time.Time{}
+}
+
 // slowFrameBegan is called as a frame's update starts.
 func slowFrameBegan() {
 	slowState.mu.Lock()
@@ -139,9 +152,21 @@ func slowRenderDone(m Model, render time.Duration) {
 	slowState.pending = false
 
 	began, update := slowState.began, slowState.update
+	slowState.frames++
+
+	// The first frame of a stretch has nothing to be measured against: either
+	// nothing has been drawn yet, or the picture has been off screen and the
+	// loop with it. Measured before this was here — five and a half seconds
+	// spent on the library tab, filed as the worst frame of an eleven thousand
+	// frame run, and the rate it was averaged into with it.
+	if slowState.last.IsZero() {
+		slowState.last = began
+		slowState.lastUpdate, slowState.lastRender = update, render
+		return
+	}
+
 	gap := began.Sub(slowState.last)
 	slowState.last = began
-	slowState.frames++
 
 	// Every frame, not only the late ones: a rate is only a rate if the frames
 	// that arrived on time are counted too. Eased, because a single gap is
@@ -158,7 +183,7 @@ func slowRenderDone(m Model, render time.Duration) {
 		}
 	}
 
-	if slowState.frames == 1 || slowState.off {
+	if slowState.off {
 		return
 	}
 	if gap < slowGap && update+render < slowBudget {

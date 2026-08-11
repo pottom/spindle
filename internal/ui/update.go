@@ -1082,5 +1082,11 @@ func (m *Model) startScope() tea.Cmd {
 		return nil
 	}
 	m.scope.running = true
+
+	// The loop has been off — the picture was not on screen — so the gap the
+	// first frame back reports is the time it was away rather than a frame that
+	// went missing. Measured: five and a half seconds on the library tab, filed
+	// as the worst frame of an eleven thousand frame run. See slow.go.
+	slowResume()
 	return scopeFrameCmd(m.player, m.frameMode())
 }
