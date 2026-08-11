@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -178,7 +179,67 @@ func TestTheHatchLetsTheLineGo(t *testing.T) {
 		t.Error("the leaving did not start now")
 	}
 
+	// And the line that comes back has to gather, or it stands there whole in
+	// front of the copy falling away from it and nothing appears to happen. The
+	// wind-back that puts a real line on time for its own singing is a wind-back
+	// past the end here, because the line was sung a while ago.
+	if since := time.Since(m.words.since); since > wordsGather/4 {
+		t.Errorf("the line came back %v into its gathering, so it is already whole", since)
+	}
+
 	// And with no line up it does nothing rather than falling over.
 	var empty Model
 	empty.wordsLetGo()
+}
+
+// Ink appears below where the line stood, on the screen rather than in the
+// arithmetic.
+//
+// The fall was right and invisible: the line that came back stood whole in front
+// of the copy falling away, so all that reached the screen was a few dim sparks
+// off something sitting still. Nothing measured on wordsSpill alone could have
+// caught that — it takes drawing the frames the way the screen draws them.
+func TestTheLineIsSeenToFall(t *testing.T) {
+	const w, rows = 90, 30
+
+	m := scopeModel(100, 44)
+	m.width, m.height = w, rows
+	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
+
+	img, layout, ok := wordsImage([]string{"jaj de jo"}, w*dotsPerCellX, rows*dotsPerCellY)
+	if !ok {
+		t.Fatal("the face could not draw the line")
+	}
+	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	m.words.cellsX, m.words.cellsY, m.words.text = w, rows, "jaj de jo"
+	m.words.where = layout
+	m.words.since = time.Now().Add(-5 * time.Second)
+
+	foot := layout.Bottoms[0] / dotsPerCellY
+	m.wordsLetGo()
+	went, since := m.words.went, m.words.since
+
+	below := func(at time.Duration) int {
+		m.words.went, m.words.since = went.Add(-at), since.Add(-at)
+		n := 0
+		for i, line := range m.wordsLines(w, rows) {
+			if i > foot {
+				n += len(strings.TrimSpace(ansiOff(line)))
+			}
+		}
+		return n
+	}
+
+	if n := below(0); n != 0 {
+		t.Errorf("something was already below the line before it let go: %d cells", n)
+	}
+	was := 0
+	for _, at := range []time.Duration{100, 300, 600} {
+		n := below(at * time.Millisecond)
+		if n <= was {
+			t.Errorf("%v after letting go, %d cells below the line — no more than the %d before",
+				at*time.Millisecond, n, was)
+		}
+		was = n
+	}
 }

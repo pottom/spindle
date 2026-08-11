@@ -191,4 +191,17 @@ func (m *Model) wordsLetGo() {
 	m.wordsAdopt(m.words.have, m.words.where, m.words.text)
 	m.words.leave = wordsSpilling
 	m.words.went = time.Now()
+
+	// And gathering from scratch, which wordsAdopt will not do here.
+	//
+	// It winds the gathering back so a line finishes arriving as it is sung, and
+	// takes the wait from the sheet: at the moment this hatch is pressed that
+	// line was sung some time ago, so the wait is negative and the wind-back is
+	// longer than the gathering itself. The line came back already whole.
+	//
+	// Which looked like nothing happening. The same line, complete and at full
+	// light, stood exactly where the falling copy had started, so what reached
+	// the screen was a line sitting still with a few dim sparks coming off it —
+	// the fall, drawn behind the thing it was falling away from.
+	m.words.since = time.Now()
 }
