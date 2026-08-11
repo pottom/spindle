@@ -172,17 +172,20 @@ func (m Model) signDraw(w, rows int, grid []uint8, paint, hue []int8, levels, fr
 		}
 	}
 
-	// Turned, because the sheet has him walking to the right and he is going
-	// the other way.
-	pose.draw(true, func(x, y int) { light(x+left, y+top) })
+	// Not turned. He was drawn walking the way he goes: in walk3 the left leg is
+	// out in front with the heel down and the right is behind pushing off, and
+	// the placard is up on the leading side. Mirroring him kept the travel and
+	// reversed the stride, which is a moonwalk — and nothing else in the drawing
+	// argues with it, because the face is round and looks straight out. See
+	// TestTheSignerWalksTheWayHeGoes.
+	pose.draw(false, func(x, y int) { light(x+left, y+top) })
 
-	// And what he is carrying, written into the blank. Turned as he is, so the
-	// slot measured on the drawing has to be turned with him.
+	// And what he is carrying, written into the blank where the drawing has it.
 	slot := signSlotFor(pose)
 	if slot.wide <= 0 {
 		return
 	}
-	x0 := left + pose.wide - slot.left - slot.wide
+	x0 := left + slot.left
 	signMark(m.sign.what, x0+signInset, top+slot.top+signInset,
 		slot.wide-2*signInset, slot.tall-2*signInset, light)
 }
