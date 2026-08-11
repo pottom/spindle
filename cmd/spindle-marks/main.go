@@ -524,6 +524,20 @@ func render(path string, h height, turn bool) (dots, error) {
 // only the smallest size needs anything, and there it needs it badly — at 2 dots
 // the threshold leaves a dashed line, which is the same thing that decided the
 // stroke width for the drawn sets.
+// traceFill is how wide a measured pen may be, as a fraction of the figure's
+// height, before the drawing is read as filled rather than stroked.
+//
+// The question has to be settled in the drawing's own pixels, because the answer
+// cannot depend on the size being baked: the equaliser was thinned away at 36
+// dots and left alone at 54 by a rule that compared the scaled pen against the
+// wanted weight, so the same drawing was a stroke at one size and a fill at the
+// next.
+//
+// Measured across the nineteen drawings of the band: every stroked one comes out
+// between 0.03 and 0.05 of its height, and the equaliser — a stack of solid bars
+// — at 0.14. Nine hundredths sits in the middle of a gap of a factor of three.
+const traceFill = 0.09
+
 func trace(path string, h height, turn bool) (dots, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -587,7 +601,9 @@ func trace(path string, h height, turn bool) (dots, error) {
 	// a heavier hand than this screen draws with. Both matter: a picture carries
 	// one pen for every size it is baked at, so without this a row is a hairline
 	// at the bottom of the range and a set of clubs at the top.
-	pen := float64(penOf(pic, ink, left, right, top, bottom)) * float64(h.Tall) / float64(fh)
+	penPx := penOf(pic, ink, left, right, top, bottom)
+	pen := float64(penPx) * float64(h.Tall) / float64(fh)
+	filled := float64(penPx) > float64(fh)*traceFill
 	// A dot at a time, and to one side. Grown the obvious way — a ring of eight
 	// neighbours — a pen goes 1, 3, 5: there is no even weight to be had, and a
 	// set asked for 2 came out at 3 with nothing to show for the asking. Adding
@@ -597,9 +613,15 @@ func trace(path string, h height, turn bool) (dots, error) {
 		on = fatten(on, wide, h.Tall)
 		pen++
 	}
-	for pen-1 > float64(h.Thick) {
-		on = thin(on, wide, h.Tall)
-		pen -= 2
+	// Thinning is only for a drawing whose pen was heavier than this screen's.
+	// A drawing that is filled rather than stroked has no pen at all, and what
+	// gets measured is the width of its body — so thinning it takes the body
+	// away. See traceFill.
+	if !filled {
+		for pen-1 > float64(h.Thick) {
+			on = thin(on, wide, h.Tall)
+			pen -= 2
+		}
 	}
 
 	grey := image.NewGray(image.Rect(0, 0, wide, h.Tall))
