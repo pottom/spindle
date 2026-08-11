@@ -177,3 +177,18 @@ func wordsSpillsNow(text string, starts int64) bool {
 	x ^= x >> 29
 	return x%wordsSpillEvery == 0
 }
+
+// wordsLetGo drops the line that is on screen and brings the same one back.
+//
+// What the hatch on keys.Spill does. It goes through wordsAdopt rather than
+// setting the state here, so what is watched is the path a real line change
+// takes and not a second one built to look like it — the leaving, the gathering
+// and the overlap between them are all the ones that ship.
+func (m *Model) wordsLetGo() {
+	if m.words.have.DotsX == 0 {
+		return
+	}
+	m.wordsAdopt(m.words.have, m.words.where, m.words.text)
+	m.words.leave = wordsSpilling
+	m.words.went = time.Now()
+}

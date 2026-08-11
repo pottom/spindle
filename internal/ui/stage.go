@@ -237,6 +237,12 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		m.marksWalk()
 		return nil, true
 
+	case key.Matches(k, m.keys.Spill):
+		// The hatch: the line on screen lets go now, and comes back dealt a
+		// fresh way in. Not in the help — see keys.Spill.
+		m.wordsLetGo()
+		return nil, true
+
 	case key.Matches(k, m.keys.Face):
 		// Puts a face up, and walks its expressions a press at a time.
 		m.faceShow()

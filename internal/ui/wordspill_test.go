@@ -2,7 +2,9 @@ package ui
 
 import (
 	"testing"
+	"time"
 
+	"github.com/pottom/spindle/internal/ui/cover"
 	"github.com/pottom/spindle/internal/ui/msg"
 )
 
@@ -138,4 +140,45 @@ func TestOnlyTheFallIsGivenLonger(t *testing.T) {
 			t.Errorf("move %d was given %v rather than the usual %v", move, got, wordsLeaving)
 		}
 	}
+}
+
+// The hatch drops the line and brings it back.
+//
+// It is not in the help and it is not meant to be, so this is the only thing
+// that says it still works. A hatch nobody tests is a hatch that has quietly
+// stopped working by the time it is next wanted.
+func TestTheHatchLetsTheLineGo(t *testing.T) {
+	const w, rows = 90, 14
+
+	m := scopeModel(100, 44)
+	m.width, m.height = w, rows
+	m.scope.modes[tabPlayer], m.stage.on = scopeWords, true
+
+	img, layout, ok := wordsImage([]string{"jaj de jo"}, w*dotsPerCellX, rows*dotsPerCellY)
+	if !ok {
+		t.Fatal("the face could not draw the line")
+	}
+	m.words.have = cover.Grind(grayToImage(img), w, rows, dotsPerCellX, dotsPerCellY)
+	m.words.cellsX, m.words.cellsY, m.words.text = w, rows, "jaj de jo"
+	m.words.where = layout
+	m.words.since = time.Now().Add(-5 * time.Second)
+
+	m.wordsLetGo()
+
+	if m.words.leave != wordsSpilling {
+		t.Errorf("the line is leaving as %d rather than falling", m.words.leave)
+	}
+	if m.words.was.DotsX == 0 {
+		t.Error("nothing was given notice, so there is nothing to fall")
+	}
+	if m.words.have.DotsX == 0 {
+		t.Error("the line did not come back")
+	}
+	if time.Since(m.words.went) > time.Second {
+		t.Error("the leaving did not start now")
+	}
+
+	// And with no line up it does nothing rather than falling over.
+	var empty Model
+	empty.wordsLetGo()
 }

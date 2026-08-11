@@ -49,6 +49,16 @@ type keyMap struct {
 	Marks key.Binding
 	Face  key.Binding
 
+	// Spill makes the line on screen let go and fall, and is not in the help.
+	//
+	// A hatch for judging, not a feature. The fall is dealt one line in eight,
+	// which on a record is one about every twenty-five seconds — often enough to
+	// be worth having and far too rare to tune against, because tuning means
+	// seeing the same thing twice in a row with one number changed. Every rare
+	// effect on this screen has needed one of these and every one of them was
+	// added after a session spent waiting for the effect to come round.
+	Spill key.Binding
+
 	// Loose turns keeping time with the record off and on, so the two ways of
 	// drawing can be put side by side on the one record.
 	Loose  key.Binding
@@ -248,6 +258,10 @@ func newKeyMap() keyMap {
 		Peek: key.NewBinding(
 			key.WithKeys("u"),
 			key.WithHelp("u", "up next"),
+		),
+		Spill: key.NewBinding(
+			key.WithKeys("c"),
+			key.WithHelp("c", "let the line go"),
 		),
 		Mute: key.NewBinding(
 			key.WithKeys("m"),
