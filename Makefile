@@ -17,8 +17,12 @@ run-mock:
 login:
 	go run ./cmd/spindle login
 
+# One binary, one place: ./spindle, and nowhere else. Builds scattered under
+# /tmp under half a dozen names cost a morning — a picture was fixed and went on
+# looking broken because an older one was being run. The version it prints is
+# the commit it was built from; see internal/build.
 build:
-	go build -o spindle ./cmd/spindle
+	@go build -o spindle ./cmd/spindle && ./spindle version && echo "  -> ./spindle"
 
 cross:
 	@echo "targets: $(PLATFORMS)"

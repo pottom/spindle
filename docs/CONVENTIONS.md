@@ -10,6 +10,11 @@ resolving the four risks listed in `DESIGN.md`, not production readiness.
 - `make login` — run the OAuth flow and report who you are signed in as.
 - `spindle daemon` — start the Connect device in the background.
   `spindle daemon --foreground` keeps it in the terminal, where Ctrl-C stops it.
+- `make build` — the binary, at `./spindle` and **nowhere else**. It prints the
+  commit it was built from, which is the same thing `spindle version`, the help
+  header and the debug bar say. Builds under other names cost a morning once:
+  a picture was fixed and went on looking broken because an older one was still
+  being run, and nothing on screen could tell them apart.
 - `make lint` — `go vet ./... && staticcheck ./...`
 - `make cross` — build every supported platform. Run it after touching anything
   that talks to the terminal or the filesystem.
