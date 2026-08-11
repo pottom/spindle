@@ -1,0 +1,58 @@
+{
+  "name": "zoo",
+  "from": "drawn for spindle",
+  "licence": "ours",
+  "turns": true,
+  "marks": [
+    {
+      "file": "bear.png",
+      "pitch": 0.05
+    },
+    {
+      "file": "croc.png",
+      "pitch": 0.2
+    },
+    {
+      "file": "panda.png",
+      "pitch": 0.35
+    },
+    {
+      "file": "dog.png",
+      "pitch": 0.5
+    },
+    {
+      "file": "fox.png",
+      "pitch": 0.62
+    },
+    {
+      "file": "cat.png",
+      "pitch": 0.75
+    },
+    {
+      "file": "rabbit.png",
+      "pitch": 0.88
+    },
+    {
+      "file": "penguin.png",
+      "pitch": 1.0
+    }
+  ],
+  "heights": [
+    {
+      "tall": 24,
+      "thick": 3
+    },
+    {
+      "tall": 36,
+      "thick": 3
+    },
+    {
+      "tall": 54,
+      "thick": 3
+    },
+    {
+      "tall": 72,
+      "thick": 3
+    }
+  ]
+}
