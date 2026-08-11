@@ -455,10 +455,90 @@ STRUCK — small, larger, largest, and back — so three frames is the whole of 
                  Small / larger / largest.
 ```
 
+## Sheet 10 — under the line: the sea
+
+The meter that runs under everything on that screen draws a line across it, and
+the water thrown off the picture falls back through it. Read that line as the
+surface of a sea and the screen already has two halves that were always there:
+the marks stand on it, the spray comes off it, and underneath it there is room
+for something to swim past. Nothing new is introduced — it is the same picture
+with something living in it.
+
+Each of these crosses the screen the way the visiting figure does: it comes on
+at one side, goes about its business, and leaves. The crossing itself is not
+drawn. Only the swimming is: the tail beating, the wings going. Where it is, how
+fast, and whether it is there at all comes from the record.
+
+```
+Grid: 8 columns by 4 rows. Each column is one creature seen from the side,
+swimming or flying on the spot, facing right. Four frames, CYCLED: frame 4 must
+lead back into frame 1 without a bump.
+
+The creature does not move within its cell between frames and does not change
+size. Only the part that beats — a tail, a fin, a wing — changes shape. Nothing
+is drawn moving forwards: the crossing happens elsewhere.
+
+1. Small fish.   Tail straight / tail bent one way / straight / bent the other.
+2. Large fish, a deep body and a wide tail.  Same four.
+3. Whale, long body, broad flat tail.        Same four, slower and wider.
+4. Dolphin, seen from the side.              Same four.
+5. Jellyfish, a bell and trailing threads.
+   Bell squeezed narrow, threads trailing / half open / wide open, threads
+   spread / half closed.
+6. Crab, seen from the front, legs either side and two claws.
+   Legs down, claws low / legs mid, one claw raised / legs up, both claws
+   raised / legs mid, the other claw raised.
+7. Seagull in flight, seen from the side.
+   Wings down / wings level rising / wings up / wings level falling.
+8. Butterfly, seen from the side.            Same four as the gull, sharper.
+```
+
+## Sheet 11 — above the line, and passing through
+
+The other half of the same world, and the visitors that are neither fish nor
+weather: things that walk across the floor the marks stand on, or fall through
+the air above them.
+
+```
+Grid: 8 columns by 4 rows. Each column is one subject seen from the side, facing
+right, moving on the spot. Four frames, CYCLED: frame 4 leads into frame 1.
+
+Nothing moves forwards within its cell and nothing changes size between frames.
+Only the legs, wings or wheels change.
+
+1. Cat walking, seen from the side, tail up.
+   Legs together / mid-step, tail curled left / legs apart / mid-step, tail
+   curled right.
+2. Mouse running, seen from the side.        Four frames of a fast run cycle.
+3. Snail, shell on its back, seen from the side.
+   Body stretched forward / gathered / stretched / gathered, the two feelers
+   swapping which is higher.
+4. Spider hanging from a single thread that rises out of the top of the cell.
+   Legs gathered / half spread / spread wide / half spread.
+5. Bicycle seen from the side, no rider.
+   The pedals and the spokes at four positions of one turn.
+6. Paper plane seen from the side.
+   Level / nose slightly up / level / nose slightly down.
+7. Balloon on a string, seen from the side.
+   Round / squeezed taller / round / squeezed wider, the string trailing after
+   it in each.
+8. Rocket seen from the side, nose up, flame beneath.
+   Flame short / medium / long / medium, with two sparks in the longest.
+```
+
 ## Ideas without a sheet yet
 
 Kept here so they are not lost, and because several of them need something in
 the code before a drawing would help.
+
+**What the sea is for.** The creatures on sheets 10 and 11 need a reason to
+arrive, and the reasons are already measured. A shoal whose number follows how
+busy the top of the spectrum is. A whale that only comes through after a long
+quiet stretch, and only once. Birds that cross at a join. A fish that jumps the
+row of marks on the loudest moment of a record. A snail on the slowest track
+this machine has measured, and a mouse on the fastest. A balloon that rises with
+the swell and is gone on the drop. None of it is drawn — it is where and when,
+which is code, and it is the part worth arguing about once the drawings exist.
 
 **The screen answering the person at it.** The figure blows a kiss when a key is
 pressed — the kiss is on sheet 4, the reason for it is not built. Waving as
