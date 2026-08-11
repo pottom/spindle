@@ -353,7 +353,7 @@ func lyricFade(t Theme, accent color.Color) []lipgloss.Style {
 const (
 	// barFreqSteps is how many hues the spectrum sweeps across its width, and
 	// barLevelSteps how many strengths it climbs through.
-	barFreqSteps  = 10
+	barFreqSteps  = 64
 	barLevelSteps = 6
 
 	// wordsHueArc is how far a lyric's colours travel. Much wider than the
