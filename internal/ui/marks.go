@@ -333,8 +333,18 @@ func (m Model) wordsTurning(count int) []bool {
 		return nil
 	}
 
-	age := max(time.Duration(m.wordsClock()-m.words.leanAt)*time.Millisecond, 0)
-	beats, ok := m.beatsIn(age)
+	// Counted from the record rather than from the row, which is the difference
+	// between a dance and a set of statues. The row is dealt again at every one
+	// of the record's own turns — see joins.go — and counted from there, a
+	// record with a lot of build in it puts everybody back on their starting
+	// side every time. Watched on Sandstorm against Cuban Pete: the first has a
+	// join every twenty seconds and the row barely moved, the second holds a
+	// stretch and it danced.
+	//
+	// What the deal still decides is who turns how often and which way up they
+	// start. That is dealt from the bar, so a new row is a new arrangement — it
+	// is only the counting that runs on.
+	beats, ok := m.beatsIn(m.elapsed())
 	if !ok {
 		return nil
 	}
