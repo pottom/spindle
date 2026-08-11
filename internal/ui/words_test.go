@@ -190,16 +190,21 @@ func TestWordsGatherEveryWay(t *testing.T) {
 	t.Logf("all %d arrivals look different halfway through, and land in the same place", wordsPopping)
 }
 
-// Which move a line gets is worked out from the line, so it is the same every
-// time that line comes round — and different lines get different ones.
+// Which move a line gets is worked out from the line, from when it is sung, and
+// from the one before it — so a record plays the same way twice, and no two
+// arrivals in a row are the same.
 //
-// Measured over thirty real sheets, half of what this screen shows is a line
-// that has been sung before: 44% of lines at the median and 85% at the top of
-// the range. So this is not a nicety about hashing — it is what makes a chorus
-// come back the way it went, which is most of what the screen does with a song
-// that has one.
+// It used to come from the line alone, so a chorus came back exactly as it went.
+// That is worth wanting — measured over thirty real sheets, half of what this
+// screen shows is a line that has been sung before, 44% at the median and 85% at
+// the top of the range — and it is not what happens: three arrivals dealt freely
+// out of eight ways collide better than a third of the time, and a line coming
+// in exactly as the last one did reads as a mistake rather than as a refrain.
+// Measured on a chorus that comes round three times, two of the three drew the
+// same way. So the one promise this deal makes is the one it can keep: never
+// twice in a row.
 func TestWordsMoveComesFromTheLine(t *testing.T) {
-	if a, b := wordsMoveFor("better off alone", 1000), wordsMoveFor("better off alone", 1000); a != b {
+	if a, b := wordsMoveFor("better off alone", 1000, 0), wordsMoveFor("better off alone", 1000, 0); a != b {
 		t.Errorf("the same line got moves %d and %d", a, b)
 	}
 
@@ -220,7 +225,7 @@ func TestWordsMoveComesFromTheLine(t *testing.T) {
 		"Is this the real life",
 		"Sultans of swing",
 	} {
-		seen[wordsMoveFor(line, 0)] = true
+		seen[wordsMoveFor(line, 0, 0)] = true
 	}
 	t.Logf("eight lines used %d of the %d moves", len(seen), wordsMoves)
 	if len(seen) < 3 {

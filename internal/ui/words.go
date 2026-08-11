@@ -611,7 +611,8 @@ const (
 	wordsMoves
 )
 
-// wordsMoveFor picks one from the line and from when it is sung.
+// wordsMoveFor picks one from the line, from when it is sung, and never the one
+// before it.
 //
 // From the text alone it was the same move every time the words were, and a
 // chorus is the same words three times in four minutes: watched on Ocho Macho's
@@ -623,7 +624,7 @@ const (
 //
 // Popping is not among them: it is a way of leaving, and a line that arrived by
 // un-bursting would be a film run backwards.
-func wordsMoveFor(text string, starts int64) wordsMove {
+func wordsMoveFor(text string, starts int64, was wordsMove) wordsMove {
 	var h uint32 = 2166136261
 	for _, r := range text {
 		h = (h ^ uint32(r)) * 16777619
@@ -637,7 +638,15 @@ func wordsMoveFor(text string, starts int64) wordsMove {
 	x ^= x >> 33
 	x *= 0xff51afd7ed558ccd
 	x ^= x >> 29
-	return wordsMove(x % uint64(wordsPopping))
+
+	// One of the seven that is not the one just used, rather than one of the
+	// eight. Dealt freely, three arrivals out of eight ways collide better than
+	// a third of the time — measured on a chorus that comes round three times,
+	// where two of the three drew the same way and looked it. A line coming in
+	// exactly as the last one did is the one thing that reads as a mistake, and
+	// it is also the only thing this deal can promise not to do.
+	step := x % uint64(wordsPopping-1)
+	return wordsMove((uint64(was) + 1 + step) % uint64(wordsPopping))
 }
 
 // wordsState is the picture the words are drawn from, and how far it has
@@ -755,7 +764,7 @@ const (
 	// wordsGather is how long the dots take to come together. A lyric line
 	// stands for two or three seconds, so anything slower would leave the
 	// picture permanently half made.
-	wordsGather = 650 * time.Millisecond
+	wordsGather = 420 * time.Millisecond
 
 	// wordsScatter is how far a dot starts from where it belongs, in dot rows
 	// and columns.
@@ -1591,7 +1600,7 @@ func (m *Model) wordsAdopt(grain cover.Grain, where msg.WordLayout, text string)
 	}
 
 	m.words.have, m.words.text = grain, text
-	m.words.move = wordsMoveFor(text, m.words.starts)
+	m.words.move = wordsMoveFor(text, m.words.starts, m.words.move)
 
 	if m.words.telling {
 		// The one picture that is not dealt its arrival: the record's name comes
