@@ -36,12 +36,11 @@ const (
 	// volumeInset is how far in from the left edge the column stands, in dot
 	// columns.
 	//
-	// Six, which is three cells in. The outermost dots are the record's own
-	// progress and the head running round them passes down this very side; a
-	// second reading beside it would be read as part of it, and the head would
-	// look like it had grown a tail it does not have. Three cells is far enough
-	// that there is plain dark between them at any font.
-	volumeInset = 6
+	// Four, which is two cells in: one clear cell of dark between the lamps and
+	// the outermost dots, which are the record's own progress. Touching them the
+	// head would look like it had grown a tail it does not have; a cell apart it
+	// plainly has not.
+	volumeInset = 4
 
 	// volumeWide is how many dots across a lamp is, and volumeTall how many
 	// down. A lamp has to be a block rather than a dot or the column reads as a
@@ -238,16 +237,19 @@ func (m Model) volumeDraw(w, rows int, grid []uint8, paint, hue []int8, levels, 
 		}
 	}
 
-	// A lamp's colour climbs with where it stands, the way the segmented meter's
-	// does: the eye reads how high the stack has got from the colour it has got
-	// to, without counting anything.
-	lamp := func(x, y float32, i, of int, bright float32) {
-		if of <= 0 {
-			return
-		}
-		up := float64(i) / float64(of)
+	// The record's own colour, all the way up.
+	//
+	// It climbed with the height first, the way the segmented meter's does, and
+	// that is the meter's answer to a different question: there the colour is
+	// the reading, because a lamp on its own has to say how high the stack has
+	// got. Here the stack is right there to be looked at, so the colour saying
+	// it again is one question with two movements. What it says instead is whose
+	// screen this is — the middle of the palette, which is the artwork's own
+	// accent.
+	accent := (freqs - 1) / 2
+	lamp := func(x, y float32, bright float32) {
 		step := int8(min(int((0.55+0.45*float64(bright))*float64(levels-1)), levels-1))
-		band := int(up * float64(freqs-1))
+		band := accent
 		for dy := range volumeTall {
 			for dx := range volumeWide {
 				light(int(x)+dx, int(y)+dy, step, band)
@@ -259,10 +261,10 @@ func (m Model) volumeDraw(w, rows int, grid []uint8, paint, hue []int8, levels, 
 		floor := m.volumeFoot(rows)
 		pitch := volumePitch(dotsY)
 		for i := range lit {
-			lamp(volumeInset, float32(floor-i*pitch), i, lit, 1)
+			lamp(volumeInset, float32(floor-i*pitch), 1)
 		}
 	}
 	for _, l := range m.volume.falling {
-		lamp(l.x, l.y, int(l.step), max(m.volumeLit(), int(l.step)+1), l.bright)
+		lamp(l.x, l.y, l.bright)
 	}
 }
