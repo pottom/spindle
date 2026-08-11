@@ -70,6 +70,16 @@ const (
 
 	// wordsLead is the line spacing, as a share of the size of the type.
 	wordsLead = 1.35
+
+	// wordsOver is how many times over each dot is drawn before it is decided,
+	// and wordsCover how much of a dot the type has to cover to light it.
+	//
+	// Three, and a third. Drawn straight onto the dot grid a stem about one dot
+	// wide is a coin toss per dot, so the letters came out dotted with stripes
+	// through them — and which dots went missing changed with every step of the
+	// terminal's font size, which is how it was noticed.
+	wordsOver  = 3
+	wordsCover = 128
 )
 
 // wordsImage draws the lines, white on black, filling w by h dots as far as the
@@ -100,20 +110,27 @@ func wordsImage(lines []string, w, h int) (*image.Gray, msg.WordLayout, bool) {
 	}
 
 	face, err := opentype.NewFace(wordsFont, &opentype.FaceOptions{
-		Size: float64(size), DPI: 72, Hinting: font.HintingFull,
+		Size: float64(size * wordsOver), DPI: 72, Hinting: font.HintingNone,
 	})
 	if err != nil {
 		return nil, msg.WordLayout{}, false
 	}
 	defer face.Close() //nolint:errcheck // nothing to do about a face that will not close
 
-	img := image.NewGray(image.Rect(0, 0, w, h))
-	d := &font.Drawer{Dst: img, Src: image.NewUniform(color.Gray{Y: 255}), Face: face}
+	// Set larger than the dots it will be shown in, and brought down by
+	// coverage. Drawn straight onto the dot grid, a stem about one dot wide is
+	// a coin toss per dot — over the threshold here, under it there — and the
+	// letters come out as a dotted texture with stripes through them, which
+	// changes every time the terminal's font size does. Averaged from a larger
+	// drawing, the same stem is a decision made once and made the same all the
+	// way along it.
+	big := image.NewGray(image.Rect(0, 0, w*wordsOver, h*wordsOver))
+	d := &font.Drawer{Dst: big, Src: image.NewUniform(color.Gray{Y: 255}), Face: face}
 
 	metrics := face.Metrics()
-	lead := int(float64(size) * wordsLead)
+	lead := int(float64(size*wordsOver) * wordsLead)
 	block := lead * (len(lines) - 1)
-	top := (h-block)/2 + metrics.Ascent.Round()/2
+	top := (h*wordsOver-block)/2 + metrics.Ascent.Round()/2
 
 	// Where every word lands is worked out here rather than afterwards: this is
 	// the only place the widths are known, because a proportional face gives no
@@ -125,7 +142,7 @@ func wordsImage(lines []string, w, h int) (*image.Gray, msg.WordLayout, bool) {
 
 	for i, line := range lines {
 		width := d.MeasureString(line).Round()
-		left := (w - width) / 2
+		left := (w*wordsOver - width) / 2
 		baseline := top + i*lead
 
 		d.Dot = fixed.P(left, baseline)
@@ -134,20 +151,40 @@ func wordsImage(lines []string, w, h int) (*image.Gray, msg.WordLayout, bool) {
 		// The line of type covers from the top of its tallest letter to the
 		// bottom of its lowest, with a little either side so that a dot on the
 		// edge of a stroke still counts as part of the word it belongs to.
-		layout.Tops = append(layout.Tops, max(baseline-metrics.Ascent.Round(), 0))
-		layout.Bottoms = append(layout.Bottoms, min(baseline+metrics.Descent.Round(), h-1))
+		layout.Tops = append(layout.Tops, max((baseline-metrics.Ascent.Round())/wordsOver, 0))
+		layout.Bottoms = append(layout.Bottoms, min((baseline+metrics.Descent.Round())/wordsOver, h-1))
 
 		// Measured as prefixes of the line rather than piece by piece, so that
 		// where a piece is taken to be is where the drawer actually put it: a
 		// face kerns its pairs, and a run of widths added up separately walks
 		// away from the line under it.
 		for _, piece := range wordsPieces(line) {
-			from := left + d.MeasureString(line[:piece.from]).Round()
-			to := left + d.MeasureString(line[:piece.to]).Round()
+			from := (left + d.MeasureString(line[:piece.from]).Round()) / wordsOver
+			to := (left + d.MeasureString(line[:piece.to]).Round()) / wordsOver
 			for x := max(from, 0); x < to && x < w; x++ {
 				layout.At[i*w+x] = int16(layout.Count)
 			}
 			layout.Count++
+		}
+	}
+
+	// Down to the dots, by how much of each one the type covers. The threshold
+	// is well under half on purpose: a stem of this face comes out around a dot
+	// wide at the sizes a lyric is set at, so asking for half of a dot would
+	// throw away every stroke that happens to straddle two of them — which is
+	// the dotted, striped look this replaces.
+	img := image.NewGray(image.Rect(0, 0, w, h))
+	for y := range h {
+		for x := range w {
+			var sum int
+			for dy := range wordsOver {
+				for dx := range wordsOver {
+					sum += int(big.GrayAt(x*wordsOver+dx, y*wordsOver+dy).Y)
+				}
+			}
+			if sum/(wordsOver*wordsOver) >= wordsCover {
+				img.SetGray(x, y, color.Gray{Y: 255})
+			}
 		}
 	}
 	return img, layout, true
