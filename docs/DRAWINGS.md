@@ -71,43 +71,97 @@ thing moving.
 
 ## The style block
 
-Paste this above every sheet, unchanged.
+Paste this above every sheet, unchanged. The three rules in capitals are the
+ones that were broken the first time this was asked, and each of them makes the
+sheet unusable rather than imperfect.
 
 ```
-STYLE, applying to everything on the sheet
+RETURN ONE SHEET ONLY. Draw exactly the one sheet described below. Do not add
+other sheets, do not combine several sheets into one image, do not include
+extra rows of subjects that were not asked for. One sheet, one image.
+
+NO TEXT ANYWHERE ON THE IMAGE. No titles, no headings, no captions, no column
+names, no row labels, no numbering of the frames, no legend, no signature, no
+watermark. Not one letter and not one digit anywhere on the sheet, including
+the margins. Every mark on the image is part of a drawing.
+
+AN ANIMATION IS A MOVING PART, NOT MOTION LINES. Between two frames, some part
+of the subject must actually change position or shape: a beater falls, a mouth
+opens, cymbals part, a tail bends, legs pass each other. Drawing the subject
+unchanged and adding short radiating lines around it is NOT an animation and
+will be rejected. Short decorative lines are too fine to survive at all: they
+disappear when the drawing is reduced. If a subject cannot be animated by
+moving one of its own parts, choose a different pose for it, but never fall
+back on motion lines.
+
+STYLE
 - Pure black background (#000000). All drawing in pure white (#FFFFFF).
 - No grey, no fills, no shading, no gradients, no glow, no colour.
 - Outline strokes ONLY. Nothing is filled in. No solid shapes, no silhouettes.
-- ONE constant stroke weight everywhere, about 3% of a cell's height, with
-  rounded caps and rounded joins.
-- Simple enough to survive being shrunk to a 24 by 24 grid of dots: no fine
-  detail, no hatching, no small features, no textures, no thin decorations.
-- No text, letters, numbers, labels, captions or watermarks anywhere.
-- No boxes, frames, grid lines, separators, drop shadows or ground shadows.
-- Flat and front-on. No perspective, no 3/4 view, no depth.
-- Draw each subject large, filling its own cell.
-- Return ONE image, at the largest resolution available, at least 250 pixels
-  per cell.
+- ONE constant stroke weight everywhere, rounded caps and rounded joins.
+- Simple enough to survive being reduced to a 24 by 24 grid of dots: no fine
+  detail, no hatching, no small features, no textures, no thin decoration.
+  Any feature smaller than a tenth of the subject's height will be lost.
+- Flat and front-on. No perspective, no 3/4 view, no depth, no shadows.
 
-LAYOUT, applying to everything on the sheet
+SIZE
+- Return ONE image at the largest resolution available, and no smaller than
+  2000 pixels on its long side.
+- Each subject is drawn LARGE: it fills at least three quarters of the height
+  of its own cell. A sheet where the drawings are small in the middle of empty
+  cells is a sheet that cannot be used.
+
+LAYOUT
 - An invisible grid, evenly spaced, with a wide empty margin around the sheet
-  and clear empty space between every cell.
+  and clear empty black space between every cell.
 - NOTHING MAY OVERLAP OR TOUCH ANYTHING ELSE. Every drawing stays entirely
-  inside its own cell with clear black space all around it. No drawing crosses
-  into a neighbouring cell, no two drawings share a line, no element is common
-  to two cells, no ground line or horizon runs across the sheet, no subject is
-  cropped by the edge of the sheet, and no line of one drawing crosses a line of
-  another. Each cell must be liftable out of the sheet as a plain rectangle with
-  one complete drawing in it and nothing else.
-- Where a column is one subject and the rows are its animation frames, the
-  frames are the SAME drawing at the SAME size in the SAME position within the
-  cell, with ONLY the moving part changed. Everything else must be identical.
+  inside its own cell. No drawing crosses into a neighbouring cell, no subject
+  spans two cells or two rows, no two drawings share a line, no ground line or
+  horizon runs across the sheet, nothing is cropped by the edge of the sheet.
+  Each cell must be liftable out of the sheet as a plain rectangle containing
+  one complete drawing and nothing else.
+- A column is one subject and the rows under it are that subject's animation
+  frames: the SAME drawing at the SAME size in the SAME position within its
+  cell, with ONLY the moving part changed. Nothing that is not moving may shift
+  by even a little between frames.
 - Every subject on the sheet is drawn by one hand, sharing one build and one
   pen, like a single icon family.
 
 Style reference: clean pictogram line icons, the weight and simplicity of
 Tabler Icons.
 ```
+
+## What the first sheet taught
+
+Asked once, without the three rules above, and this is what came back — worth
+recording, because every one of these is a thing an image generator does by
+default rather than a mistake it happened to make.
+
+**It bundled five sheets into one image.** 1543 by 1019 pixels for all of them,
+which left each drawing about 60 pixels tall where 250 was asked for. Everything
+else follows from that: at 60 pixels the pen is two pixels wide and there is no
+detail left to lose.
+
+**It labelled everything.** A title over each sheet, a name over each column,
+and the frame numbers down the side. All of it is ink, and ink is a drawing.
+
+**It animated with motion lines.** Frame 1 the subject at rest, frame 2 the same
+subject with short lines radiating from it, frame 3 the same subject with more
+of them. Nothing moved in eleven of the sixteen columns. Those lines are exactly
+the detail that vanishes when a drawing is reduced to 24 dots, so those columns
+would bake into three identical marks.
+
+**It let a figure span three rows.** The dancers came back as one tall figure per
+column crossing all three frame rows, so there were sixteen poses and no
+animation at all.
+
+**And it improved on what was asked.** The instruments came back as a drum kit
+spread across the row — kick, snare, clap, closed hi-hat, open hi-hat, rim, tom,
+cymbal — instead of the mixed band that was asked for, and that is the better
+row: it is the spectrum from low to high without anybody having to be told, and
+the open and closed hi-hat as neighbours is a gift. It also invented a weather
+sheet that nobody asked for, which is the best answer yet to the loudness. Both
+are kept below. A brief is a floor, not a ceiling.
 
 ## Frames, and how they play
 
@@ -171,40 +225,44 @@ Two things about the frames themselves, whatever the count:
   between the next two. Three frames where the first two are nearly identical
   and the third leaps is a stutter, not an animation.
 
-## Sheet 1 — instruments, animated
+## Sheet 1 — the kit, animated
 
-The row that has the clearest reason to exist: each mark already rides its own
-band, so a kick at the left kicks on the kick and a hi-hat at the right opens on
-the cymbals. Replaces a set assembled out of an icon library.
+The row that has the clearest reason to exist: every mark rides its own slice of
+the spectrum, so a kick at the left kicks on the kick and a cymbal at the right
+rings on the cymbals. A drum kit spread across the row is that order without
+anybody being told it — this is the set the first attempt invented, kept, with
+every column now moving a part of itself instead of growing motion lines.
 
 ```
-Grid: 8 columns by 3 rows. Each column is one instrument, the three rows are
-three frames of it. Every instrument here is STRUCK or SWUNG: it returns to
-where it started, so three frames is the whole animation.
+Grid: 8 columns by 3 rows. Each column is one drum or one pair of hands, the
+three rows are three frames of it. All eight are STRUCK: they return to where
+they started, so three frames is the whole animation.
 
-1. Kick drum with pedal and beater, seen from the front.
-   Beater pulled back / beater against the drum head / beater on the head with
-   two short curved motion lines beside the drum.
-2. Bass guitar standing upright, thick strings.
-   Plucking hand open above the strings / hand touching the strings / hand
-   below, with one string drawn as a shallow wave.
-3. Electric guitar standing upright.
-   Pick held above the strings / pick crossing the strings / pick below, with
-   the strings drawn as shallow waves.
-4. A short run of piano keys seen from the front, with a hand above them.
-   All keys level / one key pressed down / two keys pressed down with two short
-   straight lines rising above them.
-5. Microphone on a short stand.
-   Bare / one curved arc leaving one side / two curved arcs leaving one side.
-6. Two hands clapping, seen from the front.
-   Hands apart / hands touching / hands touching with four short straight lines
-   radiating outward.
-7. A shaker: a closed cylinder with a handle.
-   Upright / tilted to the right with two short motion lines / tilted to the
-   left with two short motion lines.
-8. Hi-hat cymbals on a stand, seen from the side.
-   The two cymbals closed / a small gap between them / a wide gap with two
-   short curved motion lines.
+Every column must move a part. In each of the eight, name the part that moves:
+
+1. Kick drum, seen from the front, with its pedal and beater to one side.
+   Beater standing up, away from the head / beater halfway down /
+   beater flat against the head, the head bowed slightly inwards.
+2. Snare drum, seen from the side, with one stick above it.
+   Stick raised well above the drum / stick halfway down /
+   stick touching the head, the head bowed slightly downwards.
+3. Two hands clapping, seen from the front, fingers up.
+   Hands well apart / hands nearly touching / hands flat together as one shape.
+4. Hi-hat cymbals on a stand, seen from the side, with the pedal at the bottom.
+   Cymbals together and the pedal down / cymbals apart by a little, pedal
+   halfway / cymbals wide apart and the pedal up.
+5. Open hi-hat, the two cymbals already apart, with a stick above the top one.
+   Stick raised / stick halfway down / stick on the top cymbal, which is tilted
+   by the blow.
+6. Rim shot: a shallow drum seen from above as an ellipse, one stick lying
+   across the rim.
+   Stick raised above the rim / stick halfway / stick across the rim, the
+   ellipse pushed slightly out of round by the blow.
+7. Floor tom, seen from the side on its legs, with one stick above.
+   Stick raised / stick halfway / stick on the head, the head bowed downwards.
+8. Ride cymbal on a stand, seen from the side, with one stick above it.
+   Stick raised, cymbal flat / stick on the cymbal, cymbal tilted one way /
+   stick lifting away, cymbal tilted the other way.
 ```
 
 ## Sheet 2 — the animal choir
@@ -306,8 +364,12 @@ Ask for the same eight poses, and say so: this is a redraw of an existing set,
 not a new cast.
 
 ```
-Grid: 8 columns by 4 rows. Each column is one dancing figure, the four rows are
-four frames. CYCLED: frame 4 must lead back into frame 1 without a bump, so a
+Grid: 8 columns by 4 rows, so 32 separate drawings. Each cell holds one whole
+figure, head to feet, inside that cell alone: no figure is drawn tall enough to
+cross into the row above or below it. Asked without this, the figures came back
+one per column spanning all three rows, which is sixteen poses and no animation.
+
+Each column is one dancing figure, the four rows are four frames. CYCLED: frame 4 must lead back into frame 1 without a bump, so a
 figure that leans left through the four frames has to be on its way back by the
 fourth. Where a pose is named with three positions below, the fourth frame is
 the second one again on the way back.
@@ -524,6 +586,44 @@ Only the legs, wings or wheels change.
    it in each.
 8. Rocket seen from the side, nose up, flame beneath.
    Flame short / medium / long / medium, with two sparks in the longest.
+```
+
+## Sheet 12 — the weather
+
+Invented by the generator rather than asked for, and the best answer yet to the
+one measurement that has nothing drawn from it: how loud the record is against
+its own recent range. A row of weather is a row that says quiet and loud without
+a number — drizzle in the verse, downpour in the chorus.
+
+```
+Grid: 8 columns by 3 rows. Each column is one kind of weather, the three rows
+are three frames of it: least, middle, most. STRUCK — it returns to the least.
+
+Between frames the drawing itself must change, not just gain decoration: more
+drops, longer rays, a taller cloud, a longer bolt. Nothing here is a subject
+sitting still with lines added around it.
+
+1. Sun with straight rays around it.
+   Short rays / longer rays / longest rays, and the disc a little larger.
+2. Cloud alone.
+   One small cloud / the same cloud taller / two clouds overlapping into one
+   larger shape.
+3. Rain: a cloud with drops beneath it.
+   Three short drops / six drops, longer / ten drops, longest, reaching the
+   bottom of the cell.
+4. Lightning: a cloud with a bolt beneath it.
+   A short bolt with two turns / a longer bolt with three turns / a long bolt
+   with three turns and a second, shorter bolt beside it.
+5. Snow: a cloud with flakes beneath it.
+   Three flakes / six flakes / ten flakes, the lowest ones larger.
+6. Wind: three horizontal curling lines.
+   Three short lines, gently curled / three longer lines, more curled / four
+   long lines with tighter curls at their ends.
+7. Rainbow: concentric arcs rising from a flat base.
+   Two arcs, low / three arcs, higher / four arcs, a full half circle.
+8. Fog: horizontal broken lines stacked up the cell.
+   Three lines, short / five lines, longer / seven lines filling the cell, the
+   breaks in different places.
 ```
 
 ## Ideas without a sheet yet
