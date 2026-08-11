@@ -227,9 +227,10 @@ func pauseBeforeLeaving(p player.Player) {
 // openBackend picks between the offline mock, the local daemon and the bare
 // Web API.
 //
-// The daemon is started if it is not already up. Failing to start one is not
-// fatal: everything except queue editing and instant updates works without it,
-// and refusing to run would be a worse answer than saying so.
+// The daemon is started if it is not already up, and not waited for. Failing to
+// start one is not fatal: everything except queue editing and instant updates
+// works without it, and refusing to run would be a worse answer than saying so.
+// Nor is being slow to come up — see daemon.Spawn.
 func openBackend(ctx context.Context, mock bool) (player.Player, error) {
 	if mock {
 		return player.NewMock(), nil
@@ -241,11 +242,9 @@ func openBackend(ctx context.Context, mock bool) (player.Player, error) {
 	}
 	web := player.NewSpotify(session.Client(ctx))
 
-	if !daemon.Running() {
-		if err := detachDaemon(); err != nil {
-			fmt.Fprintln(os.Stderr, "spindle: no local playback device:", err)
-			return web, nil
-		}
+	if _, _, err := daemon.Spawn(); err != nil {
+		fmt.Fprintln(os.Stderr, "spindle: no local playback device:", err)
+		return web, nil
 	}
 
 	local := player.NewLocal(web, daemon.Addr(), nil)

@@ -25,19 +25,45 @@ import (
 // The path of the log it writes to comes back either way, because that is where
 // a failure will have gone.
 func Start(ctx context.Context) (logPath string, err error) {
+	logPath, started, err := Spawn()
+	if err != nil || !started {
+		return logPath, err
+	}
+
+	if err := WaitReady(ctx); err != nil {
+		return logPath, fmt.Errorf("%w (see %s)", err, logPath)
+	}
+	return logPath, nil
+}
+
+// Spawn launches a detached daemon and comes straight back, saying whether it
+// launched one at all — false means one was already answering.
+//
+// Waiting is separate from launching because the interface must not wait. The
+// daemon's API only answers once it has reached Spotify's access point, and
+// that is not always quick: after the machine has been asleep the name lookups
+// fail for a while and the login retries, which was measured taking the whole
+// of the twenty seconds WaitReady allows. All of that happened before Bubble
+// Tea took the terminal, so what the listener saw was a shell prompt and
+// nothing else — the interface had not started, and nothing said why.
+//
+// It does not need to wait. The screen draws from whatever the Web API says
+// until the device is there, and the local player reconnects on its own, so the
+// daemon arriving late costs nothing but the moment it takes to arrive.
+func Spawn() (logPath string, started bool, err error) {
 	logPath, log, err := openLog()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	defer log.Close() //nolint:errcheck // the child holds its own handle
 
 	if Running() {
-		return logPath, nil
+		return logPath, false, nil
 	}
 
 	self, err := os.Executable()
 	if err != nil {
-		return logPath, fmt.Errorf("locate spindle: %w", err)
+		return logPath, false, fmt.Errorf("locate spindle: %w", err)
 	}
 
 	cmd := exec.Command(self, "daemon", "--foreground")
@@ -47,18 +73,14 @@ func Start(ctx context.Context) (logPath string, err error) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
 	if err := cmd.Start(); err != nil {
-		return logPath, fmt.Errorf("start daemon: %w", err)
+		return logPath, false, fmt.Errorf("start daemon: %w", err)
 	}
 	// Nothing waits for it, so let the process table reap it rather than
 	// leaving a zombie parented to a shell that has moved on.
 	if err := cmd.Process.Release(); err != nil {
-		return logPath, fmt.Errorf("release daemon: %w", err)
+		return logPath, true, fmt.Errorf("release daemon: %w", err)
 	}
-
-	if err := WaitReady(ctx); err != nil {
-		return logPath, fmt.Errorf("%w (see %s)", err, logPath)
-	}
-	return logPath, nil
+	return logPath, true, nil
 }
 
 // Restart stops the daemon and starts it again, which is what a setting the
