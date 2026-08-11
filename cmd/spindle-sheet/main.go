@@ -138,14 +138,44 @@ func main() {
 		fmt.Println("!! the grid did not come out as asked")
 	}
 
+	// Whose is what, decided once over the whole sheet rather than cell by cell.
+	//
+	// A drawing near a cut is the question this tool exists to get right, and it
+	// cannot be answered inside one cell: a hand beside the line looks the same
+	// whether it is this character reaching out or the next one reaching in.
+	// Followed across the sheet it is never in doubt — the hand is joined to a
+	// body, and the body is in one cell or the other. So every run of connected
+	// ink is found once, and it goes to whichever cell holds most of it.
+	//
+	// Parts that are drawn loose — eyes, a mouth, the bars of an equaliser — go
+	// by the same rule and land where they were drawn, because they are nowhere
+	// near a cut.
+	owner := blobs(ink, w, h)
+
+	os.MkdirAll(want, 0o755)
 	os.MkdirAll(want, 0o755)
 	for c := 0; c+1 < len(xs); c++ {
 		for r := 0; r+1 < len(ys); r++ {
 			x0, x1, y0, y1 := xs[c], xs[c+1], ys[r], ys[r+1]
-			l, t, rr, bb := x1, y1, x0-1, y0-1
-			for y := y0; y < y1; y++ {
-				for x := x0; x < x1; x++ {
-					if ink(x, y) {
+
+			// The whole cut region, not the ink in it. What is thrown out next
+			// is whatever runs into the cut line, and in a picture already
+			// cropped to its ink everything runs into an edge — the leftmost
+			// stroke of every drawing touches the left of its own box. Cropping
+			// is ownOnly's last act instead.
+			mine := func(x, y int) bool {
+				if !ink(x, y) {
+					return false
+				}
+				id := owner.at[y*w+x]
+				return owner.cx[id] >= x0 && owner.cx[id] < x1 &&
+					owner.cy[id] >= y0 && owner.cy[id] < y1
+			}
+
+			l, t, rr, bb := w, h, -1, -1
+			for y := range h {
+				for x := range w {
+					if mine(x, y) {
 						l, t = min(l, x), min(t, y)
 						rr, bb = max(rr, x), max(bb, y)
 					}
@@ -155,76 +185,62 @@ func main() {
 				fmt.Printf("  col %d frame %d: EMPTY\n", c+1, r+1)
 				continue
 			}
-			cell := image.NewGray(image.Rect(0, 0, rr-l+1, bb-t+1))
+			out := image.NewGray(image.Rect(0, 0, rr-l+1, bb-t+1))
+			var on int
 			for y := t; y <= bb; y++ {
 				for x := l; x <= rr; x++ {
-					if ink(x, y) {
-						cell.SetGray(x-l, y-t, color.Gray{Y: 255})
+					if mine(x, y) {
+						out.SetGray(x-l, y-t, color.Gray{Y: 255})
+						on++
 					}
 				}
 			}
-			out, on := ownOnly(cell)
 			name := filepath.Join(want, fmt.Sprintf("c%d-f%d.png", c+1, r+1))
 			g, _ := os.Create(name)
 			png.Encode(g, out)
 			g.Close()
+			b := out.Bounds()
 			fmt.Printf("  col %d frame %d: %dx%d px, ink %.1f%%\n",
-				c+1, r+1, rr-l+1, bb-t+1, float64(on)/float64((rr-l+1)*(bb-t+1))*100)
+				c+1, r+1, b.Dx(), b.Dy(), float64(on)/float64(max(b.Dx()*b.Dy(), 1))*100)
 		}
 	}
 }
 
-// ownOnly throws away whatever leant in from next door, and crops to what is
-// left.
-//
-// A cut that avoids taking anybody's arm off has to fall in the emptiest column
-// rather than an empty one, and where two figures reach across the gap that
-// column still has something in it — so a fingertip or a shoe belonging to the
-// neighbour comes with the cell. It is always small and it always touches the
-// side it came in from, which is what tells it apart from a face's eyes or an
-// equaliser's bars: those are small too, but they sit inside.
-//
-// One in twenty of the cell's ink is the line. Measured across the sheets here,
-// a leant-in fingertip is under a fiftieth and the smallest thing anybody owns
-// separately — an eye — is a twentieth and nowhere near an edge.
-func ownOnly(pic *image.Gray) (*image.Gray, int) {
-	b := pic.Bounds()
-	w, h := b.Dx(), b.Dy()
-	lit := func(x, y int) bool {
-		return x >= 0 && y >= 0 && x < w && y < h && pic.GrayAt(x, y).Y > 128
-	}
+// held is every run of connected ink on the sheet, and where each one's weight
+// lies: cx and cy are the middle of a blob by its own pixels, so a hand joined
+// to a body is placed by the body rather than by itself.
+type held struct {
+	at     []int
+	cx, cy []int
+}
 
-	// Every blob, by flood fill, with where it reaches.
-	blob := make([]int, w*h)
-	for i := range blob {
-		blob[i] = -1
+func blobs(ink func(int, int) bool, w, h int) held {
+	out := held{at: make([]int, w*h)}
+	for i := range out.at {
+		out.at[i] = -1
 	}
-	var size []int
-	var atSide []bool
-	var total int
+	var sumX, sumY, n []int
 	for y := range h {
 		for x := range w {
-			if !lit(x, y) || blob[y*w+x] >= 0 {
+			if !ink(x, y) || out.at[y*w+x] >= 0 {
 				continue
 			}
-			id := len(size)
-			size = append(size, 0)
-			atSide = append(atSide, false)
+			id := len(n)
+			sumX, sumY, n = append(sumX, 0), append(sumY, 0), append(n, 0)
 			stack := [][2]int{{x, y}}
-			blob[y*w+x] = id
+			out.at[y*w+x] = id
 			for len(stack) > 0 {
 				p := stack[len(stack)-1]
 				stack = stack[:len(stack)-1]
-				size[id]++
-				total++
-				if p[0] == 0 || p[0] == w-1 {
-					atSide[id] = true
-				}
+				sumX[id], sumY[id], n[id] = sumX[id]+p[0], sumY[id]+p[1], n[id]+1
 				for dy := -1; dy <= 1; dy++ {
 					for dx := -1; dx <= 1; dx++ {
 						nx, ny := p[0]+dx, p[1]+dy
-						if lit(nx, ny) && blob[ny*w+nx] < 0 {
-							blob[ny*w+nx] = id
+						if nx < 0 || ny < 0 || nx >= w || ny >= h {
+							continue
+						}
+						if ink(nx, ny) && out.at[ny*w+nx] < 0 {
+							out.at[ny*w+nx] = id
 							stack = append(stack, [2]int{nx, ny})
 						}
 					}
@@ -232,36 +248,11 @@ func ownOnly(pic *image.Gray) (*image.Gray, int) {
 			}
 		}
 	}
-
-	keep := make([]bool, len(size))
-	for i := range size {
-		keep[i] = !atSide[i] || size[i]*20 >= total
+	out.cx, out.cy = make([]int, len(n)), make([]int, len(n))
+	for i := range n {
+		out.cx[i], out.cy[i] = sumX[i]/n[i], sumY[i]/n[i]
 	}
-
-	// What is left, cropped to itself.
-	l, t, r, bt := w, h, -1, -1
-	for y := range h {
-		for x := range w {
-			if id := blob[y*w+x]; id >= 0 && keep[id] {
-				l, t = min(l, x), min(t, y)
-				r, bt = max(r, x), max(bt, y)
-			}
-		}
-	}
-	if r < l {
-		return pic, 0
-	}
-	out := image.NewGray(image.Rect(0, 0, r-l+1, bt-t+1))
-	var on int
-	for y := t; y <= bt; y++ {
-		for x := l; x <= r; x++ {
-			if id := blob[y*w+x]; id >= 0 && keep[id] {
-				out.SetGray(x-l, y-t, color.Gray{Y: 255})
-				on++
-			}
-		}
-	}
-	return out, on
+	return out
 }
 
 // splits picks the n widest gaps that have ink on both sides, and returns the
