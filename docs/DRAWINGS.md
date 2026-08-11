@@ -104,12 +104,19 @@ STYLE
   Any feature smaller than a tenth of the subject's height will be lost.
 - Flat and front-on. No perspective, no 3/4 view, no depth, no shadows.
 
-SIZE
-- Return ONE image at the largest resolution available, and no smaller than
-  2000 pixels on its long side.
+SIZE AND FILE
+- Return ONE image, PNG, at the largest resolution available and no smaller
+  than 2000 pixels on its long side. Not JPEG.
 - Each subject is drawn LARGE: it fills at least three quarters of the height
   of its own cell. A sheet where the drawings are small in the middle of empty
   cells is a sheet that cannot be used.
+- Every subject on the sheet is drawn at the same height as every other, even
+  where the real things differ in size. A whale and a mosquito are the same
+  height here.
+- Nothing on the sheet is smaller than a tenth of a subject's height, and no
+  enclosed shape is narrower than a fifth of it. Below those, a small circle
+  fills in solid and a short line disappears entirely when the drawing is
+  reduced.
 
 LAYOUT
 - An invisible grid, evenly spaced, with a wide empty margin around the sheet
@@ -125,7 +132,17 @@ LAYOUT
   cell, with ONLY the moving part changed. Nothing that is not moving may shift
   by even a little between frames.
 - Every subject on the sheet is drawn by one hand, sharing one build and one
-  pen, like a single icon family.
+  pen, like a single icon family. Where the subjects are creatures or figures
+  they share one build as well: the same proportions, the same simple body.
+- All the subjects stand on the same invisible line across the sheet, at the
+  same place within their cells, so that a row of them reads as standing on one
+  floor.
+- Everything faces the same way: to the right.
+- Keep the eight subjects to a similar amount of ink. One dense subject beside
+  seven sparse ones makes the row lopsided.
+- Keep each subject under about fifteen strokes.
+- Nothing depends on a face, on eyes, or on fingers to be recognised.
+- Read the frames downwards: the first frame is the top row.
 
 Style reference: clean pictogram line icons, the weight and simplicity of
 Tabler Icons.
@@ -166,64 +183,111 @@ are kept below. A brief is a floor, not a ceiling.
 ## Frames, and how they play
 
 A mark that animates is a set of drawings, and how many there are is decided by
-how the movement returns to where it started. Say which of these a subject is
-when asking for it, because it is what the number of cells means.
+two things: how the movement returns to where it started, and how many drawings
+a beat has room for.
 
-**Struck** — three frames: at rest, striking, ringing. A kick, a clap, a piano
-key, the woodpecker. Played 1, 2, 3, 2 and back to 1, with the strike landing on
-the beat rather than after it. Three drawings, four steps, and it always returns
-to rest, which is why three is enough.
+### How many a beat has room for
 
-**Swung** — three frames: one side, the middle, the other side. A metronome, a
-pendulum, a flag, a shaker. Played 1, 2, 3, 2 across two beats, so the swing is
-a bar rather than a twitch. Never draw the two ends as mirror images of each
-other by hand: draw one and say the other is its mirror, or the row will lean.
+The drawn frames advance on the beat, not on the frame rate — that is what makes
+them independent of the machine. What the frame rate decides is how many of them
+fit before one goes by unseen.
 
-**Cycled** — four frames, and it does not return: a walk, a run, wings beating,
-a disc turning. Played 1, 2, 3, 4, 1, and frame 4 has to lead back into frame 1
-or the loop has a bump in it. This is the one that needs more than three, and
-the one to ask for explicitly.
+A beat on the records this is watched against runs 470 to 710 milliseconds. The
+picture is drawn at 60 frames a second by default, so a beat is 28 to 43 drawn
+frames, and a listener may set it as low as 15. Put N drawings in a beat and each
+one is on screen for beat/N:
 
-**Once** — as many frames as the movement takes, played front to back and then
-stopped. Blowing a kiss, a curtain opening, a page turning, falling asleep. Six
-is comfortable; the movement is over when the frames are.
+	N       held for      seen at 60fps     seen at 30fps
+	3       160-240ms     10-14 frames      5-7 frames
+	4       120-180ms     7-11 frames       4-5 frames
+	6        80-120ms     5-7 frames        2-4 frames
+	8        60-90ms      4-5 frames        2-3 frames
+	12       40-60ms      2-4 frames        1-2 frames
 
-**Why three, in numbers.** The frames advance on the beat, and a beat on the
-records this is watched against runs 470 to 710 milliseconds. Three frames
-played out and back is four steps in that beat: 120 to 180 milliseconds a frame,
-which is six to eight drawings a second. Hand-drawn animation on twos is twelve.
-So three is plainly enough for a strike, where the whole point is that it is
-sudden and everything after it is a decay, and plainly thin for a walk, where
-the eye is following a limb from one place to another. Hence four for a cycle,
-and six if a walk still steps once it is baked.
+A drawing that is on screen for one rendered frame is a drawing that flickers
+rather than one that is seen. So: **eight is the ceiling at sixty, six at
+thirty**, and twelve is out of the question at any rate this runs at. Twelve is
+also where hand-drawn animation sits — "on twos" — which is worth knowing as the
+thing we cannot reach and are not trying to.
 
-None of this is the whole movement, either. The row leans, sways, rides and
-bounces in the code at the full frame rate, so what the drawn frames add is the
-shape changing, not the motion — which is why a strike gets away with three.
+The default is **four**. Three was the old default and it was chosen before the
+rate was: at sixty a beat has room for four comfortably, and the fourth is the
+one that turns a hit into a hit.
 
-The default is three. Where a sheet below wants four or six it says so, and the
-grid is that many rows or that many cells wide. Asking for more frames costs
-nothing in the code — a mark is about a kilobyte baked at all four sizes — and
-costs a great deal in the drawing, because every extra cell is another chance
-for the subject to drift. Get a set working at three or four first, then ask for
-more on that set alone, when its style is already known to bake well.
+### The four kinds
 
-**What not to draw at all.** The row already leans, sways, rides and bounces:
-those are transforms in the code, applied to whatever the mark is, and they take
-their timing from the beat. A subject drawn leaning gets the lean twice. So the
-frames are only ever the part that changes SHAPE — a mouth opening, a beater
-falling, cymbals parting, legs passing each other — and never the whole subject
-tilted, shifted, grown or moved across its cell.
+**Struck** — four frames: at rest, wound up, contact, recoiling. A kick, a clap,
+a piano key, a beak. The contact frame lands ON the beat and the wound-up frame
+is the one before it, so the movement anticipates the beat the way a drummer's
+arm does. Played 1, 2, 3, 4 and back to 1.
 
-Two things about the frames themselves, whatever the count:
+**Swung** — three frames: one side, the middle, the other side, played 1, 2, 3, 2
+across two beats so the swing is a bar rather than a twitch. Draw one side only
+and let the code mirror it — a hand-drawn pair of ends never matches, and the row
+leans for it.
 
-- They are the same drawing with one part moved. Not the same subject drawn
-  again — the same drawing. Anything that is not moving must not shift by a
-  pixel between frames, and the easiest way to get that wrong is to let the
-  whole subject drift a little towards the middle of its cell.
-- The movement between two frames should be the same size as the movement
-  between the next two. Three frames where the first two are nearly identical
-  and the third leaps is a stutter, not an animation.
+**Cycled** — six frames, and it does not return: a walk, a run, wings beating, a
+disc turning. Played round and round, one frame a beat-eighth, and frame 6 has to
+lead back into frame 1 or the loop has a bump in it. Six rather than four because
+a cycle is the one movement the eye follows limb by limb.
+
+**Once** — six to eight frames, played front to back and then stopped. Blowing a
+kiss, a curtain opening, a page turning, falling asleep. It is not on the beat at
+all: it takes the time it takes.
+
+### What is not drawn
+
+The row already leans, sways, rides and bounces, and everything crossing the
+screen is moved by the code at the full frame rate — smoothly, at 60 or at 30,
+because those motions are worked out per second rather than per frame. A subject
+drawn leaning gets its lean twice.
+
+So the frames are only ever the part that changes SHAPE — a mouth opening, a
+beater falling, cymbals parting, legs passing each other — and never the whole
+subject tilted, shifted, grown, or moved across its cell.
+
+### Two things that ruin a frame, whatever the count
+
+- They must be the same drawing with one part moved. Not the same subject drawn
+  again. Anything not moving must not shift by a pixel, and the easiest way to
+  get that wrong is to let the whole subject drift towards the middle of its cell.
+- The movement between each pair of frames should be the same size. Three frames
+  where the first two are nearly identical and the third leaps is a stutter.
+
+Asking for more frames costs nothing in the code — a mark is about a kilobyte
+baked at all four sizes — and costs a great deal in the drawing, because every
+extra cell is another chance for the subject to drift. Get a set working at four
+first, then ask for six on that set alone, once its style is known to bake well.
+
+## What survives being baked
+
+Everything above is about the sheet. This is about what is left of it at the size
+it is actually seen, and it is arithmetic rather than taste.
+
+A mark is baked at 24, 36, 54 and 72 dots tall, and the largest that fits the
+whole row across the terminal wins — which on a normal window is usually 24 or
+36. The pen is taken to three dots at every one of them. So a 24-dot mark is a
+drawing about eight pen-widths tall. That is the whole budget.
+
+	drawn feature          at 24 dots         verdict
+	the subject itself     24 dots            fine
+	a limb, a tail         6-12 dots          fine
+	an eye, a hand         2-4 dots           a blob or nothing
+	a short motion line    1-2 dots           gone
+	hatching, texture      under a dot        gone
+
+Two rules come out of that, and they are the ones to check a sheet against:
+
+- **Nothing smaller than a tenth of the subject's height.** Below that it is not
+  simplified, it is absent.
+- **No enclosed area narrower than a fifth of the subject's height.** A three-dot
+  pen on both sides of a small circle leaves no hole in the middle: the eye of a
+  face, the sound hole of a guitar and the gap inside a small loop all fill in
+  and become blobs.
+
+And one test worth applying to every drawing before it is asked for: would it
+still be recognisable as a solid black shape, with all its inside detail thrown
+away? If not, it will not read at 24 dots either.
 
 ## Sheet 1 — the kit, animated
 
@@ -671,18 +735,33 @@ dancers' build so the two sets read as one company.
 
 ## Judging what comes back
 
-Before anything is cut, look for these. Any one of them is a redraw, because
-none of them survives being baked.
+Before anything is cut. Any one of these is a redraw, because none of them
+survives being baked, and asking again costs one image where cutting a bad sheet
+costs an afternoon.
 
-- Two drawings in a column that are not the same object in the same place. This
-  is the one that fails most often and the one that matters most.
-- A stroke weight that drifts between cells, or a subject drawn small in its
-  cell while its neighbours fill theirs.
+**The three that make a sheet unusable**
+
+- More than one sheet in the image, or subjects nobody asked for.
+- Any text at all: a title, a column name, a frame number, a signature.
+- An animation made of motion lines rather than a moving part. Look along each
+  column: if the subject is the same in all frames and only the decoration around
+  it changed, that column is three identical marks.
+
+**The ones that cost the sheet quietly**
+
+- Two frames of a column that are not the same object in the same place. Lay
+  them over each other in your head: everything not moving must sit still.
+- A subject that spans two cells or two rows, or is cropped by the edge.
+- Two drawings that touch. The cut is a rectangle: they cannot be separated.
+- A stroke weight that drifts between cells, or a subject drawn small while its
+  neighbours fill theirs.
 - Anything filled in: a solid head, a black note, a shaded body.
-- Detail finer than a tenth of the drawing's height — a face on a figure, teeth,
-  fingers, strings drawn as five separate hairlines.
-- Grey. There is no grey in the pipeline; it is either ink or it is not.
-- A caption, a number, a frame, or one cell's line crossing into another.
+- Detail finer than a tenth of the subject's height, or an enclosed shape
+  narrower than a fifth of it — the second one is the sneaky one, because it
+  looks fine on the sheet and bakes into a blob.
+- Grey. There is no grey in the pipeline: it is ink or it is not.
+- Subjects drawn at their real relative sizes rather than all to one height.
 
 Then cut, bake, and look at the row on screen at the size a normal terminal
-actually gives it. That is the only judgement that counts.
+actually gives it — which is usually 24 or 36 dots, not the 72 it would flatter
+the drawing to be judged at. That is the only judgement that counts.
