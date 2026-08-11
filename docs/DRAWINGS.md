@@ -214,6 +214,11 @@ The default is **four**. Three was the old default and it was chosen before the
 rate was: at sixty a beat has room for four comfortably, and the fourth is the
 one that turns a hit into a hit.
 
+The sheets below that still ask for three were written before this, and every one
+of them is struck. When one of them is asked for, add the fourth frame and say
+where it goes: it is the wind-up, and it always sits between at rest and
+contact — the subject gathered, nothing else changed.
+
 ### The four kinds
 
 **Struck** — four frames: at rest, wound up, contact, recoiling. A kick, a clap,
@@ -291,42 +296,47 @@ away? If not, it will not read at 24 dots either.
 
 ## Sheet 1 — the kit, animated
 
-The row that has the clearest reason to exist: every mark rides its own slice of
-the spectrum, so a kick at the left kicks on the kick and a cymbal at the right
-rings on the cymbals. A drum kit spread across the row is that order without
-anybody being told it — this is the set the first attempt invented, kept, with
-every column now moving a part of itself instead of growing motion lines.
+The row with the clearest reason to exist: every mark rides its own slice of the
+spectrum, so a kick at the left kicks on the kick and a cymbal at the right rings
+on the cymbals. A drum kit spread across the row is that order without anybody
+being told it — this is the set the first attempt invented, kept, with every
+column now moving a part of itself instead of growing motion lines.
 
 ```
-Grid: 8 columns by 3 rows. Each column is one drum or one pair of hands, the
-three rows are three frames of it. All eight are STRUCK: they return to where
-they started, so three frames is the whole animation.
+Grid: 8 columns by 4 rows, so 32 drawings. Each column is one drum or one pair
+of hands. The four rows are four frames of a single strike, read downwards:
 
-Every column must move a part. In each of the eight, name the part that moves:
+  row 1  at rest
+  row 2  wound up: the stick or beater at its highest, nothing else changed
+  row 3  contact: the stick or beater against the drum, and the struck surface
+         visibly pushed in or bowed by the blow
+  row 4  recoiling: the stick or beater lifting away again, the surface still
+         slightly out of shape
 
-1. Kick drum, seen from the front, with its pedal and beater to one side.
-   Beater standing up, away from the head / beater halfway down /
-   beater flat against the head, the head bowed slightly inwards.
-2. Snare drum, seen from the side, with one stick above it.
-   Stick raised well above the drum / stick halfway down /
-   stick touching the head, the head bowed slightly downwards.
-3. Two hands clapping, seen from the front, fingers up.
-   Hands well apart / hands nearly touching / hands flat together as one shape.
-4. Hi-hat cymbals on a stand, seen from the side, with the pedal at the bottom.
-   Cymbals together and the pedal down / cymbals apart by a little, pedal
-   halfway / cymbals wide apart and the pedal up.
-5. Open hi-hat, the two cymbals already apart, with a stick above the top one.
-   Stick raised / stick halfway down / stick on the top cymbal, which is tilted
-   by the blow.
-6. Rim shot: a shallow drum seen from above as an ellipse, one stick lying
-   across the rim.
-   Stick raised above the rim / stick halfway / stick across the rim, the
-   ellipse pushed slightly out of round by the blow.
-7. Floor tom, seen from the side on its legs, with one stick above.
-   Stick raised / stick halfway / stick on the head, the head bowed downwards.
-8. Ride cymbal on a stand, seen from the side, with one stick above it.
-   Stick raised, cymbal flat / stick on the cymbal, cymbal tilted one way /
-   stick lifting away, cymbal tilted the other way.
+The stick or beater is the part that moves. In rows 1, 2 and 4 the drum itself
+is drawn identically; only in row 3 does its struck surface change shape, and
+only slightly.
+
+1. Kick drum: a large circle seen from the front, standing on two short legs,
+   with a pedal and a beater to one side.
+2. Snare drum: a shallow cylinder seen from the side, on a stand, with one
+   stick above it.
+3. A pair of hands clapping, seen from the front, fingers up. Here the two
+   hands are the moving part: apart / wide apart / flat together as one shape /
+   parting again.
+4. Hi-hat: two cymbals on a stand seen from the side, with a pedal at the
+   bottom. Here the moving part is the cymbals and the pedal together: closed
+   with the pedal down / open with the pedal up / closed hard, the top cymbal
+   pushed against the bottom one / open a little again.
+5. Open hi-hat: the same two cymbals already parted, with a stick above the top
+   one. The stick moves; the top cymbal tilts when it is struck.
+6. Rim shot: a shallow drum seen from above as an ellipse, with one stick
+   lying across its rim.
+7. Floor tom: a deep cylinder seen from the side, standing on three legs, with
+   one stick above it.
+8. Ride cymbal: a wide shallow cymbal on a stand seen from the side, with one
+   stick above it. The cymbal tilts when struck and is still tilted the other
+   way as the stick lifts.
 ```
 
 ## Sheet 2 — the animal choir
