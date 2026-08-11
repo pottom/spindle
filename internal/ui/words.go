@@ -1539,6 +1539,17 @@ func (m *Model) wordsGrind() tea.Cmd {
 		// for a picture that did not change at all.
 		if starts != was && !m.words.beats {
 			m.words.since, m.words.leanAt = time.Now(), starts
+
+			// And dealt afresh, which it was not. This is the branch a chorus
+			// comes through — the same words, so the picture already held is the
+			// picture wanted and nothing is sent for — and the deal lives in
+			// wordsAdopt, which is only reached when a picture arrives. So the
+			// gathering restarted with the move the line had last time, every
+			// time: a refrain that came in identically on each of its returns,
+			// while the line after it, whose words were new, came in differently.
+			// Read straight off the screen with the move printed on it — 4 for
+			// every occurrence of the chorus, 5 for the line that followed.
+			m.words.move = wordsMoveFor(text, starts, m.words.move)
 		}
 		return nil
 	}
