@@ -107,6 +107,14 @@ type markSize struct {
 // means the one thing.
 const markHush = "hush"
 
+// wordsStill is whether what is set should ignore the music altogether.
+//
+// The one who has his fingers in his ears cannot hear it. He stands there while
+// the water goes on behind him, which is the whole of the joke and also the
+// plainest way a picture can say the sound is not reaching anybody: everything
+// else on this screen answers the record, and he does not.
+func (m Model) wordsStill() bool { return m.muted() }
+
 // muted is whether the room has been silenced from here.
 //
 // What the key remembered, and not the reading. A reading of nothing is not the
@@ -558,6 +566,9 @@ const marksShows = 12 * time.Second
 // not be answering the music, and there are already enough of those elsewhere.
 func (m Model) wordsTurning(count int) []bool {
 	if count == 0 || !m.words.beats || len(m.words.where.Lefts) < count {
+		return nil
+	}
+	if m.wordsStill() {
 		return nil
 	}
 

@@ -1837,7 +1837,7 @@ func (m *Model) wordsFlow(w, rows int) {
 // one thing standing rigid in the middle of that reads as a picture that has
 // stopped rather than as a card.
 func (m Model) wordsRiding(count int) []int {
-	if count <= 0 {
+	if count <= 0 || m.wordsStill() {
 		return nil
 	}
 
@@ -1949,7 +1949,7 @@ func wordsBesideMark(marks []bool, at int) (int, bool) {
 // Which way each is sheared, and so what the middle it turns about means, is
 // the marks' business: see wordsSlanting.
 func (m Model) wordsTilting(count int) ([]float32, []int) {
-	if count <= 0 || m.words.telling {
+	if count <= 0 || m.words.telling || m.wordsStill() {
 		return nil, nil
 	}
 
