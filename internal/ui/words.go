@@ -95,7 +95,24 @@ const (
 	// wide is a coin toss per dot, so the letters came out dotted with stripes
 	// through them — and which dots went missing changed with every step of the
 	// terminal's font size, which is how it was noticed.
-	wordsOver  = 3
+	wordsOver = 3
+
+	// wordsCover is how much of a dot the type has to cover for it to light.
+	//
+	// Half, and it stays there. A thin stroke end sometimes comes through as a
+	// small clump joined to its letter by a single dot, which reads as a smudge
+	// stuck to the letter rather than as part of it — measured over the
+	// lowercase alphabet at seventeen sizes, 48 of the 442 do it, the j's
+	// descender among them, which is how it was noticed.
+	//
+	// Every way of stopping it costs something. Lowering this to a fifth leaves
+	// 6 of the 442; a second, lower threshold that only lights a dot already
+	// touching lit ink leaves 23 with the low one at a fifth and 0 at a sixth.
+	// All of them fatten the type, and measured at the smallest size a line is
+	// set at, all of them close "rn" into "m" and fill in a counter.
+	//
+	// A smudge on one letter in nine is worth less than a word that reads as a
+	// different word. Left where it is on purpose, not for want of looking.
 	wordsCover = 128
 )
 
@@ -695,8 +712,13 @@ const (
 	wordsWipingBack                  // right to left
 	wordsBlurring                    // barely anywhere: a picture coming into focus
 	wordsPopping                     // one piece at a time, and each one bursts
+	wordsSpilling                    // lets go and falls, under the screen's own gravity
 	wordsMoves
 )
+
+// The last two are ways of leaving only, which is why the deal below counts up
+// to wordsPopping rather than to wordsMoves. A line that arrived by un-bursting
+// or by falling upward would be a film run backwards.
 
 // wordsMoveFor picks one from the line, from when it is sung, and never the one
 // before it.
@@ -1030,8 +1052,10 @@ func (m Model) wordsLines(w, rows int) []string {
 
 	// The line before this one, on its way out: the same arithmetic run
 	// backwards, and fading as it goes.
-	if since := time.Since(m.words.went); since < wordsLeaving && m.words.was.DotsX == dotsX {
-		m.drawLeaving(grid, paint, hue, w, rows, float32(since)/float32(wordsLeaving), levels)
+	if goes := wordsLeavingFor(m.words.leave); m.words.was.DotsX == dotsX {
+		if since := time.Since(m.words.went); since < goes {
+			m.drawLeaving(grid, paint, hue, w, rows, float32(since)/float32(goes), levels)
+		}
 	}
 
 	// What each word is burning at, and in what colour.
@@ -1753,6 +1777,8 @@ func (m *Model) wordsAdopt(grain cover.Grain, where msg.WordLayout, text string)
 		// now says what is arriving.
 		if wordsBeats(m.words.text) {
 			m.words.leave = wordsPopping
+		} else if wordsSpillsNow(m.words.text, m.words.starts) {
+			m.words.leave = wordsSpilling
 		}
 	}
 
