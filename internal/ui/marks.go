@@ -346,15 +346,31 @@ func (m Model) wordsTurning(count int) []bool {
 		h := uint64(m.words.leanAt)*0x9e3779b97f4a7c15 + uint64(i)*0xbf58476d1ce4e5b9
 		h ^= h >> 31
 		every := marksTurnLeast + int(h%uint64(marksTurnMost-marksTurnLeast+1))
-		out[i] = (beats/every)%2 == 1
+
+		// And its own starting side and its own place in the count. Both were
+		// missing and both showed. Without a side, every mark starts facing the
+		// same way and the ones dealt a long count stay there — twenty beats in,
+		// two of eight had turned, which was arithmetic rather than luck.
+		// Without a shift, two marks dealt the same count turn on the same beat
+		// for as long as they are up, and six of eight going round together is
+		// not eight people dancing, it is a row being flipped.
+		side := int(h >> 8 & 1)
+		shift := int(h >> 16 % uint64(every))
+		out[i] = ((beats+shift)/every+side)%2 == 1
 	}
 	return out
 }
 
 // marksTurnLeast and marksTurnMost are the fewest and the most beats a mark
-// keeps facing one way. Swept by eye against a row of eight: under three the
-// row twitches, over ten nothing appears to happen while anybody is watching.
+// keeps facing one way.
+//
+// Two to six, and it was three to ten. At the top of that range a mark held
+// still for seven seconds at the tempo of an ordinary record, which is longer
+// than anybody watches one mark for — and with eight of them the row looked
+// like it was doing nothing while half of it was mid-turn. Short enough that
+// something is always going round, long enough that no one of them is a
+// flicker.
 const (
-	marksTurnLeast = 3
-	marksTurnMost  = 10
+	marksTurnLeast = 2
+	marksTurnMost  = 6
 )
