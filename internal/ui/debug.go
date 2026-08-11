@@ -671,6 +671,10 @@ var debugDoingNames = [faceDoings]string{
 	faceLooking:  "look",
 	faceGrinning: "grin",
 	faceWaving:   "wave",
+	faceSinging:  "sing",
+	faceKissing:  "kiss",
+	faceStunned:  "stun",
+	faceNodding:  "nod",
 }
 
 func debugDoingName(d faceDoing) string {

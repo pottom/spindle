@@ -511,6 +511,10 @@ const (
 	faceLooking
 	faceGrinning
 	faceWaving
+	faceSinging
+	faceKissing
+	faceStunned
+	faceNodding
 	faceDoings
 )
 
@@ -706,6 +710,14 @@ func faceDoingFor(doing faceDoing) time.Duration {
 		return 2*faceBlinkShut + faceGrinHold
 	case faceWaving:
 		return faceWaveFor
+	case faceSinging:
+		return faceSingFor
+	case faceKissing:
+		return faceKissFor
+	case faceStunned:
+		return faceBlinkShut + faceStunHold + faceBlinkOpen
+	case faceNodding:
+		return faceNodFor
 	}
 	return 0
 }
@@ -797,6 +809,58 @@ func (m Model) faceNow() faceLook {
 			look.hold[0] = faceHoldWave
 		}
 		look.brow[0] = max32(look.brow[0], v*0.5)
+
+	case faceSinging:
+		// Along with it, badly. The mouth is the record's already — this shuts
+		// the eyes over it and lifts the brows, which is the difference between
+		// a mouth that is open and somebody singing.
+		//
+		// Held open at the least, too: the quiet bars of a song are where a
+		// singer holds a note, and a mouth that closes on them reads as somebody
+		// who has stopped rather than somebody sustaining.
+		v := faceRising(since, faceBlinkShut, faceSingFor-faceBlinkShut-faceBlinkOpen)
+		look.mouth = max32(look.mouth, v*faceSingLeast)
+		look.lid = [2]float32{v * faceSingShut, v * faceSingShut}
+		look.brow = [2]float32{v * 0.5, v * 0.5}
+		if v > 0.4 {
+			look.hold[0] = faceHoldOne
+		}
+
+	case faceKissing:
+		// Pursed, and thrown. The mouth goes small rather than wide, which is
+		// the one shape nothing else here makes, and the hand comes up to it
+		// and away — so the throw is the hand and not a heart nobody drew.
+		v := faceRising(since, faceBlinkShut, faceKissFor-faceBlinkShut-faceBlinkOpen)
+		look.mouth = min32(look.mouth, faceKissMouth)
+		look.lid = [2]float32{v * 0.55, v * 0.55}
+		look.brow = [2]float32{v * 0.4, v * 0.4}
+		if v > 0.25 {
+			look.hold[0] = faceHoldWave
+		}
+
+	case faceStunned:
+		// What a drop deserves. Eyes wide open under raised brows, which is the
+		// opposite of the grin: there the eyes squeeze and here they do not.
+		v := faceRising(since, faceBlinkShut, faceStunHold)
+		look.lid = [2]float32{0, 0}
+		look.brow = [2]float32{v, v}
+		look.mouth = max32(look.mouth, v*0.7)
+		if v > 0.5 {
+			look.hold = [2]faceHold{faceHoldUp, faceHoldUp}
+		}
+
+	case faceNodding:
+		// Keeping time, with the one part of him that can: the eyes drop and
+		// come back on the beat, and a finger goes up with them. Off the beat
+		// this is a slow blink, which is what nodding to a record without a beat
+		// looks like anyway.
+		v := float32(math.Abs(math.Sin(math.Pi * faceNods * since.Seconds() / faceNodFor.Seconds())))
+		if phase, ok := m.beatPhase(); ok {
+			v = 1 - phase
+		}
+		look.lid = [2]float32{v * faceNodShut, v * faceNodShut}
+		look.brow = [2]float32{v * 0.3, v * 0.3}
+		look.hold[1] = faceHoldOne
 	}
 	return look
 }
@@ -1212,6 +1276,13 @@ func (m *Model) faceShow() {
 	m.face.doing, m.face.since = m.face.stepped, now
 	m.face.act, m.face.actAt = figureActFor(m.face.picked, now.UnixMilli(), int(m.face.stepped)), now
 
+	// And he is the one on, there and then. A visit already running outranks
+	// everything else for as long as it lasts — that is what stops a figure
+	// being swapped mid-stride — so without this the key only ever worked
+	// between visits, and pressing it during one handed back whoever the bar
+	// had dealt. Asked for by hand is the one thing that may interrupt.
+	m.face.on, m.face.was = m.face.picked, true
+
 	m.face.came, m.face.bar = now, 0
 	m.face.turns, m.face.did, m.face.rested = 0, false, time.Time{}
 	m.face.crumbled = 1
@@ -1283,6 +1354,29 @@ const (
 	// of the bands rarely comes near one, and arms that never leave his sides
 	// are arms nobody put there.
 	faceLiftFrom = 2.2
+
+	// faceSingFor is how long a bar of singing along lasts, faceSingShut how far
+	// the eyes close over it, and faceSingLeast the mouth it keeps open however
+	// quiet the record goes.
+	faceSingFor   = 2600 * time.Millisecond
+	faceSingShut  = 0.75
+	faceSingLeast = 0.55
+
+	// faceKissFor is how long a kiss takes, and faceKissMouth how small the
+	// mouth goes for it. Small rather than wide: it is the only shape on this
+	// face that closes towards the middle.
+	faceKissFor   = 1400 * time.Millisecond
+	faceKissMouth = 0.18
+
+	// faceStunHold is how long the eyes stay wide.
+	faceStunHold = 900 * time.Millisecond
+
+	// faceNodFor is how long he keeps time for, and faceNods how many nods that
+	// is where there is no beat to take them from. faceNodShut is how far the
+	// eyes drop on each.
+	faceNodFor  = 3200 * time.Millisecond
+	faceNods    = 6
+	faceNodShut = 0.6
 
 	// faceLiftEase is how fast the arms follow the music. Slower than the mouth
 	// and the eyes: arms answer a passage, not a beat.
