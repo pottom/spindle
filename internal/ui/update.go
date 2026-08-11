@@ -283,7 +283,11 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.scope.follow(message.Samples)
 			m.scope.adoptBands(message.Bands)
 			if message.Beat.Found() {
-				m.scope.beat, m.scope.beatAt = message.Beat, time.Now()
+				beat := message.Beat
+				// The same beat counted the other way is not a change of
+				// tempo. See beatSteady.
+				beat.Period = beatSteady(m.scope.beat.Period, beat.Period)
+				m.scope.beat, m.scope.beatAt = beat, time.Now()
 			}
 		}
 		if m.scopeMode().wave() {
@@ -294,6 +298,10 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				m.throwSparks(m.scopeWidth(m.layout()), scopeRows)
 			}
 		}
+		// The record's beats, counted forwards rather than derived from a period
+		// that moves. See beatrun.go.
+		m.beatRunFlow()
+
 		// The head on the edge walks to wherever the record has been moved to,
 		// so a seek is watched rather than reported. Every picture on the big
 		// screen carries the edge — see drawCellsIn — so this runs for all of

@@ -114,6 +114,9 @@ type Model struct {
 	// chosen is worth keeping, and the music keeps playing either way.
 	mutedFrom int
 
+	// run is the record's beats, counted forwards. See beatrun.go.
+	run beatRun
+
 	// volume is the stack of lamps the big screen says the level with, and
 	// whatever has fallen off it. See volume.go.
 	volume volumeState

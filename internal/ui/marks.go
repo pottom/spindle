@@ -2,6 +2,7 @@ package ui
 
 import (
 	"encoding/base64"
+	"math"
 	"sort"
 	"time"
 
@@ -628,7 +629,7 @@ func (m Model) wordsTurning(count int) []bool {
 	// What the deal still decides is who turns how often and which way up they
 	// start. That is dealt from the bar, so a new row is a new arrangement — it
 	// is only the counting that runs on.
-	beats, ok := m.beatsIn(m.elapsed())
+	beats, ok := m.beatsRun()
 	if !ok {
 		return nil
 	}
@@ -637,9 +638,24 @@ func (m Model) wordsTurning(count int) []bool {
 	for i := range out {
 		// Its own count, from the bar it arrived under: two beats is a fidget
 		// and sixteen is a statue, so the deal is somewhere between.
+		//
+		// And the record shortens it. A count dealt once and held is a metronome
+		// however fast it is set — at a hundred and seventy the row was turning
+		// often and still reading as machinery, because each of them was turning
+		// on its own fixed number and nothing about that number was the music.
+		// Driven hard they turn nearly every beat, and in a lull they hold.
+		//
+		// The deal keeps its job: it decides where in the range each of them
+		// sits, so they are still eight different dancers rather than eight
+		// copies. The drive decides how far down that range the whole row is
+		// pushed.
 		h := uint64(m.words.leanAt)*0x9e3779b97f4a7c15 + uint64(i)*0xbf58476d1ce4e5b9
 		h ^= h >> 31
-		every := marksTurnLeast + int(h%uint64(marksTurnMost-marksTurnLeast+1))
+
+		span := marksTurnMost - marksTurnLeast
+		rank := float64(h%uint64(span+1)) / float64(span)
+		every := marksTurnLeast + int(math.Round(rank*float64(span)*float64(1-m.marksDrive())))
+		every = min(max(every, marksTurnLeast), marksTurnMost)
 
 		// And its own starting side and its own place in the count. Both were
 		// missing and both showed. Without a side, every mark starts facing the
@@ -653,6 +669,20 @@ func (m Model) wordsTurning(count int) []bool {
 		out[i] = turns[i] && ((beats+shift)/every+side)%2 == 1
 	}
 	return out
+}
+
+// marksDrive is how hard the record is pushing, nought to one, for the purpose
+// of how often the row turns.
+//
+// The reading the rest of the screen already leans on, held to its own range so
+// that a quiet record still turns sometimes and a loud one does not turn on
+// every single beat for three minutes. Measured over one record's three
+// minutes, the drive moved between 0.10 and 1.00 and spent most of its time
+// above 0.6 — so there is plenty of signal in it, and the floor matters more
+// than the ceiling.
+func (m Model) marksDrive() float64 {
+	d := float64(m.words.drive)
+	return min(max(d, 0), 1)
 }
 
 // marksTurnLeast and marksTurnMost are the fewest and the most beats a mark
