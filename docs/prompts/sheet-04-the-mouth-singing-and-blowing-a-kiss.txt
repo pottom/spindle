@@ -1,0 +1,125 @@
+RETURN ONE SHEET ONLY. Draw the one sheet described below. Do not add other
+sheets and do not combine several sheets into one image. One sheet, one image.
+
+DRAW EVERYTHING THAT IS ASKED FOR. Every subject named below must be on the
+sheet. If you have a better idea than one of them — a better subject for the
+set, a better way to animate it, something the brief did not think of — keep it,
+but ADD it rather than swapping it in: draw everything asked for, and put the
+extra subjects in extra columns at the right-hand end of the same sheet, in the
+same style and to the same rules. Nothing asked for is ever dropped to make
+room for something better. A brief is a floor, not a ceiling.
+
+NO TEXT ANYWHERE ON THE IMAGE. No titles, no headings, no captions, no column
+names, no row labels, no numbering of the frames, no legend, no signature, no
+watermark. Not one letter and not one digit anywhere on the sheet, including
+the margins. Every mark on the image is part of a drawing.
+
+AN ANIMATION IS A MOVING PART, NOT MOTION LINES. Between two frames, some part
+of the subject must actually change position or shape: a beater falls, a mouth
+opens, cymbals part, a tail bends, legs pass each other. Drawing the subject
+unchanged and adding short radiating lines around it is NOT an animation and
+will be rejected. Short decorative lines are too fine to survive at all: they
+disappear when the drawing is reduced. If a subject cannot be animated by
+moving one of its own parts, choose a different pose for it, but never fall
+back on motion lines.
+
+STYLE
+- Pure black background (#000000). All drawing in pure white (#FFFFFF).
+- No grey, no fills, no shading, no gradients, no glow, no colour.
+- Outline strokes ONLY. Nothing is filled in. No solid shapes, no silhouettes.
+- ONE constant stroke weight everywhere, rounded caps and rounded joins.
+- Simple enough to survive being reduced to a 24 by 24 grid of dots: no fine
+  detail, no hatching, no small features, no textures, no thin decoration.
+  Any feature smaller than a tenth of the subject's height will be lost.
+- Flat and front-on. No perspective, no 3/4 view, no depth, no shadows.
+
+SIZE AND FILE
+- Return ONE image, PNG, at the largest resolution available and no smaller
+  than 2000 pixels on its long side. Not JPEG.
+- Each subject is drawn LARGE: it fills at least three quarters of the height
+  of its own cell. A sheet where the drawings are small in the middle of empty
+  cells is a sheet that cannot be used.
+- Every subject on the sheet is drawn at the same height as every other, even
+  where the real things differ in size. A whale and a mosquito are the same
+  height here.
+- Nothing on the sheet is smaller than a tenth of a subject's height, and no
+  enclosed shape is narrower than a fifth of it. Below those, a small circle
+  fills in solid and a short line disappears entirely when the drawing is
+  reduced.
+
+LAYOUT
+- An invisible grid, evenly spaced, with a wide empty margin around the sheet
+  and clear empty black space between every cell.
+- NOTHING MAY OVERLAP OR TOUCH ANYTHING ELSE. Every drawing stays entirely
+  inside its own cell. No drawing crosses into a neighbouring cell, no subject
+  spans two cells or two rows, no two drawings share a line, no ground line or
+  horizon runs across the sheet, nothing is cropped by the edge of the sheet.
+  Each cell must be liftable out of the sheet as a plain rectangle containing
+  one complete drawing and nothing else.
+- A column is one subject and the rows under it are that subject's animation
+  frames: the SAME drawing at the SAME size in the SAME position within its
+  cell, with ONLY the moving part changed. Nothing that is not moving may shift
+  by even a little between frames.
+- Every subject on the sheet is drawn by one hand, sharing one build and one
+  pen, like a single icon family. Where the subjects are creatures or figures
+  they share one build as well: the same proportions, the same simple body.
+- All the subjects stand on the same invisible line across the sheet, at the
+  same place within their cells, so that a row of them reads as standing on one
+  floor.
+- Everything faces the same way: to the right.
+- Keep the eight subjects to a similar amount of ink. One dense subject beside
+  seven sparse ones makes the row lopsided.
+- Keep each subject under about fifteen strokes.
+- Nothing depends on a face, on eyes, or on fingers to be recognised.
+- Read the frames downwards: the first frame is the top row.
+
+Style reference: clean pictogram line icons, the weight and simplicity of
+Tabler Icons.
+
+THE SHEET TO DRAW
+
+Grid: 8 columns by 3 rows, so 24 drawings.
+
+THIS SHEET IS LAID OUT IN ROWS, NOT COLUMNS. Each row is its own set of eight
+drawings, read left to right. The columns mean nothing here.
+
+Every drawing on the sheet is an outline only: no teeth, no tongue, no lips
+drawn as separate shapes, no shading. No face is drawn around any mouth — the
+mouth is the whole drawing.
+
+ROW 1, eight mouth shapes for miming a song. Every one of them is exactly the
+same width, centred at exactly the same point in its cell, and drawn with the
+same weight, so that any one may be swapped for any other without the mouth
+appearing to move. They differ only in shape:
+   1. closed: a single straight horizontal line
+   2. barely open: a very shallow lens shape
+   3. a small round o
+   4. a tall narrow oval
+   5. a wide flat lens, the corners drawn out sideways
+   6. a large wide-open oval, taller than it is wide
+   7. an open mouth pushed to one side, wider on the right
+   8. a smile: an upward curve with the ends turned up
+
+ROW 2, blowing a kiss: eight frames of ONE mouth, played once, left to right.
+The moving part is the mouth's shape and then the heart's position and size.
+   1. mouth relaxed, a shallow lens
+   2. mouth gathering, narrower
+   3. mouth pursed to a small round o
+   4. pursed, with a small heart outline touching the mouth
+   5. the heart just clear of the mouth, still small
+   6. the heart a third of the way across the cell, larger
+   7. the heart two thirds across, larger again
+   8. the heart at the far edge of the cell, largest
+No motion lines behind the heart at any point: the heart moving IS the motion,
+and short lines behind it disappear when the drawing is reduced.
+
+ROW 3, falling asleep: eight frames of ONE cat, seen from the side, played once.
+The cat is drawn identically in every frame apart from what is named:
+   1. sitting up, ears up, eyes open
+   2. sitting, eyes half closed
+   3. curling, head lowered
+   4. curled up, eyes closed
+   5. curled up, one small Z above it
+   6. curled up, two Z's, the second larger
+   7. curled up, three Z's rising and growing
+   8. stretching awake, front legs pushed forward, ears up
