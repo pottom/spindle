@@ -42,6 +42,9 @@ func (m Model) View() tea.View {
 	v := tea.NewView(m.debugOver(m.render()))
 	slowRenderDone(m, time.Since(began))
 
+	// And, while the bar is up, the same numbers to a file. See debug.go.
+	m.debugNote()
+
 	v.AltScreen = true
 	v.WindowTitle = m.windowTitle()
 	return v

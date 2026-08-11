@@ -1,11 +1,17 @@
 package ui
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"charm.land/lipgloss/v2"
+
+	"github.com/pottom/spindle/internal/xdg"
 )
 
 // The numbers the screen decides from, on a key.
@@ -41,6 +47,10 @@ const (
 	debugDepths
 )
 
+// debugFile is where the bar writes itself down, under the state directory. It
+// is removed as spindle closes — see ForgetDebug.
+const debugFile = "debug.jsonl"
+
 // debugKey takes the toggle. Ctrl and shift together, because ctrl alone is
 // spoken for: ctrl+d is half a page down in the lists.
 func (m *Model) debugKey(k string) bool {
@@ -75,6 +85,28 @@ func (m Model) debugOver(screen string) string {
 	return strings.Join(lines, "\n")
 }
 
+// debugGroup is one subject's worth of readings: the rows of the block, and the
+// fields of a line in the file. One source for both, so what is read off the
+// disk afterwards is what was on the screen at the time.
+type debugGroup struct {
+	name   string
+	fields []debugField
+}
+
+// debugGroups is the whole block, in the order it is drawn.
+func (m Model) debugGroups() []debugGroup {
+	return []debugGroup{
+		{"scr", m.debugSelf()},
+		{"trk", m.debugTrack()},
+		{"snd", m.debugSound()},
+		{"bt", m.debugBeat()},
+		{"jn", m.debugJoins()},
+		{"wrd", m.debugWords()},
+		{"lyr", m.debugSheet()},
+		{"fig", m.debugFigure()},
+	}
+}
+
 // debugRows is the bar itself: one line, the block, or nothing at all.
 func (m Model) debugRows() []string {
 	if m.debug.level == debugOff || m.width < 40 || m.height < 2 {
@@ -84,15 +116,9 @@ func (m Model) debugRows() []string {
 		return []string{m.debugFit("", m.debugQuick())}
 	}
 
-	rows := []string{
-		m.debugFit("scr", m.debugSelf()),
-		m.debugFit("trk", m.debugTrack()),
-		m.debugFit("snd", m.debugSound()),
-		m.debugFit("bt", m.debugBeat()),
-		m.debugFit("jn", m.debugJoins()),
-		m.debugFit("wrd", m.debugWords()),
-		m.debugFit("lyr", m.debugSheet()),
-		m.debugFit("fig", m.debugFigure()),
+	var rows []string
+	for _, g := range m.debugGroups() {
+		rows = append(rows, m.debugFit(g.name, g.fields))
 	}
 	// Never the whole screen. A block taller than the terminal is a block with
 	// nothing left to debug underneath it.
@@ -100,7 +126,7 @@ func (m Model) debugRows() []string {
 }
 
 // debugQuick is the one line: what it is doing, in the order it is asked.
-func (m Model) debugQuick() []string {
+func (m Model) debugQuick() []debugField {
 	var b debugPad
 	b.put("", "%s/%s", debugScreen(m), debugMode(m.frameMode()))
 	if m.ps != nil {
@@ -108,8 +134,8 @@ func (m Model) debugQuick() []string {
 	} else {
 		b.put("", "no track")
 	}
-	b.put("", "%s", debugBPM(m))
-	b.put("", "%s", debugDeal(m))
+	b.add(debugBPM(m))
+	b.add(debugDeal(m))
 	b.put("jn", "%d %s", m.joinsTurns(), debugAgo(m.elapsed()-m.joinsAt()))
 	b.put("swl", "%.2f %.0fdB", m.swell(), m.scope.beat.Loud)
 
@@ -124,7 +150,7 @@ func (m Model) debugQuick() []string {
 // debugSelf is this program: where it is, how big, and how fast it is going
 // round. The frame timing is the half of it nothing else can report — see
 // slow.go.
-func (m Model) debugSelf() []string {
+func (m Model) debugSelf() []debugField {
 	var b debugPad
 	b.put("", "%s/%s", debugScreen(m), debugMode(m.frameMode()))
 	b.put("", "%dx%d", m.width, m.height)
@@ -143,7 +169,7 @@ func (m Model) debugSelf() []string {
 
 // debugTrack is what the daemon last said about the record, including the two
 // things only it can say: the stream it chose and the tempo it measured.
-func (m Model) debugTrack() []string {
+func (m Model) debugTrack() []debugField {
 	var b debugPad
 	if m.ps == nil {
 		b.put("", "no state")
@@ -178,7 +204,7 @@ func (m Model) debugTrack() []string {
 // debugSound is the measurement itself, and the two ranges everything drawn from
 // it is read against: how loud the record has been lately, and how hard the low
 // end is hitting.
-func (m Model) debugSound() []string {
+func (m Model) debugSound() []debugField {
 	var b debugPad
 	b.put("loud", "%.1fdB", m.scope.beat.Loud)
 	b.put("swl", "%.2f", m.swell())
@@ -198,7 +224,7 @@ func (m Model) debugSound() []string {
 // debugBeat is the beat as the picture has it: not what the daemon reported but
 // what that report has been carried forward to, which is what everything on
 // screen actually moves on.
-func (m Model) debugBeat() []string {
+func (m Model) debugBeat() []debugField {
 	var b debugPad
 	beat := m.scope.beat
 	if !beat.Found() {
@@ -226,7 +252,7 @@ func (m Model) debugBeat() []string {
 
 // debugJoins is where the record turns over, with the line it has to cross
 // printed beside the reading. See joins.go.
-func (m Model) debugJoins() []string {
+func (m Model) debugJoins() []debugField {
 	var b debugPad
 	j := m.joins
 	b.put("turns", "%d", m.joinsTurns())
@@ -253,7 +279,7 @@ func (m Model) debugJoins() []string {
 // debugWords is the deal: which line is up, how it came in, how far through
 // coming in it is, and what the colour is doing to it. The row this whole bar
 // was built for.
-func (m Model) debugWords() []string {
+func (m Model) debugWords() []debugField {
 	var b debugPad
 	w := m.words
 	if w.text == "" {
@@ -269,7 +295,7 @@ func (m Model) debugWords() []string {
 		kind = "marks"
 	}
 	b.put("", "%s", kind)
-	b.put("", "%s", debugDeal(m))
+	b.add(debugDeal(m))
 	b.put("leave", "%s", debugMoveName(w.leave))
 	b.put("sung", "%s", debugClock(time.Duration(w.starts)*time.Millisecond))
 	b.put("ends", "%s", debugClock(time.Duration(w.ends)*time.Millisecond))
@@ -293,7 +319,7 @@ func (m Model) debugWords() []string {
 
 // debugSheet is what the lyric sheet says, which is half of what goes wrong on
 // the screen it feeds.
-func (m Model) debugSheet() []string {
+func (m Model) debugSheet() []debugField {
 	var b debugPad
 	switch {
 	case m.ps == nil:
@@ -325,7 +351,7 @@ func (m Model) debugSheet() []string {
 
 // debugFigure is who is on, what they are in the middle of, and the colour of
 // the record coming after this one.
-func (m Model) debugFigure() []string {
+func (m Model) debugFigure() []debugField {
 	var b debugPad
 	if m.faceUp() {
 		b.put("", "up")
@@ -355,27 +381,184 @@ func (m Model) debugFigure() []string {
 	return b.out
 }
 
-// debugPad collects one row's fields.
-type debugPad struct{ out []string }
-
-// put adds a field: a dim tag and a value, or a bare value where the tag would
-// only repeat what the value says.
-func (b *debugPad) put(tag, format string, a ...any) {
-	v := fmt.Sprintf(format, a...)
-	if tag != "" {
-		v = debugTag(tag) + " " + v
+// debugNote writes the block down as well as drawing it.
+//
+// The bar is on the screen, and the screen is in front of whoever is listening —
+// which leaves everybody else in the conversation, this program's author
+// included, being told what the numbers said rather than reading them. So while
+// the bar is up the same readings go to a file, in plain text, and the record of
+// what the screen was deciding from can be read back afterwards.
+//
+// Not every frame. A line goes down when something that matters has changed —
+// the record, the deal, a join, which line of the sheet is being sung — and once
+// a second regardless, so a stretch where nothing changes is still visible as a
+// stretch rather than as a gap. Thirty lines a second would bury the change that
+// is being looked for in the frames either side of it.
+//
+// It lives only as long as the session does. See ForgetDebug.
+func (m Model) debugNote() {
+	if m.debug.level == debugOff {
+		return
 	}
-	b.out = append(b.out, v)
+
+	debugPen.mu.Lock()
+	defer debugPen.mu.Unlock()
+	if debugPen.off {
+		return
+	}
+
+	// What counts as something having happened. The deal is in it because that
+	// is the reading this whole bar was built for; the rest is anything that
+	// changes which picture is on screen.
+	why := "tick"
+	key := fmt.Sprintf("%s|%d|%d|%d|%v|%s|%d", m.words.forTrack, m.words.move, m.words.leave,
+		m.joinsTurns(), m.words.beats, debugScreen(m), m.wordsAt())
+	switch {
+	case key != debugPen.was:
+		why = "change"
+	case time.Since(debugPen.at) < time.Second:
+		return
+	}
+	debugPen.was, debugPen.at = key, time.Now()
+
+	said := map[string]string{}
+	for _, g := range m.debugGroups() {
+		said[g.name] = debugPlain(g.fields)
+	}
+	raw, err := json.Marshal(struct {
+		At     string `json:"at"`
+		Clock  string `json:"clock"`
+		Why    string `json:"why"`
+		Screen string `json:"screen"`
+		Track  string `json:"track"`
+		Sound  string `json:"sound"`
+		Beat   string `json:"beat"`
+		Joins  string `json:"joins"`
+		Words  string `json:"words"`
+		Sheet  string `json:"sheet"`
+		Figure string `json:"figure"`
+	}{
+		At:     time.Now().Format(time.RFC3339Nano),
+		Clock:  debugClock(m.elapsed()),
+		Why:    why,
+		Screen: said["scr"],
+		Track:  said["trk"],
+		Sound:  said["snd"],
+		Beat:   said["bt"],
+		Joins:  said["jn"],
+		Words:  said["wrd"],
+		Sheet:  said["lyr"],
+		Figure: said["fig"],
+	})
+	if err != nil {
+		return
+	}
+
+	path, err := debugPath()
+	if err != nil {
+		debugPen.off = true
+		return
+	}
+	// The first line of a run starts the file again. A session's worth is what
+	// anybody wants to read; two sessions interleaved is what nobody does.
+	flags := os.O_APPEND | os.O_CREATE | os.O_WRONLY
+	if !debugPen.began {
+		flags = os.O_TRUNC | os.O_CREATE | os.O_WRONLY
+		debugPen.began = true
+	}
+	f, err := os.OpenFile(path, flags, 0o600)
+	if err != nil {
+		debugPen.off = true
+		return
+	}
+	defer f.Close()
+	_, _ = f.Write(append(raw, '\n'))
 }
+
+// debugPen is what the writing above remembers between frames.
+var debugPen struct {
+	mu    sync.Mutex
+	at    time.Time
+	was   string
+	began bool
+	off   bool
+}
+
+func debugPath() (string, error) {
+	dir, err := xdg.StateDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, debugFile), nil
+}
+
+// ForgetDebug removes what the bar wrote down.
+//
+// Called as spindle closes. The file is for the session it was written in and
+// for nothing else: it is a page of working, not a log, and a page of working
+// left lying about is read months later as though it still meant something.
+func ForgetDebug() {
+	debugPen.mu.Lock()
+	defer debugPen.mu.Unlock()
+
+	debugPen.began, debugPen.was = false, ""
+	path, err := debugPath()
+	if err != nil {
+		return
+	}
+	_ = os.Remove(path)
+}
+
+// debugPlain is a row as the file wants it: no colour, nothing cut off.
+func debugPlain(fields []debugField) string {
+	out := make([]string, 0, len(fields))
+	for _, f := range fields {
+		out = append(out, f.plain())
+	}
+	return strings.Join(out, "  ")
+}
+
+// debugField is one reading: a dim tag and a value, or a bare value where the
+// tag would only repeat what the value says.
+//
+// The two are kept apart rather than pasted together at the point they are
+// written, because the same reading goes two places — the screen, in colour, and
+// the file, in plain text. Styled at the point of writing, the file would be
+// full of escape sequences.
+type debugField struct{ tag, val string }
+
+func (f debugField) plain() string {
+	if f.tag == "" {
+		return f.val
+	}
+	return f.tag + " " + f.val
+}
+
+func (f debugField) styled() string {
+	if f.tag == "" {
+		return f.val
+	}
+	return debugTag(f.tag) + " " + f.val
+}
+
+// debugPad collects one row's fields.
+type debugPad struct{ out []debugField }
+
+func (b *debugPad) put(tag, format string, a ...any) {
+	b.out = append(b.out, debugField{tag, fmt.Sprintf(format, a...)})
+}
+
+func (b *debugPad) add(f debugField) { b.out = append(b.out, f) }
 
 // debugFit lays a row out and cuts it where the terminal ends, a whole field at
 // a time — half a number is worse than no number.
-func (m Model) debugFit(name string, fields []string) string {
+func (m Model) debugFit(name string, fields []debugField) string {
 	line := ""
 	if name != "" {
 		line = debugName(m, name)
 	}
-	for _, f := range fields {
+	for _, field := range fields {
+		f := field.styled()
 		sep := "  "
 		if line == "" {
 			sep = ""
@@ -410,25 +593,25 @@ func debugTag(tag string) string {
 
 // debugDeal is how the line on screen came in and how far in it has got, which
 // is the reading this bar exists for.
-func debugDeal(m Model) string {
+func debugDeal(m Model) debugField {
 	gather := float32(1)
 	if since := time.Since(m.words.since); since < wordsGather {
 		gather = float32(since) / float32(wordsGather)
 	}
-	return fmt.Sprintf("%s %s %.0f%%", debugTag("move"), debugMoveName(m.words.move), gather*100)
+	return debugField{"move", fmt.Sprintf("%s %.0f%%", debugMoveName(m.words.move), gather*100)}
 }
 
 // debugBPM is the beat in the shortest form worth reading.
-func debugBPM(m Model) string {
+func debugBPM(m Model) debugField {
 	beat := m.scope.beat
 	if !beat.Found() {
-		return "no beat"
+		return debugField{val: "no beat"}
 	}
 	kept := "loose"
 	if m.beatKeeping() {
 		kept = "kept"
 	}
-	return fmt.Sprintf("%.0fbpm %s", 60000/float64(beat.Period.Milliseconds()+1), kept)
+	return debugField{val: fmt.Sprintf("%.0fbpm %s", 60000/float64(beat.Period.Milliseconds()+1), kept)}
 }
 
 // debugMode is which picture the big screen is set to, in one word.

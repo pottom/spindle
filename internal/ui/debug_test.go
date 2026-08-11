@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -75,5 +76,67 @@ func TestEveryRowSaysSomething(t *testing.T) {
 		if len(strings.Fields(row)) < 2 {
 			t.Errorf("row %d says nothing but its own name: %q", i, row)
 		}
+	}
+}
+
+// What the bar says goes to a file as well, and goes with the session.
+//
+// The screen is in front of whoever is listening; everybody else is told what
+// the numbers said rather than reading them. So it is written down — and
+// deleted as spindle closes, because it is a page of working rather than a log.
+func TestTheBarIsReadableOffTheDiskAndOnlyForNow(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	debugPen.began, debugPen.was, debugPen.at, debugPen.off = false, "", time.Time{}, false
+
+	path, err := debugPath()
+	if err != nil {
+		t.Fatalf("no state directory: %v", err)
+	}
+	lines := func() int {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return 0
+		}
+		return len(strings.Fields(strings.ReplaceAll(strings.TrimSpace(string(raw)), "\n", " \n ")))
+	}
+
+	m := stageWords("f")
+	m.lyrics.forTrack, m.lyrics.missing = "f", true
+	m.setProgress(30 * time.Second)
+	if cmd := m.wordsGrind(); cmd != nil {
+		m.wordsTake(cmd)
+	}
+	m.debugNote()
+	if _, err := os.Stat(path); err == nil {
+		t.Error("the bar was off and it wrote anyway")
+	}
+
+	m.debug.level = debugFull
+	m.debugNote()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("the bar was up and nothing was written: %v", err)
+	}
+	if !strings.Contains(string(raw), "\"words\"") || !strings.Contains(string(raw), "move") {
+		t.Errorf("the deal is missing from what was written: %s", raw)
+	}
+	was := lines()
+
+	// Nothing has happened, and it is not a second later.
+	m.debugNote()
+	if got := lines(); got != was {
+		t.Errorf("a frame where nothing changed was written down anyway (%d fields, was %d)", got, was)
+	}
+
+	// Something has.
+	m.words.move = (m.words.move + 1) % wordsMoves
+	m.debugNote()
+	if got := lines(); got <= was {
+		t.Error("the deal changed and nothing was written down")
+	}
+
+	ForgetDebug()
+	if _, err := os.Stat(path); err == nil {
+		t.Error("the session ended and its working was left behind")
 	}
 }

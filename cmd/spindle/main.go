@@ -177,6 +177,10 @@ func main() {
 	loader := cover.NewLoader(renderer, &http.Client{Timeout: 15 * time.Second})
 
 	final, err := tea.NewProgram(ui.New(backendPlayer, loader, cell)).Run()
+
+	// Whatever the debug bar wrote down goes with the session that wrote it.
+	ui.ForgetDebug()
+
 	if err != nil {
 		reportFatal(err)
 	}
