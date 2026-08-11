@@ -1518,3 +1518,57 @@ func TestAShortLineKeepsItsHyphensToItself(t *testing.T) {
 		}
 	}
 }
+
+// A chant moves a word at a time; a compound word moves as one word.
+//
+// Everything on this screen rides its own band of the spectrum and moves on its
+// own, and what counts as a "thing" is decided here. Set as one piece,
+// "whoa-whoa-whoa-whoa-whoa-whoa-whoa-whoa-whoa" answered one band and moved as
+// a slab: one word sung nine times, drawn as a single object.
+//
+// The repetition is the test rather than the hyphens. Nobody builds a compound
+// out of the same part twice, so "mother-in-law", "up-to-date" and
+// "state-of-the-art" have more hyphens between them than "whoa-whoa" and not one
+// repeated part; counting hyphens would have broken all three.
+//
+// And where the cut is made the hyphen is a piece of its own, as the comma is.
+// It was tried the other way, riding along with the word in front of it, and
+// that is the one rule this file already refuses to make for the comma: a mark
+// given to a word can only ever do what the word does.
+func TestAChantIsCutIntoItsRepeatsAndACompoundIsNot(t *testing.T) {
+	pieces := func(line string) []string {
+		var out []string
+		for _, p := range wordsPieces(line) {
+			out = append(out, line[p.from:p.to])
+		}
+		return out
+	}
+
+	for _, c := range []struct {
+		line string
+		want []string
+	}{
+		{"whoa-whoa-whoa-whoa-", []string{"whoa", "-", "whoa", "-", "whoa", "-", "whoa", "-"}},
+		{"na-na-na, hey!", []string{"na", "-", "na", "-", "na", ",", "hey", "!"}},
+
+		// Whole, every one of them.
+		{"well-known and much-loved", []string{"well-known", "and", "much-loved"}},
+		{"my mother-in-law is up-to-date", []string{"my", "mother-in-law", "is", "up-to-date"}},
+		{"state-of-the-art", []string{"state-of-the-art"}},
+
+		// The hyphen a line break leaves comes away as a mark, like any other.
+		{"You got me like whoa-", []string{"You", "got", "me", "like", "whoa", "-"}},
+	} {
+		got := pieces(c.line)
+		if len(got) != len(c.want) {
+			t.Errorf("%q came out as %q, want %q", c.line, got, c.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != c.want[i] {
+				t.Errorf("%q came out as %q, want %q", c.line, got, c.want)
+				break
+			}
+		}
+	}
+}

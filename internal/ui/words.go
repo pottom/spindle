@@ -265,6 +265,14 @@ func wordsPieces(line string) []wordsPiece {
 func wordsCut(line string, from, to int) []wordsPiece {
 	field := line[from:to]
 
+	// A chant first, because it is a run of words rather than a word. Its last
+	// part goes back through here, so a comma or a full stop hanging off the end
+	// of one still comes away as its own mark.
+	if cut := wordsChant(field, from); cut != nil {
+		last := cut[len(cut)-1]
+		return append(cut[:len(cut)-1], wordsCut(line, last.from, last.to)...)
+	}
+
 	head := 0
 	for _, r := range field {
 		if !wordsPunct(r) {
@@ -292,6 +300,66 @@ func wordsCut(line string, from, to int) []wordsPiece {
 	out = append(out, wordsPiece{from + head, from + tail})
 	if tail < len(field) {
 		out = append(out, wordsPiece{from + tail, to})
+	}
+	return out
+}
+
+// wordsChant cuts a hyphenated run into its parts when it is the same part over
+// again, and reports nil when it is not.
+//
+// A hyphen holds two halves of a word together — "well-known" is one word and
+// moves as one — so wordsCut leaves them alone, and it should. But
+// "whoa-whoa-whoa-whoa-whoa-whoa-whoa-whoa-whoa" is not a word with hyphens in
+// it. It is one word sung nine times, and set as a single piece it rides one
+// band of the spectrum and moves as a slab, which is the one thing that reads as
+// a picture rather than as singing.
+//
+// The repetition is the test, and it is the whole difference. Nobody writes a
+// compound out of the same part twice: "mother-in-law", "up-to-date" and
+// "state-of-the-art" all have more hyphens than "whoa-whoa" and not one repeated
+// part between them, so all three stay whole. Counting hyphens would have broken
+// every one of them.
+//
+// Each hyphen is then a piece of its own, like every other mark on this screen.
+// That is the rule this file already keeps for the comma — a mark is not part of
+// the word in front of it, and given to the word it can only ever do what the
+// word does — and a hyphen we have decided to cut at is a mark like any other.
+// The one a line break leaves at the end of a line comes away the same way.
+func wordsChant(field string, from int) []wordsPiece {
+	if !strings.ContainsRune(field, '-') {
+		return nil
+	}
+
+	seen, twice := map[string]bool{}, false
+	for _, part := range strings.Split(field, "-") {
+		if part == "" {
+			continue
+		}
+		part = strings.ToLower(part)
+		if seen[part] {
+			twice = true
+			break
+		}
+		seen[part] = true
+	}
+	if !twice {
+		return nil
+	}
+
+	var out []wordsPiece
+	at := 0
+	for i, r := range field {
+		if r != '-' {
+			continue
+		}
+		if i > at {
+			out = append(out, wordsPiece{from + at, from + i})
+		}
+		out = append(out, wordsPiece{from + i, from + i + 1})
+		at = i + 1
+	}
+	if at < len(field) {
+		out = append(out, wordsPiece{from + at, from + len(field)})
 	}
 	return out
 }
