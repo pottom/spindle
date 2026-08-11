@@ -117,6 +117,10 @@ type Model struct {
 	// run is the record's beats, counted forwards. See beatrun.go.
 	run beatRun
 
+	// splash is the program's own picture, up while the device is awaited.
+	// See splash.go.
+	splash splashState
+
 	// sign is the one who walks past with a placard when a switch moves.
 	// See sign.go.
 	sign signState

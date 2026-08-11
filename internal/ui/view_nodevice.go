@@ -15,12 +15,18 @@ func (m Model) noDevicePanel(l layout, rows int) []string {
 	s := m.styles
 	w := l.interior - leftMargin - rightMargin
 
-	lines := []string{
+	// The program's own picture, as large as what is left allows, while the
+	// device is being waited for. See splash.go.
+	lines := m.splashRows()
+	if len(lines) > 0 {
+		lines = append(lines, "")
+	}
+	lines = append(lines,
 		s.Title.Render("No active playback device"),
 		"",
 		s.Detail.Render("Start Spotify on one of your devices, or pick one below."),
 		"",
-	}
+	)
 	lines = append(lines, m.deviceRows(min(w, deviceListCols), true)...)
 	lines = append(lines, "", "")
 

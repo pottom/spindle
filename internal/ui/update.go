@@ -302,6 +302,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		// that moves. See beatrun.go.
 		m.beatRunFlow()
 
+		// The program's own picture, while the device is being waited for.
+		m.splashFlow()
+
 		// The head on the edge walks to wherever the record has been moved to,
 		// so a seek is watched rather than reported. Every picture on the big
 		// screen carries the edge — see drawCellsIn — so this runs for all of
