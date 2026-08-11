@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"github.com/pottom/spindle/internal/build"
 	"strings"
 )
 
@@ -145,11 +146,21 @@ func helpGroups() []helpGroup {
 func (m Model) helpPanel(l layout, rows int) []string {
 	w := l.interior - leftMargin - rightMargin
 
-	head := []string{
+	// What this is, above what its keys do. The picture heads it where there is
+	// room and is simply absent where there is not — see splashRoom, which
+	// gives the keys their rows first.
+	head := m.splashRows()
+	if len(head) > 0 {
+		head = append(head, strings.Repeat(" ", w))
+	}
+	head = append(head,
+		fit(m.styles.Title.Render("spindle "+build.Version()), w),
+		fit(m.styles.Album.Render("a Spotify player that plays the music itself — GPL-3.0"), w),
+		strings.Repeat(" ", w),
 		fit(m.styles.Title.Render("Keys"), w),
 		fit(m.styles.Album.Render("and what they are for"), w),
 		strings.Repeat(" ", w),
-	}
+	)
 
 	// Set from the top rather than centred: this is a page to read, and a page
 	// that floats in the middle of the screen reads as a dialogue box.

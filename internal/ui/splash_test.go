@@ -56,11 +56,23 @@ func TestTheLogoFillsTheWait(t *testing.T) {
 		t.Error("the logo stayed after the device arrived")
 	}
 
-	// And somebody choosing a device is past looking at a logo.
-	m.noDevice, m.devices.open = true, true
+	// A logo above a list of speakers is a logo in somebody's way.
+	m.ps, m.noDevice, m.devices.open = nil, true, true
 	m.splashFlow()
 	if len(m.splashRows()) != 0 {
 		t.Error("the logo was up over the device picker")
+	}
+
+	// The help screen has it whatever is playing: that is where a picture of
+	// the program belongs, and it is the answer to "what is this". It wants a
+	// tall terminal — the keys alone lay out in 36 rows.
+	m.devices.open = false
+	m.tab = tabHelp
+	m.height = 80
+	m.ps = &player.State{TrackID: "one", Title: "x", Duration: time.Minute}
+	m.splashFlow()
+	if len(m.splashRows()) == 0 {
+		t.Error("the help screen had no picture of the program on it")
 	}
 }
 

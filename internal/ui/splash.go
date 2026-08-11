@@ -43,6 +43,16 @@ const (
 	// themselves. The logo gets the rest, which is the whole point of it: it is
 	// as large as the screen allows.
 	splashKeeps = 9
+
+	// splashAbout is how many rows the help screen keeps for its keys and its
+	// heading. They are the page and the picture only heads it, so on a
+	// terminal with no room to spare the picture is what goes.
+	//
+	// Measured: the keys lay out in 36 rows at anything from 120 cells wide,
+	// and in 68 at 80 — where they do not fit the screen at all and a logo
+	// would be the least of it. Six more for the name, the version and the air
+	// around them.
+	splashAbout = 42
 )
 
 var (
@@ -115,13 +125,18 @@ func (m *Model) splashFlow() {
 // daemon answers, the state arrives with a device in it and the first screen is
 // the only one anybody sees.
 //
-// Not while the device picker is open over it: somebody choosing a device is
-// past looking at a logo.
+// Not while the device picker is open over it: a logo above a list of speakers
+// is a logo in somebody's way. What it is over the picker is what it is on the
+// help screen — see splashAbout, which is where a picture of the program
+// belongs.
 func (m Model) splashWanted() bool {
-	if m.covers == nil || m.tab != tabPlayer || m.devices.open {
+	if m.covers == nil || m.devices.open {
 		return false
 	}
-	return m.ps == nil || m.noDevice
+	if m.tab == tabHelp {
+		return true
+	}
+	return m.tab == tabPlayer && (m.ps == nil || m.noDevice)
 }
 
 // splashRoom is the box the logo is given: everything the screen has, less what
@@ -132,12 +147,18 @@ func (m Model) splashWanted() bool {
 // allows, and on the connecting screen almost nothing is left over.
 func (m Model) splashRoom() (w, rows int) {
 	l := m.layout()
+	w = l.interior - leftMargin - rightMargin
+	if m.tab == tabHelp {
+		// Whatever the keys do not want. They are the page; this heads it, and
+		// on a short terminal it does not appear at all rather than pushing a
+		// key off the bottom.
+		return w, max(l.bodyHeight-splashAbout, 0)
+	}
 	keeps := splashKeeps
 	if m.ps == nil {
 		keeps = 2
 	}
-	return l.interior - leftMargin - rightMargin,
-		max(l.bodyHeight-1-keeps, 0)
+	return w, max(l.bodyHeight-1-keeps, 0)
 }
 
 // splashRows is what was rendered, ready to put in the panel.
