@@ -2,36 +2,31 @@
   "name": "disco",
   "from": "drawn for spindle",
   "licence": "ours",
+  "turns": true,
+  "//": "Four of the eight people on the dance floor; the other four are in dance. Split so that they are drawn large: the size a row gets is decided by its width, and eight at 54 dots come to 273 cells across against the 167 an ordinary terminal has, so the row fell to 36 and every dancer with it. Four hold 98 cells at 54. Each is told apart by one bold mark and by the dance, and by nothing else.",
   "marks": [
     "hat.png",
     "skirt.png",
     "ponytail.png",
-    "belly.png",
-    "spikes.png",
-    "glasses.png",
-    "bowtie.png",
-    "scarf.png"
+    "belly.png"
   ],
+  "//heights": "Traced from a drawing, so the pen is measured off it and taken to three dots.",
   "heights": [
     {
       "tall": 24,
-      "thick": 2
+      "thick": 3
     },
     {
       "tall": 36,
-      "thick": 2
+      "thick": 3
     },
     {
       "tall": 54,
-      "thick": 2
+      "thick": 3
     },
     {
       "tall": 72,
-      "thick": 2
+      "thick": 3
     }
-  ],
-  "//": "Eight people on a dance floor, in place of two sets that were people: a crowd taken from an icon library and eight dancers drawn as one hand but standing still. These dance, and every one of them is somebody \u2014 told apart by one bold mark and by the dance, and by nothing else. Two different builds read as two different sets at this size; a hat reads as a person in a hat.",
-  "//marks": "The order is the sound, so the row runs from the one with both feet on the floor to the one in the air. Narrow, which is why eight of them fit where eight faces did not: 0.57 of the height against 0.89, and 138 cells at 36 dots against 184.",
-  "turns": true,
-  "//turns": "These have feet, so they turn round on the beat, each on its own count. See wordsTurning."
+  ]
 }

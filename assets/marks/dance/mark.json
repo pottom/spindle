@@ -1,0 +1,32 @@
+{
+  "name": "dance",
+  "from": "drawn for spindle",
+  "licence": "ours",
+  "turns": true,
+  "//": "The other four of the dance floor; the first four are in disco. Two sets rather than one, so that each is drawn half again as tall \u2014 and so that a record shows two rooms rather than one.",
+  "marks": [
+    "spikes.png",
+    "glasses.png",
+    "bowtie.png",
+    "scarf.png"
+  ],
+  "//heights": "Traced from a drawing, so the pen is measured off it and taken to three dots.",
+  "heights": [
+    {
+      "tall": 24,
+      "thick": 3
+    },
+    {
+      "tall": 36,
+      "thick": 3
+    },
+    {
+      "tall": 54,
+      "thick": 3
+    },
+    {
+      "tall": 72,
+      "thick": 3
+    }
+  ]
+}
