@@ -35,22 +35,6 @@ const (
 	// per row.
 	coverSettleDelay = 250 * time.Millisecond
 
-	// scopeInterval is the waveform's frame time. Thirty a second was the point
-	// where a trace stops looking like a slideshow, and it was chosen for that
-	// and never questioned.
-	//
-	// Sixty, measured. Asked at 16ms over an eleven thousand frame run on the
-	// words screen at 167x41: 62.6 frames a second against the 62.5 the interval
-	// allows, one frame reported late in the whole run and that one the picture
-	// coming back from a tab it is not drawn on. The daemon answered in 0.2ms at
-	// the median, deciding a frame took 1ms and drawing it took 1ms — two of the
-	// sixteen a frame has. The room was there; nobody had asked for it.
-	//
-	// It costs what it says: twice the requests and twice the redraws, on one
-	// machine and one terminal. If a slower one cannot keep up, the bar says so
-	// in its own first field.
-	scopeInterval = 16 * time.Millisecond
-
 	// A track change does not appear in State() the moment the command returns.
 	// Measured against a live account it took 466, 530, 564 and 678 ms — so the
 	// 400 ms single shot DESIGN.md guessed at would have confirmed the *old*

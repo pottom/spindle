@@ -80,9 +80,9 @@ func (m *Model) throwSparks(w, rows int) {
 
 	kept := m.scope.sparks[:0]
 	for _, s := range m.scope.sparks {
-		s.speed -= sparkGravity
+		s.speed -= sparkGravityAt
 		s.at += s.speed
-		s.bright *= sparkDim
+		s.bright *= sparkDimAt
 
 		// Gone when it falls back onto the line, leaves the picture, or has
 		// nothing left to see.
@@ -105,7 +105,7 @@ func (m *Model) throwSparks(w, rows int) {
 		// The tallest crests throw the most: squared, so the peaks of a wave
 		// spray and the flat of it does not.
 		swing := abs32(now)
-		chance := sparkSpray * swing * swing * (sparkIdle + rise*sparkHit)
+		chance := sparkSprayAt * swing * swing * (sparkIdle + rise*sparkHit)
 		if m.scope.roll() > chance {
 			continue
 		}
@@ -118,7 +118,7 @@ func (m *Model) throwSparks(w, rows int) {
 			col:    c,
 			side:   side,
 			at:     swing * half * scopeDeflection,
-			speed:  throw * (sparkLift + rise*sparkHeave),
+			speed:  paceSpeed(throw * (sparkLift + rise*sparkHeave)),
 			bright: min(swing+rise, 1),
 		})
 	}

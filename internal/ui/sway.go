@@ -221,8 +221,8 @@ func (m *Model) swayFlow() {
 	hit := max(low-m.words.swayWas, 0)
 	m.words.swayWas = low
 
-	m.words.swayHit = max(hit, m.words.swayHit*swayFall)
-	m.words.swayCeil = max(hit, m.words.swayCeil*swaySettle)
+	m.words.swayHit = max(hit, m.words.swayHit*swayFallAt)
+	m.words.swayCeil = max(hit, m.words.swayCeil*swaySettleAt)
 
 	m.words.drive = min(m.words.swayHit/max(m.words.swayCeil, swayLeast)*swayGain, 1)
 }

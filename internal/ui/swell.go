@@ -63,12 +63,12 @@ func (m *Model) swellFlow() {
 	if db < m.words.swellLow {
 		m.words.swellLow += (db - m.words.swellLow) * swellRise
 	} else {
-		m.words.swellLow += (db - m.words.swellLow) * swellClose
+		m.words.swellLow += (db - m.words.swellLow) * swellCloseAt
 	}
 	if db > m.words.swellHigh {
 		m.words.swellHigh += (db - m.words.swellHigh) * swellRise
 	} else {
-		m.words.swellHigh += (db - m.words.swellHigh) * swellClose
+		m.words.swellHigh += (db - m.words.swellHigh) * swellCloseAt
 	}
 }
 

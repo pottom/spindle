@@ -497,7 +497,6 @@ const (
 
 	// faceTurn is the rise in loudness he takes as his cue.
 	faceTurn = 0.055
-
 )
 
 // faceDoing is what the face has started and not yet finished.
@@ -589,8 +588,8 @@ func (m *Model) faceFlow() {
 			}
 		}
 		want := (float32(at)/float32(max(len(bands)-1, 1)))*2 - 1
-		m.face.look += (want - m.face.look) * faceEase
-		m.face.mouth += (loud*faceMouthMost - m.face.mouth) * faceEase
+		m.face.look += (want - m.face.look) * faceEaseAt
+		m.face.mouth += (loud*faceMouthMost - m.face.mouth) * faceEaseAt
 
 		// The arms answer the whole of it rather than one band, and slowly, so
 		// they climb through a build rather than flapping on every beat.
@@ -598,7 +597,7 @@ func (m *Model) faceFlow() {
 		for _, v := range bands {
 			all += v
 		}
-		m.face.lift += (min32(all/float32(len(bands))*faceLiftFrom, 1) - m.face.lift) * faceLiftEase
+		m.face.lift += (min32(all/float32(len(bands))*faceLiftFrom, 1) - m.face.lift) * faceLiftEaseAt
 	}
 
 	// If he went out with both arms up, they go off as he does.
@@ -966,7 +965,7 @@ func (m *Model) faceSparks(w, rows int) {
 			m.stage.drops = append(m.stage.drops, stageDrop{
 				col:    int(tipX + float64(dir)*float64(m.scope.roll())*mitt),
 				at:     float32(dotsY-1) - float32(tipY),
-				speed:  faceSparkThrow * (0.6 + m.scope.roll()),
+				speed:  paceSpeed(faceSparkThrow * (0.6 + m.scope.roll())),
 				bright: 0.7 + 0.3*m.scope.roll(),
 			})
 		}
@@ -1294,11 +1293,11 @@ const (
 type faceHold int
 
 const (
-	faceHoldDown faceHold = iota // by his sides, out of the way
-	faceHoldWave                 // hello, and goodbye
-	faceHoldThumb                // that was good
-	faceHoldOne                  // wait for it
-	faceHoldUp                   // both arms up, which is the whole joke
+	faceHoldDown  faceHold = iota // by his sides, out of the way
+	faceHoldWave                  // hello, and goodbye
+	faceHoldThumb                 // that was good
+	faceHoldOne                   // wait for it
+	faceHoldUp                    // both arms up, which is the whole joke
 )
 
 // hands draws the pair, out to the sides of the face.

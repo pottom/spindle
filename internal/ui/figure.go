@@ -711,7 +711,7 @@ func (m *Model) figureSweep(w, rows int) {
 			m.stage.drops = append(m.stage.drops, stageDrop{
 				col:    x,
 				at:     float32(dotsY - 1 - y),
-				speed:  figureSprayThrow * (m.scope.roll() + 0.15),
+				speed:  paceSpeed(figureSprayThrow * (m.scope.roll() + 0.15)),
 				bright: 0.6 + 0.4*m.scope.roll(),
 			})
 		}
@@ -772,7 +772,7 @@ func (m *Model) figureSpray(w, rows int) {
 		m.stage.drops = append(m.stage.drops, stageDrop{
 			col:    x + left,
 			at:     float32(at),
-			speed:  figureSprayThrow * (m.scope.roll() - 0.35),
+			speed:  paceSpeed(figureSprayThrow * (m.scope.roll() - 0.35)),
 			bright: 0.5 + 0.5*m.scope.roll(),
 		})
 	})

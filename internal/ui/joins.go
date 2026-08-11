@@ -186,7 +186,7 @@ func (m *Model) joinsFlow(fps int) {
 	if !j.seen {
 		j.watch, j.seen = nov, true
 	}
-	j.watch += (nov - j.watch) * joinWatch
+	j.watch += (nov - j.watch) * joinWatchAt
 
 	if j.heard < joinWarm || j.heard-j.begins < joinApart {
 		return

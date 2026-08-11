@@ -100,6 +100,16 @@ func reportFatal(err error) {
 }
 
 func main() {
+	// The flags are declared before anything else so that the help has them to
+	// list: the word "help" is answered from the subcommands below, which used
+	// to run before these existed, and the section headed "Options for the
+	// interface" printed nothing under it for as long as it has been there.
+	mock := flag.Bool("mock", false, "run against the offline mock backend, without auth or network")
+	backend := flag.String("cover", "auto", "artwork backend: auto, kitty or halfblock")
+	info := flag.Bool("cover-info", false, "report what the terminal supports and exit")
+	fps := flag.Int("fps", 60, "how many frames a second the visualisers are drawn at, 15 to 120")
+	flag.Usage = usage
+
 	// Subcommands come before flags so "spindle login" reads the way it looks.
 	if len(os.Args) > 1 {
 		// The daemon-driving commands leave through os.Exit rather than
@@ -148,16 +158,17 @@ func main() {
 		}
 	}
 
-	mock := flag.Bool("mock", false, "run against the offline mock backend, without auth or network")
-	backend := flag.String("cover", "auto", "artwork backend: auto, kitty or halfblock")
-	info := flag.Bool("cover-info", false, "report what the terminal supports and exit")
-	flag.Usage = usage
 	flag.Parse()
 
 	if *info {
 		reportCoverSupport()
 		return
 	}
+
+	// Before anything is drawn, and once: everything on the visual screens is
+	// tuned per frame, and the conversion for the rate actually asked for is
+	// worked out here. See internal/ui/pace.go.
+	ui.SetFrameRate(*fps)
 
 	ctx, stopWatching := context.WithCancel(context.Background())
 	defer stopWatching()

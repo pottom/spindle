@@ -380,9 +380,9 @@ func (m *Model) stageFlowIn(w, rows int, t stageThrows) {
 
 	kept := m.stage.drops[:0]
 	for _, d := range m.stage.drops {
-		d.speed -= stageGravity
+		d.speed -= stageGravityAt
 		d.at += d.speed
-		d.bright *= stageDim
+		d.bright *= stageDimAt
 
 		// It is gone when it falls back into the middle, leaves the frame, or
 		// has nothing left to see.
@@ -419,14 +419,14 @@ func (m *Model) stageFlowIn(w, rows int, t stageThrows) {
 		}
 		// Only some of the columns throw, so the spray is ragged the way water
 		// is rather than a curtain going up.
-		if m.stage.roll() > stageSpray {
+		if m.stage.roll() > stageSprayAt {
 			continue
 		}
 
 		m.stage.drops = append(m.stage.drops, stageDrop{
 			col:    x,
 			at:     now * reach,
-			speed:  jump * throw,
+			speed:  paceSpeed(jump * throw),
 			bright: min(now+jump, 1),
 		})
 	}

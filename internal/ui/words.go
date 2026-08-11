@@ -1265,8 +1265,8 @@ func (m *Model) wordsEase(w, rows int) {
 		return
 	}
 
-	m.words.band += (float32(tall) - m.words.band) * wordsRoomEase
-	m.words.head += (float32(head) - m.words.head) * wordsRoomEase
+	m.words.band += (float32(tall) - m.words.band) * wordsRoomEaseAt
+	m.words.head += (float32(head) - m.words.head) * wordsRoomEaseAt
 }
 
 // wordsBandNow is the meter's room as it is drawn this frame: what it has been
@@ -1666,7 +1666,7 @@ func (m *Model) wordsRollFlow() {
 	for d < -0.5 {
 		d++
 	}
-	m.words.roll += d * wordsRollEase
+	m.words.roll += d * wordsRollEaseAt
 	for m.words.roll >= 1 {
 		m.words.roll--
 	}
@@ -2130,12 +2130,12 @@ func (m *Model) wordsFollowCentre(centre float32) {
 	if centre < m.words.low {
 		m.words.low = centre
 	} else {
-		m.words.low += (centre - m.words.low) * wordsRangeClose
+		m.words.low += (centre - m.words.low) * wordsRangeCloseAt
 	}
 	if centre > m.words.high {
 		m.words.high = centre
 	} else {
-		m.words.high += (centre - m.words.high) * wordsRangeClose
+		m.words.high += (centre - m.words.high) * wordsRangeCloseAt
 	}
 }
 
@@ -2200,14 +2200,14 @@ func (m *Model) wordsSparks(w, rows int) {
 			continue
 		}
 		ride := rides[word]
-		if ride < wordsSparkLeast || m.stage.roll() > wordsSparkSpray {
+		if ride < wordsSparkLeast || m.stage.roll() > wordsSparkSprayAt {
 			continue
 		}
 
 		m.stage.drops = append(m.stage.drops, stageDrop{
 			col:    x,
 			at:     1,
-			speed:  (ride - wordsSparkLeast) / (1 - wordsSparkLeast) * wordsSparkThrow * float32(math.Sqrt(float64(span))),
+			speed:  paceSpeed((ride - wordsSparkLeast) / (1 - wordsSparkLeast) * wordsSparkThrow * float32(math.Sqrt(float64(span)))),
 			bright: ride,
 		})
 	}

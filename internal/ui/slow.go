@@ -27,22 +27,18 @@ import (
 // It costs two clock reads a frame and a comparison. The file is only opened
 // when something is worth writing to it.
 
-const (
-	// slowBudget is how long a frame has: whatever the interface set out to
-	// draw at. Anything past it has already cost a frame.
-	slowBudget = scopeInterval
+const slowFile = "frames.jsonl"
 
-	// slowGap is how far apart two frames have to land before the gap is worth
-	// writing down. A frame and a half: a frame that merely ran late is not a
-	// frame that went missing.
-	//
-	// Both are taken from the rate rather than written down beside it. Left as
-	// the numbers that suited thirty a second, a run at sixty would have called
-	// every frame on time whatever it did.
-	slowGap = scopeInterval * 3 / 2
-
-	slowFile = "frames.jsonl"
-)
+// slowBudget is how long a frame has: whatever the interface set out to draw
+// at. Anything past it has already cost a frame. slowGap is how far apart two
+// frames have to land before the gap is worth writing down — a frame and a
+// half, because a frame that merely ran late is not a frame that went missing.
+//
+// Both are taken from the rate rather than written down beside it. Left as the
+// numbers that suited thirty a second, a run at sixty would have called every
+// frame on time whatever it did. See pace.go.
+func slowBudget() time.Duration { return scopeInterval }
+func slowGap() time.Duration    { return scopeInterval * 3 / 2 }
 
 // slowState is what one frame's timing needs to remember. It is package state
 // rather than model state because View has a value receiver and cannot write
@@ -179,14 +175,14 @@ func slowRenderDone(m Model, render time.Duration) {
 		if slowState.fps == 0 {
 			slowState.fps = now
 		} else {
-			slowState.fps += (now - slowState.fps) * 0.1
+			slowState.fps += (now - slowState.fps) * float64(paceEase(0.1))
 		}
 	}
 
 	if slowState.off {
 		return
 	}
-	if gap < slowGap && update+render < slowBudget {
+	if gap < slowGap() && update+render < slowBudget() {
 		return
 	}
 

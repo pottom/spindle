@@ -178,16 +178,16 @@ const (
 // so bringing both down together would leave the picture exactly as it was.
 func (s *scopeState) settle() {
 	for i := range s.sparks {
-		s.sparks[i].bright *= scopeSettle
+		s.sparks[i].bright *= scopeSettleAt
 	}
 	for i := range s.bands {
-		s.bands[i] *= scopeSettle
+		s.bands[i] *= scopeSettleAt
 	}
 	for i := range s.peaks {
-		s.peaks[i] *= scopeSettle
+		s.peaks[i] *= scopeSettleAt
 	}
 	for i := range s.frame {
-		s.frame[i] *= scopeSettle
+		s.frame[i] *= scopeSettleAt
 	}
 }
 
@@ -201,7 +201,7 @@ func (s *scopeState) follow(frame []float32) {
 		peak = max(peak, v)
 	}
 
-	s.envelope = max(peak, s.envelope*scopeRelease)
+	s.envelope = max(peak, s.envelope*scopeReleaseAt)
 	s.envelope = max(s.envelope, scopeFloor)
 }
 
@@ -454,8 +454,8 @@ func (m Model) scopeDraw(w, rows int, grid []uint8, loud, dwell []float32) []str
 // remember keeps a frame's dots so the next few can glow behind the beam.
 func (s *scopeState) remember(grid []uint8) {
 	s.trail = append(s.trail, grid)
-	if len(s.trail) > scopeTrail {
-		s.trail = s.trail[len(s.trail)-scopeTrail:]
+	if len(s.trail) > scopeTrailAt {
+		s.trail = s.trail[len(s.trail)-scopeTrailAt:]
 	}
 }
 
