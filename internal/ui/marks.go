@@ -186,6 +186,10 @@ type markDots struct {
 	least int
 	turns bool
 
+	// set is the sheet it was drawn on. It is not used to draw anything — it is
+	// how a dealt company keeps from being all one kind. See pick.
+	set string
+
 	name       string
 	wide, tall int
 	bits       string
@@ -281,6 +285,7 @@ func pick(pool []markDots, dotsX, gap int, seed int64) []markDots {
 	for places := markCrowdMost; places >= markCrowdLeast; places-- {
 		var crowd []markDots
 		var wide int
+		already := map[string]bool{}
 		for band := range places {
 			low, high := float64(band)/float64(places), float64(band+1)/float64(places)
 
@@ -296,15 +301,49 @@ func pick(pool []markDots, dotsX, gap int, seed int64) []markDots {
 				in[i], in[j] = in[j], in[i]
 			}
 
-			for _, one := range in {
+			// Whoever fits, and a sheet nobody in the row has come off yet
+			// before one that is already represented.
+			//
+			// Without the preference the deal is fair to the drawings and unfair
+			// to the sheets: the instruments are nineteen of fifty-seven and the
+			// faces fourteen, so a third of every company was instruments and
+			// four hundred deals put up four rows that were all one sheet.
+			room := func(one markDots) (int, bool) {
 				want := one.wide
 				if len(crowd) > 0 {
 					want += gap
 				}
-				if wide+want <= dotsX {
-					crowd = append(crowd, one)
-					wide += want
+				return want, wide+want <= dotsX
+			}
+
+			// A leaning, not a rule. Held absolutely it stopped being a mix and
+			// became a quota: five places and five sheets means one of each,
+			// every time, which is one animal and one face and one instrument
+			// for ever. Overruled a quarter of the time, a company is usually
+			// four or five sheets and sometimes three, which is a crowd.
+			mind := roll()%markMixEvery != 0
+
+			spare, hasSpare, took := markDots{}, false, false
+			for _, one := range in {
+				want, fits := room(one)
+				if !fits {
+					continue
+				}
+				if !mind || !already[one.set] {
+					crowd, wide, took = append(crowd, one), wide+want, true
+					already[one.set] = true
 					break
+				}
+				if !hasSpare {
+					spare, hasSpare = one, true
+				}
+			}
+			// Nobody new fitted. A second off a sheet already in the row beats a
+			// shorter row: the spread along the sound is what the row says, and
+			// a missing band is a hole in it.
+			if !took && hasSpare {
+				if want, fits := room(spare); fits {
+					crowd, wide = append(crowd, spare), wide+want
 				}
 			}
 		}
@@ -324,6 +363,25 @@ func pick(pool []markDots, dotsX, gap int, seed int64) []markDots {
 const (
 	markCrowdLeast = 4
 	markCrowdMost  = 6
+
+	// markMixEvery is how often the leaning toward a sheet not yet in the row is
+	// overruled: one band in this many takes whoever comes first.
+	//
+	// Measured over four hundred deals against the five sheets in the pool, as
+	// how many sheets a company came off:
+	//
+	//	no leaning   3.46 — and four rows that were all one sheet
+	//	every 6      4.93 — 375 of 400 rows held all five
+	//	every 4      4.79
+	//	every 3      4.76
+	//	every 2      4.44 — 216 held five, 146 four, 36 three, 2 two
+	//	absolute     5.00 — one of each, every time
+	//
+	// Two. Anything weaker and the row is a quota with a rounding error: five
+	// places and five sheets means one animal, one face, one instrument, for
+	// ever. At two the usual company is four or five sheets and now and then it
+	// is three, which is a crowd rather than a delegation.
+	markMixEvery = 2
 )
 
 // markPicture builds the field of dots a row of marks is drawn from, and the

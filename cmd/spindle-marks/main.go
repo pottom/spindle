@@ -452,8 +452,8 @@ func emit(b *strings.Builder, dir string, s set) error {
 			if least == 0 {
 				least = s.Least
 			}
-			fmt.Fprintf(b, "\t\t\t\t{name: %q, pitch: %.3f, least: %d, turns: %v, wide: %d, tall: %d, bits: %q},\n",
-				strings.TrimSuffix(name, filepath.Ext(name)), pitch, least, s.Turns, m.wide, m.tall, m.bits)
+			fmt.Fprintf(b, "\t\t\t\t{name: %q, set: %q, pitch: %.3f, least: %d, turns: %v, wide: %d, tall: %d, bits: %q},\n",
+				strings.TrimSuffix(name, filepath.Ext(name)), s.Name, pitch, least, s.Turns, m.wide, m.tall, m.bits)
 		}
 		fmt.Fprintf(b, "\t\t\t}},\n")
 	}
