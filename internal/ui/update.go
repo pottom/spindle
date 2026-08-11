@@ -300,6 +300,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		// them rather than inside one of their branches.
 		if m.stage.on {
 			m.stageEdgeFlow()
+			m.volumeFlow(m.height)
 		}
 
 		// The colour of the record coming next, arriving before the sound of it.

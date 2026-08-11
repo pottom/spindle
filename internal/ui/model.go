@@ -114,6 +114,10 @@ type Model struct {
 	// chosen is worth keeping, and the music keeps playing either way.
 	mutedFrom int
 
+	// volume is the stack of lamps the big screen says the level with, and
+	// whatever has fallen off it. See volume.go.
+	volume volumeState
+
 	// mutedAt is when the room went quiet, which is what the row of marks that
 	// says so is stamped with — so the company is dealt once rather than afresh
 	// on every frame. See wordsComing.
