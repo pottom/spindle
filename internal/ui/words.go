@@ -1058,6 +1058,10 @@ func (m Model) wordsLines(w, rows int) []string {
 		}
 	}
 
+	// And this beat's sparks coming off the underside of the type. See
+	// wordspark.go, which is the fall held down to almost nothing.
+	m.wordsSparkDraw(g, grid, paint, w, rows, levels)
+
 	// What each word is burning at, and in what colour.
 	//
 	// The whole line, all of it lit, and every word answering its own share of
