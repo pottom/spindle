@@ -46,6 +46,7 @@ type keyMap struct {
 	// record's own name up there without waiting for a solo to make room.
 	Stage key.Binding
 	Tell  key.Binding
+	Marks key.Binding
 	Face  key.Binding
 
 	// Loose turns keeping time with the record off and on, so the two ways of
@@ -206,6 +207,10 @@ func newKeyMap() keyMap {
 		Tell: key.NewBinding(
 			key.WithKeys("t"),
 			key.WithHelp("t", "what is playing"),
+		),
+		Marks: key.NewBinding(
+			key.WithKeys("m"),
+			key.WithHelp("m", "the marks"),
 		),
 		Face: key.NewBinding(
 			key.WithKeys("w"),

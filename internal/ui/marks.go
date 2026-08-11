@@ -3,6 +3,7 @@ package ui
 import (
 	"encoding/base64"
 	"sort"
+	"time"
 
 	"github.com/pottom/spindle/internal/ui/cover"
 	"github.com/pottom/spindle/internal/ui/msg"
@@ -258,3 +259,45 @@ func markPicture(name string, w, rows int) (cover.Grain, msg.WordLayout, bool) {
 	}
 	return grain, layout, true
 }
+
+// marksWalk moves to the next set of marks by hand, and round to the deal again.
+//
+// The row is dealt at the record's own turns, which is right for listening and
+// useless for looking: a set that has just been drawn cannot be seen without
+// waiting for a join that may be a minute off. So the key walks the sets in the
+// order they are named, and one more press hands the row back to the deal.
+func (m *Model) marksWalk() {
+	sets := make([]string, 0, len(markSets)+1)
+	for name := range markSets {
+		sets = append(sets, name)
+	}
+	sort.Strings(sets)
+	sets = append(sets, "") // and back to whatever the record would have given
+
+	at := len(sets) - 1
+	for i, name := range sets {
+		if name == m.words.picked {
+			at = i
+			break
+		}
+	}
+	m.words.picked = sets[(at+1)%len(sets)]
+	m.words.showed = time.Now()
+
+	// Thrown away rather than left up: the picture on screen was made for the
+	// set that was on, and wordsGrind only asks for a new one when what it holds
+	// is not what it wants.
+	m.words.cast = "\x00"
+}
+
+// marksForcing reports that a bar of marks is up because somebody asked for it.
+//
+// The same length the record's name gets: long enough to look at, short enough
+// that the screen goes back to the music on its own rather than waiting to be
+// let go.
+func (m Model) marksForcing() bool {
+	return !m.words.showed.IsZero() && time.Since(m.words.showed) < marksShows
+}
+
+// marksShows is how long a set stays when it is asked for.
+const marksShows = 12 * time.Second

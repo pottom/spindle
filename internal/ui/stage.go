@@ -162,6 +162,12 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		m.words.forced = time.Now()
 		return nil, true
 
+	case key.Matches(k, m.keys.Marks):
+		// Walks the sets of marks a press at a time, and round to the deal
+		// again. See marksWalk.
+		m.marksWalk()
+		return nil, true
+
 	case key.Matches(k, m.keys.Face):
 		// Puts a face up, and walks its expressions a press at a time.
 		m.faceShow()

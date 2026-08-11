@@ -506,6 +506,14 @@ func (m Model) wordsComing() ([]string, int64) {
 		}
 	}
 
+	// And the marks, when they are asked for by hand. A set of them arrives on
+	// the record's own turns, which is right for listening and useless for
+	// looking: on a record with words they may not arrive at all. Asked for,
+	// they come up over whatever is being sung, for as long as the name would.
+	if m.marksForcing() {
+		return []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)}, m.words.showed.UnixMilli()
+	}
+
 	if m.lyrics.synced && m.ps != nil && m.lyrics.forTrack == m.ps.TrackID {
 		at, clock := m.wordsAt(), m.wordsClock()
 
@@ -716,6 +724,14 @@ type wordsState struct {
 	// forced is when the record's name was last asked for by hand, so that the
 	// one thing on this screen that happens on purpose can be seen on purpose.
 	forced time.Time
+
+	// showed is when the marks were last asked for by hand, and picked which set
+	// was asked for — empty for whatever the deal gives. A set arrives when the record turns over, which is a handful of
+	// times in a record and never on demand — so a new one cannot be looked at
+	// without a key, and a set that cannot be looked at cannot be judged. See
+	// marksWalk.
+	picked string
+	showed time.Time
 
 	// telling says what is on screen is the record's own name, put up once in
 	// the middle of a solo. It arrives the same way every time and it holds
@@ -1520,6 +1536,9 @@ func (m *Model) wordsGrind() tea.Cmd {
 	cast := ""
 	if m.words.beats && marksDrawn {
 		cast = markCastFor(m.words.forTrack, starts)
+		if m.words.picked != "" {
+			cast = m.words.picked
+		}
 	}
 
 	if m.words.text == text && m.words.cast == cast && m.words.cellsX == m.width && m.words.cellsY == m.height {
