@@ -1566,7 +1566,15 @@ func (m *Model) wordsGrind() tea.Cmd {
 	cast := ""
 	if m.words.beats && marksDrawn {
 		cast = markCastFor(m.words.forTrack, starts)
-		if m.words.picked != "" {
+
+		// A set asked for by hand holds the screen for as long as the asking
+		// does, and then the deal has it back. Held for good, the key was not a
+		// look at a set but a choice of one: the row never changed again for the
+		// rest of the session, and the notes — which are the deal's own empty
+		// hand, and what a bar of music has looked like here from the start —
+		// never came up at all. The choice is remembered so that pressing the
+		// key again carries on where it left off. See marksWalk.
+		if m.words.picked != "" && m.marksForcing() {
 			cast = m.words.picked
 		}
 	}
