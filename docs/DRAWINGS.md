@@ -13,7 +13,9 @@ each sheet below go into an image generator as they stand, one sheet at a time.
 
 1. Paste the style block and one sheet's brief. Ask for one image.
 2. Keep the returned PNG. It is cut into one file per cell.
-3. The cells go under `assets/marks/<set>/`, with a `mark.json` listing them.
+3. The cells go under `assets/marks/<set>/`, with a `mark.json` listing them:
+   the marks in the order they stand in the row, the frames of each, and how
+   those frames play — struck, swung, cycled or once. See below.
 4. `go run ./cmd/spindle-marks` bakes every mark at every size into
    `internal/ui/marks_gen.go`. Nothing is rasterised at playback time.
 
@@ -87,15 +89,53 @@ STYLE, applying to everything on the sheet
 LAYOUT, applying to everything on the sheet
 - An invisible grid, evenly spaced, with a wide empty margin around the sheet
   and clear empty space between every cell. Nothing touches or overlaps.
-- Where a column is one subject and the rows are its phases, the phases are the
-  SAME drawing at the SAME size in the SAME position within the cell, with ONLY
-  the moving part changed. Everything else must be identical.
+- Where a column is one subject and the rows are its animation frames, the
+  frames are the SAME drawing at the SAME size in the SAME position within the
+  cell, with ONLY the moving part changed. Everything else must be identical.
 - Every subject on the sheet is drawn by one hand, sharing one build and one
   pen, like a single icon family.
 
 Style reference: clean pictogram line icons, the weight and simplicity of
 Tabler Icons.
 ```
+
+## Frames, and how they play
+
+A mark that animates is a set of drawings, and how many there are is decided by
+how the movement returns to where it started. Say which of these a subject is
+when asking for it, because it is what the number of cells means.
+
+**Struck** — three frames: at rest, striking, ringing. A kick, a clap, a piano
+key, the woodpecker. Played 1, 2, 3, 2 and back to 1, with the strike landing on
+the beat rather than after it. Three drawings, four steps, and it always returns
+to rest, which is why three is enough.
+
+**Swung** — three frames: one side, the middle, the other side. A metronome, a
+pendulum, a flag, a shaker. Played 1, 2, 3, 2 across two beats, so the swing is
+a bar rather than a twitch. Never draw the two ends as mirror images of each
+other by hand: draw one and say the other is its mirror, or the row will lean.
+
+**Cycled** — four frames, and it does not return: a walk, a run, wings beating,
+a disc turning. Played 1, 2, 3, 4, 1, and frame 4 has to lead back into frame 1
+or the loop has a bump in it. This is the one that needs more than three, and
+the one to ask for explicitly.
+
+**Once** — as many frames as the movement takes, played front to back and then
+stopped. Blowing a kiss, a curtain opening, a page turning, falling asleep. Six
+is comfortable; the movement is over when the frames are.
+
+The default is three. Where a sheet below wants four or six it says so, and the
+grid is that many rows or that many cells wide.
+
+Two things about the frames themselves, whatever the count:
+
+- They are the same drawing with one part moved. Not the same subject drawn
+  again — the same drawing. Anything that is not moving must not shift by a
+  pixel between frames, and the easiest way to get that wrong is to let the
+  whole subject drift a little towards the middle of its cell.
+- The movement between two frames should be the same size as the movement
+  between the next two. Three frames where the first two are nearly identical
+  and the third leaps is a stutter, not an animation.
 
 ## Sheet 1 — instruments, animated
 
@@ -105,7 +145,8 @@ the cymbals. Replaces a set assembled out of an icon library.
 
 ```
 Grid: 8 columns by 3 rows. Each column is one instrument, the three rows are
-three phases of it.
+three frames of it. Every instrument here is STRUCK or SWUNG: it returns to
+where it started, so three frames is the whole animation.
 
 1. Kick drum with pedal and beater, seen from the front.
    Beater pulled back / beater against the drum head / beater on the head with
@@ -140,7 +181,8 @@ something anybody hears. Each animal opens its mouth when its own band sounds.
 
 ```
 Grid: 8 columns by 3 rows. Each column is one animal, seen from the side with
-its head turned towards the viewer. The three rows are three phases.
+its head turned towards the viewer. The three rows are three frames: mouth
+closed, half open, wide. STRUCK — it returns to closed, so three is enough.
 
 Every animal is drawn LARGE, filling its cell to the same height, whatever the
 real animal's size is. Do not draw them to scale with each other.
@@ -166,7 +208,7 @@ against. These are the objects that say so without being read.
 
 ```
 Grid: 8 columns by 3 rows. Each column is one object, the three rows are three
-phases of it.
+frames of it. All eight are STRUCK or SWUNG: they return to where they started.
 
 1. Metronome, the classic wedge with a swinging arm and a weight on it.
    Arm leaning left / arm upright / arm leaning right.
@@ -196,15 +238,17 @@ presses a key. The sleeping row is for the quiet: a paused player that keeps
 moving is a player that has not noticed.
 
 ```
-Grid: 6 columns by 3 rows. Every mouth is drawn at the same width and in the
-same position in its cell. Mouths are outlines only: no teeth, no tongue, no
+Grid: 6 columns by 3 rows. Row 1 is six separate mouth shapes rather than an
+animation. Row 2 is ONE animation of six frames, played once. Row 3 is one
+animation of six frames, played once. Every mouth is drawn at the same width and
+in the same position in its cell. Mouths are outlines only: no teeth, no tongue, no
 lips, no face around them.
 
 ROW 1, six mouth shapes for miming a song, one per cell:
    a closed straight line / a small round o / a tall narrow o / a wide flat
    lens shape / a large wide-open oval / a smile curving upwards.
 
-ROW 2, blowing a kiss: six phases of ONE mouth, left to right:
+ROW 2, blowing a kiss: six frames of ONE mouth, played once, left to right:
    mouth relaxed / mouth pursed and small / pursed with a tiny heart touching
    it / the heart just clear of the mouth, small / the heart further away and
    larger / the heart largest at the edge of the cell with two short motion
@@ -215,6 +259,201 @@ ROW 3, six drawings of the same cat, one per cell:
    two Z's, the second larger / with three Z's rising / stretching with the
    front legs forward / sitting up awake with the ears up.
 ```
+
+## Sheet 5 — the dancers, animated
+
+The eight already exist and one hand drew them, which is the whole reason they
+work: a row assembled out of an icon library is eight strangers standing next to
+each other, and the eye reads the differences in build instead of the
+differences in pose. What they do not do is move. Each pose becomes three, and
+the row dances rather than leaning.
+
+Ask for the same eight poses, and say so: this is a redraw of an existing set,
+not a new cast.
+
+```
+Grid: 8 columns by 4 rows. Each column is one dancing figure, the four rows are
+four frames. CYCLED: frame 4 must lead back into frame 1 without a bump, so a
+figure that leans left through the four frames has to be on its way back by the
+fourth. Where a pose is named with three positions below, the fourth frame is
+the second one again on the way back.
+
+All eight figures share one build: the same height, the same proportions, the
+same simple body, no faces, no hair, no clothing detail. They are drawn front
+on, standing on an invisible floor at the same level.
+
+1. Standing square, arms straight out to the sides.
+   Arms level / arms slightly down / arms slightly up.
+2. Grooving, knees soft, arms bent at the elbows.
+   Weight left / centred / weight right.
+3. Stepping to one side.
+   Feet together / one foot lifted / foot planted wide.
+4. A long stride.
+   Legs together / mid-stride / legs at their widest.
+5. Reaching to one side, one arm long.
+   Arm halfway / arm out / arm out and the body leaning after it.
+6. Leaning back from the waist.
+   Upright / leaning / leaning further with both arms trailing.
+7. Both arms raised above the head.
+   Arms at the shoulders / arms halfway up / arms straight up.
+8. Jumping, both feet off the floor.
+   Crouched / rising with the feet just off the floor / at the top, legs tucked.
+```
+
+## Sheet 6 — the faces, animated
+
+The set that is up most often, and the one that is still an icon library. A
+smile that widens on the chorus is worth more than a smile.
+
+```
+Grid: 8 columns by 3 rows. Each column is one face, the three rows are three
+frames of it. STRUCK: it returns to the first, so three is the whole animation.
+
+Every face is the same circle at the same size in the same position. Only the
+features change between columns, and only the moving feature changes between
+phases. No hair, no ears, no colour, no cheeks, no eyebrows unless named.
+
+1. Happy.      Small smile / wider smile / widest smile with the eyes creased.
+2. Delighted.  Smile and open eyes / open mouth / mouth wide with two short
+               lines either side of the head.
+3. Winking.    Both eyes open / one eye half closed / one eye shut, smile wider.
+4. Sad.        Slight frown / deeper frown / frown with one tear below one eye.
+5. Cross.      Level brows / brows angled down / brows down hard with two short
+               lines above the head.
+6. Puzzled.    Level brows, straight mouth / one brow raised / one brow raised
+               and the mouth pushed to one side.
+7. Bookish.    Round glasses, straight mouth / small smile / smile and the
+               glasses pushed up slightly.
+8. Asleep.     Eyes shut, straight mouth / one Z above the head / two Z's, the
+               second larger.
+```
+
+## Sheet 7 — the crowd, animated
+
+A row of people rather than a row of objects: the room the record is playing to.
+Same build for all of them, the way the dancers are.
+
+```
+Grid: 8 columns by 4 rows. Each column is one figure, four frames each. CYCLED,
+like the dancers: frame 4 leads back into frame 1. Walking and running are true
+cycles — left foot forward, passing, right foot forward, passing.
+
+All eight share one build, drawn front on, standing on an invisible floor at the
+same level, no faces.
+
+1. Waving.        Hand at the shoulder / hand up / hand up and leaning over.
+2. Bouncing.      Feet down / feet just off the floor / at the top of the hop.
+3. Arms up.       Arms at the chest / arms halfway / arms straight up.
+4. Two arm in arm. Standing / leaning together / leaning the other way.
+5. Walking.       Feet together / mid-step / feet apart.
+6. Running.       Feet together / mid-stride / legs at their widest, leaning.
+7. Stretching.    Arms down / arms out / arms up and the back arched.
+8. Clapping above the head.
+                  Hands apart / hands together / hands together with four short
+                  lines radiating out.
+```
+
+## Sheet 8 — the record turning over
+
+The picture is dealt at the record's own joins now, so a change of set is the
+record changing. These are the objects that say a page has turned, for the one
+mark in a row that turns over when it does.
+
+```
+Grid: 8 columns by 3 rows. Each column is one object, three frames each. These
+are ONCE animations — a page turns and stays turned — so the three frames are
+the beginning, the middle and the end of the movement, not a loop.
+
+1. Turntable seen from above: a disc, a spindle, a tonearm.
+   Arm parked to one side / arm halfway across / arm on the disc with two short
+   curved lines following the groove.
+2. A pair of stage curtains.
+   Closed / parted a little / open wide.
+3. A book or a page, seen from the front.
+   Flat / one corner lifted and curling / the page halfway over.
+4. A traffic light with three lamps.
+   The top lamp filled with a ring around it / the middle one / the bottom one.
+   (Only the ring changes: no lamp is ever solid.)
+5. A chameleon on a branch, seen from the side.
+   Plain body / body with a few spots / body with many spots.
+6. A kaleidoscope pattern: a simple six-fold star.
+   Upright / turned a little / turned further.
+7. A train seen from the side, an engine and two carriages.
+   At the left of the cell / centred / at the right, with two short motion lines
+   behind it.
+8. A door in a frame.
+   Shut / ajar / wide open with a straight line of light across the floor.
+```
+
+## Sheet 9 — words that change the picture
+
+For the line being sung: a word in the lyric puts something on the screen. These
+are the ten worth having, because they are the words that actually turn up.
+
+```
+Grid: 5 columns by 6 rows. Each cell is one drawing. Rows 1 and 2 are the three
+phases of the objects in row 1's columns; rows 3 and 4 the same for row 3's; and
+so on. Read it as three bands of two rows: in each band, the top row names the
+object and the row under it continues its phases.
+
+Simpler statement of the same thing: ten objects, each drawn three times as the
+frames of a small movement, laid out in a grid five cells wide. All ten are
+STRUCK — small, larger, largest, and back — so three frames is the whole of it.
+
+1. Flame.        Small / taller and leaning / tall and split at the tip.
+2. Raindrop.     High in the cell / halfway down / at the bottom with a small
+                 splash of three short lines.
+3. Heart.        Small / larger / largest with two short lines either side.
+4. Crescent moon and one star.
+                 Star small / star larger / star largest with four points.
+5. Sun with rays.
+                 Short rays / longer rays / longest rays.
+6. Car seen from the side.
+                 At the left / centred / at the right with two motion lines.
+7. Teardrop below an eye.
+                 Just formed / halfway down the cheek / at the bottom.
+8. Bird in flight, seen from the side.
+                 Wings down / wings level / wings up.
+9. House with a door and a roof.
+                 Windows plain / one window with a cross of light / smoke
+                 curling from the chimney.
+10. Snowflake, six arms.
+                 Small / larger / largest.
+```
+
+## Ideas without a sheet yet
+
+Kept here so they are not lost, and because several of them need something in
+the code before a drawing would help.
+
+**The screen answering the person at it.** The figure blows a kiss when a key is
+pressed — the kiss is on sheet 4, the reason for it is not built. Waving as
+spindle closes. Leaving footprints across the floor it walks over. Carrying the
+record's title card on rather than having it appear.
+
+**The twelve notes.** A piano keyboard whose pressed keys are the notes actually
+sounding, a guitar neck with the fingering, a harp with the struck strings
+moving, a choir of twelve mouths where whoever is sounding sings. All of them
+wait on the chroma being worth drawing from, which has not been measured yet —
+see the note in `internal/ui/joins.go` about what the harmony was worth for
+finding sections, which is not the same question.
+
+**The low end and the top of the range.** A speaker cone pushed out, a spring
+compressed, a jelly wobbling, a mole out of its hole; rain, sparks, glitter, a
+shooting star, a wind chime, insects. These are per-band answers, and the marks
+row already maps the bands, so they would be a set rather than an addition —
+worth drawing only if one of them is better than the instruments at saying the
+same thing.
+
+**A whole row that is one landscape.** A skyline whose windows light up by band,
+a forest from oak to reed with the wind as the loudness, a mountain range, an
+ocean cross-section, a stack of speaker cabinets from bins to tweeters. Same
+idea as the animal choir: the row read as one picture rather than eight objects.
+
+**Instruments as players.** The band as people rather than as objects — a
+drummer, a bassist, a guitarist, a singer — each playing on their own band. It
+is the same row as sheet 1 with a different subject, and it would want the
+dancers' build so the two sets read as one company.
 
 ## Judging what comes back
 
