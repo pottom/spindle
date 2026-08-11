@@ -146,6 +146,26 @@ var markSets = map[string]markSet{
 			}},
 		},
 	},
+	"held": {
+		from:    "drawn for spindle",
+		licence: "ours",
+		turns:   true,
+		apart:   true,
+		sizes: []markSize{
+			{tall: 24, marks: []markDots{
+				{name: "cross", set: "held", pitch: 0.500, least: 0, turns: true, wide: 13, tall: 24, bits: "8AP/YBgDbOBn7sycmQNwPJ5HA8Df+J//9/78D/7AGNgDG2ADbuAB"},
+			}},
+			{tall: 36, marks: []markDots{
+				{name: "cross", set: "held", pitch: 0.500, least: 0, turns: true, wide: 20, tall: 36, bits: "gD8A/g/w4IEDOBwA5wDgbsBsHs/HcTgch8NxOBiDAwA44ICHP2w4xw5gzgFwuLsD/z/47sPtdgwOxud++P8D/B/AgQEcHMD5AZwPwD0A3APAOQCeA/gBgB8A"},
+			}},
+			{tall: 54, marks: []markDots{
+				{name: "cross", set: "held", pitch: 0.500, least: 0, turns: true, wide: 30, tall: 54, bits: "APAPAID/DwD4/w8AH8AH4AHAAzwA4IEHAPDgAAB4HAAAHMcAOO7wAI87fPDBBzwe8IGPD3zgwQMeePCAAxwc4AAAAHgAAAAeAADAB+AHsAP+A+zA44FzcODgHAw4HA4AgIcHAPDA4z0e4P/fA/j//wD/nH/AMWc8OMwZDg5zhoPHnPHAH+cf4Of/AwD/NwDA9xwAMAAHAAyAAwAD+ADA8B8AMPwDAAwfAADDBwDA8AEAMHwAAAwfAACDAwD8AACAfwAA4B8AAPgHAAA="},
+			}},
+			{tall: 72, marks: []markDots{
+				{name: "cross", set: "held", pitch: 0.500, least: 0, turns: true, wide: 40, tall: 72, bits: "AAD+AAAAwP8HAAD4AB8AADwAeAAADwDgAIADAMABwAEAAAPgAAAABnAAAAAMMAAAAAwYAAAAGBgAAAAwDAwAMDAMPAA4YAZwAA5gBsABB2AGwIEDQALgAAfAA+AAD8AD8AAPwAPgAAfAA0AAAsADAAAAwAMAAADAAwAAAMACAAAAwAYAGABABgD/AGAGgMMBYAzAAAMwDGAABjAYYAAMGDgAAAAYMAAAAAxgAAAABsAAAAADgIHDgQMAx/fjAAB/PPYAgH88/gPAcTwOA2BgPAYGIGA8BgwwYDwCDDBgPAIMYAA8BgbAHzz+A4AfPP4BACA8YgAA4PdjAABgw2AAAGAA4AAAYADAAABgAMABAGAAwAEAYAD4AQBgwH8AAGDgDwAAYOABAABg4AMAAGDgAwAAYOADAABg4AMAAGDAAwAAYMADAABggAEAAGAAAAAAfwAAAID/AAAAwP8AAADAfwAAAIAfAAAA"},
+			}},
+		},
+	},
 	"hush": {
 		from:    "drawn for spindle",
 		licence: "ours",

@@ -543,17 +543,22 @@ func (m Model) wordsComing() ([]string, int64) {
 		}
 	}
 
-	// Silenced, and the row keeps the screen — over a line being sung as much as
-	// over a bar of music.
+	// Stopped or silenced, and the row keeps the screen — over a line being sung
+	// as much as over a bar of music.
 	//
 	// Before the lyric rather than after it. A record with a sheet is words for
-	// most of its length, and the deal that puts the hush up only runs on a bar
+	// most of its length, and the deal that puts these up only runs on a bar
 	// with no words in it — so on anything anybody actually sings, muting
 	// changed nothing. Read straight off the screen with the bar printed on it:
 	// "line, cast notes, MUTED", which is three facts and one of them wrong.
 	//
-	// Stamped at the moment the room went quiet, so the company is dealt once
-	// and stays rather than being dealt afresh every frame.
+	// Stamped with something that holds still for as long as the state does, so
+	// the picture is dealt once and stays: when the room went quiet, or where
+	// the record stopped — the clock is pinned while it is stopped, so that
+	// number does not move either.
+	if m.held() {
+		return []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)}, m.elapsed().Milliseconds()
+	}
 	if m.muted() {
 		return []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)}, m.mutedAt.UnixMilli()
 	}
@@ -1633,7 +1638,10 @@ func (m *Model) wordsGrind() tea.Cmd {
 		// Silenced, and the row says so: the same company with their fingers in
 		// their ears, for as long as it lasts. Last, because it is a state
 		// rather than a request — whatever else was up, this is what is true.
-		if m.muted() {
+		switch {
+		case m.held():
+			cast = markHeld
+		case m.muted():
 			cast = markHush
 		}
 	}

@@ -98,6 +98,15 @@ type markSize struct {
 	marks []markDots
 }
 
+// markHeld is the set that stands in while the record is stopped: one drawing,
+// unimpressed, holding the pause up where anybody can see it.
+//
+// The other half of markHush, and for the same reason — a bar of music with no
+// music in it should look like something. Which of the two is up when both are
+// true is settled in wordsComing: stopped beats silenced, because a stopped
+// record is not playing to anybody, silenced or not.
+const markHeld = "held"
+
 // markHush is the set that stands in while the room is silenced: the same faces
 // as the rest of them, with their fingers in their ears.
 //
@@ -113,7 +122,16 @@ const markHush = "hush"
 // the water goes on behind him, which is the whole of the joke and also the
 // plainest way a picture can say the sound is not reaching anybody: everything
 // else on this screen answers the record, and he does not.
-func (m Model) wordsStill() bool { return m.muted() }
+func (m Model) wordsStill() bool { return m.muted() || m.held() }
+
+// held is whether the record is stopped rather than playing.
+//
+// A record has to be there to be stopped: a status with nothing in it is a
+// device that has not said anything yet, and drawing the pause over that would
+// be the picture answering a question nobody had asked.
+func (m Model) held() bool {
+	return m.ps != nil && m.ps.TrackID != "" && !m.ps.Playing
+}
 
 // muted is whether the room has been silenced from here.
 //

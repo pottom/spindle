@@ -311,6 +311,9 @@ func (m Model) debugWords() []debugField {
 	if m.muted() {
 		b.put("", "MUTED")
 	}
+	if m.held() {
+		b.put("", "HELD")
+	}
 	b.add(debugDeal(m))
 	b.put("leave", "%s", debugMoveName(w.leave))
 	b.put("sung", "%s", debugClock(time.Duration(w.starts)*time.Millisecond))
