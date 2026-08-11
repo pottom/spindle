@@ -300,6 +300,17 @@ func (m Model) debugWords() []debugField {
 		kind = "marks"
 	}
 	b.put("", "%s", kind)
+	// Which company is up, and whether the room is silenced — the two readings
+	// that answer "why are those the marks on screen". Empty is the notes the
+	// face carries, which is the deal's own empty hand.
+	if w.cast == "" {
+		b.put("cast", "notes")
+	} else {
+		b.put("cast", "%s", w.cast)
+	}
+	if m.muted() {
+		b.put("", "MUTED")
+	}
 	b.add(debugDeal(m))
 	b.put("leave", "%s", debugMoveName(w.leave))
 	b.put("sung", "%s", debugClock(time.Duration(w.starts)*time.Millisecond))

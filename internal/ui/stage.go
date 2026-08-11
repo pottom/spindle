@@ -291,6 +291,15 @@ func (m Model) stageView() string {
 func (m Model) stagePicture(w, rows int) []string {
 	var art []string
 	switch {
+	// Silenced, and the screen has one thing to say. The row of marks is the
+	// only picture here with anybody in it to put their fingers in their ears,
+	// and a room with nothing coming out of it is worth more than whichever
+	// picture was up — the water and the meters answer the sound, and there
+	// isn't any. The picture you chose comes back the moment it does.
+	case m.muted():
+		if art = m.wordsLines(w, rows); art == nil {
+			art = m.wordsIdleArt(w, rows)
+		}
 	case m.scopeMode().wave():
 		art = m.scopeLinesFrom(w, rows, m.scopeTrigger(w*dotsPerCellX))
 	case m.scopeMode().bars():
