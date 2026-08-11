@@ -3,12 +3,40 @@
   "from": "drawn for spindle",
   "licence": "ours",
   "turns": true,
-  "//": "Four of the eight people on the dance floor; the other four are in dance. Split so that they are drawn large: the size a row gets is decided by its width, and eight at 54 dots come to 273 cells across against the 167 an ordinary terminal has, so the row fell to 36 and every dancer with it. Four hold 98 cells at 54. Each is told apart by one bold mark and by the dance, and by nothing else.",
+  "//": "A pool of eight people who dance, and the room decides how many of them are on. It was two sets of four, split by hand so they would be drawn large; the dealing does that now, and better \u2014 it takes the largest size the band allows and fills it.",
   "marks": [
-    "hat.png",
-    "skirt.png",
-    "ponytail.png",
-    "belly.png"
+    {
+      "file": "belly.png",
+      "pitch": 0.05
+    },
+    {
+      "file": "hat.png",
+      "pitch": 0.2
+    },
+    {
+      "file": "bowtie.png",
+      "pitch": 0.35
+    },
+    {
+      "file": "glasses.png",
+      "pitch": 0.5
+    },
+    {
+      "file": "skirt.png",
+      "pitch": 0.62
+    },
+    {
+      "file": "scarf.png",
+      "pitch": 0.75
+    },
+    {
+      "file": "ponytail.png",
+      "pitch": 0.86
+    },
+    {
+      "file": "spikes.png",
+      "pitch": 0.96
+    }
   ],
   "//heights": "Traced from a drawing, so the pen is measured off it and taken to three dots.",
   "heights": [
@@ -28,5 +56,6 @@
       "tall": 72,
       "thick": 3
     }
-  ]
+  ],
+  "//marks": "Each says where it stands along the row. For people the pitch is not a sound but an order, and the order is the one thing that has to hold still: dealt afresh every time with no pitch, the same four would come up in a different order and read as four different people."
 }

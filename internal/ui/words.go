@@ -1620,7 +1620,7 @@ func (m *Model) wordsGrind() tea.Cmd {
 	// same string of notes — so once a row of notes had been sent for, the
 	// drawings were never reached again for the rest of the record.
 	if cast != "" {
-		if grain, layout, ok := markPicture(cast, m.width, m.height); ok {
+		if grain, layout, ok := markPicture(cast, m.width, m.height, starts); ok {
 			m.wordsAdopt(grain, layout, text)
 			m.words.cast = cast
 			m.words.cellsX, m.words.cellsY = m.width, m.height

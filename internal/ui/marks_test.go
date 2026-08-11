@@ -71,7 +71,7 @@ func TestTheWholeRowFitsBeforeItIsThinned(t *testing.T) {
 
 	for _, size := range [][2]int{{200, 50}, {160, 44}, {120, 40}, {100, 30}} {
 		w, rows := size[0], size[1]
-		_, layout, ok := markPicture("band", w, rows)
+		_, layout, ok := markPicture("band", w, rows, 7_000)
 		if !ok {
 			t.Errorf("%dx%d: no row at all", w, rows)
 			continue
@@ -79,8 +79,8 @@ func TestTheWholeRowFitsBeforeItIsThinned(t *testing.T) {
 		t.Logf("%3dx%-3d %d of the %d marks, standing %d..%d of %d dots",
 			w, rows, layout.Count, len(set.sizes[0].marks), layout.Tops[0], layout.Bottoms[0], rows*dotsPerCellY)
 
-		if layout.Count < markLeast {
-			t.Errorf("%dx%d: the row is down to %d marks, which is under the %d that make a row", w, rows, layout.Count, markLeast)
+		if layout.Count < markCrowdLeast {
+			t.Errorf("%dx%d: the row is down to %d marks, which is under the %d that make a row", w, rows, layout.Count, markCrowdLeast)
 		}
 	}
 }
@@ -92,7 +92,7 @@ func TestTheWholeRowFitsBeforeItIsThinned(t *testing.T) {
 func TestADrawnRowReadsLikeAnyOther(t *testing.T) {
 	const w, rows = 160, 44
 
-	grain, layout, ok := markPicture("band", w, rows)
+	grain, layout, ok := markPicture("band", w, rows, 7_000)
 	if !ok {
 		t.Fatal("no row")
 	}
@@ -169,7 +169,7 @@ func TestADrawnRowNeedsNoRoundTrip(t *testing.T) {
 	if m.words.have.DotsX == 0 {
 		t.Fatal("the row was not put up at all")
 	}
-	if m.words.where.Count < markLeast {
+	if m.words.where.Count < markCrowdLeast {
 		t.Errorf("the row has %d marks in its layout", m.words.where.Count)
 	}
 	t.Logf("the bar at %s was dealt %q and went up with %d marks in the frame it was asked in",
@@ -204,7 +204,7 @@ func TestADrawnRowNeedsNoRoundTrip(t *testing.T) {
 func TestADrawnRowStandsWhereTypeWould(t *testing.T) {
 	const w, rows = 160, 44
 
-	_, layout, ok := markPicture("band", w, rows)
+	_, layout, ok := markPicture("band", w, rows, 7_000)
 	if !ok {
 		t.Fatal("no row")
 	}

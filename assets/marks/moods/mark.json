@@ -3,13 +3,34 @@
   "from": "drawn for spindle",
   "licence": "ours",
   "marks": [
-    "happy.png",
-    "grin.png",
-    "wink.png",
-    "amazed.png",
-    "cool.png",
-    "cross.png",
-    "teeth.png"
+    {
+      "file": "happy.png",
+      "pitch": 0.0
+    },
+    {
+      "file": "grin.png",
+      "pitch": 0.17
+    },
+    {
+      "file": "wink.png",
+      "pitch": 0.33
+    },
+    {
+      "file": "amazed.png",
+      "pitch": 0.5
+    },
+    {
+      "file": "cool.png",
+      "pitch": 0.67
+    },
+    {
+      "file": "cross.png",
+      "pitch": 0.83
+    },
+    {
+      "file": "teeth.png",
+      "pitch": 1.0
+    }
   ],
   "heights": [
     {

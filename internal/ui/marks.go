@@ -96,6 +96,11 @@ type markSize struct {
 
 // markDots is one drawing: its own size in dots, and a bit per dot.
 type markDots struct {
+	// pitch is where this one stands between the low end of the room and the
+	// top of it. It is what keeps the row meaning something now that the crowd
+	// is dealt rather than listed: whoever is picked, they line up by it.
+	pitch float64
+
 	name       string
 	wide, tall int
 	bits       string
@@ -115,28 +120,26 @@ const (
 	// Enough that they read as separate players rather than as a frieze, little
 	// enough that the row is a group.
 	markSpread = 0.45
-
-	// markLeast is the fewest that make a row. Under this the ends are all there
-	// is, and the sound running along the row has nowhere to run.
-	markLeast = 3
 )
 
-// markRowFor is the size to draw a row at and which of the set fit across it.
+// markCrowdFor is who is on this time, and how large they are drawn.
 //
-// The whole row at a smaller size beats part of it at a larger one, and that is
-// the only reason there is a choice: the order is what the row says — the kick
-// at one end and the cymbals at the other, and the sound running between them —
-// so four of seven marks is not a smaller version of the picture, it is a
-// different one. Every baked size is tried from the largest down, and the first
-// that holds all of them wins.
+// The row used to be a list: a set was seven or eight drawings in a fixed order,
+// every appearance the same, and the only question was whether they fitted. When
+// they did not — and eight of anything usually does not — the whole row dropped
+// a size and everybody shrank with it.
 //
-// Only sizes at or under the room there is: a drawing scaled up is a drawing
-// with its stroke pulled apart, and the sizes were baked so that the stroke
-// comes out the same weight at each of them.
+// It is a pool now, and the question is turned round: take the largest size the
+// room allows, and see who fits at it. What comes up is a handful of the pool
+// rather than all of it, dealt from the bar, so the same record puts up the same
+// company twice and the next record puts up another.
 //
-// If none of them holds the whole row, the smallest is taken and the middle is
-// thinned — the ends are kept, because the ends are what the order is for.
-func markRowFor(set markSet, tall, dotsX int) (markSize, []markDots, int, bool) {
+// Two things are kept from the list it replaces. The order is the sound — the
+// low end at the left, the top of the range at the right — which is why a
+// drawing carries a pitch and the company is sorted by it however it was dealt.
+// And the ends matter more than the middle, which is why a size that holds only
+// two is passed over: a row needs enough of a spread for the sound to run along.
+func markCrowdFor(set markSet, tall, dotsX int, seed int64) (markSize, []markDots, int, bool) {
 	sizes := append([]markSize(nil), set.sizes...)
 	sort.Slice(sizes, func(i, j int) bool { return sizes[i].tall > sizes[j].tall })
 
@@ -146,59 +149,108 @@ func markRowFor(set markSet, tall, dotsX int) (markSize, []markDots, int, bool) 
 		if size.tall > tall {
 			continue
 		}
-		smallest = size
 		if !found {
-			found = true
+			smallest, found = size, true
 		}
-		if row, gap := markFit(size, dotsX, len(size.marks)); row != nil {
-			return size, row, gap, true
+		if len(size.marks) == 0 {
+			continue
 		}
+		gap := max(int(markSpread*float64(size.tall)), 1)
+		if crowd := pick(size.marks, dotsX, gap, seed); len(crowd) >= markCrowdLeast {
+			return size, crowd, gap, true
+		}
+		smallest = size
 	}
-	if !found {
-		// Smaller than anything baked: the smallest there is, which is better
-		// than nothing at all.
-		smallest = sizes[len(sizes)-1]
-	}
-
-	row, gap := markFit(smallest, dotsX, markLeast)
-	if row == nil {
+	if !found || len(smallest.marks) == 0 {
 		return markSize{}, nil, 0, false
 	}
-	return smallest, row, gap, true
+
+	// Nothing held a company at any size, which is a very narrow screen. The
+	// smallest, and whoever fits on it.
+	gap := max(int(markSpread*float64(smallest.tall)), 1)
+	crowd := pick(smallest.marks, dotsX, gap, seed)
+	return smallest, crowd, gap, len(crowd) > 0
 }
 
-// markFit thins a row until it fits, and gives up rather than going under least.
-func markFit(size markSize, dotsX, least int) ([]markDots, int) {
-	gap := max(int(markSpread*float64(size.tall)), 2)
+// pick takes a company from the pool that fits across the room.
+//
+// Not at random out of the whole pool, which was the first way and skewed: the
+// narrow drawings fit more often than the wide ones, so a dealt company came out
+// as four things from the top of the range and nothing from the bottom, and the
+// row stopped meaning anything. The range is cut into as many bands as there are
+// places, and each band sends one — so the company spans the room however it is
+// dealt, and the low end is always somebody's.
+//
+// Within a band the choice is the bar's, and a band with nobody who fits sends
+// nobody: the pool has a piano in it half again as wide as a note, and holding a
+// place open for it would keep the row short.
+func pick(pool []markDots, dotsX, gap int, seed int64) []markDots {
+	h := uint64(seed)*0x9e3779b97f4a7c15 + 0xd6e8feb86659fd93
+	roll := func() uint64 {
+		h ^= h >> 30
+		h *= 0xbf58476d1ce4e5b9
+		h ^= h >> 27
+		return h
+	}
 
-	fits := func(marks []markDots) bool {
-		wide := gap * (len(marks) - 1)
-		for _, m := range marks {
-			wide += m.wide
+	for places := markCrowdMost; places >= markCrowdLeast; places-- {
+		var crowd []markDots
+		var wide int
+		for band := range places {
+			low, high := float64(band)/float64(places), float64(band+1)/float64(places)
+
+			// Everybody in this stretch of the range, walked in a dealt order.
+			var in []markDots
+			for _, one := range pool {
+				if one.pitch >= low && (one.pitch < high || band == places-1) {
+					in = append(in, one)
+				}
+			}
+			for i := len(in) - 1; i > 0; i-- {
+				j := int(roll() % uint64(i+1))
+				in[i], in[j] = in[j], in[i]
+			}
+
+			for _, one := range in {
+				want := one.wide
+				if len(crowd) > 0 {
+					want += gap
+				}
+				if wide+want <= dotsX {
+					crowd = append(crowd, one)
+					wide += want
+					break
+				}
+			}
 		}
-		return wide <= dotsX
+		if len(crowd) >= markCrowdLeast {
+			sort.SliceStable(crowd, func(i, j int) bool { return crowd[i].pitch < crowd[j].pitch })
+			return crowd
+		}
 	}
-
-	row := append([]markDots(nil), size.marks...)
-	for len(row) > least && !fits(row) {
-		row = append(row[:len(row)/2], row[len(row)/2+1:]...)
-	}
-	if !fits(row) {
-		return nil, 0
-	}
-	return row, gap
+	return nil
 }
+
+// markCrowdLeast and markCrowdMost are how many make a company.
+//
+// Four to six. Under four the row is a pair of ends with nothing between them
+// and the sound has nowhere to run; over six they are small again, which is the
+// thing this was built to stop.
+const (
+	markCrowdLeast = 4
+	markCrowdMost  = 6
+)
 
 // markPicture builds the field of dots a row of marks is drawn from, and the
 // layout the rest of the screen reads it through.
-func markPicture(name string, w, rows int) (cover.Grain, msg.WordLayout, bool) {
+func markPicture(name string, w, rows int, seed int64) (cover.Grain, msg.WordLayout, bool) {
 	set, ok := markSets[name]
 	if !ok || w <= 0 || rows <= 0 {
 		return cover.Grain{}, msg.WordLayout{}, false
 	}
 
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
-	size, row, gap, ok := markRowFor(set, int(wordsMark*float64(dotsY)), dotsX)
+	size, row, gap, ok := markCrowdFor(set, int(wordsMark*float64(dotsY)), dotsX, seed)
 	if !ok || len(row) == 0 {
 		return cover.Grain{}, msg.WordLayout{}, false
 	}

@@ -63,6 +63,37 @@ import (
 
 // set is a manifest: the drawings, in the order they stand in the row, and the
 // sizes they are baked at.
+// mark is one drawing in a pool, and where it belongs along the row.
+//
+// Written either as a bare filename or as {"file": ..., "pitch": ...}. The
+// pitch is where the drawing sits between the low end of the room and the top
+// of it, nought to one, and it is what keeps the row meaning something when the
+// crowd is dealt rather than listed: whoever is picked, they line up by it.
+// Left out, a mark takes its place from where it was written.
+type mark struct {
+	File  string
+	Pitch float64
+	Fixed bool
+}
+
+func (m *mark) UnmarshalJSON(raw []byte) error {
+	if len(raw) > 0 && raw[0] == '"' {
+		return json.Unmarshal(raw, &m.File)
+	}
+	var was struct {
+		File  string   `json:"file"`
+		Pitch *float64 `json:"pitch"`
+	}
+	if err := json.Unmarshal(raw, &was); err != nil {
+		return err
+	}
+	m.File = was.File
+	if was.Pitch != nil {
+		m.Pitch, m.Fixed = *was.Pitch, true
+	}
+	return nil
+}
+
 type set struct {
 	// Turns says the drawings have a front, so the screen may turn one round on
 	// the beat. Anything with feet has; a drum seen head on has not.
@@ -71,7 +102,7 @@ type set struct {
 	Name    string   `json:"name"`
 	From    string   `json:"from"`
 	Licence string   `json:"licence"`
-	Marks   []string `json:"marks"`
+	Marks   []mark   `json:"marks"`
 	Heights []height `json:"heights"`
 
 	// Faces turns the row in on itself: with it set, everything past the middle
@@ -180,9 +211,9 @@ func draw(paths []string, want string, only int, into string) {
 				continue
 			}
 			var row []dots
-			for i, name := range s.Marks {
+			for i, one := range s.Marks {
 				turn := s.Faces == "in" && float64(i) > float64(len(s.Marks)-1)/2
-				m, err := convert(filepath.Join(dir, name), h, turn)
+				m, err := convert(filepath.Join(dir, one.File), h, turn)
 				if err != nil {
 					fail(err)
 				}
@@ -204,7 +235,7 @@ func draw(paths []string, want string, only int, into string) {
 			// enough to cost the row a size.
 			if only > 0 {
 				for i, m := range row {
-					fmt.Printf("  %-12s %.2f wide\n", strings.TrimSuffix(s.Marks[i], filepath.Ext(s.Marks[i])),
+					fmt.Printf("  %-12s %.2f wide\n", strings.TrimSuffix(s.Marks[i].File, filepath.Ext(s.Marks[i].File)),
 						float64(m.wide)/float64(h.Tall))
 				}
 			}
@@ -379,7 +410,8 @@ func emit(b *strings.Builder, dir string, s set) error {
 
 	for _, h := range s.Heights {
 		fmt.Fprintf(b, "\t\t\t{tall: %d, marks: []markDots{\n", h.Tall)
-		for i, name := range s.Marks {
+		for i, one := range s.Marks {
+			name := one.File
 			// Past the middle they turn back on the row. The middle one of an
 			// odd row is left alone: it is the one everybody else is facing.
 			turn := s.Faces == "in" && float64(i) > float64(len(s.Marks)-1)/2
@@ -388,8 +420,15 @@ func emit(b *strings.Builder, dir string, s set) error {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(b, "\t\t\t\t{name: %q, wide: %d, tall: %d, bits: %q},\n",
-				strings.TrimSuffix(name, filepath.Ext(name)), m.wide, m.tall, m.bits)
+			// Where it stands along the row. Written down, it is honoured; left
+			// out, it is where it was written — which keeps a set that was a
+			// list a list.
+			pitch := one.Pitch
+			if !one.Fixed && len(s.Marks) > 1 {
+				pitch = float64(i) / float64(len(s.Marks)-1)
+			}
+			fmt.Fprintf(b, "\t\t\t\t{name: %q, pitch: %.3f, wide: %d, tall: %d, bits: %q},\n",
+				strings.TrimSuffix(name, filepath.Ext(name)), pitch, m.wide, m.tall, m.bits)
 		}
 		fmt.Fprintf(b, "\t\t\t}},\n")
 	}

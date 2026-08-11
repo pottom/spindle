@@ -3,11 +3,82 @@
   "from": "drawn for spindle",
   "licence": "ours",
   "marks": [
-    "speaker.png",
-    "snare.png",
-    "guitar.png",
-    "mic.png",
-    "note.png"
+    {
+      "file": "speaker.png",
+      "pitch": 0.02
+    },
+    {
+      "file": "snare.png",
+      "pitch": 0.12
+    },
+    {
+      "file": "bolt.png",
+      "pitch": 0.18
+    },
+    {
+      "file": "vinyl.png",
+      "pitch": 0.24
+    },
+    {
+      "file": "piano.png",
+      "pitch": 0.32
+    },
+    {
+      "file": "guitar.png",
+      "pitch": 0.4
+    },
+    {
+      "file": "smiley.png",
+      "pitch": 0.46
+    },
+    {
+      "file": "play.png",
+      "pitch": 0.5
+    },
+    {
+      "file": "heart.png",
+      "pitch": 0.54
+    },
+    {
+      "file": "mic.png",
+      "pitch": 0.58
+    },
+    {
+      "file": "headphones.png",
+      "pitch": 0.62
+    },
+    {
+      "file": "cloud.png",
+      "pitch": 0.66
+    },
+    {
+      "file": "bars.png",
+      "pitch": 0.72
+    },
+    {
+      "file": "pulse.png",
+      "pitch": 0.76
+    },
+    {
+      "file": "wave.png",
+      "pitch": 0.8
+    },
+    {
+      "file": "note.png",
+      "pitch": 0.86
+    },
+    {
+      "file": "quaver.png",
+      "pitch": 0.9
+    },
+    {
+      "file": "droplet.png",
+      "pitch": 0.94
+    },
+    {
+      "file": "star.png",
+      "pitch": 0.98
+    }
   ],
   "heights": [
     {
@@ -29,6 +100,6 @@
   ],
   "turns": true,
   "//turns": "These have feet, so they turn round on the beat, each on its own count. See wordsTurning.",
-  "//": "Eight instruments with arms and legs, dancing, in place of a set assembled out of an icon library. The idea is the listener's and it is what made the set work: a row of instruments standing still is a shop window, and the same instruments dancing are a band. Every one of them has feet, so every one of them turns round on the beat.",
-  "//marks": "Five rather than eight, so that they are drawn large. The size a row gets is decided by its width: eight at 54 dots come to 240 cells across, and an ordinary terminal is 167, so the whole row fell to 36 and every instrument with it \u2014 small enough that the listener called them dwarves. Five hold 145 cells at 54, which is half again as tall. The order is still the sound, low at the left.\nThe three that went are the ones that are not instruments: the record, the headphones and the waveform."
+  "//": "A pool of nineteen things that dance, rather than a row of five that always did. Who comes up is dealt from the bar and how many is decided by the room: the largest size the band allows, and whoever fits across it at that size. See markCrowdFor.",
+  "//marks": "Every one of them says where it stands between the low end of the room and the top of it, because the order of the row is the sound and the company is no longer a list. Whoever is dealt, they line up by pitch."
 }
