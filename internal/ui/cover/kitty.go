@@ -65,9 +65,17 @@ type Kitty struct {
 	sent [slots]uint64
 }
 
-// slots is how many pictures may be on screen at once: what the cursor is
-// resting on, and what is playing.
-const slots = 2
+// slots is how many pictures may be kept apart at once.
+//
+// Four: what the cursor is resting on, what is playing, the next record's colour
+// and the program's own picture while it waits for a device.
+//
+// It was two, and the two that came after went out under numbers this renderer
+// refuses — so their Render failed, quietly, and only on terminals that draw
+// pictures this way. What that looked like was a logo that never appeared and a
+// colour that never crossed, on exactly the terminals good enough to show both.
+// A slot is an integer here; running out of them costs nothing but saying so.
+const slots = 4
 
 func NewKitty(out io.Writer, cell CellSize) *Kitty {
 	// Zero is not an id the protocol accepts, and a pid can be anything. The

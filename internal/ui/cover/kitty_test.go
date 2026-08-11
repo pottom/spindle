@@ -2,6 +2,7 @@ package cover
 
 import (
 	"bytes"
+	"image"
 	"image/color"
 	"io"
 	"os"
@@ -174,5 +175,26 @@ func TestSlotsKeepTheirOwnSequence(t *testing.T) {
 	}
 	if _, err := k.Render(img, 12, 6, 1, 1); err != nil {
 		t.Errorf("Render(slot 1, seq 1) = %v, want the other slot's sequence to be its own", err)
+	}
+}
+
+// Every slot the program uses is a slot this renderer has.
+//
+// It had two — the cursor's cover and the playing one — and two more were added
+// above it without anybody counting: the next record's colour, and the picture
+// shown while a device is being waited for. Render refuses a slot it does not
+// have, quietly, and only where pictures are drawn this way. What that looked
+// like was a logo that never appeared and a colour that never crossed, on
+// exactly the terminals good enough to show both.
+func TestEverySlotTheProgramUsesExists(t *testing.T) {
+	k := NewKitty(io.Discard, CellSize{Width: 10, Height: 20, Measured: true})
+	img := image.NewRGBA(image.Rect(0, 0, 64, 64))
+	for slot := range slots {
+		if _, err := k.Render(img, 20, 10, uint64(slot+1), slot); err != nil {
+			t.Errorf("slot %d: %v", slot, err)
+		}
+	}
+	if _, err := k.Render(img, 20, 10, 99, slots); err == nil {
+		t.Error("a slot past the end was accepted, so running out would be silent")
 	}
 }
