@@ -1,0 +1,22 @@
+{
+  "name": "odds",
+  "from": "drawn for spindle",
+  "licence": "ours",
+  "turns": true,
+  "marks": [
+    {"file": "telly.png",    "pitch": 0.05},
+    {"file": "dino.png",     "pitch": 0.18},
+    {"file": "robot.png",    "pitch": 0.32},
+    {"file": "cactus.png",   "pitch": 0.45},
+    {"file": "squid.png",    "pitch": 0.58},
+    {"file": "hedgehog.png", "pitch": 0.72},
+    {"file": "owl.png",      "pitch": 0.86},
+    {"file": "ghost.png",    "pitch": 1.00}
+  ],
+  "heights": [
+    {"tall": 24, "thick": 3},
+    {"tall": 36, "thick": 3},
+    {"tall": 54, "thick": 3},
+    {"tall": 72, "thick": 3}
+  ]
+}
