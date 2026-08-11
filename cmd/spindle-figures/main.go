@@ -28,6 +28,7 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"go/format"
 	"image"
@@ -42,6 +43,10 @@ import (
 
 // figure is a manifest: where the drawings are and how to take them apart.
 type figure struct {
+	// Fill takes the drawing as a silhouette rather than as an outline: every
+	// dot darker than Gate is set. See convert.
+	Fill bool `json:"fill"`
+
 	Name    string            `json:"name"`
 	From    string            `json:"from"`
 	Licence string            `json:"licence"`
@@ -91,6 +96,11 @@ const (
 )
 
 func main() {
+	show := flag.String("show", "", "after baking, draw these figures in the terminal — a name, several separated by commas, or \"all\"")
+	pose := flag.String("pose", "idle", "with -show, which pose to draw")
+	only := flag.Int("size", 0, "with -show, draw only this baked height in dots")
+	flag.Parse()
+
 	dirs, err := filepath.Glob(filepath.Join(assets, "*", "figure.json"))
 	if err != nil || len(dirs) == 0 {
 		fail(fmt.Errorf("no figures under %s", assets))
@@ -122,6 +132,10 @@ func main() {
 		fail(err)
 	}
 	fmt.Printf("wrote %s (%d bytes)\n", out, len(src))
+
+	if *show != "" {
+		look(dirs, *show, *pose, *only)
+	}
 }
 
 func read(path string) (figure, error) {
@@ -190,6 +204,19 @@ func convert(path, name string, h height, f figure) (pose, error) {
 	draw.CatmullRom.Scale(scaled, scaled.Bounds(), src, box, draw.Src, nil)
 
 	gate := uint32(f.Gate * 0xffff)
+
+	// Which way round the drawing is, asked of its corners rather than written
+	// down: a silhouette arrives black on white from one hand and white on black
+	// from another, and filled the wrong way round a figure comes back as the
+	// hole it was cut from.
+	var bright int
+	for _, c := range [][2]int{{0, 0}, {wide - 1, 0}, {0, h.Tall - 1}, {wide - 1, h.Tall - 1}} {
+		r, g, bl, _ := scaled.At(c[0], c[1]).RGBA()
+		if (299*r+587*g+114*bl)/1000 >= 0x7fff {
+			bright++
+		}
+	}
+	dark := bright < 3
 	at := func(x, y int) (uint32, uint32) {
 		if x < 0 || y < 0 || x >= wide || y >= h.Tall {
 			return 0, 0
@@ -202,10 +229,26 @@ func convert(path, name string, h height, f figure) (pose, error) {
 	for y := range lit {
 		lit[y] = make([]bool, wide)
 	}
+
+	// A shadow is not an outline. Where a figure is a solid silhouette — a
+	// puppet cut out of leather, a paper cut, anything whose whole shape is the
+	// drawing — the edges are the wrong question: run over one, a picture with
+	// any texture inside it comes back as an outline of every speck. Filled, it
+	// comes back as what it is.
+	//
+	// Which is also the one thing on this screen that may be solid. Everything
+	// else is a stroke among strokes and a filled shape reads as a hole punched
+	// in the picture; a figure who walks on is not among anything.
 	for y := range h.Tall {
 		for x := range wide {
 			lum, a := at(x, y)
 			if a < 0x7fff {
+				continue
+			}
+			if f.Fill {
+				if dark && lum >= gate || !dark && lum < gate {
+					lit[y][x] = true
+				}
 				continue
 			}
 
@@ -291,4 +334,89 @@ func head(img *image.RGBA, wide, tall int, share float64) (int, int, int, int) {
 func fail(err error) {
 	fmt.Fprintln(os.Stderr, "spindle-figures:", err)
 	os.Exit(1)
+}
+
+// draw prints a figure in the terminal, in the dots it will be drawn in.
+//
+// The same reason the marks have it: a drawing is judged at the size it is seen
+// at, and a figure that reads beautifully at a thousand pixels can be a smudge
+// at a hundred and thirty dots. Braille, because that is what the screen draws
+// in — two dots across and four down to a cell.
+func look(dirs []string, want, poseName string, only int) {
+	var found bool
+	for _, path := range dirs {
+		f, err := read(path)
+		if err != nil {
+			fail(err)
+		}
+		if want != "all" && !wanted(want, f.Name) {
+			continue
+		}
+		found = true
+		for _, h := range f.Heights {
+			if only > 0 && h.Tall != only {
+				continue
+			}
+			p, err := convert(filepath.Join(filepath.Dir(path), poseName+".png"), poseName, h, f)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s at %d: %v\n", f.Name, h.Tall, err)
+				continue
+			}
+			fmt.Printf("\n%s %s at %d dots, pen %d — %dx%d\n", f.Name, poseName, h.Tall, h.Thick, p.wide, p.tall)
+			for _, line := range braille(p) {
+				fmt.Println(line)
+			}
+		}
+	}
+	if !found {
+		fmt.Fprintf(os.Stderr, "spindle-figures: no figure called %q\n", want)
+		os.Exit(1)
+	}
+}
+
+func wanted(want, name string) bool {
+	for _, one := range strings.Split(want, ",") {
+		if strings.TrimSpace(one) == name {
+			return true
+		}
+	}
+	return false
+}
+
+// braille lays one pose out in braille cells.
+func braille(p pose) []string {
+	raw, err := base64.StdEncoding.DecodeString(p.bits)
+	if err != nil {
+		fail(err)
+	}
+	// Packed a row at a time with a stride, which is how the interface reads it
+	// back — see figurePose.draw. Read as one long run of bits instead, a figure
+	// comes out as diagonal noise, and it took two wrong conclusions about the
+	// drawings before the reading was doubted.
+	stride := (p.wide + 7) / 8
+	on := func(x, y int) bool {
+		if x < 0 || y < 0 || x >= p.wide || y >= p.tall {
+			return false
+		}
+		at := y*stride + x/8
+		return at < len(raw) && raw[at]&(1<<(x%8)) != 0
+	}
+	bit := [2][4]uint8{{0, 1, 2, 6}, {3, 4, 5, 7}}
+	out := make([]string, (p.tall+3)/4)
+	for r := range out {
+		var b strings.Builder
+		for x := 0; x < p.wide; x += 2 {
+			var cell rune
+			for dx := range 2 {
+				for dy := range 4 {
+					if on(x+dx, r*4+dy) {
+						cell |= 1 << bit[dx][dy]
+					}
+				}
+			}
+			b.WriteRune(0x2800 + cell)
+		}
+		out[r] = b.String()
+	}
+	return out
 }
