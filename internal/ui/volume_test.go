@@ -98,18 +98,22 @@ func TestTheVolumeKeepsClearOfTheProgress(t *testing.T) {
 			t.Errorf("%dx%d: %d cells of the volume landed on the progress ring", w, rows, wall)
 		}
 
-		// And the top of the column is on the screen: a meter whose top has run
-		// off is not a meter.
-		top := dotsY
+		// The whole column is on the screen: a meter whose top has run off is
+		// not a meter, and one standing on the bottom row is in the water.
+		top, foot := dotsY, 0
 		for r := range rows {
 			for c := range w {
 				if grid[r*w+c] != 0 {
 					top = min(top, r*dotsPerCellY)
+					foot = max(foot, r)
 				}
 			}
 		}
 		if top <= 0 {
 			t.Errorf("%dx%d: the column reached the top of the screen", w, rows)
+		}
+		if foot >= rows-1 {
+			t.Errorf("%dx%d: the column stood on the very bottom row", w, rows)
 		}
 		_ = dotsX
 	}

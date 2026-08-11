@@ -139,7 +139,7 @@ func (m *Model) volumeSpill(rows int) {
 		return
 	}
 	dotsY := rows * dotsPerCellY
-	floor := float32(dotsY - volumeTall)
+	floor := float32(m.volumeFoot(rows))
 	pitch := volumePitch(dotsY)
 	for i := range lit {
 		m.volume.falling = append(m.volume.falling, volumeLamp{
@@ -151,6 +151,40 @@ func (m *Model) volumeSpill(rows int) {
 			bright: 1,
 		})
 	}
+}
+
+// volumeFoot is the dot row the bottom lamp stands on.
+//
+// On the band the words are set in rather than on the floor of the screen. The
+// floor is where the water is thrown from and where the meter's own columns
+// stand, so a reading down there is a reading among four other things; the band
+// across the middle is the one place this screen keeps for whatever it has to
+// say, and it is empty at the sides.
+//
+// The whole column is placed rather than the lit part of it, so the foot stays
+// put and only the top of the stack moves — a meter whose bottom slid about with
+// the reading would be a meter you had to find before you could read.
+func (m Model) volumeFoot(rows int) int {
+	dotsY := rows * dotsPerCellY
+	middle := dotsY / 2
+
+	// Where the line or the row of marks is standing, when there is one. The
+	// other pictures have no band, and the middle of the screen is where the
+	// words would have been.
+	if tops, bottoms := m.words.where.Tops, m.words.where.Bottoms; len(tops) > 0 && len(bottoms) > 0 {
+		high, low := tops[0], bottoms[0]
+		for _, t := range tops {
+			high = min(high, t)
+		}
+		for _, b := range bottoms {
+			low = max(low, b)
+		}
+		middle = (high + low) / 2
+	}
+
+	full := (100/volumeLampIs)*volumePitch(dotsY) + volumeTall
+	foot := middle + full/2 - volumeTall
+	return min(max(foot, full), dotsY-volumeTall)
 }
 
 // volumePitch is how far apart two lamps stand, in dots.
@@ -222,7 +256,7 @@ func (m Model) volumeDraw(w, rows int, grid []uint8, paint, hue []int8, levels, 
 	}
 
 	if lit := m.volumeLit(); m.volumeShowing() && lit > 0 {
-		floor := dotsY - volumeTall
+		floor := m.volumeFoot(rows)
 		pitch := volumePitch(dotsY)
 		for i := range lit {
 			lamp(volumeInset, float32(floor-i*pitch), i, lit, 1)
