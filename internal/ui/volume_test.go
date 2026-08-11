@@ -118,3 +118,35 @@ func TestTheVolumeKeepsClearOfTheProgress(t *testing.T) {
 		_ = dotsX
 	}
 }
+
+// Silence is not a level, so the lamps do not answer it.
+//
+// Muting is already said by the one with his fingers in his ears, and coming
+// back out of it is a restoring rather than a choosing. The lamps arriving on
+// the way back would be the picture announcing something nobody asked for.
+func TestTheVolumeSaysNothingAboutSilence(t *testing.T) {
+	m := volumeModel(t, 80, 30)
+	m.volumeFlow(m.height) // adopt the level it started at
+
+	m.toggleMute()
+	m.volumeFlow(m.height)
+	if m.volumeShowing() {
+		t.Error("muting put the lamps up")
+	}
+
+	m.toggleMute()
+	m.volumeFlow(m.height)
+	if m.volumeShowing() {
+		t.Error("coming back from mute put the lamps up")
+	}
+	if got, want := m.ps.Volume, 60; got != want {
+		t.Fatalf("came back to %d rather than %d", got, want)
+	}
+
+	// An ordinary change still does.
+	m.setVolume(80)
+	m.volumeFlow(m.height)
+	if !m.volumeShowing() {
+		t.Error("a change of level after all that said nothing")
+	}
+}

@@ -88,6 +88,10 @@ type volumeState struct {
 	// are not thrown again on every frame after it lapses.
 	spilt bool
 
+	// hushed is whether the room was silenced at the last look, which is how a
+	// change into or out of silence is told from a change of level.
+	hushed bool
+
 	falling []volumeLamp
 }
 
@@ -98,11 +102,23 @@ func (m *Model) volumeFlow(rows int) {
 	}
 
 	// A change, from wherever it came.
-	if !m.volume.seen {
+	//
+	// Silence is not a level, so going into it and coming back out of it are
+	// taken quietly. Muting is already said by the one with his fingers in his
+	// ears, and coming back is a restoring rather than a choosing — the lamps
+	// answering it would be the picture announcing something nobody asked for,
+	// on the way back from something it had already announced.
+	hushed := m.muted()
+	quiet := hushed || m.volume.hushed
+	switch {
+	case !m.volume.seen:
 		m.volume.was, m.volume.seen = m.ps.Volume, true
-	} else if m.ps.Volume != m.volume.was {
+	case m.ps.Volume != m.volume.was && quiet:
+		m.volume.was = m.ps.Volume
+	case m.ps.Volume != m.volume.was:
 		m.volume.was, m.volume.at, m.volume.spilt = m.ps.Volume, time.Now(), false
 	}
+	m.volume.hushed = hushed
 
 	// The moment the showing lapses, the lamps let go — once.
 	if !m.volume.spilt && !m.volume.at.IsZero() && time.Since(m.volume.at) >= volumeShows {
