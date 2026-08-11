@@ -270,7 +270,7 @@ func markCrowdFor(set markSet, tall, dotsX int, seed int64) (markSize, []markDot
 			continue
 		}
 		gap := max(int(markSpread*float64(size.tall)), 1)
-		if crowd := pick(size.marks, dotsX, gap, seed); len(crowd) >= markCrowdLeast {
+		if crowd := pick(size.marks, dotsX, gap, seed); len(crowd) >= min(markCrowdLeast, len(size.marks)) {
 			return size, crowd, gap, true
 		}
 		smallest = size
@@ -299,6 +299,16 @@ func markCrowdFor(set markSet, tall, dotsX int, seed int64) (markSize, []markDot
 // nobody: the pool has a piano in it half again as wide as a note, and holding a
 // place open for it would keep the row short.
 func pick(pool []markDots, dotsX, gap int, seed int64) []markDots {
+	// A set can be smaller than a company. The hush is one drawing — the room
+	// is silent, which is one fact and not a scene — and asked for four of it
+	// the deal found one, called that a failure at every size and fell through
+	// to the smallest, so the one thing on screen was drawn as small as it can
+	// be drawn. You cannot deal four out of one.
+	least, most := markCrowdLeast, markCrowdMost
+	if n := len(pool); n < least {
+		least, most = n, n
+	}
+
 	h := uint64(seed)*0x9e3779b97f4a7c15 + 0xd6e8feb86659fd93
 	roll := func() uint64 {
 		h ^= h >> 30
@@ -307,7 +317,7 @@ func pick(pool []markDots, dotsX, gap int, seed int64) []markDots {
 		return h
 	}
 
-	for places := markCrowdMost; places >= markCrowdLeast; places-- {
+	for places := most; places >= least; places-- {
 		var crowd []markDots
 		var wide int
 		already := map[string]bool{}
@@ -372,7 +382,7 @@ func pick(pool []markDots, dotsX, gap int, seed int64) []markDots {
 				}
 			}
 		}
-		if len(crowd) >= markCrowdLeast {
+		if len(crowd) >= least {
 			sort.SliceStable(crowd, func(i, j int) bool { return crowd[i].pitch < crowd[j].pitch })
 			return crowd
 		}
