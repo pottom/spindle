@@ -76,9 +76,16 @@ ones that were broken the first time this was asked, and each of them makes the
 sheet unusable rather than imperfect.
 
 ```
-RETURN ONE SHEET ONLY. Draw exactly the one sheet described below. Do not add
-other sheets, do not combine several sheets into one image, do not include
-extra rows of subjects that were not asked for. One sheet, one image.
+RETURN ONE SHEET ONLY. Draw the one sheet described below. Do not add other
+sheets and do not combine several sheets into one image. One sheet, one image.
+
+DRAW EVERYTHING THAT IS ASKED FOR. Every subject named below must be on the
+sheet. If you have a better idea than one of them — a better subject for the
+set, a better way to animate it, something the brief did not think of — keep it,
+but ADD it rather than swapping it in: draw everything asked for, and put the
+extra subjects in extra columns at the right-hand end of the same sheet, in the
+same style and to the same rules. Nothing asked for is ever dropped to make
+room for something better. A brief is a floor, not a ceiling.
 
 NO TEXT ANYWHERE ON THE IMAGE. No titles, no headings, no captions, no column
 names, no row labels, no numbering of the frames, no legend, no signature, no
