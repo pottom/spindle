@@ -78,8 +78,15 @@ ones that were broken the first time this was asked, and each of them makes the
 sheet unusable rather than imperfect.
 
 ```
-RETURN ONE SHEET ONLY. Draw the one sheet described below. Do not add other
-sheets and do not combine several sheets into one image. One sheet, one image.
+GENERATE A NEW IMAGE FROM NOTHING. There is no input image and nothing is being
+edited: what follows describes a picture to draw from scratch. Draw it.
+
+The picture is one reference sheet of line-art drawings arranged in a grid, of
+the subjects listed at the end. Everything between here and there says how it
+should look.
+
+ONE SHEET ONLY. Draw the one sheet described below. Do not add other sheets and
+do not combine several sheets into one image. One sheet, one image.
 
 DRAW EVERYTHING THAT IS ASKED FOR. Every subject named below must be on the
 sheet. If you have a better idea than one of them — a better subject for the
@@ -95,13 +102,12 @@ watermark. Not one letter and not one digit anywhere on the sheet, including
 the margins. Every mark on the image is part of a drawing.
 
 AN ANIMATION IS A MOVING PART, NOT MOTION LINES. Between two frames, some part
-of the subject must actually change position or shape: a beater falls, a mouth
+of the subject actually changes position or shape: a beater falls, a mouth
 opens, cymbals part, a tail bends, legs pass each other. Drawing the subject
-unchanged and adding short radiating lines around it is NOT an animation and
-will be rejected. Short decorative lines are too fine to survive at all: they
-disappear when the drawing is reduced. If a subject cannot be animated by
-moving one of its own parts, choose a different pose for it, but never fall
-back on motion lines.
+unchanged and adding short radiating lines around it is not an animation, and
+those lines are too fine to survive: they disappear when the drawing is
+reduced. Where a subject is hard to animate, choose a pose for it whose parts
+can move, rather than falling back on motion lines.
 
 STYLE
 - Pure black background (#000000). All drawing in pure white (#FFFFFF).
@@ -117,8 +123,10 @@ SIZE AND FILE
 - Return ONE image, PNG, at the largest resolution available and no smaller
   than 2000 pixels on its long side. Not JPEG.
 - Each subject is drawn LARGE: it fills at least three quarters of the height
-  of its own cell. A sheet where the drawings are small in the middle of empty
-  cells is a sheet that cannot be used.
+  of its own cell, and is no wider than three quarters of its own height —
+  taller than it is wide, always. Where a thing is naturally wide, turn it: a
+  cymbal at a steeper angle, a pedal tucked under rather than out to the side,
+  a stick coming in from above rather than lying across.
 - Every subject on the sheet is drawn at the same height as every other, even
   where the real things differ in size. A whale and a mosquito are the same
   height here.
@@ -126,16 +134,18 @@ SIZE AND FILE
   enclosed shape is narrower than a fifth of it. Below those, a small circle
   fills in solid and a short line disappears entirely when the drawing is
   reduced.
+- No repeated small features: no rows of lugs around a drum, no tension rods, no
+  spokes, no studs, no teeth. Eight small things around a small shape merge into
+  a band of solid ink.
 
 LAYOUT
 - An invisible grid, evenly spaced, with a wide empty margin around the sheet
   and clear empty black space between every cell.
-- NOTHING MAY OVERLAP OR TOUCH ANYTHING ELSE. Every drawing stays entirely
-  inside its own cell. No drawing crosses into a neighbouring cell, no subject
-  spans two cells or two rows, no two drawings share a line, no ground line or
-  horizon runs across the sheet, nothing is cropped by the edge of the sheet.
-  Each cell must be liftable out of the sheet as a plain rectangle containing
-  one complete drawing and nothing else.
+- NOTHING OVERLAPS OR TOUCHES ANYTHING ELSE. Every drawing sits entirely inside
+  its own cell. No drawing crosses into a neighbouring cell, no subject spans
+  two cells or two rows, no two drawings share a line, no ground line or horizon
+  runs across the sheet, and nothing runs off the edge of the sheet. Each cell
+  is a plain rectangle holding one complete drawing and nothing else.
 - A column is one subject and the rows under it are that subject's animation
   frames: the SAME drawing at the SAME size in the SAME position within its
   cell, with ONLY the moving part changed. Nothing that is not moving may shift
