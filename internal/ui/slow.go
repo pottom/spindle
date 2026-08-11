@@ -57,7 +57,38 @@ var slowState struct {
 	missed int
 	worst  time.Duration
 
+	// The last frame's parts, and the rate they are arriving at. Kept for the
+	// bar on ctrl+shift+d: the file says what went wrong an hour ago, and the
+	// bar has to say what is going on now.
+	lastGap, lastUpdate, lastRender time.Duration
+	fps                             float64
+
 	off bool // set once the file cannot be written, so it is not tried again
+}
+
+// slowRead is the timing as a reader wants it: one lock, one copy, nothing that
+// can change underneath whoever is drawing it.
+type slowRead struct {
+	frames, missed                    int
+	worst, gap, update, render, asked time.Duration
+	fps                               float64
+}
+
+// slowNow hands out that copy.
+func slowNow() slowRead {
+	slowState.mu.Lock()
+	defer slowState.mu.Unlock()
+
+	return slowRead{
+		frames: slowState.frames,
+		missed: slowState.missed,
+		worst:  slowState.worst,
+		gap:    slowState.lastGap,
+		update: slowState.lastUpdate,
+		render: slowState.lastRender,
+		asked:  slowState.asked,
+		fps:    slowState.fps,
+	}
 }
 
 // slowFrameBegan is called as a frame's update starts.
@@ -112,6 +143,21 @@ func slowRenderDone(m Model, render time.Duration) {
 	slowState.last = began
 	slowState.frames++
 
+	// Every frame, not only the late ones: a rate is only a rate if the frames
+	// that arrived on time are counted too. Eased, because a single gap is
+	// noise and what anybody reading it wants is the rate over the last second
+	// or so. Anything past a second is the interface having been left alone,
+	// not a rate.
+	slowState.lastGap, slowState.lastUpdate, slowState.lastRender = gap, update, render
+	if gap > 0 && gap < time.Second {
+		now := float64(time.Second) / float64(gap)
+		if slowState.fps == 0 {
+			slowState.fps = now
+		} else {
+			slowState.fps += (now - slowState.fps) * 0.1
+		}
+	}
+
 	if slowState.frames == 1 || slowState.off {
 		return
 	}
@@ -146,7 +192,7 @@ func slowRenderDone(m Model, render time.Duration) {
 		Render: render.Microseconds(),
 		Elsew:  (gap - update - render).Microseconds(),
 		Asked:  slowState.asked.Microseconds(),
-		Screen: slowScreen(m),
+		Screen: debugScreen(m),
 		Mode:   int(m.scopeMode()),
 		Wide:   m.width,
 		High:   m.height,
@@ -172,16 +218,4 @@ func slowRenderDone(m Model, render time.Duration) {
 	}
 	defer f.Close()
 	_, _ = f.Write(append(raw, '\n'))
-}
-
-// slowScreen is which picture was up, in one word.
-func slowScreen(m Model) string {
-	switch {
-	case m.stage.on:
-		return "stage"
-	case m.lyrics.on:
-		return "lyrics"
-	default:
-		return "player"
-	}
 }
