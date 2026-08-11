@@ -77,3 +77,59 @@ func TestTheNextRecordsColourComesInFirst(t *testing.T) {
 	}
 	t.Error("the tide was half across and the whole screen had already changed over")
 }
+
+// A track put in front while the colour is crossing does not send it back.
+//
+// Watched on a live record: the colour started over toward the record that was
+// coming, and then a track was added from a phone. The crossing began with one
+// colour and finished with another — and in between it snapped the whole way
+// back to the record that was still playing, which is the one thing this exists
+// to stop happening.
+//
+// Following the new track is right. Starting again from nothing is not: the last
+// twelve seconds of a record are exactly when the screen must not flinch.
+func TestATrackPutInFrontDoesNotSendTheColourBack(t *testing.T) {
+	m := scopeModel(120, 44)
+	m.stage.on = true
+	m.ps.TrackID, m.ps.Duration, m.ps.Playing = "first", 3*time.Minute, true
+	m.queue = []player.Track{{ID: "second", CoverURL: "http://example/second.jpg"}}
+
+	m.setProgress(3*time.Minute - tideFor - time.Second)
+	m.tideCmd()
+	m.tideTook(cover.Art{Accent: color.RGBA{R: 200, G: 40, B: 40, A: 255}, HasAccent: true})
+
+	// Half across.
+	m.setProgress(3*time.Minute - tideFor/2)
+	m.tideFlow()
+	half := m.tide.buckets
+	if half <= 0 {
+		t.Fatalf("the tide had not started: %d bands handed over", half)
+	}
+
+	// And now a track arrives in front of it, from somewhere else entirely.
+	m.queue = []player.Track{
+		{ID: "jumped", CoverURL: "http://example/jumped.jpg"},
+		{ID: "second", CoverURL: "http://example/second.jpg"},
+	}
+	m.setProgress(3*time.Minute - tideFor/2 + time.Second)
+	m.tideFlow()
+
+	if m.tide.buckets < half {
+		t.Errorf("the colour went back from %d bands to %d when a track was put in front",
+			half, m.tide.buckets)
+	}
+
+	// The new record's colour is sent for, and when it lands the crossing carries
+	// on from where it was rather than starting again.
+	if cmd := m.tideCmd(); cmd == nil {
+		t.Error("the colour of the track that jumped the queue was never asked for")
+	}
+	m.tideTook(cover.Art{Accent: color.RGBA{R: 40, G: 40, B: 200, A: 255}, HasAccent: true})
+	m.setProgress(3*time.Minute - tideFor/2 + 2*time.Second)
+	m.tideFlow()
+
+	if m.tide.buckets < half {
+		t.Errorf("the colour went back from %d bands to %d once the new one was in hand",
+			half, m.tide.buckets)
+	}
+}

@@ -74,11 +74,26 @@ func (m Model) tideComing() string {
 // It runs out where the record does — with a crossfade set, where the next one
 // starts underneath rather than where this one stops, which is the moment the
 // picture is about to be answering the wrong record.
+//
+// How far across does not depend on whose colour is being crossed to. It used to:
+// the crossing stopped dead if the colour in hand was not the track now at the
+// head of the queue, which meant that adding a track from a phone in the last
+// twelve seconds of a record snapped the whole screen back to the record still
+// playing and started again. Watched on a live record — the crossing began with
+// one colour and ended with another, with a jump back to the beginning in
+// between, which is the one thing this file exists to stop happening.
+//
+// So the crossing is a property of where the record has got to, and nothing
+// else. What changes when the queue changes is the colour at the other end of
+// it: tideCmd asks for the new one and tideTook swaps it in, and the bands
+// already handed over take the new colour where they stand rather than being
+// given back. The record itself changing still resets it, and does so without a
+// rule of its own — a record that has just started has more than tideFor left.
 func (m Model) tideAt() (float32, bool) {
 	if !m.tide.has || m.ps == nil || !m.ps.Playing || m.ps.Duration <= 0 {
 		return 0, false
 	}
-	if m.tide.forTrack == "" || m.tide.forTrack != m.tideComing() {
+	if m.tide.forTrack == "" {
 		return 0, false
 	}
 
