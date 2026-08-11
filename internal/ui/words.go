@@ -1032,6 +1032,17 @@ func (m Model) wordsLines(w, rows int) []string {
 				}
 			}
 
+			// Every offset above can carry a dot off the screen — the lean
+			// shears whole columns sideways, and a mark turning round starts
+			// its column somewhere else — so the last word on where a dot lands
+			// is here rather than inside each of them. Left to the movements to
+			// check for themselves, one of them did not: a turned mark leaning
+			// took a dot to a negative column, and the picture went down with
+			// an index of minus one.
+			if at < 0 || to < 0 || at >= dotsX || to >= dotsY {
+				continue
+			}
+
 			cell := (to/dotsPerCellY)*w + at/dotsPerCellX
 			grid[cell] |= 1 << brailleBit[at%dotsPerCellX][to%dotsPerCellY]
 
@@ -1352,6 +1363,17 @@ func (m Model) drawLeaving(grid []uint8, paint, hue []int8, w, rows int, gone fl
 				at, to, burn = x+int(dx*(1-p)), y+int(dy*(1-p)), step
 			}
 
+			if at < 0 || to < 0 || at >= dotsX || to >= dotsY {
+				continue
+			}
+
+			// Every offset above can carry a dot off the screen — the lean
+			// shears whole columns sideways, and a mark turning round starts
+			// its column somewhere else — so the last word on where a dot lands
+			// is here rather than inside each of them. Left to the movements to
+			// check for themselves, one of them did not: a turned mark leaning
+			// took a dot to a negative column, and the picture went down with
+			// an index of minus one.
 			if at < 0 || to < 0 || at >= dotsX || to >= dotsY {
 				continue
 			}

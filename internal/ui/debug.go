@@ -308,6 +308,22 @@ func (m Model) debugWords() []debugField {
 	hue, level := m.wordsColourNow()
 	b.put("col", "%d/%d", hue, level)
 	b.put("band", "%.1f/%.1f", w.band, w.head)
+	if w.beats {
+		// How many of the row are facing the other way, and whether any of them
+		// may: a set without a front never turns, and neither does a row with no
+		// beat to turn on. See wordsTurning.
+		if turned := m.wordsTurning(w.where.Count); turned != nil {
+			var n int
+			for _, one := range turned {
+				if one {
+					n++
+				}
+			}
+			b.put("turn", "%d/%d", n, len(turned))
+		} else {
+			b.put("turn", "-")
+		}
+	}
 	if n := len(m.scope.sparks); n > 0 {
 		b.put("sparks", "%d", n)
 	}
