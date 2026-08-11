@@ -180,7 +180,26 @@ func draw(paths []string, want string, only int) {
 				}
 				row = append(row, m)
 			}
-			fmt.Printf("\n%s at %d dots, pen %d — %d marks\n", s.Name, h.Tall, h.Thick, len(row))
+			// What the row costs across the screen, which is the number that
+			// decides which size it is drawn at: the largest that holds all of
+			// it wins, so a wide set is a small set. See markRowFor.
+			var wide int
+			for _, m := range row {
+				wide += m.wide
+			}
+			gap := int(0.45 * float64(h.Tall)) // markSpread
+			across := wide + gap*(len(row)-1)
+			fmt.Printf("\n%s at %d dots, pen %d — %d marks, %.2f wide each, row %d dots = %d cells\n",
+				s.Name, h.Tall, h.Thick, len(row),
+				float64(wide)/float64(len(row))/float64(h.Tall), across, (across+1)/2)
+			// Which of them is the wide one, since one mark out of eight is
+			// enough to cost the row a size.
+			if only > 0 {
+				for i, m := range row {
+					fmt.Printf("  %-12s %.2f wide\n", strings.TrimSuffix(s.Marks[i], filepath.Ext(s.Marks[i])),
+						float64(m.wide)/float64(h.Tall))
+				}
+			}
 			for _, line := range braille(row) {
 				fmt.Println(line)
 			}
