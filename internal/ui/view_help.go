@@ -86,6 +86,7 @@ func helpGroups() []helpGroup {
 			{"n / p", "next or previous track"},
 			{"d", "another company of dancers"},
 			{"t", "what is playing, said there and then"},
+			{"s / r", "shuffle and repeat, said by the one with the placard"},
 			{"any other key", "back"},
 		},
 	}, {

@@ -117,6 +117,10 @@ type Model struct {
 	// run is the record's beats, counted forwards. See beatrun.go.
 	run beatRun
 
+	// sign is the one who walks past with a placard when a switch moves.
+	// See sign.go.
+	sign signState
+
 	// volume is the stack of lamps the big screen says the level with, and
 	// whatever has fallen off it. See volume.go.
 	volume volumeState

@@ -246,7 +246,8 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		key.Matches(k, m.keys.VolUp), key.Matches(k, m.keys.VolDown),
 		key.Matches(k, m.keys.Mute),
 		key.Matches(k, m.keys.Next), key.Matches(k, m.keys.Prev),
-		key.Matches(k, m.keys.SeekFwd), key.Matches(k, m.keys.SeekBack):
+		key.Matches(k, m.keys.SeekFwd), key.Matches(k, m.keys.SeekBack),
+		key.Matches(k, m.keys.Shuffle), key.Matches(k, m.keys.Repeat):
 		// The transport, which belongs to whatever is playing rather than to
 		// whichever screen is up. Everything not named here closes the picture,
 		// which is what makes it a picture rather than a screen with a way out:

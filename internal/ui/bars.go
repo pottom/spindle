@@ -224,6 +224,8 @@ func (m Model) drawCellsIn(w, rows int, grid []uint8, paint, hue []int8,
 		// And how loud the room is, while somebody is changing it. Same
 		// reasoning: every picture gets it without knowing about it.
 		m.volumeDraw(w, rows, grid, paint, hue, len(palette[0]), len(palette))
+		// And whoever is walking past with a placard about a switch.
+		m.signDraw(w, rows, grid, paint, hue, len(palette[0]), len(palette))
 	}
 
 	lines := make([]string, rows)

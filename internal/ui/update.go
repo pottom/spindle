@@ -309,6 +309,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if m.stage.on {
 			m.stageEdgeFlow()
 			m.volumeFlow(m.height)
+			m.signFlow()
 		}
 
 		// The colour of the record coming next, arriving before the sound of it.
