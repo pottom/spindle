@@ -8,6 +8,7 @@ import (
 
 	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui/cover"
+	"github.com/pottom/spindle/internal/ui/msg"
 )
 
 func splashModel(t *testing.T, w, rows int) Model {
@@ -69,5 +70,26 @@ func TestTheLogoKnowsWhenThereIsNoRoom(t *testing.T) {
 	panel := strings.Join(m.noDevicePanel(m.layout(), 10), "\n")
 	if !strings.Contains(panel, "No active playback device") {
 		t.Error("the panel lost its words")
+	}
+}
+
+// The picture is kept up to date by the ordinary tick.
+//
+// It hung off a frame of the visualiser first, and that branch leaves at once
+// when the trace is not on screen — which is the very case the picture exists
+// for, so it never ran once. A test that only called splashFlow would not have
+// caught it; this one goes through Update.
+func TestTheLogoIsDrawnByTheTick(t *testing.T) {
+	m := splashModel(t, 120, 40)
+	if len(m.splashRows()) != 0 {
+		t.Fatal("something was rendered before a single tick")
+	}
+	out, _ := m.Update(msg.Tick{})
+	got, ok := out.(Model)
+	if !ok {
+		t.Fatal("the update did not hand back a model")
+	}
+	if len(got.splashRows()) == 0 {
+		t.Error("a tick on the screen the logo is for drew nothing")
 	}
 }

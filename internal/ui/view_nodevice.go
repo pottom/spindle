@@ -1,5 +1,7 @@
 package ui
 
+import "github.com/pottom/spindle/internal/build"
+
 // deviceListCols keeps the device names and their kinds within reading distance
 // of each other on a wide terminal.
 const deviceListCols = 52
@@ -29,6 +31,12 @@ func (m Model) noDevicePanel(l layout, rows int) []string {
 	)
 	lines = append(lines, m.deviceRows(min(w, deviceListCols), true)...)
 	lines = append(lines, "", "")
+
+	// Which build this is. It belongs here more than anywhere: this is the
+	// screen you are looking at while you wait, and half a day went on a picture
+	// that had been fixed and went on looking broken because the binary running
+	// was older than the fix.
+	lines = append(lines, s.Empty.Render("spindle "+build.Version()), "")
 
 	if len(m.devices.items) == 0 {
 		lines = append(lines,

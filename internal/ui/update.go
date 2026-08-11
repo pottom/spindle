@@ -302,9 +302,6 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		// that moves. See beatrun.go.
 		m.beatRunFlow()
 
-		// The program's own picture, while the device is being waited for.
-		m.splashFlow()
-
 		// The head on the edge walks to wherever the record has been moved to,
 		// so a seek is watched rather than reported. Every picture on the big
 		// screen carries the edge — see drawCellsIn — so this runs for all of
@@ -394,6 +391,13 @@ func (m *Model) resize() {
 func (m Model) handleTick() (tea.Model, tea.Cmd) {
 	m.tickCount++
 	cmds := []tea.Cmd{tickCmd()}
+
+	// The program's own picture, while the device is being waited for.
+	//
+	// On the ordinary tick rather than on a frame of the visualiser. It was on
+	// the frame, and that branch leaves at once when the trace is not on screen
+	// — which is exactly the case the picture exists for, so it never ran once.
+	m.splashFlow()
 	if cmd := m.spinDevice(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
