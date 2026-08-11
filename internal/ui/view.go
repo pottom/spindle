@@ -39,7 +39,7 @@ func (m Model) View() tea.View {
 	// The other half of a frame's timing: what the update decided, and what it
 	// cost to draw. See slow.go.
 	began := time.Now()
-	v := tea.NewView(m.render())
+	v := tea.NewView(m.debugOver(m.render()))
 	slowRenderDone(m, time.Since(began))
 
 	v.AltScreen = true

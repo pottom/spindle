@@ -197,6 +197,9 @@ type Model struct {
 	// stage is the visualiser with the whole terminal to itself. See stage.go.
 	stage stageState
 
+	// debug is the bar of numbers on ctrl+shift+d. See debug.go.
+	debug debugState
+
 	// joins is where the record changes, which is when the picture changes with
 	// it. See joins.go.
 	joins joinsState

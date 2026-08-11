@@ -26,6 +26,11 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyPressMsg:
+		// Before anything else takes it: the bar is for looking at whatever the
+		// screen is doing, including the screens that swallow keys. See debug.go.
+		if m.debugKey(message.String()) {
+			return m, nil
+		}
 		return m.handleKey(message)
 
 	case deviceRestarted:
