@@ -8,27 +8,55 @@
       "pitch": 0.0
     },
     {
+      "file": "beam.png",
+      "pitch": 0.077
+    },
+    {
       "file": "grin.png",
-      "pitch": 0.17
+      "pitch": 0.154
+    },
+    {
+      "file": "rock.png",
+      "pitch": 0.231
     },
     {
       "file": "wink.png",
-      "pitch": 0.33
+      "pitch": 0.308
+    },
+    {
+      "file": "sly.png",
+      "pitch": 0.385
     },
     {
       "file": "amazed.png",
-      "pitch": 0.5
+      "pitch": 0.462
+    },
+    {
+      "file": "whistle.png",
+      "pitch": 0.538
     },
     {
       "file": "cool.png",
-      "pitch": 0.67
+      "pitch": 0.615
+    },
+    {
+      "file": "stars.png",
+      "pitch": 0.692
     },
     {
       "file": "cross.png",
-      "pitch": 0.83
+      "pitch": 0.769
+    },
+    {
+      "file": "content.png",
+      "pitch": 0.846
     },
     {
       "file": "teeth.png",
+      "pitch": 0.923
+    },
+    {
+      "file": "peace.png",
       "pitch": 1.0
     }
   ],
