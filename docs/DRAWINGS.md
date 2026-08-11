@@ -48,7 +48,10 @@ strokes. Anything finer than about a tenth of the drawing's height is gone.
 **Each mark is cut to its own ink.** Margins on the sheet do not matter and the
 row stands on one floor whatever they were. What does matter is that nothing
 from a neighbouring cell — a stray line, a caption, a frame — falls inside the
-cut, because it becomes part of the mark.
+cut, because it becomes part of the mark. The cut is a rectangle, so two
+drawings that touch cannot be separated at all: the sheet is thrown away and
+asked for again. This is the rule that fails most often and the one to state
+loudest.
 
 **No text anywhere.** A label inside the sheet is ink, and ink is a drawing.
 
@@ -88,7 +91,14 @@ STYLE, applying to everything on the sheet
 
 LAYOUT, applying to everything on the sheet
 - An invisible grid, evenly spaced, with a wide empty margin around the sheet
-  and clear empty space between every cell. Nothing touches or overlaps.
+  and clear empty space between every cell.
+- NOTHING MAY OVERLAP OR TOUCH ANYTHING ELSE. Every drawing stays entirely
+  inside its own cell with clear black space all around it. No drawing crosses
+  into a neighbouring cell, no two drawings share a line, no element is common
+  to two cells, no ground line or horizon runs across the sheet, no subject is
+  cropped by the edge of the sheet, and no line of one drawing crosses a line of
+  another. Each cell must be liftable out of the sheet as a plain rectangle with
+  one complete drawing in it and nothing else.
 - Where a column is one subject and the rows are its animation frames, the
   frames are the SAME drawing at the SAME size in the SAME position within the
   cell, with ONLY the moving part changed. Everything else must be identical.
@@ -124,8 +134,32 @@ the one to ask for explicitly.
 stopped. Blowing a kiss, a curtain opening, a page turning, falling asleep. Six
 is comfortable; the movement is over when the frames are.
 
+**Why three, in numbers.** The frames advance on the beat, and a beat on the
+records this is watched against runs 470 to 710 milliseconds. Three frames
+played out and back is four steps in that beat: 120 to 180 milliseconds a frame,
+which is six to eight drawings a second. Hand-drawn animation on twos is twelve.
+So three is plainly enough for a strike, where the whole point is that it is
+sudden and everything after it is a decay, and plainly thin for a walk, where
+the eye is following a limb from one place to another. Hence four for a cycle,
+and six if a walk still steps once it is baked.
+
+None of this is the whole movement, either. The row leans, sways, rides and
+bounces in the code at the full frame rate, so what the drawn frames add is the
+shape changing, not the motion — which is why a strike gets away with three.
+
 The default is three. Where a sheet below wants four or six it says so, and the
-grid is that many rows or that many cells wide.
+grid is that many rows or that many cells wide. Asking for more frames costs
+nothing in the code — a mark is about a kilobyte baked at all four sizes — and
+costs a great deal in the drawing, because every extra cell is another chance
+for the subject to drift. Get a set working at three or four first, then ask for
+more on that set alone, when its style is already known to bake well.
+
+**What not to draw at all.** The row already leans, sways, rides and bounces:
+those are transforms in the code, applied to whatever the mark is, and they take
+their timing from the beat. A subject drawn leaning gets the lean twice. So the
+frames are only ever the part that changes SHAPE — a mouth opening, a beater
+falling, cymbals parting, legs passing each other — and never the whole subject
+tilted, shifted, grown or moved across its cell.
 
 Two things about the frames themselves, whatever the count:
 
