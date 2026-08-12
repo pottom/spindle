@@ -42,7 +42,6 @@ func (l *Local) Bands() ([]float32, Beat) {
 		Beat  float64   `json:"beat_ms"`
 		Since float64   `json:"beat_since_ms"`
 		Loud  float64   `json:"loud_db"`
-		Notes []float32 `json:"notes"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return nil, Beat{}
@@ -52,6 +51,5 @@ func (l *Local) Bands() ([]float32, Beat) {
 		Period: time.Duration(out.Beat * float64(time.Millisecond)),
 		Since:  time.Duration(out.Since * float64(time.Millisecond)),
 		Loud:   out.Loud,
-		Notes:  out.Notes,
 	}
 }

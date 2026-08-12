@@ -39,7 +39,9 @@ import (
 //
 // So the shape of the spectrum is the whole of it, and the notes are no help:
 // harmony moves every couple of bars and the key holds for minutes, and neither
-// is a section. That measurement is why there is no chroma in this file.
+// is a section. That measurement is the first of the two that took the chroma
+// out of the program altogether; the second was listening to it, which is
+// written up on the commit that removed it.
 //
 // At the figures below the row turns over 1.9 times a minute, against the two a
 // minute the clock did, and 57% of those turns land within a bar of a join a

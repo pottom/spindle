@@ -222,7 +222,6 @@ func (m Model) debugSound() []debugField {
 		b.put("sway", "-")
 	}
 	b.put("bands", "%d", len(m.scope.bands))
-	b.put("notes", "%s", debugNotes(m.scope.beat.Notes))
 	return b.out
 }
 
@@ -717,25 +716,6 @@ func debugDoingName(d faceDoing) string {
 		return fmt.Sprintf("?%d", int(d))
 	}
 	return debugDoingNames[d]
-}
-
-// debugNotes names the loudest of the twelve, which is the only part of a chroma
-// reading a bar has room for.
-func debugNotes(notes []float32) string {
-	if len(notes) < 12 {
-		return "-"
-	}
-	names := [12]string{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"}
-	top, at := float32(0), -1
-	for i, v := range notes {
-		if v > top {
-			top, at = v, i
-		}
-	}
-	if at < 0 {
-		return "-"
-	}
-	return fmt.Sprintf("%s %.2f", names[at], top)
 }
 
 func debugClock(d time.Duration) string {
