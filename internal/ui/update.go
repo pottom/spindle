@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/player"
+	"github.com/pottom/spindle/internal/ui/cover"
 	"github.com/pottom/spindle/internal/ui/msg"
 )
 
@@ -44,6 +45,16 @@ func (m Model) answer(message tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.BackgroundColorMsg:
 		m.isDark = message.IsDark()
 		m.restyle()
+
+		// And the artwork, for the renderer that has to composite it itself. A
+		// cell can only be one colour, so a picture with transparency in it is
+		// flattened before it is drawn; until the terminal says what it is
+		// flattened against, the answer is black.
+		if m.covers != nil {
+			if h, ok := m.covers.Renderer().(*cover.Halfblock); ok {
+				h.SetBehind(message)
+			}
+		}
 		return m, nil
 
 	case tea.KeyPressMsg:

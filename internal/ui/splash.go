@@ -23,10 +23,16 @@ import (
 // key: the wait is the thing it is for, and the end of the wait is the end of
 // it.
 //
-// Carried in the binary rather than fetched. It is 900k of a 30 megabyte
-// program, and the moment it exists for is the moment the network is not
-// answering — a logo downloaded on demand would be missing exactly when it was
-// wanted.
+// Carried in the binary rather than fetched. It is under two megabytes of a
+// thirty megabyte program, and the moment it exists for is the moment the
+// network is not answering — a logo downloaded on demand would be missing
+// exactly when it was wanted.
+//
+// It has a transparent background, so what is round it is whatever the terminal
+// is. The kitty renderer hands the alpha to the terminal and it composites;
+// the halfblock renderer has to do it itself, because a cell can only be one
+// colour — see Halfblock.behind, and the background the terminal is asked for
+// when the interface starts.
 
 // splashSlot is which picture on the screen this is, kept apart from the three
 // the artwork uses so that a renderer holding images in the terminal does not
