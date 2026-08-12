@@ -113,11 +113,15 @@ passes it with no change to spindle at all**, and the cover draws as a picture.
 And because `braille.zig` comes along byte for byte, the picture is not merely
 similar to Ghostty's — the same arithmetic shares out the same gaps.
 
-Three things are not known and should not be assumed. It is young: first release
-2026-04-16, one maintainer, latest 1.3.123 on 2026-08-06. Its renderer on Windows
-is OpenGL 4.3 through WGL rather than Metal, so **none of the speeds below carry
-over** — they were taken on macOS. And none of this has been run on a Windows
-machine yet; it is read, not measured.
+Its renderer on Windows is OpenGL 4.3 through WGL rather than Metal, which was
+the reason to expect nothing and measure instead. Run on the Windows machine,
+2026-08-12, same test and same 45x13 as everything below: **3446 frames a second,
+0.29 ms a frame.** Ghostty on macOS measured 4577 and then 3070 on a repeat with
+the machine busier, so winghostty sits inside Ghostty's own spread. OpenGL
+instead of Metal costs nothing that this test can see.
+
+What is left is age rather than speed: first release 2026-04-16, one maintainer,
+latest 1.3.123 on 2026-08-06, and a SmartScreen warning on install.
 
 **But Rio is much slower at taking the stream, and it is the one thing to check
 before building on it.** Measured 2026-08-12, same window size for all three, 100
