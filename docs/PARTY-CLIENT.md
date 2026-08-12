@@ -52,11 +52,34 @@ knows what is playing.
 
 ## What was measured
 
-**The terminal.** Alacritty on a Windows laptop drew spindle's own stream — 100
-frames of 200×50 coloured braille, byte for byte the same file used on macOS — at
-**296 frames a second**. That is 3.4 ms a frame against a 16.7 ms budget, five
-times over, and in the same band as the three measured on macOS: Alacritty 501,
-Ghostty 471, kitty 380, WezTerm 190.
+**The terminal, for speed.** Alacritty on a Windows laptop drew spindle's own
+stream — 100 frames of 200×50 coloured braille, byte for byte the same file used
+on macOS — at **296 frames a second**. That is 3.4 ms a frame against a 16.7 ms
+budget, five times over, and in the same band as the three measured on macOS:
+Alacritty 501, Ghostty 471, kitty 380, WezTerm 190.
+
+**And speed is the wrong thing to choose by.** Alacritty is the fastest of the
+four and the picture is unusable in it: the braille comes out as vertical stripes
+at every size. That is not a setting and no font fixes it. A braille glyph leaves
+space around its dots because braille is meant to be read as separate dots, so
+every cell boundary is a seam — measured 2026-08-12, and measured twice, because
+JetBrainsMono has no braille at all and Cascadia Code, which has the whole block
+at the right width, changed nothing.
+
+What separates them is whether the terminal **draws braille itself** rather than
+taking it from a font:
+
+| | braille | speed |
+|---|---|---|
+| Ghostty | draws it — clean | 471 |
+| WezTerm | draws it — clean | 190 |
+| Rio | draws it, by its own documentation — unmeasured | unmeasured |
+| Alacritty | from the font — striped | 501, and it does not matter |
+
+So the Windows choice is **WezTerm or Rio**, not Alacritty. Rio is the more
+promising of the two — it draws braille itself, it is GPU-accelerated, and it
+runs on Windows — and it is the one nothing has been measured about. That is the
+next thing to try.
 
 **The network.** 600 spectrum requests from that laptop to the Mac, through a
 SOCKS proxy: median **4.47 ms**, p95 5.85, p99 6.8, **spread 2.32 ms**. The bar
