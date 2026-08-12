@@ -30,6 +30,9 @@ func TestATerminalMaySpeakTheProtocolWithoutItsPlaceholders(t *testing.T) {
 		{"WezTerm", wez, true, false, "halfblock"},
 		{"one that says nothing", plain, false, false, "halfblock"},
 		{"Ghostty", []byte("\x1b_Gi=31;OK\x1b\\\x1bP>|ghostty 1.3.1\x1b\\\x1b[?62;c"), true, true, "kitty"},
+		// Word for word what Rio 0.5.21 answered, capital R and all, which is
+		// why the match is made on a lowercased name.
+		{"Rio", []byte("\x1b_Gi=31;OK\x1b\\\x1bP>|Rio 0.5.21\x1b\\\x1b[?62;c"), true, true, "kitty"},
 		// Answers the query, is not on the list, and so is drawn the safe way.
 		{"one nobody has tried", []byte("\x1b_Gi=31;OK\x1b\\\x1bP>|Ninetendo 3\x1b\\\x1b[?62;c"), true, false, "halfblock"},
 	} {

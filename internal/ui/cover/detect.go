@@ -80,14 +80,21 @@ func (g Graphics) Backend() string {
 //
 // Researched 2026-08-12. Terminals that speak the protocol at all: kitty,
 // Ghostty, Konsole, st (patched), Warp, wayst, WezTerm, iTerm2, xterm.js, Rio.
-// Confirmed to do placeholders: these two, and kitty's own documentation says
-// nothing about the rest. Confirmed not to: WezTerm, measured here, and
-// xterm.js, which is VS Code's terminal.
+// Confirmed to do placeholders: the three here. Confirmed not to: WezTerm,
+// measured here, and xterm.js, which is VS Code's terminal.
+//
+// Rio was added on measurement rather than on its documentation, 2026-08-12,
+// version 0.5.21: it answered the graphics query, so Kitty was already true, but
+// the protocol has no way to ask about placeholders, so the only test is to draw
+// one and look. Drawn with this package's own renderer in a Rio window, the
+// picture came out whole. Until then Rio fell through to half blocks, which is
+// exactly what this list is for — a terminal nobody has tried gets a coarse
+// cover rather than a broken screen.
 //
 // Matched against what the terminal says it is when asked directly, rather than
 // against TERM_PROGRAM: that variable is inherited, and measured, Alacritty
 // started from a Ghostty window reports TERM_PROGRAM=ghostty.
-var placeholderers = []string{"kitty", "ghostty"}
+var placeholderers = []string{"kitty", "ghostty", "rio"}
 
 // Probe asks the terminal what it can do. It must be called before Bubble Tea
 // takes over the terminal.

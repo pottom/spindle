@@ -59,27 +59,92 @@ budget, five times over, and in the same band as the three measured on macOS:
 Alacritty 501, Ghostty 471, kitty 380, WezTerm 190.
 
 **And speed is the wrong thing to choose by.** Alacritty is the fastest of the
-four and the picture is unusable in it: the braille comes out as vertical stripes
-at every size. That is not a setting and no font fixes it. A braille glyph leaves
-space around its dots because braille is meant to be read as separate dots, so
-every cell boundary is a seam — measured 2026-08-12, and measured twice, because
-JetBrainsMono has no braille at all and Cascadia Code, which has the whole block
-at the right width, changed nothing.
+four and the picture comes out of it as stripes, at every font size. That alone
+settles the choice, but the reason took three goes to get right and is worth
+writing down, because it is not what it looks like.
 
-What separates them is whether the terminal **draws braille itself** rather than
-taking it from a font:
+It is not that some terminals leave gaps between braille dots and others do not.
+**They all leave gaps.** Ghostty's own source says so — `braille.zig` lays out
+eight square dots with a gap between them. What it then does, and what nothing
+else here does, is spend the cell's leftover pixels on making the gap *between*
+two cells equal the gap *inside* one. Even gaps read as a texture; uneven gaps
+read as stripes.
 
-| | braille | speed |
+So it is the ratio, and the ratio follows from the cell size. Measured on this
+machine, 2026-08-12:
+
+| | inside a cell | between cells | |
+|---|---|---|---|
+| Alacritty, cell 17px | 0px — the two dot columns merge | 2-3px | stripes |
+| Alacritty, cell narrowed by 2px | even | even | clean |
+| Ghostty, cell 17x41 | 5px | 4px | off by one, barely visible |
+| Ghostty, cell 16x41 | 4px | 4px | exact |
+
+Two things follow. Alacritty *can* be made to draw the picture, with
+`font.offset` — it was wrong to write that no setting fixes it. And a terminal
+that draws braille itself is still worth preferring, because it does this
+arithmetic on every font size by itself instead of needing a number per machine.
+
+| | braille | cover |
 |---|---|---|
-| Ghostty | draws it — clean | 471 |
-| WezTerm | draws it — clean | 190 |
-| Rio | draws it, by its own documentation — unmeasured | unmeasured |
-| Alacritty | from the font — striped | 501, and it does not matter |
+| Ghostty | draws it — clean | kitty placeholders |
+| Rio | draws it — clean | kitty placeholders, measured 2026-08-12 |
+| kitty | draws it — clean | kitty placeholders |
+| Alacritty | from the font — needs a per-machine offset | half blocks |
 
-So the Windows choice is **WezTerm or Rio**, not Alacritty. Rio is the more
-promising of the two — it draws braille itself, it is GPU-accelerated, and it
-runs on Windows — and it is the one nothing has been measured about. That is the
-next thing to try.
+So on this machine the choice is **Rio** or Ghostty. Alacritty and WezTerm were
+taken off it.
+
+**On Windows the choice is probably Ghostty itself.** There are now three forks
+carrying it there — [winghostty](https://github.com/amanthanvi/winghostty),
+langchenglc's fork of it, and [wintty](https://github.com/deblasis/wintty) — each
+pairing Ghostty's terminal core with a native Win32 runtime. Read from their
+source rather than from their pages, 2026-08-12:
+
+| | |
+|---|---|
+| `src/font/sprite/draw/braille.zig` | present, and the same 4511 bytes, in all three |
+| the kitty graphics protocol | in the shared core, placeholders with it |
+| the XTVERSION reply | still `"ghostty"`, unchanged in the fork's `stream_handler.zig` |
+
+That last row is the one that matters here: the allow-list in
+`internal/ui/cover/detect.go` matches a lowercased substring, so **winghostty
+passes it with no change to spindle at all**, and the cover draws as a picture.
+And because `braille.zig` comes along byte for byte, the picture is not merely
+similar to Ghostty's — the same arithmetic shares out the same gaps.
+
+Three things are not known and should not be assumed. It is young: first release
+2026-04-16, one maintainer, latest 1.3.123 on 2026-08-06. Its renderer on Windows
+is OpenGL 4.3 through WGL rather than Metal, so **none of the speeds below carry
+over** — they were taken on macOS. And none of this has been run on a Windows
+machine yet; it is read, not measured.
+
+**But Rio is much slower at taking the stream, and it is the one thing to check
+before building on it.** Measured 2026-08-12, same window size for all three, 100
+frames of braille with a different 24-bit colour on every cell, the clock stopped
+by a cursor query so the terminal has to have parsed everything before it can
+answer:
+
+| at 45x13 cells | frames a second | a frame |
+|---|---|---|
+| Ghostty | 4577 | 0.22 ms |
+| kitty | 2203 | 0.45 ms |
+| Rio | 65 | **15.4 ms** |
+
+And Rio's cost is mostly per frame rather than per cell: 65 fps at 45x13, 33 at
+90x23 — four times the cells for half the rate. Extended, a 200x50 picture would
+be around 110 ms a frame, which is three times the budget.
+
+Two reasons not to panic, and one reason not to dismiss it. Ghostty and kitty
+almost certainly answer without presenting every intermediate frame, so this
+compares parsing against parsing-and-drawing and flatters them. The test is also
+a deliberate worst case — every cell a different colour, every frame a full
+repaint. Against that: **15 ms a frame at 45x13 is already half the 33 ms budget
+at a size far below a party screen**, and it was still 30 ms at 90x23.
+
+Not settled either way, and not settleable by this test. What settles it is the
+real picture on a real record, timed the way the interface already times itself.
+That is the first measurement to take when the party screen starts.
 
 **The network.** 600 spectrum requests from that laptop to the Mac, through a
 SOCKS proxy: median **4.47 ms**, p95 5.85, p99 6.8, **spread 2.32 ms**. The bar
@@ -225,6 +290,12 @@ it can be five minutes, and a frozen screen reads as a crashed machine.
 Deliberately not decided here. It wants looking at rather than arguing about.
 
 **The cover on Windows.** Nothing here shows one, so it does not matter for this
-— but for the record: neither kitty nor Ghostty runs on Windows, and of the
-terminals that do, only Rio speaks the kitty protocol at all. Whether it does the
-Unicode placeholders spindle draws in is unmeasured.
+— but for the record, and it is good news twice over. Rio speaks the kitty
+protocol and does the Unicode placeholders: measured 2026-08-12 on Rio 0.5.21 by
+drawing one with this project's own renderer and looking at it, which is the only
+test there is, since the protocol has no way to ask. Rio is on the allow-list in
+`internal/ui/cover/detect.go` because of that measurement, so the interface draws
+real artwork in it. And the Ghostty forks for Windows carry the same graphics
+core and answer to the same name, so they need no entry of their own — though
+that half is read rather than measured, and wants confirming on a Windows machine
+the same way Rio was confirmed here.
