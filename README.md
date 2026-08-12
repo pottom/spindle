@@ -82,7 +82,7 @@ spindle needs a Spotify application to authenticate as. Register one at
 [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard), add
 this exact redirect URI
 
-    http://127.0.0.1:8888/callback
+    http://127.0.0.1:3679/callback
 
 and then
 
@@ -91,6 +91,10 @@ and then
 
 The client secret is not needed: authorisation is PKCE. Playback needs a second
 authorisation, which the daemon asks for on its own the first time.
+
+If something on your machine already wants port 3679, `spindle callback <port>`
+moves it — add the new address to the application as well, which may list
+several.
 
 Settings live in `~/.config/spindle`:
 
@@ -111,6 +115,7 @@ key binding or a status bar wants:
     spindle volume [0-100]               report the level, or set it
     spindle seek 90 | +30 | -15          to a position, or by an offset
     spindle notify on | off              announce each new track to the desktop
+    spindle callback [port]              where the browser is sent back to when logging in
     spindle daemon start | stop          the playback device itself
     spindle daemon restart | status      restart it, or ask whether one is running
 

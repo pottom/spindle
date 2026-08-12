@@ -34,9 +34,16 @@ type callbackServer struct {
 // listenForCallback starts the server. The listener is opened eagerly so a port
 // already in use is reported before a browser window is thrown at the user.
 func listenForCallback() (*callbackServer, error) {
-	ln, err := net.Listen("tcp", callbackAddr)
+	addr := callbackAddr()
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return nil, fmt.Errorf("listen on %s: %w (is another spindle login running?)", callbackAddr, err)
+		// Named, because the two causes want different answers: another login in
+		// flight wants waiting, and something else on the port wants moving one
+		// of the two. 8888 was the old default and is one of the most contested
+		// numbers there is, so the second is the likelier of them.
+		return nil, fmt.Errorf("listen on %s: %w — another spindle login may be running, "+
+			"or something else has that port. Move it with `spindle callback <port>`, "+
+			"and add the new address to the Spotify application", addr, err)
 	}
 
 	c := &callbackServer{results: make(chan callbackResult, 1)}

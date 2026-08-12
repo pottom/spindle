@@ -49,7 +49,7 @@ func controlCommandIn(args []string) (name string, rest []string, ok bool) {
 // playback. They own every word that follows them.
 var otherCommands = map[string]bool{
 	"login": true, "quality": true, "crossfade": true,
-	"notify": true, "daemon": true,
+	"notify": true, "daemon": true, "callback": true,
 }
 
 // usage is what --help prints.
@@ -83,6 +83,7 @@ func usage() {
     spindle quality [low|normal|high]    what to ask Spotify for
     spindle crossfade [seconds|off]      how long one track overlaps the next
     spindle notify on | off              announce each new track to the desktop
+    spindle callback [port]              where the browser is sent back to when logging in
 
   --json on any of the driving commands prints the daemon's own answer.
   Exit codes: 0 done, 1 refused, 3 no daemon is running, 4 nothing is playing.
@@ -154,6 +155,11 @@ func main() {
 			return
 		case "notify":
 			if err := runNotify(os.Args[2:]); err != nil {
+				reportFatal(err)
+			}
+			return
+		case "callback":
+			if err := runCallback(os.Args[2:]); err != nil {
 				reportFatal(err)
 			}
 			return

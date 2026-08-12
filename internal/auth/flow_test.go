@@ -30,7 +30,7 @@ func TestAuthURLCarriesS256Challenge(t *testing.T) {
 		"response_type":         "code",
 		"client_id":             "client-123",
 		"state":                 "state-abc",
-		"redirect_uri":          RedirectURI,
+		"redirect_uri":          RedirectURI(),
 	}
 	for key, expected := range checks {
 		if got := q.Get(key); got != expected {

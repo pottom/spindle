@@ -10,11 +10,11 @@ import (
 func TestCallbackCapturesTheCode(t *testing.T) {
 	server, err := listenForCallback()
 	if err != nil {
-		t.Skipf("cannot bind %s: %v", callbackAddr, err)
+		t.Skipf("cannot bind %s: %v", callbackAddr(), err)
 	}
 	defer server.close()
 
-	resp, err := http.Get("http://" + callbackAddr + callbackPath + "?code=abc123&state=xyz")
+	resp, err := http.Get("http://" + callbackAddr() + callbackPath + "?code=abc123&state=xyz")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,11 +38,11 @@ func TestCallbackCapturesTheCode(t *testing.T) {
 func TestCallbackReportsRefusal(t *testing.T) {
 	server, err := listenForCallback()
 	if err != nil {
-		t.Skipf("cannot bind %s: %v", callbackAddr, err)
+		t.Skipf("cannot bind %s: %v", callbackAddr(), err)
 	}
 	defer server.close()
 
-	resp, err := http.Get("http://" + callbackAddr + callbackPath + "?error=access_denied&state=xyz")
+	resp, err := http.Get("http://" + callbackAddr() + callbackPath + "?error=access_denied&state=xyz")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestCallbackReportsRefusal(t *testing.T) {
 func TestCallbackPortIsExclusive(t *testing.T) {
 	first, err := listenForCallback()
 	if err != nil {
-		t.Skipf("cannot bind %s: %v", callbackAddr, err)
+		t.Skipf("cannot bind %s: %v", callbackAddr(), err)
 	}
 	defer first.close()
 

@@ -4,17 +4,17 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 
 	"golang.org/x/oauth2"
 )
 
 const (
-	// RedirectURI must match the Spotify app's configuration character for
-	// character. Spotify no longer accepts "localhost" here, only the literal
-	// loopback address.
-	RedirectURI = "http://127.0.0.1:8888/callback"
+	// defaultCallbackPort is used until the settings say otherwise. Beside the
+	// daemon's 3678, so the two read as a pair. See settings.CallbackPort for
+	// why the number lives there rather than here.
+	defaultCallbackPort = 3679
 
-	callbackAddr = "127.0.0.1:8888"
 	callbackPath = "/callback"
 
 	clientIDEnv = "SPINDLE_CLIENT_ID"
@@ -22,6 +22,37 @@ const (
 	authURL  = "https://accounts.spotify.com/authorize"
 	tokenURL = "https://accounts.spotify.com/api/token"
 )
+
+// RedirectURI is where Spotify sends the browser back to. It must match the
+// application's own configuration character for character; Spotify no longer
+// accepts "localhost" here, only the literal loopback address.
+func RedirectURI() string { return "http://" + callbackAddr() + callbackPath }
+
+// callbackAddr is what the callback server listens on.
+func callbackAddr() string { return "127.0.0.1:" + strconv.Itoa(CallbackPort()) }
+
+// CallbackPort is the port the browser is sent back to: what the settings say,
+// or the default. An unreadable settings file is not worth refusing to log in
+// over, so it falls back rather than failing.
+func CallbackPort() int {
+	if s, err := load(); err == nil && s.CallbackPort > 0 && s.CallbackPort < 65536 {
+		return s.CallbackPort
+	}
+	return defaultCallbackPort
+}
+
+// SetCallbackPort remembers where the browser should be sent back to.
+func SetCallbackPort(port int) error {
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("callback port %d is not a port", port)
+	}
+	s, err := load()
+	if err != nil {
+		return err
+	}
+	s.CallbackPort = port
+	return save(s)
+}
 
 // Scopes are the permissions spindle asks for. Search needs none of its own.
 //
@@ -94,14 +125,14 @@ func SetupHelp() string {
 Run "spindle login" and it will ask for the id once and remember it. Setting %s
 overrides what is saved, which is handy for trying a second application.
 
-The client secret is not needed: spindle authenticates with PKCE.`, RedirectURI, clientIDEnv)
+The client secret is not needed: spindle authenticates with PKCE.`, RedirectURI(), clientIDEnv)
 }
 
 // oauthConfig builds the OAuth client for a given application.
 func oauthConfig(clientID string) *oauth2.Config {
 	return &oauth2.Config{
 		ClientID:    clientID,
-		RedirectURL: RedirectURI,
+		RedirectURL: RedirectURI(),
 		Scopes:      Scopes,
 		Endpoint: oauth2.Endpoint{
 			AuthURL:   authURL,

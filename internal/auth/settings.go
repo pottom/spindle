@@ -30,6 +30,20 @@ type settings struct {
 	// Empty means off: a notification every three minutes is somebody else's
 	// idea of useful, and it is asked for once with a command.
 	Notify string `json:"notify,omitempty"`
+
+	// CallbackPort is where the browser is sent back to when logging in.
+	//
+	// A setting rather than a number in the source, because the right value is a
+	// property of the machine rather than of spindle: it has to be a port nothing
+	// else on that machine wants, and which port that is nobody here can know. It
+	// was 8888, and 8888 is one of the most contested numbers there is — Jupyter,
+	// half the proxies, a good share of the development servers. A SOCKS proxy
+	// sitting on it is enough to make logging in fail.
+	//
+	// Whatever it is set to has to match the Spotify application's own
+	// configuration character for character. An application may list several, so
+	// the old address can stay while a new one is added.
+	CallbackPort int `json:"callback_port,omitempty"`
 }
 
 // load reads the settings file, treating an unreadable one as empty: spindle
