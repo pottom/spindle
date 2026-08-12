@@ -271,11 +271,18 @@ never sleeps again until somebody reboots — a fault nobody would think to blam
 on us. Windows needs no equivalent, since the state is the process's own and
 goes with it.
 
-Two things this is tied to rather than the obvious ones. It belongs to the party
-screen being up, not to spindle running: an interface sitting on the queue should
-let the machine sleep like anything else. And **the machine with the speakers
-needs it too** — macOS does not idle-sleep while audio plays, but its display
-still goes dark, so a Mac showing the picture has to ask as well.
+Two things this is tied to rather than the obvious ones. It belongs to the
+picture being up, not to spindle running: an interface sitting on the queue
+should let the machine sleep like anything else. And **the machine with the
+speakers needs it too** — macOS does not idle-sleep while audio plays, but its
+display still goes dark, so a Mac showing the picture has to ask as well.
+
+That second point is why this is not waiting for the client. It is built, in
+`internal/awake`, and the interface's own big picture already uses it: the
+Stage key holds, and whatever key takes the picture down lets go. The client
+will call the same two functions. The debug screen shows which state it is in,
+because both failures are silent — a screen that dims mid-party, and a machine
+that never sleeps again.
 
 ## The order of work
 

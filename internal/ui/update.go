@@ -662,7 +662,7 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.stage.on = true
-		return m, m.startScope()
+		return m, tea.Batch(m.startScope(), keepAwake(true))
 
 	case key.Matches(k, m.keys.Lyrics):
 		if !m.lyricsAvailable() {

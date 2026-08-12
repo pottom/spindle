@@ -11,6 +11,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/pottom/spindle/internal/awake"
 	"github.com/pottom/spindle/internal/build"
 	"github.com/pottom/spindle/internal/xdg"
 )
@@ -161,6 +162,10 @@ func (m Model) debugSelf() []debugField {
 	// enough to still draw it that way are indistinguishable by eye, and an
 	// hour has gone on that already.
 	b.put("", "%s", build.Version())
+	// Whether the machine has been told not to sleep. It goes wrong silently in
+	// both directions — a screen that dims mid-party, or a machine that never
+	// sleeps again — and neither leaves anything else to look at.
+	b.put("sleep", "%s", map[bool]string{true: "held off", false: "as usual"}[awake.Held()])
 
 	t := slowNow()
 	b.put("fps", "%.1f", t.fps)

@@ -259,7 +259,7 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	m.stage.on = false
 	m.stage.drops = nil
 	m.stage.was = nil
-	return nil, true
+	return keepAwake(false), true
 }
 
 // stageView draws the whole screen: the picture, with the track and the clock
