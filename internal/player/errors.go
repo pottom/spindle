@@ -15,6 +15,19 @@ import (
 // Reading playback state works on a free account; changing it does not.
 var ErrPremiumRequired = errors.New("playback control requires Spotify Premium")
 
+// ErrNotResponding is a command the daemon would not take.
+//
+// It runs its API and its playback session on one goroutine, so a session that
+// has stopped moving leaves commands queued behind it; after ten seconds the
+// daemon gives up on the caller's behalf rather than leaving it holding. Reads
+// come back with what was last true instead — see the Warning header — but a
+// command cannot be answered out of a cupboard: a pause that returned before the
+// session took it would report that the music had stopped while it played on.
+//
+// Named because the press has to say something a person can read. It arrived as
+// `call /player/next: unexpected status 503 Service Unavailable`.
+var ErrNotResponding = errors.New("the player is not responding")
+
 // RateLimitedError carries how long Spotify wants to be left alone.
 type RateLimitedError struct {
 	RetryAfter time.Duration

@@ -2,8 +2,10 @@ package player
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -71,5 +73,27 @@ func TestALastAnswerIsNotTakenForANewOne(t *testing.T) {
 	}
 	if l.localState().Stalled {
 		t.Error("it stayed stuck after the daemon started answering again")
+	}
+}
+
+// A command the daemon would not take says so in words.
+//
+// Reads fall back to what was last true; a command cannot, because a pause that
+// returned before the session took it would report that the music had stopped
+// while it played on. So the press fails — and it has to fail in a sentence. It
+// arrived as `call /player/next: unexpected status 503 Service Unavailable`.
+func TestACommandTheDaemonWouldNotTakeSaysSo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	l := &Local{addr: srv.URL, http: srv.Client()}
+	err := l.post(context.Background(), "/player/next", nil)
+	if !errors.Is(err, ErrNotResponding) {
+		t.Fatalf("a refused command gave %v, want ErrNotResponding", err)
+	}
+	if strings.Contains(err.Error(), "503") || strings.Contains(err.Error(), "unexpected") {
+		t.Errorf("the message reads like plumbing: %q", err)
 	}
 }

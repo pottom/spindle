@@ -193,6 +193,9 @@ func (l *Local) post(ctx context.Context, path string, body any) error {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		return ErrNotResponding
+	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("call %s: unexpected status %s", path, resp.Status)
 	}
