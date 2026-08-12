@@ -15,9 +15,9 @@ import (
 // take one hold, not two, and letting go once must be enough to release it.
 func TestAskingTwiceTakesOneHold(t *testing.T) {
 	held, released := 0, 0
-	swap(t, func() (func(), error) {
+	swap(t, func() (func(), string, error) {
 		held++
-		return func() { released++ }, nil
+		return func() { released++ }, "display and idle", nil
 	})
 
 	for range 3 {
@@ -31,6 +31,9 @@ func TestAskingTwiceTakesOneHold(t *testing.T) {
 	if !Held() {
 		t.Error("not held after asking")
 	}
+	if What() != "display and idle" {
+		t.Errorf("holding %q, want the name the machine gave", What())
+	}
 
 	Drop()
 	Drop()
@@ -40,13 +43,16 @@ func TestAskingTwiceTakesOneHold(t *testing.T) {
 	if Held() {
 		t.Error("still held after dropping")
 	}
+	if What() != "" {
+		t.Errorf("still says it is holding %q after dropping", What())
+	}
 }
 
 // A machine that cannot be kept awake — no systemd, no caffeinate — must leave
 // nothing held, so that a later ask tries again rather than believing itself
 // covered by a hold that never happened.
 func TestAMachineThatRefusesIsNotHeld(t *testing.T) {
-	swap(t, func() (func(), error) { return nil, errors.New("no such thing here") })
+	swap(t, func() (func(), string, error) { return nil, "", errors.New("no such thing here") })
 
 	if err := Keep(); err == nil {
 		t.Fatal("Keep said nothing went wrong on a machine that refused")
@@ -58,11 +64,11 @@ func TestAMachineThatRefusesIsNotHeld(t *testing.T) {
 
 // And the picture goes down again after a refusal without anything to undo.
 func TestDroppingWhatWasNeverHeld(t *testing.T) {
-	swap(t, func() (func(), error) { return nil, errors.New("no") })
+	swap(t, func() (func(), string, error) { return nil, "", errors.New("no") })
 	Drop()
 }
 
-func swap(t *testing.T, with func() (func(), error)) {
+func swap(t *testing.T, with func() (func(), string, error)) {
 	t.Helper()
 	was := hold
 	hold = with

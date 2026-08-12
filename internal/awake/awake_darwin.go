@@ -17,10 +17,10 @@ import (
 // caffeinate behind holding the machine awake until somebody reboots, and
 // nobody would think to blame that on a music player. With it, the assertion
 // cannot outlive the reason for it, however badly we go.
-func holdMachine() (func(), error) {
+func holdMachine() (func(), string, error) {
 	cmd := exec.Command("caffeinate", "-d", "-i", "-w", strconv.Itoa(os.Getpid()))
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("caffeinate: %w", err)
+		return nil, "", fmt.Errorf("caffeinate: %w", err)
 	}
 	// Reaped in the background so killing it later leaves no zombie.
 	waited := make(chan struct{})
@@ -31,5 +31,5 @@ func holdMachine() (func(), error) {
 	return func() {
 		_ = cmd.Process.Kill()
 		<-waited
-	}, nil
+	}, "display and idle", nil
 }

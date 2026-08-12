@@ -263,13 +263,21 @@ needs no cgo — which matters, because the client has to cross-compile:
 |---|---|
 | macOS | `caffeinate -d -i -w <our own pid>` as a child |
 | Windows | `SetThreadExecutionState` with `ES_CONTINUOUS`, `ES_DISPLAY_REQUIRED`, `ES_SYSTEM_REQUIRED`, from `x/sys/windows` |
-| Linux | `systemd-inhibit --what=idle:sleep`, or `ScreenSaver.Inhibit` over D-Bus |
+| Linux | `systemd-inhibit --what=idle:sleep` **and** `ScreenSaver.Inhibit` over D-Bus |
 
 The `-w` on macOS carries the whole weight: it makes `caffeinate` exit when our
 process does, a crash included. Without it a crash orphans it and the machine
 never sleeps again until somebody reboots — a fault nobody would think to blame
 on us. Windows needs no equivalent, since the state is the process's own and
 goes with it.
+
+**Linux is the one that needs both, and it is not obvious why.** systemd-inhibit
+stops logind suspending an idle session; it does nothing about the screen going
+dark, because on a desktop that is the session's screensaver, which listens on
+D-Bus instead. Hold only the first and the party screen stays powered on showing
+nothing — the exact failure, not a milder one. Either can be missing, so a hold
+counts if either takes, and the debug screen names which: "sleep only" is a
+machine that will not suspend while its screen goes dark anyway.
 
 Two things this is tied to rather than the obvious ones. It belongs to the
 picture being up, not to spindle running: an interface sitting on the queue

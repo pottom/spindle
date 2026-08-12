@@ -20,6 +20,7 @@ import "sync"
 var (
 	mu   sync.Mutex
 	stop func()
+	what string
 
 	// hold is a variable so the state around it can be tested without a machine
 	// that has a screen to keep awake.
@@ -35,11 +36,11 @@ func Keep() error {
 	if stop != nil {
 		return nil
 	}
-	s, err := hold()
+	s, held, err := hold()
 	if err != nil {
 		return err
 	}
-	stop = s
+	stop, what = s, held
 	return nil
 }
 
@@ -51,7 +52,7 @@ func Drop() {
 		return
 	}
 	stop()
-	stop = nil
+	stop, what = nil, ""
 }
 
 // Held reports whether the machine is being kept awake.
@@ -59,4 +60,17 @@ func Held() bool {
 	mu.Lock()
 	defer mu.Unlock()
 	return stop != nil
+}
+
+// What names the parts being held, and is the reason this is not simply a bool.
+//
+// On Linux the two halves are taken by different things and either can be
+// missing, so "held" can mean the machine will not suspend while the screen goes
+// dark anyway. Somebody watching that happen needs to be able to find out which,
+// and the alternative — reporting a hold and letting them work it out — is the
+// kind of silence this project keeps having to go back and undo.
+func What() string {
+	mu.Lock()
+	defer mu.Unlock()
+	return what
 }

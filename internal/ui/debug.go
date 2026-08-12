@@ -165,7 +165,10 @@ func (m Model) debugSelf() []debugField {
 	// Whether the machine has been told not to sleep. It goes wrong silently in
 	// both directions — a screen that dims mid-party, or a machine that never
 	// sleeps again — and neither leaves anything else to look at.
-	b.put("sleep", "%s", map[bool]string{true: "held off", false: "as usual"}[awake.Held()])
+	// Named rather than a yes, because on Linux the two halves are held by
+	// different things and either can be missing: "sleep only" is a machine that
+	// will not suspend while its screen goes dark anyway.
+	b.put("sleep", "%s", map[bool]string{true: awake.What(), false: "as usual"}[awake.Held()])
 
 	t := slowNow()
 	b.put("fps", "%.1f", t.fps)

@@ -24,7 +24,7 @@ var setThreadExecutionState = windows.NewLazySystemDLL("kernel32.dll").NewProc("
 // it is time to let go. That is also what makes this the one platform with
 // nothing to clean up after a crash: the state dies with the process, so there
 // is no equivalent of caffeinate's -w to get wrong.
-func holdMachine() (func(), error) {
+func holdMachine() (func(), string, error) {
 	done := make(chan struct{})
 	ready := make(chan error, 1)
 
@@ -43,7 +43,7 @@ func holdMachine() (func(), error) {
 	}()
 
 	if err := <-ready; err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return func() { close(done) }, nil
+	return func() { close(done) }, "display and system", nil
 }
