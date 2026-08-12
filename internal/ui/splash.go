@@ -46,9 +46,24 @@ const (
 	splashLeastH = 8
 
 	// splashKeeps is how many rows the panel's own words and list keep for
-	// themselves. The logo gets the rest, which is the whole point of it: it is
-	// as large as the screen allows.
+	// themselves.
 	splashKeeps = 9
+
+	// splashShare is the most of the body the logo takes while something is
+	// being waited for, and splashTallest the most rows it takes however large
+	// the terminal is.
+	//
+	// It used to take everything that was left, which was 88 to 95 per cent of
+	// the body — measured at four terminal sizes. That was right for the old
+	// logo, which was a wide banner, and it is wrong for this one: a square
+	// given the whole height is not a large logo, it is a wall, and the line
+	// underneath it saying what is being waited for is a caption on a poster.
+	//
+	// Under half, and never more than twenty-two rows. The ceiling is what stops
+	// a very tall terminal turning it back into a wall — a share alone keeps
+	// growing, and past a point more of it says nothing more.
+	splashShare   = 45
+	splashTallest = 22
 
 	// splashAboutShare is how much of the help screen the picture heading it
 	// takes, as a percentage of the body.
@@ -164,7 +179,8 @@ func (m Model) splashRoom() (w, rows int) {
 	if m.ps == nil {
 		keeps = 2
 	}
-	return w, max(l.bodyHeight-1-keeps, 0)
+	rows = max(l.bodyHeight-1-keeps, 0)
+	return w, min(rows, l.bodyHeight*splashShare/100, splashTallest)
 }
 
 // splashRows is what was rendered, ready to put in the panel.

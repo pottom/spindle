@@ -147,3 +147,49 @@ func TestTheLogoIsUpBeforeTheFirstTick(t *testing.T) {
 		t.Error("the screen stopped saying what it is waiting for")
 	}
 }
+
+// The logo is a mark on the waiting screen, not the waiting screen.
+//
+// It used to take everything left over, which measured 88 to 95 per cent of the
+// body at four terminal sizes. That was right for the old logo — a wide banner —
+// and wrong for a square one: given the whole height it stops being a large logo
+// and becomes a wall, with the line saying what is being waited for reading as a
+// caption on a poster.
+func TestTheLogoDoesNotTakeTheWholeWaitingScreen(t *testing.T) {
+	for _, size := range [][2]int{{100, 30}, {120, 40}, {160, 50}, {200, 60}, {300, 90}} {
+		m := New(player.NewMock(), cover.NewLoader(cover.NewHalfblock(defaultTestCell), nil), defaultTestCell)
+		m.width, m.height = size[0], size[1]
+		m.tab, m.ps = tabPlayer, nil
+
+		l := m.layout()
+		_, rows := m.splashRoom()
+
+		if rows > splashTallest {
+			t.Errorf("%dx%d: the logo is given %d rows, past the ceiling of %d",
+				size[0], size[1], rows, splashTallest)
+		}
+		if share := 100 * rows / max(l.bodyHeight, 1); share > 50 {
+			t.Errorf("%dx%d: the logo is given %d%% of the body", size[0], size[1], share)
+		}
+		// And it is still worth drawing: a mark, not a smudge.
+		if rows < splashLeastH && l.bodyHeight > 2*splashLeastH {
+			t.Errorf("%dx%d: the logo is down to %d rows on a body of %d",
+				size[0], size[1], rows, l.bodyHeight)
+		}
+	}
+}
+
+// The help screen keeps its own half, which is a separate decision.
+func TestTheAboutPageIsNotCappedWithTheWaitingScreen(t *testing.T) {
+	m := New(player.NewMock(), cover.NewLoader(cover.NewHalfblock(defaultTestCell), nil), defaultTestCell)
+	m.width, m.height = 200, 60
+	m.tab = tabHelp
+
+	_, rows := m.splashRoom()
+	if want := m.layout().bodyHeight * splashAboutShare / 100; rows != want {
+		t.Errorf("the About picture is given %d rows, want its own %d", rows, want)
+	}
+	if rows <= splashTallest {
+		t.Errorf("the About picture was capped with the waiting screen: %d rows", rows)
+	}
+}
