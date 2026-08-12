@@ -269,7 +269,7 @@ func coverRenderer(backend string, cell cover.CellSize) (cover.Renderer, error) 
 	case "kitty":
 		return cover.NewKitty(os.Stdout, cell), nil
 	case "auto":
-		if cover.SupportsKitty(os.Stdout, os.Stdin) {
+		if cover.Probe(os.Stdout, os.Stdin).Backend() == "kitty" {
 			return cover.NewKitty(os.Stdout, cell), nil
 		}
 		return cover.NewHalfblock(cell), nil
@@ -287,16 +287,18 @@ func reportCoverSupport() {
 		source = "assumed; the terminal reported no pixel size"
 	}
 
-	kitty := cover.SupportsKitty(os.Stdout, os.Stdin)
-	backend := "halfblock"
-	if kitty {
-		backend = "kitty"
-	}
+	g := cover.Probe(os.Stdout, os.Stdin)
 
+	says := g.Name
+	if says == "" {
+		says = "(it did not say)"
+	}
 	fmt.Printf("terminal:   TERM=%s TERM_PROGRAM=%s\n", os.Getenv("TERM"), os.Getenv("TERM_PROGRAM"))
+	fmt.Printf("says it is: %s\n", says)
 	fmt.Printf("cell size:  %d × %d px (%s)\n", cell.Width, cell.Height, source)
-	fmt.Printf("kitty:      %v\n", kitty)
-	fmt.Printf("backend:    %s\n", backend)
+	fmt.Printf("kitty:      %v\n", g.Kitty)
+	fmt.Printf("placehold:  %v\n", g.Placeholders)
+	fmt.Printf("backend:    %s\n", g.Backend())
 	fmt.Printf("artwork:    %d × %d cells = %d × %d px\n",
 		20, 10, 20*cell.Width, 10*cell.Height)
 }

@@ -162,9 +162,29 @@ A terminal, a Premium account, and Go 1.26 to build. CGO is required — the aud
 decoder is C — so it builds for the machine it is built on. macOS and Linux;
 Windows is not supported.
 
-Artwork is drawn through the kitty graphics protocol when the terminal reports
-it (kitty, Ghostty, WezTerm), and through half blocks otherwise, which works
-anywhere with 24-bit colour.
+## Terminals
+
+Everything except the album cover is braille and colour, and looks the same
+anywhere. The cover is the one thing that depends on the terminal.
+
+| | cover | notes |
+|---|---|---|
+| **Ghostty** | a real image | what spindle is developed against |
+| **kitty** | a real image | |
+| **Alacritty** | half blocks | no graphics protocol at all, by their own choice |
+| **WezTerm** | half blocks | speaks the kitty protocol but not its Unicode placeholders |
+
+A real image goes through the kitty graphics protocol in Unicode placeholder
+mode. Half blocks are coloured cells — recognisable rather than sharp — and work
+anywhere with 24-bit colour. spindle asks the terminal what it is and picks;
+`--cover=kitty` or `--cover=halfblock` overrules it, and `--cover-info` says what
+was found.
+
+Measured on the same 100 frames of full-screen coloured braille, one window at a
+time: Alacritty 501 fps, Ghostty 471, kitty 380, WezTerm 190. The window manager
+would not give the four windows the same number of cells, so the first three are
+one band rather than an order; WezTerm being about half the rest is the part that
+held across both runs.
 
 ## Shape
 

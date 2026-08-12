@@ -11,22 +11,26 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// probeGraphics sends the query and reads whatever comes back.
+// askTerminal sends the query and reads whatever comes back.
 //
 // The reply is read with poll(2) rather than os.File deadlines: Go's poller
 // refuses to take a terminal, so SetReadDeadline fails with "file type does not
 // support deadline" and every detection would come back negative.
-func probeGraphics(out, in *os.File) bool {
+func askTerminal(out, in *os.File) []byte {
 	state, err := term.MakeRaw(in.Fd())
 	if err != nil {
-		return false
+		return nil
 	}
 	defer term.Restore(in.Fd(), state) //nolint:errcheck // nothing useful to do here
 
-	if _, err := out.WriteString(graphicsQuery); err != nil {
-		return false
+	if _, err := out.WriteString(tidyBefore + graphicsQuery); err != nil {
+		return nil
 	}
-	return bytes.Contains(readReply(int(in.Fd())), []byte("\x1b_G"))
+	reply := readReply(int(in.Fd()))
+
+	// Whatever the terminal printed because it did not know what it was asked.
+	_, _ = out.WriteString(tidyAfter)
+	return reply
 }
 
 // readReply collects whatever the terminal says until the device attributes
