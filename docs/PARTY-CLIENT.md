@@ -252,6 +252,31 @@ millisecond. So "together" means the same company, the same arrivals, the same
 mark set — the water falls in its own time on each screen, which is better than
 perfect mirroring anyway.
 
+**Nothing sleeps while the party screen is up.** A screen in a room is left
+alone for an hour at a time and nobody touches its keyboard, which is exactly
+what a machine reads as "gone away". It goes dark, and the party loses a wall.
+
+So the picture asks the machine to stay awake, and each system has a way that
+needs no cgo — which matters, because the client has to cross-compile:
+
+| | |
+|---|---|
+| macOS | `caffeinate -d -i -w <our own pid>` as a child |
+| Windows | `SetThreadExecutionState` with `ES_CONTINUOUS`, `ES_DISPLAY_REQUIRED`, `ES_SYSTEM_REQUIRED`, from `x/sys/windows` |
+| Linux | `systemd-inhibit --what=idle:sleep`, or `ScreenSaver.Inhibit` over D-Bus |
+
+The `-w` on macOS carries the whole weight: it makes `caffeinate` exit when our
+process does, a crash included. Without it a crash orphans it and the machine
+never sleeps again until somebody reboots — a fault nobody would think to blame
+on us. Windows needs no equivalent, since the state is the process's own and
+goes with it.
+
+Two things this is tied to rather than the obvious ones. It belongs to the party
+screen being up, not to spindle running: an interface sitting on the queue should
+let the machine sleep like anything else. And **the machine with the speakers
+needs it too** — macOS does not idle-sleep while audio plays, but its display
+still goes dark, so a Mac showing the picture has to ask as well.
+
 ## The order of work
 
 **1. Lift the picture out of the Model.** The large piece, and nothing else can
