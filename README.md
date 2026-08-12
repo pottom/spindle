@@ -211,6 +211,13 @@ Everything drawn on the full screen — the characters, the marks, the placards 
 is a drawing cut from a sheet and baked into dots at build time by the tools in
 `cmd/`. Nothing is rendered from a font except the lyric itself.
 
+## What is being built next
+
+A screen for a room: the picture on a second machine, watching what this one is
+playing and doing nothing else. Windows included, because that half needs no
+audio. Written up, with what was measured before committing to it, in
+[`docs/PARTY-CLIENT.md`](docs/PARTY-CLIENT.md).
+
 ## Licence
 
 GPL-3.0 — see [`NOTICE.md`](NOTICE.md) for why, and for what else is in the
