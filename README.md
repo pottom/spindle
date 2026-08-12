@@ -173,9 +173,13 @@ anywhere. The cover is the one thing that depends on the terminal.
 | **kitty** | a real image | |
 | **Alacritty** | half blocks | no graphics protocol at all, by their own choice |
 | **WezTerm** | half blocks | speaks the kitty protocol but not its Unicode placeholders |
+| anything else | half blocks | until it is known to do placeholders, which is a line to add |
 
 A real image goes through the kitty graphics protocol in Unicode placeholder
-mode. Half blocks are coloured cells — recognisable rather than sharp — and work
+mode. The terminals that do it are named rather than the ones that do not:
+there is no way to ask, and guessing yes breaks the screen while guessing no
+only makes the cover less sharp. The settings screen says which is in use and
+why. Half blocks are coloured cells — recognisable rather than sharp — and work
 anywhere with 24-bit colour. spindle asks the terminal what it is and picks;
 `--cover=kitty` or `--cover=halfblock` overrules it, and `--cover-info` says what
 was found.

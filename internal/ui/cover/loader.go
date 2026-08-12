@@ -33,6 +33,9 @@ const (
 // Every method is safe to call from a tea.Cmd goroutine.
 type Loader struct {
 	renderer Renderer
+
+	// graphics is what the terminal was found to be able to do. See SetGraphics.
+	graphics Graphics
 	client   *http.Client
 	dir      string
 
@@ -47,6 +50,14 @@ type Loader struct {
 
 // NewLoader prepares the pipeline. A cache directory that cannot be created is
 // not fatal: the loader simply downloads every time.
+// SetGraphics keeps what the terminal was found to be able to do, so the
+// interface can say why the cover is drawn the way it is rather than leaving
+// somebody to wonder whether this is as good as it gets.
+func (l *Loader) SetGraphics(g Graphics) { l.graphics = g }
+
+// Graphics is what the terminal was found to be able to do.
+func (l *Loader) Graphics() Graphics { return l.graphics }
+
 func NewLoader(r Renderer, client *http.Client) *Loader {
 	dir := ""
 	if base, err := xdg.CacheDir(); err == nil {

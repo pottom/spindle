@@ -12,6 +12,8 @@ import (
 	"github.com/pottom/spindle/internal/auth"
 	"github.com/pottom/spindle/internal/daemon"
 	"github.com/pottom/spindle/internal/ui/msg"
+
+	"github.com/pottom/spindle/internal/ui/cover"
 )
 
 // The settings, on a screen rather than in a command.
@@ -225,9 +227,9 @@ type settingRow struct {
 
 // settingRows is the screen's contents, from what has been chosen.
 func (m Model) settingRows() []settingRow {
-	artwork := "half blocks"
+	artwork, why := "half blocks", artworkSays(cover.Graphics{})
 	if m.covers != nil && m.covers.Renderer() != nil {
-		artwork = m.covers.Renderer().Name()
+		artwork, why = m.covers.Renderer().Name(), artworkSays(m.covers.Graphics())
 	}
 
 	return []settingRow{{
@@ -245,9 +247,36 @@ func (m Model) settingRows() []settingRow {
 	}, {
 		name:  "Artwork",
 		value: artwork,
-		says:  "How the cover is drawn. kitty is the picture itself; half blocks are an approximation.",
+		says:  why,
 		live:  true,
 	}}
+}
+
+// artworkSays explains the cover, and where it would be better.
+//
+// The row already said which of the two was in use. What it did not say was
+// why, or that there is anything better — so somebody running spindle in a
+// terminal without the protocol saw a blurry approximation of the one thing the
+// program is built around and had no way of knowing a sharp version exists.
+//
+// Here rather than in a banner. A banner on every start is nagging about
+// something that is not going to change, and a line buried in the help is
+// invisible; this is the screen somebody is already on when they wonder why the
+// cover looks like that.
+func artworkSays(g cover.Graphics) string {
+	const better = " kitty and Ghostty draw it as a picture."
+	switch {
+	case g.Backend() == "kitty":
+		return "How the cover is drawn. This terminal takes the picture itself."
+	case g.Kitty:
+		// It speaks the protocol and not the part spindle draws in, which is
+		// worth saying: "no graphics protocol" would be untrue and would send
+		// somebody looking for a setting that would not help.
+		return "How the cover is drawn. " + g.Name +
+			" speaks the graphics protocol but not the placeholders spindle uses, so the cover is coloured blocks." + better
+	default:
+		return "How the cover is drawn. This terminal has no graphics protocol, so the cover is coloured blocks." + better
+	}
 }
 
 func onOff(on bool) string {

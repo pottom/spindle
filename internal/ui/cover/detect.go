@@ -48,12 +48,8 @@ type Graphics struct {
 	// Kitty renderer draws in — the image transmitted once and a rectangle of
 	// U+10EEEE cells left for the terminal to fill.
 	//
-	// Not the same question as Kitty, and there is no query for it. WezTerm
-	// answers the graphics query and does not do placeholders: measured, the
-	// placeholder cells came out as rows of tofu, the cover was drawn twice at
-	// the cursor, and the text under it was shifted. Everything that speaks the
-	// protocol is assumed to do the whole of it, and the ones known not to are
-	// named — see placeholderless.
+	// Not the same question as Kitty, and there is no query for it. See
+	// placeholderers, which is the list of terminals known to do it.
 	Placeholders bool
 
 	// Name is what the terminal called itself, or empty if it did not say.
@@ -68,16 +64,30 @@ func (g Graphics) Backend() string {
 	return "halfblock"
 }
 
-// placeholderless are the terminals that speak the kitty graphics protocol
-// without its Unicode placeholder mode.
+// placeholderers are the terminals known to do the kitty protocol's Unicode
+// placeholder mode. Everything else gets half blocks.
 //
-// A list rather than a test, because the protocol has no way to ask. Matched
-// against what the terminal says it is when asked directly, rather than against
-// TERM_PROGRAM: that variable is inherited, and measured, Alacritty started from
-// a Ghostty window reports TERM_PROGRAM=ghostty. A terminal opened from another
-// terminal would be told apart wrongly, and the wrong way round — a Ghostty
-// window opened from WezTerm would lose its pictures.
-var placeholderless = []string{"WezTerm"}
+// A list rather than a test, because the protocol has no way to ask.
+//
+// Named the right way round, which took two goes. It was a list of the ones
+// known *not* to do placeholders, and that is wrong by default for every
+// terminal nobody has tried: a new one gets a broken screen — rows of tofu, the
+// cover drawn twice, the text shifted — until somebody reports it. WezTerm sat
+// there for months, and iTerm was reported drawing no artwork at all, which is
+// the same fault. Named this way, the worst an unknown terminal gets is a cover
+// made of coloured blocks, which is a picture rather than a mess, and a terminal
+// that does support placeholders is one line to add.
+//
+// Researched 2026-08-12. Terminals that speak the protocol at all: kitty,
+// Ghostty, Konsole, st (patched), Warp, wayst, WezTerm, iTerm2, xterm.js, Rio.
+// Confirmed to do placeholders: these two, and kitty's own documentation says
+// nothing about the rest. Confirmed not to: WezTerm, measured here, and
+// xterm.js, which is VS Code's terminal.
+//
+// Matched against what the terminal says it is when asked directly, rather than
+// against TERM_PROGRAM: that variable is inherited, and measured, Alacritty
+// started from a Ghostty window reports TERM_PROGRAM=ghostty.
+var placeholderers = []string{"kitty", "ghostty"}
 
 // Probe asks the terminal what it can do. It must be called before Bubble Tea
 // takes over the terminal.
@@ -109,10 +119,12 @@ func Probe(out, in *os.File) Graphics {
 // the reading can be tested without a terminal.
 func readReplyAs(reply []byte) Graphics {
 	g := Graphics{Kitty: bytes.Contains(reply, []byte("\x1b_G")), Name: terminalName(reply)}
-	g.Placeholders = g.Kitty
-	for _, bad := range placeholderless {
-		if strings.Contains(g.Name, bad) {
-			g.Placeholders = false
+	if g.Kitty {
+		name := strings.ToLower(g.Name)
+		for _, good := range placeholderers {
+			if strings.Contains(name, good) {
+				g.Placeholders = true
+			}
 		}
 	}
 	return g

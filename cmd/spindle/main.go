@@ -188,11 +188,13 @@ func main() {
 	}
 
 	cell := cover.DetectCellSize(os.Stdout)
-	renderer, err := coverRenderer(*backend, cell)
+	found := cover.Probe(os.Stdout, os.Stdin)
+	renderer, err := coverRenderer(*backend, cell, found)
 	if err != nil {
 		reportFatal(err)
 	}
 	loader := cover.NewLoader(renderer, &http.Client{Timeout: 15 * time.Second})
+	loader.SetGraphics(found)
 
 	final, err := tea.NewProgram(ui.New(backendPlayer, loader, cell)).Run()
 
@@ -262,14 +264,14 @@ func openBackend(ctx context.Context, mock bool) (player.Player, error) {
 // coverRenderer picks the artwork backend. The terminal is probed before Bubble
 // Tea claims it, so the query and its reply cannot collide with the event loop's
 // own input handling.
-func coverRenderer(backend string, cell cover.CellSize) (cover.Renderer, error) {
+func coverRenderer(backend string, cell cover.CellSize, found cover.Graphics) (cover.Renderer, error) {
 	switch backend {
 	case "halfblock":
 		return cover.NewHalfblock(cell), nil
 	case "kitty":
 		return cover.NewKitty(os.Stdout, cell), nil
 	case "auto":
-		if cover.Probe(os.Stdout, os.Stdin).Backend() == "kitty" {
+		if found.Backend() == "kitty" {
 			return cover.NewKitty(os.Stdout, cell), nil
 		}
 		return cover.NewHalfblock(cell), nil

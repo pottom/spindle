@@ -2,13 +2,19 @@ package cover
 
 import "testing"
 
-// Speaking the kitty graphics protocol is not one question.
+// Speaking the kitty graphics protocol is not one question, and the terminals
+// that can be drawn on are named rather than the ones that cannot.
 //
 // WezTerm answers the graphics query and does not do the Unicode placeholder
 // mode the Kitty renderer draws in. Measured on a live window: the placeholder
 // cells came out as rows of tofu, the cover was drawn twice at the cursor, and
-// the text under it was shifted. There is no query for placeholders, so the ones
-// known not to do them are named.
+// the text under it was shifted. iTerm was reported drawing no artwork at all,
+// which is the same fault.
+//
+// Naming the broken ones is wrong by default for every terminal nobody has
+// tried, and it is wrong in the direction that breaks the screen. Named this
+// way, an unknown terminal gets a cover made of coloured blocks — a picture
+// rather than a mess.
 func TestATerminalMaySpeakTheProtocolWithoutItsPlaceholders(t *testing.T) {
 	kitty := []byte("\x1b_Gi=31;OK\x1b\\\x1bP>|kitty 0.42.0\x1b\\\x1b[?62;c")
 	wez := []byte("\x1b_Gi=31;OK\x1b\\\x1bP>|WezTerm 20240203\x1b\\\x1b[?62;c")
@@ -23,6 +29,9 @@ func TestATerminalMaySpeakTheProtocolWithoutItsPlaceholders(t *testing.T) {
 		{"kitty", kitty, true, true, "kitty"},
 		{"WezTerm", wez, true, false, "halfblock"},
 		{"one that says nothing", plain, false, false, "halfblock"},
+		{"Ghostty", []byte("\x1b_Gi=31;OK\x1b\\\x1bP>|ghostty 1.3.1\x1b\\\x1b[?62;c"), true, true, "kitty"},
+		// Answers the query, is not on the list, and so is drawn the safe way.
+		{"one nobody has tried", []byte("\x1b_Gi=31;OK\x1b\\\x1bP>|Ninetendo 3\x1b\\\x1b[?62;c"), true, false, "halfblock"},
 	} {
 		g := readReplyAs(c.reply)
 		if g.Kitty != c.kitty || g.Placeholders != c.place {
