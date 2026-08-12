@@ -36,6 +36,14 @@ func (m Model) notice() (string, lipgloss.Style, bool) {
 	}
 
 	switch {
+	// Above the rest of these because it is about all of them: while the daemon
+	// is stuck, everything else on the screen is what was true a while ago, and
+	// saying anything about it without saying that first would be saying it
+	// about the past.
+	case m.stalled():
+		return warnGlyph + " The player has stopped responding — this is what it last said",
+			m.styles.Warning, true
+
 	case m.throttled():
 		left := time.Until(m.rateLimitedUntil).Round(time.Second)
 		return fmt.Sprintf("%s Rate limited — pausing for %s", warnGlyph, left),
@@ -60,6 +68,18 @@ func (m Model) hasNotice() bool {
 	_, _, ok := m.notice()
 	return ok
 }
+
+// stalled reports that the daemon is answering with what it last said rather
+// than with what is true now.
+//
+// It has to be asked for rather than inferred: the daemon speaks only when
+// something happens, so a quiet stretch is an ordinary record playing through,
+// and reading silence as a fault once froze the picture for half a minute at a
+// time — see the resync, which asks. A socket ping is not enough either, because
+// the API answers that on a goroutine of its own while the session sits still.
+// The daemon says so itself, in the header on the answer it served out of the
+// cupboard.
+func (m Model) stalled() bool { return m.ps != nil && m.ps.Stalled }
 
 // ranOut reports that the device stopped because it had nothing left to play.
 //

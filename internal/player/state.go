@@ -11,6 +11,12 @@ const (
 
 // State is a snapshot of what the active playback device is doing.
 type State struct {
+	// Stalled is the daemon answering out of a cupboard: its API is up and its
+	// playback session has stopped moving, so what follows was true a while ago
+	// rather than now. The position is left where the daemon last put it rather
+	// than carried forward by this end's clock.
+	Stalled bool
+
 	TrackID  string
 	Title    string
 	Artists  []string

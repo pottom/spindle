@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 )
@@ -36,6 +37,10 @@ type Local struct {
 	// without this it would be carried forward past the daemon's own death: the
 	// screen counting through a track that stopped playing minutes ago.
 	live bool
+
+	// stalled is the daemon answering with what it last said rather than with
+	// what is true now — see refresh.
+	stalled bool
 
 	changes chan struct{}
 }
@@ -87,7 +92,7 @@ func (l *Local) State(ctx context.Context) (*State, error) {
 // kept current by the event stream, so this costs no network at all.
 func (l *Local) localState() *State {
 	l.mu.RLock()
-	snapshot, taken, live := l.snapshot, l.snapshotAt, l.live
+	snapshot, taken, live, stalled := l.snapshot, l.snapshotAt, l.live, l.stalled
 	l.mu.RUnlock()
 
 	// A daemon that is not answering has no view to report. What it last said
@@ -103,7 +108,14 @@ func (l *Local) localState() *State {
 	// snapshot's position is frozen at whenever it was taken. Returning it
 	// as-is makes the progress bar tick forward and then snap back on every
 	// poll. Carry the clock forward instead.
-	if st.Playing {
+	//
+	// Except while it is stuck. Carrying the clock forward is a guess that
+	// nothing has changed since the daemon last spoke, and that guess is right
+	// almost always — but a daemon serving its last answer out of a cupboard is
+	// precisely the case where it is wrong, and the screen would count out a
+	// record that stopped playing a minute ago.
+	st.Stalled = stalled
+	if st.Playing && !stalled {
 		st.Progress += time.Since(taken)
 		if st.Duration > 0 && st.Progress > st.Duration {
 			st.Progress = st.Duration
@@ -129,13 +141,22 @@ func (l *Local) refresh(ctx context.Context) error {
 		return fmt.Errorf("fetch daemon status: unexpected status %s", resp.Status)
 	}
 
+	// Answering is not the same as answering freshly. The daemon runs its API
+	// and its playback session on one goroutine, and when that goroutine stops
+	// moving it serves the last answer it gave rather than nothing — with a
+	// Warning saying so. Everything else this end has to tell the two apart is
+	// silence, and silence is not a fault: the socket's ping is answered by the
+	// API's own goroutine, so a session that has seized up still says "yes, I am
+	// here". This header is the only thing that says "and I am stuck".
+	stalled := strings.Contains(resp.Header.Get("Warning"), "110")
+
 	var status localStatus
 	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
 		return fmt.Errorf("decode daemon status: %w", err)
 	}
 
 	l.mu.Lock()
-	l.snapshot, l.snapshotAt, l.live = &status, time.Now(), true
+	l.snapshot, l.snapshotAt, l.live, l.stalled = &status, time.Now(), true, stalled
 	l.mu.Unlock()
 
 	l.notify()
