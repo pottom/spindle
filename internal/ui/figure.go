@@ -715,7 +715,7 @@ func (m *Model) figureSweep(w, rows int) {
 	m.face.sweptLow, m.face.sweptHigh = min(wasLow, edge), max(wasHigh, edge)
 
 	g, where := m.words.have, m.words.where
-	if g.DotsX != dotsX || where.Count == 0 {
+	if !wordsFits(g, dotsX, dotsY) || where.Count == 0 {
 		return
 	}
 
@@ -934,7 +934,7 @@ func (m Model) figureThrough(w, rows int, light func(x, y, piece int, burn float
 	low, high, from := m.figureSwept()
 	g, where := m.words.have, m.words.where
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
-	if g.DotsX != dotsX || g.DotsY != dotsY || where.Count == 0 {
+	if !wordsFits(g, dotsX, dotsY) || where.Count == 0 {
 		return
 	}
 	ride := m.wordsRiding(where.Count)

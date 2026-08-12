@@ -98,7 +98,7 @@ func (m Model) wordsSparkDraw(g cover.Grain, grid []uint8, paint []int8, w, rows
 	}
 
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
-	if dotsX <= 0 || dotsY <= 0 || len(g.Lum) < dotsX*dotsY {
+	if dotsX <= 0 || dotsY <= 0 || !wordsFits(g, dotsX, dotsY) {
 		return
 	}
 

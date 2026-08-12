@@ -656,6 +656,21 @@ func wordsSplit(line string, n int) []string {
 	return out
 }
 
+// wordsFits reports that a grain was ground for exactly the field of dots about
+// to be walked.
+//
+// Written once because it was written five times, and the sixth got it wrong: a
+// terminal resized while the face was walking left the old grain in hand and a
+// new size on the screen, and figureSweep walked a picture 120 dot rows tall
+// over a screen 244 deep. `index out of range [56880] with length 56880`, and
+// the whole interface with it.
+//
+// Both dimensions and the length. The width alone was what the two loose ones
+// checked, and the width alone is exactly what survives a change of height.
+func wordsFits(g cover.Grain, dotsX, dotsY int) bool {
+	return g.DotsX == dotsX && g.DotsY == dotsY && len(g.Lum) >= dotsX*dotsY
+}
+
 // grayToImage is the words as something the grinder can take.
 func grayToImage(g *image.Gray) image.Image {
 	out := image.NewRGBA(g.Bounds())
@@ -1159,7 +1174,7 @@ func (m Model) wordsLines(w, rows int) []string {
 
 	// The line before this one, on its way out: the same arithmetic run
 	// backwards, and fading as it goes.
-	if goes := wordsLeavingFor(m.words.leave); m.words.was.DotsX == dotsX {
+	if goes := wordsLeavingFor(m.words.leave); wordsFits(m.words.was, dotsX, dotsY) {
 		if since := time.Since(m.words.went); since < goes {
 			m.drawLeaving(grid, paint, hue, w, rows, float32(since)/float32(goes), levels)
 		}
@@ -1550,6 +1565,13 @@ func (m Model) wordsRoom(rows int) (from, tall int) {
 func (m Model) drawLeaving(grid []uint8, paint, hue []int8, w, rows int, gone float32, levels int) {
 	g := m.words.was
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+
+	// Asked here as well as by the caller, because this is where the indexing
+	// happens and the caller is not the only thing that could ever call it. The
+	// rule is one line; leaving it to whoever calls is how the crash happened.
+	if !wordsFits(g, dotsX, dotsY) {
+		return
+	}
 
 	step := int8(min(int((1-gone)*wordsAhead*float32(levels)), levels-1))
 	if step < 0 {
