@@ -491,3 +491,20 @@ func TestUntimedWordsSayThatTheyAreUntimed(t *testing.T) {
 		}
 	}
 }
+
+// The words stop where the sleeve does. The box the artwork is given is a row
+// or two taller than the square drawn in it, and budgeting the lyric window
+// against the box rather than the picture ran the last line past its foot.
+func TestTheWordsStopAtThePicturesFoot(t *testing.T) {
+	for _, size := range [][2]int{{100, 30}, {120, 44}, {160, 50}, {200, 60}} {
+		m := lyricsModel(size[0], size[1])
+		l := m.layout()
+		if !l.hasArt() {
+			continue
+		}
+		if got := len(m.infoBlock(l.infoWidth)) + 1 + m.lyricsFit(l); got > l.artRows {
+			t.Errorf("%dx%d: the column runs to row %d, past the picture's foot at %d",
+				size[0], size[1], got, l.artRows)
+		}
+	}
+}

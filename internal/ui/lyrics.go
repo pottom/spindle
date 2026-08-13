@@ -93,7 +93,11 @@ func (m Model) lyricsFit(l layout) int {
 	if !l.hasArt() {
 		return lyricsMaxRows
 	}
-	return min(max(l.artHeight-len(m.infoBlock(l.infoWidth))-1, 0), lyricsMaxRows)
+	// Measured against where the picture ends, not against the box it was given.
+	// The box is a row or two taller than a square cover drawn in it, so
+	// budgeting by artHeight ran the words past the sleeve's foot — which
+	// layout.go already says reads as a mistake.
+	return min(max(l.artRows-len(m.infoBlock(l.infoWidth))-1, 0), lyricsMaxRows)
 }
 
 // lyricsRows is how many rows the words have to work with, which is what
