@@ -132,3 +132,28 @@ func TestPeekRowsAreFlushWithTheHeading(t *testing.T) {
 		t.Errorf("the glance starts at column %d and the device name at %d, want one column in", heading, device)
 	}
 }
+
+// The artists in the glance begin on the same column the playing track's
+// artists do, further down the screen. Measured rather than eyeballed: it was
+// wrong twice by a couple of columns, once because the row divided itself and
+// once because the arithmetic counted a cursor gutter this list does not have.
+func TestTheGlanceLinesUpWithTheColumnBesideThePicture(t *testing.T) {
+	m := peekModel()
+	m.peek.on = true
+	l := m.layout()
+
+	var at = -1
+	for _, row := range strings.Split(plain(m.render()), "\n") {
+		if strings.Contains(row, "first") {
+			at = strings.Index(row, "someone")
+			break
+		}
+	}
+	if at < 0 {
+		t.Fatal("no artist in the glance to measure")
+	}
+	if want := leftMargin + l.artWidth + columnGap; at != want {
+		t.Errorf("the glance's artists start at column %d, want %d — the column beside the picture",
+			at, want)
+	}
+}

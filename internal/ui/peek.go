@@ -55,7 +55,12 @@ func (m Model) drawPeek(lines []string, at int, l layout) []string {
 	// the screen. Left to the row's own arithmetic they landed wherever the
 	// division fell, which is a column that lines up with nothing.
 	glance := m
-	glance.rowsMainAt = max(l.artWidth+columnGap-inset-rowGutter-1, 0)
+	//
+	// The row starts at leftMargin+inset and the column beside the picture at
+	// leftMargin+artWidth+columnGap, so the title has to be artWidth+columnGap-
+	// inset-1 wide for the space after it to land on that column. No gutter in
+	// the arithmetic: this list is flush, having no cursor to stand anywhere.
+	glance.rowsMainAt = max(l.artWidth+columnGap-inset-1, 0)
 
 	for i, row := range glance.place(glance.upNextBlock(), w, peekRows+1) {
 		lines[at+i] = m.pad(indent+row, l)
