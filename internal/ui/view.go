@@ -79,10 +79,16 @@ func (m Model) renderPlayer() string {
 
 	inner := l.interior - leftMargin - rightMargin
 
-	var lines []string
-	for _, row := range m.outline(m.header(inner), inner, "header") {
-		lines = append(lines, m.pad(row, l))
+	// Outlined after the padding, not before, and so at the frame's width rather
+	// than the content's. Every block on the screen is inset by the same margin,
+	// so bordering one inside it and the next outside it drew two edges a few
+	// columns apart that were saying the same thing.
+	var header []string
+	for _, row := range m.header(inner) {
+		header = append(header, m.pad(row, l))
 	}
+
+	lines := m.outline(header, l.interior, "header")
 	lines = append(lines, m.pad("", l))
 
 	body := m.body(l)
@@ -101,10 +107,11 @@ func (m Model) renderPlayer() string {
 	if text, style, ok := m.notice(); ok {
 		lines = append(lines, m.pad(style.Render(text), l))
 	}
-	help := strings.Split(m.help.View(m.helpKeys()), "\n")
-	for _, row := range m.outline(help, inner, "help") {
-		lines = append(lines, m.pad(row, l))
+	var help []string
+	for _, row := range strings.Split(m.help.View(m.helpKeys()), "\n") {
+		help = append(help, m.pad(row, l))
 	}
+	lines = append(lines, m.outline(help, l.interior, "help")...)
 
 	return lipgloss.PlaceHorizontal(m.width, lipgloss.Center, strings.Join(lines, "\n"))
 }
