@@ -35,6 +35,16 @@ const (
 	wideAbove   = 132
 	narrowBelow = 96
 
+	// maxArtPx is how large the cover may get on screen, in device pixels down
+	// its side. In cells it would not be a cap at all: shrinking the terminal
+	// font makes a cell smaller and the same number of cells physically larger,
+	// which is exactly the way it kept growing.
+	//
+	// Set to what it measures at on this machine at a comfortable size, because
+	// that is the size it was tuned to look right at — past it the sleeve starts
+	// competing with the room rather than sitting in it.
+	maxArtPx = 1100
+
 	// maxBrowseArt caps the picture on the screens where it is a preview rather
 	// than the subject. Left to grow with the terminal it would take half of a
 	// very wide screen from the list, which is the thing being read there.
@@ -189,6 +199,9 @@ func artworkArea(interior, bodyHeight int, mode layoutMode, cell cover.CellSize)
 	}
 
 	maxWidth := max(min(interior-leftMargin-columnGap-minInfoCols-rightMargin, share), 1)
+	if mode == modePlayer && cell.Width > 0 {
+		maxWidth = max(min(maxWidth, maxArtPx/cell.Width), 1)
+	}
 	maxHeight := max(bodyHeight-2*artMargin-1, 1)
 
 	// The picture never takes more than two thirds of the height it is given.
@@ -235,6 +248,12 @@ const playerBelowArt = 2 * (scopeRows + scopeChrome + artMargin)
 // the words hand back what they cannot use: the offer is a width, and a width
 // alone would make a picture wider than it is tall.
 func squareOff(offered, bodyHeight int, cell cover.CellSize) (width, height int) {
+	// The ceiling holds here too. This is the path the words hand their surplus
+	// back on, and it would otherwise walk straight past a cap the other path
+	// obeys.
+	if cell.Width > 0 {
+		offered = max(min(offered, maxArtPx/cell.Width), 1)
+	}
 	rows := max(bodyHeight-playerBelowArt, 1)
 	height = max(min(rows, offered*cell.Width/cell.Height), 1)
 	width = max(min(height*cell.Height/cell.Width, offered), 1)

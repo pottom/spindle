@@ -37,6 +37,14 @@ func TestThePlayerGrowsIntoTheRoomItIsGiven(t *testing.T) {
 		if !l.hasArt() {
 			continue
 		}
+		// Once the picture has reached its ceiling the rest of the room is blank
+		// on purpose, so the rule only holds below it. With slack for the
+		// squaring off: a cover has to come out a whole number of cells both
+		// ways, and cells are not square, so the last few columns of the
+		// allowance are unreachable.
+		if ceiling := maxArtPx / defaultTestCell.Width; l.artWidth >= ceiling-3 {
+			continue
+		}
 		spare := l.bodyHeight - l.artHeight
 		if spare > playerBelowArt {
 			t.Errorf("%dx%d: %d rows spare under the picture, want no more than %d — "+
@@ -274,6 +282,19 @@ func TestOutlinesDrawNothingWhenOff(t *testing.T) {
 	for i := range rows {
 		if out[i] != rows[i] {
 			t.Errorf("row %d was drawn on with the outlines off: %q", i, out[i])
+		}
+	}
+}
+
+// The cover has a ceiling, and it is in pixels rather than cells: shrinking the
+// terminal font makes a cell smaller and the same number of cells physically
+// larger, which is how it kept growing on a screen that was not.
+func TestTheCoverStopsGrowing(t *testing.T) {
+	for _, s := range [][2]int{{160, 44}, {200, 50}, {240, 60}, {300, 70}, {400, 100}, {600, 160}} {
+		l := computeLayout(s[0], s[1], 2, false, modePlayer, defaultTestCell)
+		if px := l.artWidth * defaultTestCell.Width; px > maxArtPx {
+			t.Errorf("%dx%d: the cover is %d pixels across, past the %d it may be",
+				s[0], s[1], px, maxArtPx)
 		}
 	}
 }
