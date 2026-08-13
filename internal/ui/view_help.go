@@ -95,7 +95,7 @@ func helpGroups() []helpGroup {
 			{keyMarks, "another company of dancers"},
 			{keyTell, "what is playing, said there and then"},
 			{pair(keyShuffle, keyRepeat), "shuffle and repeat, said by the one with the placard"},
-			{pair(keyBack, keyQuit), "back — and nothing else is, so it can be leaned on"},
+			{pair(keyBack, keyQuit) + " / " + keyStage, "back — and nothing else is, so it can be leaned on"},
 		},
 	}, {
 		title: "On this page",

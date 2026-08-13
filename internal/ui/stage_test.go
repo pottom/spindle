@@ -62,18 +62,27 @@ func TestStageTakesTheScreenAndGivesItBack(t *testing.T) {
 	}
 }
 
-// And q is the other way out: the key that means "back" everywhere else means
-// it here too, so a hand that wants the working screen back has two answers and
-// does not have to remember which.
-func TestQLeavesTheBigScreen(t *testing.T) {
-	m := scopeModel(100, 40)
+// And q and f are the other two ways out: q means "back" everywhere else, and f
+// is the key that put the screen up in the first place. A hand that wants the
+// working screen back has three answers and does not have to remember which —
+// reaching for the key that opened it is what happens before anybody remembers
+// there is an esc.
+func TestThreeKeysLeaveTheBigScreen(t *testing.T) {
+	for _, out := range []tea.KeyPressMsg{
+		{Code: 'q', Text: "q"},
+		{Code: 'f', Text: "f"},
+		{Code: tea.KeyEscape},
+	} {
+		var tm tea.Model = scopeModel(100, 40)
+		tm, _ = tm.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+		if !tm.(Model).stage.on {
+			t.Fatal("f did not open the big screen")
+		}
 
-	var tm tea.Model = m
-	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
-	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
-
-	if got := tm.(Model); got.stage.on {
-		t.Error("q left the big screen up")
+		tm, _ = tm.Update(out)
+		if got := tm.(Model); got.stage.on {
+			t.Errorf("%s left the big screen up", out)
+		}
 	}
 }
 

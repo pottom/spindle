@@ -213,9 +213,10 @@ func (m *Model) stageEdgeFlow() {
 
 // stageKey answers while the big screen is up.
 //
-// Two keys leave: esc and q, the two that mean "back" everywhere else. Nothing
-// else does, and a key this screen has no use for does nothing at all rather
-// than putting the picture away.
+// Three keys leave: esc and q, the two that mean "back" everywhere else, and f,
+// which is the key that put the screen up. Nothing else does, and a key this
+// screen has no use for does nothing at all rather than putting the picture
+// away.
 //
 // Any key at all used to be the way out, on the grounds that this is a screen
 // you watch rather than work on. In a room that is not what happens: a hand
@@ -281,10 +282,15 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		// the two keys nearest to hand did the one thing nobody wanted.
 		return nil, false
 
-	case key.Matches(k, m.keys.Back), key.Matches(k, m.keys.Quit):
-		// The way out. q and ctrl+c are the same binding, and only one of them
-		// means this: ctrl+c is not "leave this screen", it is "leave", and it
-		// has to mean that wherever it is pressed.
+	case key.Matches(k, m.keys.Back), key.Matches(k, m.keys.Quit), key.Matches(k, m.keys.Stage):
+		// The way out. esc and q are what "back" means everywhere else, and f is
+		// the key that opened this — a key that puts a screen up is expected to
+		// take it down again, and reaching for it a second time is what a hand
+		// does before it remembers there is an esc.
+		//
+		// q and ctrl+c are the same binding, and only one of them means this:
+		// ctrl+c is not "leave this screen", it is "leave", and it has to mean
+		// that wherever it is pressed.
 		if k.Mod&tea.ModCtrl != 0 {
 			return nil, false
 		}
