@@ -10,15 +10,19 @@ const (
 
 	// A table earns its width; prose does not. The lists take whatever the
 	// terminal gives — a title cut short at column 60 on a 200-column screen is
-	// the one thing nobody would choose — while the player screen stays narrow,
-	// because a line of text that wide is harder to read, not easier.
+	// the one thing nobody would choose.
 	maxTableWidth = 200
-	maxProseWidth = 100
 
-	// On a wide terminal the player screen is let out too, but only enough for
-	// the artwork to grow: past this the text beside it starts to drift away
-	// from the picture it belongs to.
-	maxProseWidthWide = 140
+	// The player used to be capped narrower than this, which left a third of a
+	// large terminal blank. The reason written down for it — that a wide line of
+	// text is harder to read — is an argument about the text rather than about
+	// the frame it sits in, so it moved to where it belongs, one line down.
+	//
+	// maxInfoCols is that place: the column of words beside
+	// the picture. A title, an artist and a caption set much wider than this stop
+	// being a caption and start being a paragraph, and the eye has to travel back
+	// across the picture to find the start of the next line.
+	maxInfoCols = 64
 
 	// compactBelow is where the artwork stops being worth its columns. Two
 	// terminals side by side on a laptop is about eighty columns each, and the
@@ -100,15 +104,11 @@ func (l layout) hasArt() bool { return l.artWidth > 0 && l.artHeight > 0 }
 func computeLayout(w, h, helpHeight int, hasBanner bool, mode layoutMode, cell cover.CellSize) layout {
 	tier := tierFor(w)
 
-	// The lists are tables and take the room; the player is read and does not.
-	limit := maxProseWidth
-	switch {
-	case mode != modePlayer:
-		limit = maxTableWidth
-	case tier == tierWide:
-		limit = maxProseWidthWide
-	}
-	interior := min(w, limit)
+	// The lists take the width and fill it with columns. The player works the
+	// other way round: it is as wide as its two parts need, and centred in what
+	// is left, because a caption stretched across a very wide terminal is a
+	// worse use of the room than the blank either side of it.
+	interior := min(w, maxTableWidth)
 
 	// Above the body: the tab labels, their rule and a blank line. Below it: a
 	// blank line and the help bar, plus one more for a banner.
@@ -121,9 +121,28 @@ func computeLayout(w, h, helpHeight int, hasBanner bool, mode layoutMode, cell c
 	var artWidth, artHeight, artRows int
 	infoWidth := interior - leftMargin - rightMargin
 	if tier != tierCompact {
-		artWidth, artHeight = artworkArea(interior, bodyHeight, mode, cell)
+		// The player is measured against the whole terminal rather than the
+		// capped interior, so that a picture on a very wide screen can grow into
+		// the rows it has. Everything the words then hand back goes to it too.
+		room := interior
+		if mode == modePlayer {
+			room = w
+		}
+
+		artWidth, artHeight = artworkArea(room, bodyHeight, mode, cell)
+		infoWidth = room - leftMargin - rightMargin - artWidth - columnGap
+
+		if mode == modePlayer {
+			if infoWidth > maxInfoCols {
+				artWidth, artHeight = squareOff(artWidth+infoWidth-maxInfoCols, bodyHeight, cell)
+				infoWidth = maxInfoCols
+			}
+			infoWidth = max(min(infoWidth, maxInfoCols), minInfoCols)
+			// And the frame closes around the two of them, so what is left over
+			// is blank either side rather than a stretched caption.
+			interior = min(leftMargin+artWidth+columnGap+infoWidth+rightMargin, w)
+		}
 		artRows = artworkRows(artWidth, artHeight, cell)
-		infoWidth -= artWidth + columnGap
 	}
 
 	return layout{
@@ -168,7 +187,19 @@ func artworkArea(interior, bodyHeight int, mode layoutMode, cell cover.CellSize)
 	// grows until there is no room for it would make the trace disappear on
 	// exactly the terminals with the most space.
 	if mode == modePlayer {
-		maxHeight = max(min(maxHeight, bodyHeight*2/3), 1)
+		// The picture stops where the trace begins rather than at a fixed share
+		// of the body. Two thirds was the rule, and on a tall terminal it left a
+		// third of the screen holding nothing: every other part of this screen is
+		// a fixed height, so whatever the picture does not take is not taken at
+		// all.
+		//
+		// Two thirds stays as a floor, and it is the floor that matters on a
+		// short terminal: holding rows back there would shrink the picture to
+		// make room for a trace that is not offered at that size anyway, which is
+		// the worst of both. The two meet at a body of thirty-six rows, and above
+		// that the picture is the one that grows.
+		grown := max(bodyHeight-playerBelowArt, bodyHeight*2/3)
+		maxHeight = max(min(maxHeight, grown), 1)
 	}
 	if mode == modeList {
 		maxHeight = max(min(maxHeight, bodyHeight/3), 1)
@@ -176,6 +207,27 @@ func artworkArea(interior, bodyHeight int, mode layoutMode, cell cover.CellSize)
 
 	height = max(min(maxHeight, maxWidth*cell.Width/cell.Height), 1)
 	width = max(min(height*cell.Height/cell.Width, maxWidth), 1)
+	return width, height
+}
+
+// playerBelowArt is the rows the player screen keeps back from the picture so
+// that the trace has somewhere to go.
+//
+// Twice what the trace needs, because the picture is centred in the body: half
+// of whatever is spare ends up above it and only the other half below, which is
+// where the trace lives. Held back as one number rather than by shrinking the
+// picture when the key is pressed — a visualiser that moved the cover every time
+// it was turned on would not be worth having.
+const playerBelowArt = 2 * (scopeRows + scopeChrome + artMargin)
+
+// squareOff takes a width the picture has been offered and gives back the
+// largest square that fits in it without passing the rows available. Used when
+// the words hand back what they cannot use: the offer is a width, and a width
+// alone would make a picture wider than it is tall.
+func squareOff(offered, bodyHeight int, cell cover.CellSize) (width, height int) {
+	rows := max(bodyHeight-playerBelowArt, 1)
+	height = max(min(rows, offered*cell.Width/cell.Height), 1)
+	width = max(min(height*cell.Height/cell.Width, offered), 1)
 	return width, height
 }
 

@@ -954,9 +954,10 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 		title = m.leadIn(primary.Render(fmt.Sprintf("%d", number))) + title
 	}
 
-	return m.rowWithTempo(w, selected,
+	return m.rowWithAlbum(w, selected,
 		title,
 		m.styles.RowSecondary.Render(strings.Join(t.Artists, ", ")),
+		m.styles.RowTrailing.Render(t.Album),
 		m.tempoCell(t),
 		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
 	)
@@ -997,7 +998,29 @@ const (
 // terminal the gap it leaves in the middle of the row is the widest thing on the
 // screen. The growth is eased in from the cap and stops at an even split, so a
 // resize moves the column rather than jumping it.
-func rowWidths(body int) (main, second, beat int) {
+// The optional columns come and go in one order, so a terminal being resized
+// walks a list of layouts rather than jumping between arrangements. Narrowing,
+// the tempo goes first and the artists second; widening, the album is last in
+// because it is the column people scan for least.
+const (
+	// albumCols is the album's share. Enough for most album names and not so
+	// much that it competes with the title.
+	albumCols = 28
+
+	// albumFrom is the row width at which the album earns those columns. Below
+	// it the row has nothing spare, and taking them would come out of the title.
+	albumFrom = 2*secondaryCols + albumCols + tempoCols + trailingCols
+)
+
+func rowWidths(body int) (main, second, beat, album int) {
+	// Last in, first considered: the album is taken off the top so everything
+	// below divides what is genuinely left, rather than being squeezed after the
+	// fact.
+	if body >= albumFrom {
+		album = albumCols
+		body -= album + 1
+	}
+
 	second = min(body/3, secondaryCols)
 
 	beat = tempoCols
@@ -1008,21 +1031,21 @@ func rowWidths(body int) (main, second, beat int) {
 		main = body - second - trailingCols - 2
 	}
 	if main < 16 {
-		return body - trailingCols - 1, 0, 0
+		return body - trailingCols - 1, 0, 0, 0
 	}
 
 	free := body - beat - trailingCols - 2
 	if grown := min(secondaryCols+(body-shareAbove)/2, free/2); grown > second {
 		second, main = grown, free-grown
 	}
-	return main, second, beat
+	return main, second, beat, album
 }
 
 // rowSecondaryAt is the column a track row's artists begin at, counted from the
 // start of the row. The queue hangs its trace from the same line, so the screen
 // reads as two columns rather than four.
 func rowSecondaryAt(w int) int {
-	main, second, _ := rowWidths(w - rowGutter)
+	main, second, _, _ := rowWidths(w - rowGutter)
 	if second == 0 {
 		return w
 	}
@@ -1036,7 +1059,22 @@ func (m Model) rowWithTempo(w int, selected bool, primary, secondary, tempo, tra
 	return m.rowCols(w, selected, primary, secondary, tempo, trailing)
 }
 
+// rowWithAlbum is a track row that also carries its album, for the lists where a
+// track has one to show. The column appears on its own once the row is wide
+// enough; below that this draws exactly what rowWithTempo would.
+func (m Model) rowWithAlbum(w int, selected bool, primary, secondary, album, tempo, trailing string) string {
+	return m.rowColsAlbum(w, selected, primary, secondary, album, tempo, trailing)
+}
+
 func (m Model) rowCols(w int, selected bool, primary, secondary, tempo, trailing string) string {
+	return m.rowColsAlbum(w, selected, primary, secondary, "", tempo, trailing)
+}
+
+// rowColsAlbum is rowCols with the album between the artists and the tempo. It
+// is drawn only where the row is wide enough to have earned the column, and the
+// caller passes it whether or not that is so: which columns fit is the row's
+// business, not the caller's.
+func (m Model) rowColsAlbum(w int, selected bool, primary, secondary, album, tempo, trailing string) string {
 	gutter := "  "
 	if selected {
 		gutter = m.styles.Cursor.Render(rowCursor) + " "
@@ -1053,11 +1091,14 @@ func (m Model) rowCols(w int, selected bool, primary, secondary, tempo, trailing
 		return gutter + fit(primary, max(body, 0))
 	}
 
-	main, second, beat := rowWidths(body)
+	main, second, beat, albumWidth := rowWidths(body)
 
 	line := gutter + fit(primary, max(main, 0)) + " "
 	if second > 0 {
 		line += fit(secondary, second) + " "
+	}
+	if albumWidth > 0 {
+		line += fit(album, albumWidth) + " "
 	}
 	if beat > 0 {
 		line += padLeft(tempo, beat)

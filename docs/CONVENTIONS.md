@@ -34,6 +34,19 @@ resolving the four risks listed in `DESIGN.md`, not production readiness.
    remote.
 6. **Do not write code for features outside the current milestone.** No placeholders,
    no TODO scaffolding, no speculative abstraction.
+7. **Every screen uses the room it is given, and adding anything to one is a
+   change to that.** Shrinking the font is how somebody asks for more of a
+   screen, and every part of a screen has to answer. Nothing may be a fixed
+   height on a tall terminal or a fixed width on a wide one: whatever the other
+   parts do not take, something must. In a list that means mandatory columns and
+   optional ones that come in, in one fixed order, as the row earns them — and
+   never go away again on a wider row.
+
+   This is checked rather than remembered: `internal/ui/responsive_test.go` runs
+   every tab from the smallest terminal that draws to a very large one. **Run it
+   after any change to what a tab holds**, because a new caption or column is
+   exactly what takes the room back without anybody noticing until a screenshot
+   arrives.
 
 ## Style
 
