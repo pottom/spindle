@@ -693,6 +693,15 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.lyrics.on = !m.lyrics.on
 		return m, tea.Batch(m.fetchLyrics(), m.savePrefs())
 
+	case key.Matches(k, m.keys.Held):
+		// The same stop the big screen walks, so a record can be set here and
+		// watched there, or the other way round. See lyricsHeld.
+		if !m.lyrics.on || !m.lyrics.synced {
+			return m, nil
+		}
+		m.lyrics.held = (m.lyrics.held + 1) % len(lyricsHelds)
+		return m, nil
+
 	case key.Matches(k, m.keys.Peek):
 		if !m.peekAvailable() {
 			return m, nil

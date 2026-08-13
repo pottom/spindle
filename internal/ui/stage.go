@@ -276,6 +276,13 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		m.words.syncDark = !m.words.syncDark
 		return nil, true
 
+	case key.Matches(k, m.keys.Held):
+		// How long a line is taken to be sung for, a stop at a time. Both screens
+		// follow it, so it can be set from up here and judged down there as well.
+		// See lyricsHeld.
+		m.lyrics.held = (m.lyrics.held + 1) % len(lyricsHelds)
+		return nil, true
+
 	case key.Matches(k, m.keys.Face):
 		// Puts a face up, and walks its expressions a press at a time.
 		m.faceShow()

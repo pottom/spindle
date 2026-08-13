@@ -157,7 +157,7 @@ func (m Model) wordsSyncSpan() (gone, sung time.Duration, ok bool) {
 	if m.words.ends > m.words.starts {
 		window = time.Duration(m.words.ends-m.words.starts) * time.Millisecond
 	}
-	if sung = lyricsSung(window); sung <= 0 {
+	if sung = m.lyricsHeld(window); sung <= 0 {
 		return 0, 0, false
 	}
 	return max(time.Duration(m.wordsClock()-m.words.starts)*time.Millisecond-lyricsStampsEarly, 0), sung, true
@@ -349,8 +349,13 @@ func (m Model) wordsSyncLabel(w int) string {
 	if m.words.sync == syncRotate {
 		held = "rotating · " + m.wordsSyncEffect().String()
 	}
-	return fit(m.styles.Empty.Render(fmt.Sprintf("  %s · %s · word %.1f of %d · y next, Y darker",
-		held, ahead, at, m.words.where.Count)), w)
+
+	// What the line is being held to, in the two numbers worth reading off it:
+	// the share of the fitted span, and what that comes to on this line.
+	_, sung, _ := m.wordsSyncSpan()
+	return fit(m.styles.Empty.Render(fmt.Sprintf("  %s · %s · word %.1f of %d · sung %.0f%% (%.1fs) · y next, Y darker, h shorter",
+		held, ahead, at, m.words.where.Count,
+		lyricsHelds[m.lyrics.held%len(lyricsHelds)]*100, sung.Seconds())), w)
 }
 
 // pow is x to the y for the small non-integer powers the fall needs, without

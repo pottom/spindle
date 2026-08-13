@@ -74,7 +74,14 @@ const (
 	// keySyncDark leaves the words ahead of the voice nearly out. Shifted,
 	// because it is the same question asked louder.
 	keySyncDark = "Y"
-	keyPeek     = "u"
+
+	// keyHeld shortens how long a line is taken to be sung for, in steps, on
+	// both screens at once. A measuring key: the share was fitted on three
+	// sections of two records and a record that holds its lines for less than
+	// that has the light trailing the voice by the end of every line, which is
+	// what it was reached for.
+	keyHeld = "h"
+	keyPeek = "u"
 
 	keyFind     = "/"
 	keyFindNext = ";"

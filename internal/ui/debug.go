@@ -387,6 +387,12 @@ func (m Model) debugSheet() []debugField {
 	b.put("lines", "%d", len(m.lyrics.lines))
 	if m.lyrics.synced {
 		b.put("at", "%d", m.wordsAt())
+
+		// What a line is being taken to be sung for, which is the one number on
+		// this screen that is set by hand. See lyricsHeld.
+		at := m.wordsAt()
+		b.put("held", "%.0f%%/%.1fs", lyricsHelds[m.lyrics.held%len(lyricsHelds)]*100,
+			m.lyricsHeld(m.lyricsWindow(at)).Seconds())
 	}
 	if m.lyrics.fetching != "" {
 		b.put("fetch", "%s", debugShort(m.lyrics.fetching, 8))

@@ -63,6 +63,10 @@ type keyMap struct {
 	Sync     key.Binding
 	SyncDark key.Binding
 
+	// Held shortens how long a line is taken to be sung for, on both screens.
+	// See lyricsHeld.
+	Held key.Binding
+
 	Peek key.Binding
 	Mute key.Binding
 
@@ -267,6 +271,10 @@ func newKeyMap() keyMap {
 		SyncDark: key.NewBinding(
 			key.WithKeys(keySyncDark),
 			key.WithHelp(keySyncDark, "dim what is not sung yet"),
+		),
+		Held: key.NewBinding(
+			key.WithKeys(keyHeld),
+			key.WithHelp(keyHeld, "how long a line is sung"),
 		),
 
 		Peek: key.NewBinding(

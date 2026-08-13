@@ -96,6 +96,28 @@ func lyricsSung(window time.Duration) time.Duration {
 	return min(time.Duration(float64(window)*lyricsSungShare), lyricsSungMost)
 }
 
+// lyricsHelds are the stops the key walks through, as a share of what the fitted
+// rule above says.
+//
+// A record that holds its lines for less than the fitted share has the light
+// trailing the voice by the end of every line — heard first on a slow one, where
+// the singer says a short phrase and then leaves the band to it for two seconds,
+// and the sweep goes on creeping across words nobody is singing any more. The
+// share was fitted on three sections of two records and cannot be right for
+// every record; what it needs is not another guess but a number from the room.
+//
+// So this is a measuring key, not a preference: five stops, the same on both
+// screens, and what it is set to is written where it can be read off. What comes
+// back from it decides whether the share is a constant, something read off the
+// line itself, or something a record carries.
+var lyricsHelds = [...]float64{1, 0.9, 0.8, 0.7, 0.6}
+
+// lyricsHeld is how long this record's lines are taken to be sung for.
+func (m Model) lyricsHeld(window time.Duration) time.Duration {
+	held := lyricsHelds[m.lyrics.held%len(lyricsHelds)]
+	return time.Duration(float64(lyricsSung(window)) * held)
+}
+
 // lyricsHeadStart is how far in front of its own stamp a line takes the screen.
 func lyricsHeadStart(window time.Duration) time.Duration {
 	return min(lyricsAhead, time.Duration(float64(window)*lyricsLeadShare))
@@ -138,6 +160,10 @@ type lyricsState struct {
 	// language is what the words are in, which is how a syllable is counted in
 	// them. See syllables.go.
 	language string
+
+	// held is which stop of lyricsHelds the singing is being held to, for as
+	// long as the program is up. See lyricsHeld.
+	held int
 
 	// missing records that the track was asked about and has none, which is a
 	// different thing from not having asked yet.
@@ -392,7 +418,7 @@ func (m Model) lyricsSweep(i int, line string) int {
 	// The singing is being cut short here rather than the truth being told, and
 	// that is the right way round: a word that lights a little early is a small
 	// lie, and a word that never lights is a broken screen.
-	sung := min(lyricsSung(window), onScreen-lyricsStampsEarly)
+	sung := min(m.lyricsHeld(window), onScreen-lyricsStampsEarly)
 	if sung <= 0 {
 		return length
 	}

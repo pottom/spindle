@@ -94,6 +94,54 @@ func TestBothScreensPutTheVoiceInTheSamePlace(t *testing.T) {
 	}
 }
 
+// The key that holds a line to less than the fitted share moves both screens,
+// and moves them together.
+//
+// It exists because a record was found whose lines are sung in less time than
+// the share allows — the line arrives on time and the light then trails the
+// voice all the way to the end of it — and because the share was fitted on three
+// sections of two records, which is not enough records to be a constant.
+func TestHoldingALineShortMovesBothScreens(t *testing.T) {
+	const line = "And all along the borderlines of everything we knew"
+	m := stageModel(120, 44)
+	m.stage.mode = scopeWords
+	m.lyrics.synced, m.lyrics.language, m.lyrics.on = true, "en", true
+	m.lyrics.lines = []player.Lyric{{At: 10000, Words: line}, {At: 14000, Words: "the next one"}}
+	m.words.starts, m.words.ends = 10000, 14000
+	m.words.text, m.words.sync = line, syncModeInk
+	m.words.where.Count = len(wordsPieces(line))
+	m.setProgress(10*time.Second + lyricsStampsEarly + 2*time.Second)
+
+	was, ok := m.wordsSyncAt()
+	if !ok {
+		t.Fatal("the voice was not being followed at all")
+	}
+	wasLit := sweepTo(line, "en", 2*float64(time.Second)/float64(m.lyricsHeld(4*time.Second)))
+
+	// Every stop is shorter than the one before it, and the same two seconds of
+	// music therefore reaches further along the line.
+	for stop := 1; stop < len(lyricsHelds); stop++ {
+		m.lyrics.held = stop
+		at, _ := m.wordsSyncAt()
+		if at <= was && was < float32(m.words.where.Count) {
+			t.Errorf("held to %.0f%%, the big screen is at piece %.2f where it was at %.2f",
+				lyricsHelds[stop]*100, at, was)
+		}
+		lit := sweepTo(line, "en", 2*float64(time.Second)/float64(m.lyricsHeld(4*time.Second)))
+		if lit < wasLit {
+			t.Errorf("held to %.0f%%, the player screen has lit %d characters where it had lit %d",
+				lyricsHelds[stop]*100, lit, wasLit)
+		}
+		was, wasLit = at, lit
+	}
+
+	// And round to where it started, so nothing is stranded on a stop.
+	m.lyrics.held = 0
+	if lyricsHelds[m.lyrics.held] != 1 {
+		t.Errorf("the first stop holds a line to %.2f, want the fitted share itself", lyricsHelds[0])
+	}
+}
+
 // A mark is not sung, so it is not worth any of the singing: it lights with the
 // word beside it rather than holding the line up for a slice of a second.
 func TestPunctuationTakesNoTimeFromTheLine(t *testing.T) {
