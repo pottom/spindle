@@ -204,8 +204,20 @@ func slowRenderDone(m Model, render time.Duration) {
 		High   int    `json:"high"`
 		Words  bool   `json:"words_up"`
 		Figure bool   `json:"figure_up"`
-		Frames int    `json:"frames"`
-		Missed int    `json:"missed"`
+
+		// What the picture was in the middle of. A frame that goes missing
+		// while nothing is moving and a frame that goes missing during an
+		// arrival are two different faults, and the recording could not tell
+		// them apart: it said what was on screen and never what it was doing.
+		Move   int  `json:"move"`
+		Leave  int  `json:"leave"`
+		Coming bool `json:"coming"`
+		Going  bool `json:"going"`
+		Volume bool `json:"volume_up"`
+		Sign   bool `json:"sign_up"`
+		Marks  bool `json:"marks"`
+		Frames int  `json:"frames"`
+		Missed int  `json:"missed"`
 	}{
 		At:     began.Format(time.RFC3339Nano),
 		GapMs:  gap.Milliseconds(),
@@ -219,6 +231,13 @@ func slowRenderDone(m Model, render time.Duration) {
 		High:   m.height,
 		Words:  m.words.have.DotsX > 0,
 		Figure: m.faceUp(),
+		Move:   int(m.words.move),
+		Leave:  int(m.words.leave),
+		Coming: time.Since(m.words.since) < wordsGather,
+		Going:  time.Since(m.words.went) < wordsGather,
+		Volume: m.volumeShowing(),
+		Sign:   m.signWalking(),
+		Marks:  m.words.beats,
 		Frames: slowState.frames,
 		Missed: slowState.missed,
 	}
