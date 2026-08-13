@@ -517,3 +517,41 @@ from the band without separating them, and separating them is a model, not a
 measurement. The line model stays. What was learnt is in the fork's `voice.go`
 and in this table, and the patch is not merged: the daemon runs the pinned build
 again.
+
+### Two screens, two rulers (measured 2026-08-13)
+
+Watched on the wall — "the last word of the line lags the singer, and not only on
+this record" — and then found in the code: the two screens divided a line's
+singing by two different measures.
+
+The player screen spends it on **syllables**, and punctuation belongs to the word
+it hangs off. The big screen spent it on **pieces**, and a piece there is a word
+*or* a comma or a full stop of its own, because on that screen a mark has to be
+able to move independently of the word it follows. Every piece got an equal
+slice of the singing, so a line's marks took time off its words.
+
+Where the two put the start of a line's last word, on a 3.5 s window:
+
+| line | pieces | words | big screen | player screen | apart |
+|---|---|---|---|---|---|
+| And all along the borderlines, of everything we knew | 10 | 9 | 2677 ms | 2776 ms | −99 ms |
+| They say the times are changing, on the other side. | 12 | 10 | 2479 | 2727 | **−247** |
+| Pedig már eltelt jó pár év. | 7 | 6 | 2125 | 2603 | **−478** |
+| Sose voltunk ilyen büszkék, | 5 | 4 | 1785 | 2231 | **−446** |
+| Amit adtunk, abból szépet | 5 | 4 | 2380 | 2231 | +148 |
+
+Both directions, up to half a second, on the same line at the same instant —
+which is what the eye was catching: the screens do not agree with each other, so
+at least one of them does not agree with the singer.
+
+The pieces are worth keeping: cutting a comma loose is what lets it bounce on its
+own. What is not worth keeping is paying it. A piece is now worth its syllables,
+a mark is worth none and lights with the word beside it, and the same walk is
+used by all four followings — see `wordsSyncShares`. On the same lines the two
+screens now light the last word 0–10 ms apart, which is inside a frame.
+
+Worth knowing for later: this was **not** the tapped model being wrong. Against
+the 33 hand-tapped line endings, at the moment the last word is actually sung the
+model sits at 91% (Tony Joe White) and 92% (Majka) of the line, which is within
+one piece of where it should be. The error was between the two screens, not
+between the model and the music.

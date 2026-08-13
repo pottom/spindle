@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +23,111 @@ func syncModel(t *testing.T) Model {
 	m.words.where.Count = 4
 	m.words.sync = syncModeInk
 	return m
+}
+
+// The two screens put the voice in the same place on the same line.
+//
+// They did not: the player screen spends a line's singing on its syllables and
+// the big screen spent it on its pieces, giving a comma as long as the word in
+// front of it. On real lines the two disagreed about when the last word of a
+// line starts by up to 478 ms — which is what was seen, from across a room, as
+// the end of the line lagging the singer.
+func TestBothScreensPutTheVoiceInTheSamePlace(t *testing.T) {
+	lines := []struct{ lang, text string }{
+		{"en", "And all along the borderlines, of everything we knew"},
+		{"en", "They say the times are changing, on the other side."},
+		{"en", "Ain't nothin' gonna be the same again."},
+		{"hu", "Olyan jó volt fiatalnak lenni, akkor"},
+		{"hu", "Pedig már eltelt jó pár év."},
+		{"hu", "Sose voltunk ilyen büszkék,"},
+	}
+
+	const window = 3500 * time.Millisecond
+	for _, l := range lines {
+		m := stageModel(120, 44)
+		m.stage.mode = scopeWords
+		m.lyrics.synced, m.lyrics.language = true, l.lang
+		m.lyrics.lines = []player.Lyric{{At: 10000, Words: l.text}}
+		m.words.starts, m.words.ends = 10000, 10000+window.Milliseconds()
+		m.words.text, m.words.sync = l.text, syncModeInk
+
+		pieces := wordsPieces(l.text)
+		m.words.where.Count = len(pieces)
+
+		// The last piece that is a word rather than a mark, and where it ends in
+		// the line — which is what the player screen's sweep counts up to.
+		last, ends := -1, 0
+		for i, p := range pieces {
+			if strings.TrimFunc(l.text[p.from:p.to], wordsPunct) != "" {
+				last, ends = i, len([]rune(l.text[:p.to]))
+			}
+		}
+
+		reach := func(lit func(at time.Duration) bool) time.Duration {
+			for at := time.Duration(0); at < 2*window; at += 10 * time.Millisecond {
+				if lit(at) {
+					return at
+				}
+			}
+			return -1
+		}
+
+		stage := reach(func(at time.Duration) bool {
+			m.setProgress(10*time.Second + at)
+			pos, ok := m.wordsSyncAt()
+			return ok && pos > float32(last)
+		})
+		sung := lyricsSung(window)
+		player := reach(func(at time.Duration) bool {
+			frac := float64(at-lyricsStampsEarly) / float64(sung)
+			return sweepTo(l.text, l.lang, min(max(frac, 0), 1)) >= ends
+		})
+
+		if stage < 0 || player < 0 {
+			t.Errorf("the last word of %q never lit: stage %v, player %v", l.text, stage, player)
+			continue
+		}
+		if apart := max(stage-player, player-stage); apart > 50*time.Millisecond {
+			t.Errorf("the last word of %q lights at %v on the big screen and %v on the player screen, %v apart",
+				l.text, stage, player, apart)
+		}
+	}
+}
+
+// A mark is not sung, so it is not worth any of the singing: it lights with the
+// word beside it rather than holding the line up for a slice of a second.
+func TestPunctuationTakesNoTimeFromTheLine(t *testing.T) {
+	// Two words and a mark hanging off each: "sooner, now." — two syllables and
+	// one, and the two marks worth nothing.
+	shares := []float32{2, 0, 1, 0}
+
+	for _, at := range []struct {
+		frac float32
+		want float32
+	}{
+		{0, 0},
+		{0.25, 0.375}, // a quarter of the way through a word worth two thirds
+		{0.5, 0.75},   // still inside the first word, which is most of the line
+		{0.667, 2},    // the first word is done, and its comma with it
+		{0.833, 2.5},  // halfway through the second
+		{1, 4},        // all of it, marks and all
+	} {
+		if got := wordsSyncWalk(shares, at.frac); got < at.want-0.02 || got > at.want+0.02 {
+			t.Errorf("%.1f%% through the line the voice is at piece %.2f, want %.2f", at.frac*100, got, at.want)
+		}
+	}
+
+	// The mark is never where the voice is: it is behind the word it hangs off
+	// the moment that word is finished, and never a stop of its own.
+	if before, after := wordsSyncWalk(shares, 0.66), wordsSyncWalk(shares, 0.68); before > 1 || after < 2 {
+		t.Errorf("the comma held the line up: the voice went %.2f -> %.2f across the end of the first word", before, after)
+	}
+
+	// And with nothing to weigh — a row of marks, a line with no letters in it —
+	// the pieces share it out evenly, which is what it did before.
+	if got := wordsSyncWalk([]float32{0, 0, 0, 0}, 0.5); got != 2 {
+		t.Errorf("with nothing to weigh the voice is at piece %.2f of 4, want it halfway", got)
+	}
 }
 
 // Where the voice is, in words: nothing before the line's own stamp, and the

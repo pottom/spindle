@@ -101,27 +101,43 @@ func (m Model) wordsSyncShakes(count int) [][2]int {
 
 // wordsSyncSince is how long ago the voice reached each word, in seconds, or -1
 // for the words it has not reached.
+//
+// Off the same ruler the rest of the following uses — see wordsSyncShares — so a
+// word shakes when it is sung and not when its turn comes round in a row of
+// equal turns. The two are not the same word: on "They say the times are
+// changing" the second ruler is most of a second out by the end of it.
 func (m Model) wordsSyncSince(count int) []float32 {
-	at, ok := m.wordsSyncAt()
+	gone, sung, ok := m.wordsSyncSpan()
 	if !ok || count <= 0 {
 		return nil
 	}
-	window := lyricsDefaultLine
-	if m.words.ends > m.words.starts {
-		window = time.Duration(m.words.ends-m.words.starts) * time.Millisecond
+
+	// Where each word starts, as a share of the singing: its syllables where
+	// they are known, and an equal slice each where they are not.
+	shares := m.wordsSyncShares()
+	if len(shares) != count {
+		shares = make([]float32, count)
+		for i := range shares {
+			shares[i] = 1
+		}
 	}
-	// How long one word lasts, which is the line's singing shared out. The
-	// syllables are what share it on the player screen; here a line is a few
-	// words wide on a screen the size of a wall, and the difference between the
-	// two rulers is under a frame.
-	each := float32(lyricsSung(window)/time.Duration(count)) / float32(time.Second)
+	var total float32
+	for _, share := range shares {
+		total += share
+	}
+	if total <= 0 {
+		return nil
+	}
 
 	out := make([]float32, count)
-	for w := range out {
-		out[w] = (at - float32(w)) * each
+	var seen float32
+	for w, share := range shares {
+		starts := time.Duration(float32(sung) * seen / total)
+		out[w] = float32(gone-starts) / float32(time.Second)
 		if out[w] < 0 {
 			out[w] = -1
 		}
+		seen += share
 	}
 	return out
 }

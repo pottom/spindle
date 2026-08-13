@@ -143,31 +143,104 @@ func (m Model) wordsSyncEffect() syncEffect {
 	return syncEffect(int(m.words.sync) - int(syncModeInk))
 }
 
-// wordsSyncAt is how far through its singing the line is, in words: 0 as the
-// first word begins, count as the last has finished. It reports false where
-// there is nothing to follow.
+// wordsSyncSpan is how long this line is sung for, and how much of that has
+// gone. It reports false where there is nothing to follow.
 //
 // The model is the one the player screen's sweep uses, measured the same way —
 // see lyricsSung and lyricsStampsEarly. This screen reads it against its own
 // clock, which runs with the music rather than ahead of it.
-func (m Model) wordsSyncAt() (float32, bool) {
+func (m Model) wordsSyncSpan() (gone, sung time.Duration, ok bool) {
 	if !m.wordsSyncOn() || m.words.starts <= 0 {
-		return 0, false
+		return 0, 0, false
 	}
 	window := lyricsDefaultLine
 	if m.words.ends > m.words.starts {
 		window = time.Duration(m.words.ends-m.words.starts) * time.Millisecond
 	}
-	sung := lyricsSung(window)
-	if sung <= 0 {
-		return 0, false
+	if sung = lyricsSung(window); sung <= 0 {
+		return 0, 0, false
+	}
+	return max(time.Duration(m.wordsClock()-m.words.starts)*time.Millisecond-lyricsStampsEarly, 0), sung, true
+}
+
+// wordsSyncShares is what each piece of the line is worth in time, in syllables.
+//
+// The two screens shared a line out by two different rulers, and it was noticed
+// before it was measured: the player screen spends the singing on syllables, and
+// this one spent it on pieces — every word and every comma an equal slice of it.
+// The picture is cut into pieces because a comma has to be able to move on its
+// own, and that is worth keeping; what it is not is worth a share of the voice.
+// Measured on real lines against the player screen's ruler, the two disagreed on
+// where the last word of a line starts by up to 478 ms — the same line, the same
+// second, one screen above the other.
+//
+// So the pieces stay and the ruler goes: a piece is worth its syllables, a mark
+// is worth none and lights with the word beside it, and both screens now put the
+// voice in the same place.
+func (m Model) wordsSyncShares() []float32 {
+	count := m.words.where.Count
+	if count <= 0 || m.words.text == "" || m.words.beats {
+		return nil
 	}
 
-	since := time.Duration(m.wordsClock()-m.words.starts)*time.Millisecond - lyricsStampsEarly
-	if since < 0 {
-		return 0, true // the line is up, and the voice has not reached it
+	// Cut the same way the picture was cut, from the same text. Anything else
+	// and the shares would belong to pieces that are not on the screen, so a
+	// count that does not match is a count that is not followed.
+	pieces := wordsPieces(m.words.text)
+	if len(pieces) != count {
+		return nil
 	}
-	frac := float32(since) / float32(sung)
+
+	out := make([]float32, count)
+	var total float32
+	for i, p := range pieces {
+		out[i] = float32(syllables(m.words.text[p.from:p.to], m.lyrics.language))
+		total += out[i]
+	}
+	if total <= 0 {
+		return nil
+	}
+	return out
+}
+
+// wordsSyncWalk is where the voice has got to, in pieces, when it is this far
+// through the line's singing.
+//
+// A piece worth nothing is stepped straight over, which is what a comma should
+// be: the voice does not stop at it, so it lights as its neighbour does rather
+// than holding the line up for a slice of a second.
+func wordsSyncWalk(shares []float32, frac float32) float32 {
+	var total float32
+	for _, share := range shares {
+		total += share
+	}
+	if total <= 0 {
+		return float32(len(shares)) * min(frac, 1)
+	}
+
+	want := min(frac, 1) * total
+	var seen float32
+	for i, share := range shares {
+		if share > 0 && want < seen+share {
+			return float32(i) + (want-seen)/share
+		}
+		seen += share
+	}
+	return float32(len(shares))
+}
+
+// wordsSyncAt is how far through its singing the line is, in pieces: 0 as the
+// first word begins, count as the last has finished. It reports false where
+// there is nothing to follow.
+func (m Model) wordsSyncAt() (float32, bool) {
+	gone, sung, ok := m.wordsSyncSpan()
+	if !ok {
+		return 0, false
+	}
+	frac := float32(gone) / float32(sung)
+	if shares := m.wordsSyncShares(); shares != nil {
+		return wordsSyncWalk(shares, frac), true
+	}
 	return min(frac, 1) * float32(m.words.where.Count), true
 }
 
