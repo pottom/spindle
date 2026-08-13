@@ -182,6 +182,11 @@ func TestADrawnRowNeedsNoRoundTrip(t *testing.T) {
 	// A spell whose bar is dealt a drawn set.
 	var spell int64 = -1
 	for at := range int64(200) {
+		// One bar in three now falls to the dancer instead, and he is a
+		// different picture with a different test. See dance.go.
+		if danceCastFor(m.ps.TrackID, at*wordsSpell.Milliseconds()) {
+			continue
+		}
 		if markCastFor(m.ps.TrackID, at*wordsSpell.Milliseconds()) != "" {
 			spell = at
 			break

@@ -92,7 +92,7 @@ func helpGroups() []helpGroup {
 		keys: [][2]string{
 			{keyPlayPause + " ← → ↑ ↓", "the transport, without leaving"},
 			{pair(keyNext, keyPrev), "next or previous track"},
-			{keyMarks, "another company of dancers"},
+			{keyMarks, "another company of dancers, and the breaker's own moves"},
 			{keyTell, "what is playing, said there and then"},
 			{pair(keyShuffle, keyRepeat), "shuffle and repeat, said by the one with the placard"},
 			{pair(keyBack, keyQuit) + " / " + keyStage, "back — and nothing else is, so it can be leaned on"},

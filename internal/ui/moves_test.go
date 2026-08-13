@@ -1,6 +1,11 @@
 package ui
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"github.com/pottom/spindle/internal/player"
+)
 
 // The baked set is what the manifest asked for: every move there, every frame
 // drawn, and every one of them standing in the cell it was cut from.
@@ -120,5 +125,152 @@ func TestTheBounceIsAllLoop(t *testing.T) {
 	}
 	if d.span(d.loopFrom, d.loopTo) < 12 {
 		t.Errorf("the bounce loops over %d frames, want the whole sheet", d.span(d.loopFrom, d.loopTo))
+	}
+}
+
+// The bar is dealt between the marks and the dancer, and dealt the same way
+// twice: a record that puts him up at two minutes puts him up at two minutes
+// every time it is played.
+func TestTheDancerIsDealtTheSameWayTwice(t *testing.T) {
+	const record = "4AUqttoxyPsm7wchxAuk3G"
+
+	var his int
+	for bar := range 90 {
+		at := int64(bar) * wordsSpell.Milliseconds()
+		if danceCastFor(record, at) != danceCastFor(record, at) {
+			t.Fatalf("the bar at %d was dealt differently twice in a row", at)
+		}
+		if danceCastFor(record, at) {
+			his++
+		}
+	}
+
+	// About one in three, which is what the deal is for: often enough to be
+	// seen on a wordless record, rare enough to still be an event.
+	if his < 15 || his > 45 {
+		t.Errorf("the dancer took %d of 90 bars, want about a third", his)
+	}
+
+	// And a different record dances differently.
+	same := 0
+	for bar := range 90 {
+		at := int64(bar) * wordsSpell.Milliseconds()
+		if danceCastFor(record, at) == danceCastFor("70t03HmXqfKmqEzWNvCXVv", at) {
+			same++
+		}
+	}
+	if same == 90 {
+		t.Error("two records were given the same bars, so the deal is not the record's")
+	}
+}
+
+// He dances to the record: the frames step off the beat, so the same move takes
+// a bar whether the record is slow or fast, and he holds still where there is no
+// beat to keep.
+func TestTheDanceStepsOnTheBeat(t *testing.T) {
+	m := stageModel(120, 44)
+	m.stage.mode = scopeWords
+	m.words.dancing, m.dance.move, m.dance.rounds = true, "sixstep", 4
+	m.dance.since = time.Now().Add(-time.Second)
+
+	if !m.danceUp() {
+		t.Fatal("the dancer is not up")
+	}
+
+	// With no beat to keep, he stands where he is rather than dancing to a
+	// clock of his own.
+	m.stage.loose = false
+	if got := m.danceStep(); got != 0 {
+		t.Errorf("with the beat off he had gone %d frames, want none", got)
+	}
+
+	// And with one, a second of a 120 bpm record is half a bar: six of the
+	// twelve frames a turn is drawn in.
+	m.stage.loose = true
+	m.scope.beat = player.Beat{Period: 500 * time.Millisecond}
+	m.scope.beatAt = time.Now()
+	if got := m.danceStep(); got < 4 || got > 8 {
+		t.Errorf("a second of a 120 bpm record took him %d frames, want about six", got)
+	}
+
+	// Twice the tempo, twice as far through the move in the same second: he is
+	// dancing to the record rather than beside it.
+	m.scope.beat = player.Beat{Period: 250 * time.Millisecond}
+	if fast, slow := m.danceStep(), 6; fast < 2*slow-4 || fast > 2*slow+4 {
+		t.Errorf("at twice the tempo he had gone %d frames, want about %d", fast, 2*slow)
+	}
+}
+
+// The loud moves belong to the loud passages. Not a rule — a lean — so this
+// asks for the lean rather than for any particular deal.
+func TestTheBigMovesWantALoudPassage(t *testing.T) {
+	big := map[string]bool{"backspin": true, "headstand": true, "sixstep": true}
+
+	// The swell is read off the record's own loudness against the range it has
+	// been moving through, so a hush and a chorus are set by moving the reading
+	// rather than by writing the answer down. See swell.go.
+	count := func(loud float64, drive float32) int {
+		var n int
+		for bar := range 200 {
+			m := stageModel(120, 44)
+			m.words.drive = drive
+			m.words.swellLow, m.words.swellHigh = -30, -10
+			m.scope.beat = player.Beat{Period: 500 * time.Millisecond, Loud: loud}
+			m.danceDeal("a record", int64(bar)*1000)
+			if big[m.dance.move] {
+				n++
+			}
+		}
+		return n
+	}
+
+	quiet, loud := count(-30, 0), count(-10, 1)
+	t.Logf("of 200 bars, the big moves came up %d times in a hush and %d at full tilt", quiet, loud)
+	if loud <= quiet {
+		t.Errorf("the big moves came up %d times in a hush and %d at full tilt, want more when the record is giving", quiet, loud)
+	}
+}
+
+// He arrives once and then dances. The bar he stands in is stamped afresh every
+// time it comes round, and a picture adopted every frame would fly apart and
+// gather back sixty times a second — which is what happened to the marks once,
+// and is written up in wordsComing.
+func TestTheDancerArrivesOnce(t *testing.T) {
+	m := stageModel(120, 44)
+	m.stage.mode = scopeWords
+	m.lyrics.synced = true
+	m.words.forTrack = m.ps.TrackID
+
+	// A bar that is his, found rather than assumed.
+	spell := -1
+	for at := range 200 {
+		if danceCastFor(m.ps.TrackID, int64(at)*wordsSpell.Milliseconds()) {
+			spell = at
+			break
+		}
+	}
+	if spell < 0 {
+		t.Skip("no bar in two hundred fell to the dancer")
+	}
+	m.setProgress(time.Duration(spell)*wordsSpell + time.Second)
+
+	if cmd := m.wordsGrind(); cmd != nil {
+		t.Error("the dancer sent for a picture instead of drawing himself")
+	}
+	if !m.danceUp() {
+		t.Fatal("the bar was his and he is not up")
+	}
+	came := m.words.since
+
+	// Every frame after that leaves him where he is: same picture, same
+	// arrival, no second gathering.
+	for range 30 {
+		m.wordsGrind()
+	}
+	if !m.words.since.Equal(came) {
+		t.Error("he arrived again while he was already dancing")
+	}
+	if !m.danceUp() {
+		t.Error("he was taken down while the bar was still his")
 	}
 }

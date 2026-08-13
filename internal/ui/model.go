@@ -240,6 +240,10 @@ type Model struct {
 	// words is the line being sung, in dots. See words.go.
 	words wordsState
 
+	// dance is the figure who stands in the wordless bar when it falls to him
+	// rather than to the marks. See dance.go.
+	dance danceState
+
 	// tide is the colour of the record coming next, arriving before the sound
 	// of it. See tide.go.
 	tide tideState
