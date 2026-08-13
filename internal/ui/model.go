@@ -201,6 +201,11 @@ type Model struct {
 	err       error
 	tickCount int
 
+	// deviceLostAt is when the local daemon was last found missing, so that
+	// starting a replacement is tried at a sensible interval rather than on
+	// every tick. See revive.go.
+	deviceLostAt time.Time
+
 	width, height int
 	isDark        bool
 

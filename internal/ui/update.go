@@ -65,6 +65,10 @@ func (m Model) answer(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleKey(message)
 
+	case deviceRevived:
+		m.said, m.saidAt = "The device had gone — started a new one", time.Now()
+		return m, tea.Batch(fetchStateCmd(m.player), fetchDevicesCmd(m.player))
+
 	case deviceRestarted:
 		m.settings.restarting = false
 		m.settings.changed = false

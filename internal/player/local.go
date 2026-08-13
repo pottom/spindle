@@ -76,6 +76,19 @@ func (l *Local) lost() {
 // Changes implements Watcher.
 func (l *Local) Changes() <-chan struct{} { return l.changes }
 
+// Live reports whether the local daemon is answering.
+//
+// It is asked by whoever can do something about the answer: a device that has
+// gone can be started again, and nothing else in the program is in a position
+// to notice that it went. Everything here works without one — the Web API
+// answers, more slowly and with less to say — so this is not an error, it is a
+// fact somebody upstairs may want to act on.
+func (l *Local) Live() bool {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.live
+}
+
 // State reports the daemon's own playback when it has any, and whatever the Web
 // API says otherwise.
 func (l *Local) State(ctx context.Context) (*State, error) {

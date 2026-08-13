@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	librespot "github.com/devgianlu/go-librespot"
 	"github.com/devgianlu/go-librespot/daemon"
 	"github.com/gofrs/flock"
 
@@ -152,8 +153,32 @@ func Run(ctx context.Context, opts Options) error {
 		log.Infof("spindle: "+format, args...)
 	})
 
-	if err := app.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-		return fmt.Errorf("run daemon: %w", err)
+	// Run in a goroutine of its own so that a wedged playback loop cannot hold
+	// the process here: app.Run does not come back from one, which is the whole
+	// difficulty — see watchdog.go. When the watchdog gives up, this returns and
+	// the stuck goroutine goes with the process.
+	done := make(chan error, 1)
+	go func() { done <- app.Run(ctx) }()
+
+	select {
+	case err := <-done:
+		if err != nil && !errors.Is(err, context.Canceled) {
+			return fmt.Errorf("run daemon: %w", err)
+		}
+		return nil
+	case err := <-wedged(ctx, port, log):
+		return err
 	}
-	return nil
+}
+
+// wedged reports the watchdog's verdict, once.
+func wedged(ctx context.Context, port int, log librespot.Logger) <-chan error {
+	out := make(chan error, 1)
+	go func() {
+		if err := watch(ctx, port, func(format string, args ...any) { log.Warnf(format, args...) }); err != nil {
+			log.Warnf("the device has not answered for %s; leaving so a fresh one can take over", wedgeAfter)
+			out <- err
+		}
+	}()
+	return out
 }
