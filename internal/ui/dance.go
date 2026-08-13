@@ -1,8 +1,10 @@
 package ui
 
 import (
+	"slices"
 	"time"
 
+	"github.com/pottom/spindle/internal/ui/bones"
 	"github.com/pottom/spindle/internal/ui/cover"
 	"github.com/pottom/spindle/internal/ui/msg"
 )
@@ -38,10 +40,15 @@ const (
 	danceBeatsPerLoop = 4
 
 	// danceRoundsLeast and danceRoundsMost are how many turns of the loop a move
-	// is dealt. Between them a move lasts two bars and eight, which is the
-	// length of a passage anybody would call a passage.
-	danceRoundsLeast = 2
-	danceRoundsMost  = 8
+	// is dealt.
+	//
+	// One to four, which is one bar to four. Longer was the first arrangement
+	// and it was wrong for the same reason a dancer does not do one thing for
+	// half a minute: what he is doing here is a routine, and a routine is made
+	// of moves that follow each other. A wordless bar runs half a minute, so at
+	// this length he gets through four or five of them.
+	danceRoundsLeast = 1
+	danceRoundsMost  = 4
 
 	// danceHigh is how much of the screen's height the figure stands in.
 	//
@@ -61,6 +68,11 @@ type danceState struct {
 	// than off this, and this is where the counting starts from.
 	since time.Time
 
+	// nth is how far into the routine he is: a bar of his own is not one move
+	// but a run of them, each dealt as the one before it finishes. See
+	// danceCarryOn.
+	nth int
+
 	// picked is a move asked for by hand. A move dealt one bar in three, on a
 	// record with four wordless bars in it, is a move nobody can judge; the key
 	// walks them so one can be watched. See marksWalk.
@@ -76,11 +88,28 @@ const danceCast = "dance"
 // character is up is not something to leave to chance in the middle of a record.
 const danceSet = "break"
 
+// danceNames is every move he knows, in one order, so a deal is dealt from a
+// list that does not change between runs.
+func danceNames() []string {
+	out := make([]string, 0, len(boneDances))
+	for name := range boneDances {
+		out = append(out, name)
+	}
+	slices.Sort(out)
+	return out
+}
+
+// danceFor is the move of a given name, and whether he knows it.
+func danceFor(name string) (bones.Dance, bool) {
+	d, ok := boneDances[name]
+	return d, ok
+}
+
 // danceCastFor says whether this bar is his, dealt from the record and from
 // where in it the bar falls — so a record dances the same way twice, which is
 // the rule every other deal on this screen keeps.
 func danceCastFor(record string, starts int64) bool {
-	if _, ok := moveSetFor(danceSet); !ok {
+	if len(boneDances) == 0 {
 		return false
 	}
 
@@ -103,17 +132,13 @@ func danceCastFor(record string, starts int64) bool {
 // Loudness here is the swell rather than the decibels: where the record is
 // inside the range it has been moving through lately, which is the one reading
 // that can tell a chorus from a verse on any record. See swell.go.
-func (m *Model) danceDeal(record string, starts int64) {
-	set, ok := moveSetFor(danceSet)
-	if !ok {
-		return
-	}
-	names := set.names()
+func (m *Model) danceDeal(record string, starts int64, nth int) {
+	names := danceNames()
 	if len(names) == 0 {
 		return
 	}
 
-	h := uint64(starts)*0xd6e8feb86659fd93 + 0x9e3779b97f4a7c15
+	h := uint64(starts)*0xd6e8feb86659fd93 + uint64(nth+1)*0x9e3779b97f4a7c15
 	for _, c := range []byte(record) {
 		h = (h ^ uint64(c)) * 0x100000001b3
 	}
@@ -134,6 +159,15 @@ func (m *Model) danceDeal(record string, starts int64) {
 	for i, name := range names {
 		size := danceSizes[name]
 		weights[i] = 0.25 + (1-size)*(1-give) + size*give
+
+		// Never the one he has just done. Dealt freely, a move follows itself
+		// about one time in seven, and a man who drops to the floor, stands up
+		// and drops to the floor again reads as a picture that has stuck rather
+		// than as a routine — which is the same reason a line never arrives the
+		// way the line before it did. See wordsMoveFor.
+		if name == m.dance.move && len(names) > 1 {
+			weights[i] = 0
+		}
 		total += weights[i]
 	}
 
@@ -148,10 +182,8 @@ func (m *Model) danceDeal(record string, starts int64) {
 
 	// Unless one was asked for by name, which is how a move gets watched rather
 	// than waited for. See marksWalk.
-	if m.dance.picked != "" {
-		if _, _, ok := set.at(m.danceTall(), m.dance.picked); ok {
-			pick = m.dance.picked
-		}
+	if _, ok := danceFor(m.dance.picked); ok {
+		pick = m.dance.picked
 	}
 
 	m.dance.move = pick
@@ -176,40 +208,61 @@ var danceSizes = map[string]float64{
 }
 
 // danceUp reports that the dancer is the picture in the wordless bar.
-func (m Model) danceUp() bool { return m.words.dancing && m.dance.move != "" }
+func (m Model) danceUp() bool {
+	if !m.words.dancing {
+		return false
+	}
+	_, ok := danceFor(m.dance.move)
+	return ok
+}
 
-// danceStep is how far into the move he is, in frames.
+// danceEach is how long one keyframe lasts.
 //
-// Counted off the beat and not off a clock: a move that takes the same number of
-// seconds on every record is a move that is not dancing to any of them. Where
-// there is no beat to count — the first seconds of a record, a hush, a stream
-// that has stopped — he holds where he is. The row of marks rests the same way
-// when the drums do, and resting is the picture rather than a fault in it.
-func (m Model) danceStep() int {
+// A turn of the move is a bar, however many keyframes it was written in: the
+// same sixteen poses take two seconds on a record at 120 and three at 80, so the
+// move is danced to the record rather than beside it. Where there is no beat to
+// keep, nothing lasts any time at all and he holds still — the row of marks
+// rests the same way when the drums do, and resting is the picture rather than a
+// fault in it.
+func (m Model) danceEach() (time.Duration, bool) {
+	d, ok := danceFor(m.dance.move)
 	period := m.scope.beat.Period
-	if !m.beatKeeping() || period <= 0 {
-		return 0
+	if !ok || !m.beatKeeping() || period <= 0 || len(d.Frames) == 0 {
+		return 0, false
 	}
+	each := time.Duration(float64(period) * danceBeatsPerLoop / float64(len(d.Frames)))
+	return each, each > 0
+}
 
-	set, ok := moveSetFor(danceSet)
+// danceAt is how far into the move he is, in keyframes, and not in whole ones:
+// what is between two of them is worked out rather than waited for, so the dance
+// is as smooth as the screen is quick. See bones.Tween.
+func (m Model) danceAt() float64 {
+	each, ok := m.danceEach()
 	if !ok {
 		return 0
 	}
-	_, d, ok := set.at(m.danceTall(), m.dance.move)
-	if !ok {
-		return 0
-	}
-	loop := d.span(d.loopFrom, d.loopTo)
-	if loop <= 0 {
-		return 0
-	}
+	return float64(time.Since(m.dance.since)) / float64(each)
+}
 
-	// One turn of the loop is a bar, however many frames that turn was drawn in.
-	each := time.Duration(float64(period) * danceBeatsPerLoop / float64(loop))
-	if each <= 0 {
+// danceDone reports that the move has been round as many times as it was dealt,
+// so the bar can deal the next one.
+func (m Model) danceDone() bool {
+	d, ok := danceFor(m.dance.move)
+	if !ok || len(d.Frames) == 0 {
+		return true
+	}
+	return m.danceAt() >= float64(m.dance.rounds*len(d.Frames))
+}
+
+// danceSpent is how long the move that has just finished took, to the keyframe.
+func (m Model) danceSpent() time.Duration {
+	each, ok := m.danceEach()
+	d, known := danceFor(m.dance.move)
+	if !ok || !known {
 		return 0
 	}
-	return int(time.Since(m.dance.since) / each)
+	return time.Duration(m.dance.rounds*len(d.Frames)) * each
 }
 
 // danceTall is the height he is drawn at, in dots, at the size of the room.
@@ -217,62 +270,63 @@ func (m Model) danceTall() int {
 	return int(float64(m.height*dotsPerCellY) * danceHigh)
 }
 
-// danceFrame is the drawing that is up, and where it stands.
-func (m Model) danceFrame() (moveFrame, moveSize, bool) {
-	set, ok := moveSetFor(danceSet)
-	if !ok {
-		return moveFrame{}, moveSize{}, false
+// danceStands is where he is drawn: how much a dot is worth, where his box
+// begins across the screen, and the row his feet are on.
+func (m Model) danceStands(dotsX, dotsY int) (scale float64, left, ground int, ok bool) {
+	d, known := danceFor(m.dance.move)
+	if !known {
+		return 0, 0, 0, false
 	}
-	size, d, ok := set.at(m.danceTall(), m.dance.move)
-	if !ok {
-		return moveFrame{}, moveSize{}, false
+	from, to, top := d.Reach()
+	if d.Floor <= top || to <= from {
+		return 0, 0, 0, false
 	}
 
-	f, going := d.frameAt(m.danceStep(), m.dance.rounds)
-	if !going {
-		// The move is over and the bar is not: he stands there, which is what
-		// the last frame of every sheet is drawn for.
-		f = d.frames[len(d.frames)-1]
-	}
-	return f, size, true
+	scale = float64(m.danceTall()) / (d.Floor - top)
+	wide := int((to - from) * scale)
+	return scale, (dotsX-wide)/2 - int(from*scale), (dotsY + m.danceTall()) / 2, true
 }
 
-// danceDone reports that the move has run out, so the bar can deal another.
-func (m Model) danceDone() bool {
-	set, ok := moveSetFor(danceSet)
+// dancePose is the figure as he stands this instant.
+func (m Model) dancePose() (bones.Pose, bones.Dance, bool) {
+	d, ok := danceFor(m.dance.move)
 	if !ok {
-		return true
+		return bones.Pose{}, bones.Dance{}, false
 	}
-	_, d, ok := set.at(m.danceTall(), m.dance.move)
-	if !ok {
-		return true
-	}
-	_, going := d.frameAt(m.danceStep(), m.dance.rounds)
-	return !going
+	return d.At(m.danceAt()), d, true
 }
 
-// dancePicture is the first frame as a picture, so that the bar has something
-// to arrive with and the meter under it has something to measure against.
+// dancePicture is the pose he arrives in as a picture, so that the bar has
+// something to arrive with and the meter under it has something to measure
+// against.
 //
-// Only the first: what is drawn every frame after it comes from the baked
-// frames rather than from here. This is the still the screen adopts — see
-// wordsAdopt, and danceDraw for what is actually on the screen.
+// Only the one: what is drawn every frame after it is worked out from the
+// joints. This is the still the screen adopts — see wordsAdopt, and danceDraw
+// for what is actually on the screen.
 func (m Model) dancePicture(w, rows int) (cover.Grain, msg.WordLayout, bool) {
-	f, size, ok := m.danceFrame()
+	pose, d, ok := m.dancePose()
 	if !ok || w <= 0 || rows <= 0 {
 		return cover.Grain{}, msg.WordLayout{}, false
 	}
 
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
-	left, floor := danceStands(size, dotsX, dotsY)
+	scale, left, ground, ok := m.danceStands(dotsX, dotsY)
+	if !ok {
+		return cover.Grain{}, msg.WordLayout{}, false
+	}
 
 	g := cover.Grain{DotsX: dotsX, DotsY: dotsY, CellsX: w, CellsY: rows, Lum: make([]uint8, dotsX*dotsY)}
-	f.draw(0, size.wide, func(x, y int) {
-		px, py := left+x, floor-f.tall+y
-		if px >= 0 && py >= 0 && px < dotsX && py < dotsY {
-			g.Lum[py*dotsX+px] = 255
+	lo, hi, top := dotsX, 0, dotsY
+	bones.Draw(pose, d.Box, d.Floor, scale, left, ground, bones.Pen(m.danceTall()), func(x, y int) {
+		if x < 0 || y < 0 || x >= dotsX || y >= dotsY {
+			return
 		}
+		g.Lum[y*dotsX+x] = 255
+		lo, hi, top = min(lo, x), max(hi, x), min(top, y)
 	})
+	if hi < lo {
+		return cover.Grain{}, msg.WordLayout{}, false
+	}
 
 	// One piece, and it covers him: the rest of this screen asks the layout
 	// which word a dot belongs to, and the answer for a dancer is always the
@@ -280,14 +334,14 @@ func (m Model) dancePicture(w, rows int) (cover.Grain, msg.WordLayout, bool) {
 	layout := msg.WordLayout{
 		Count: 1, DotsX: dotsX,
 		At:      make([]int16, dotsX),
-		Tops:    []int{max(floor-f.tall, 0)},
-		Bottoms: []int{min(floor, dotsY-1)},
-		Lefts:   []int{left},
-		Rights:  []int{left + size.wide - 1},
+		Tops:    []int{top},
+		Bottoms: []int{min(ground, dotsY-1)},
+		Lefts:   []int{lo},
+		Rights:  []int{hi},
 	}
 	for x := range layout.At {
 		layout.At[x] = -1
-		if x >= left && x < left+size.wide {
+		if x >= lo && x <= hi {
 			layout.At[x] = 0
 		}
 	}
@@ -295,36 +349,31 @@ func (m Model) dancePicture(w, rows int) (cover.Grain, msg.WordLayout, bool) {
 	return g, layout, true
 }
 
-// danceStands is where he stands: across the middle of the screen, and on a
-// floor low enough to leave the meter its band.
-func danceStands(size moveSize, dotsX, dotsY int) (left, floor int) {
-	return (dotsX - size.wide) / 2, (dotsY + size.tall) / 2
-}
-
-// danceDraw puts the frame that is up on the screen.
+// danceDraw puts him on the screen as he stands this instant.
 //
 // Drawn straight into the grid rather than through a picture of his own: a
 // figure is a few thousand lit dots and the screen is a quarter of a million, so
-// grinding him into a canvas every frame would be most of the work for none of
-// the answer.
+// building him a canvas every frame would be most of the work for none of the
+// answer.
 //
 // The gathering is the same one everything else here arrives by — he assembles
 // out of the air like a line of type does — because the bar he stands in is the
 // same bar, and a picture that arrives differently reads as a different screen
 // rather than as a different picture.
 func (m Model) danceDraw(grid []uint8, paint, hue []int8, w, rows int, gather float32, freqs, levels int) {
-	f, size, ok := m.danceFrame()
+	pose, d, ok := m.dancePose()
+	if !ok {
+		return
+	}
+	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
+	scale, left, ground, ok := m.danceStands(dotsX, dotsY)
 	if !ok {
 		return
 	}
 
-	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
-	left, floor := danceStands(size, dotsX, dotsY)
-
 	// One colour for the whole of him, and one brightness: the dance is the
-	// answer to the music here, so the light is not also answering it. Which
-	// band he takes his colour from is the middle one, so he is neither the bass
-	// nor the cymbals but the record.
+	// answer to the music here, so the light is not also answering it. The
+	// middle band, so he is neither the bass nor the cymbals but the record.
 	tone := int8(min(freqs/2, freqs-1))
 	burn := int8(levels - 1)
 	if gather < 1 {
@@ -334,11 +383,11 @@ func (m Model) danceDraw(grid []uint8, paint, hue []int8, w, rows int, gather fl
 		return
 	}
 
-	f.draw(0, size.wide, func(x, y int) {
-		at, to := left+x, floor-f.tall+y
+	bones.Draw(pose, d.Box, d.Floor, scale, left, ground, bones.Pen(m.danceTall()), func(x, y int) {
+		at, to := x, y
 
-		// Arriving: the same movement the line before him left by, run
-		// backwards. See wordsAlong and wordsFrom.
+		// Arriving: the same movement the line before him left by. See
+		// wordsAlong and wordsFrom.
 		if gather < 1 {
 			p := wordsAlong(m.words.move, gather, at, to, dotsX, dotsY)
 			if p < 1 {
@@ -357,4 +406,32 @@ func (m Model) danceDraw(grid []uint8, paint, hue []int8, w, rows int, gather fl
 			paint[cell], hue[cell] = burn, tone
 		}
 	})
+}
+
+// danceCarryOn keeps the routine going: when a move runs out, the next one is
+// dealt and begins where it left off.
+//
+// A bar of his own is half a minute, and one move is a bar or four of it. What
+// he does with the rest is the point of the whole thing — he is not showing a
+// move, he is dancing, and dancing is one thing after another. The moves are
+// written to make this free: every one of them begins and ends in the same
+// standing pose, so any of them follows any other without a join.
+//
+// The clock is not restarted between them. A move is stepped off the beat from
+// when it began, and beginning the next one at the instant a frame happened to
+// be drawn would shift the whole routine off the grid by however far into a
+// frame that was. So what has been spent is added on instead, and the keyframes
+// keep falling where the beats do.
+func (m *Model) danceCarryOn(record string, starts int64) {
+	if m.dance.move == "" || m.words.cast != danceCast {
+		m.dance.nth = 0
+		m.danceDeal(record, starts, 0)
+		return
+	}
+	if !m.danceDone() {
+		return
+	}
+	m.dance.since = m.dance.since.Add(m.danceSpent())
+	m.dance.nth++
+	m.danceDeal(record, starts, m.dance.nth)
 }

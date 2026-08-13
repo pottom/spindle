@@ -242,9 +242,12 @@ func cut(path string, s set, tall int) ([]frame, int, error) {
 		return nil, 0, fmt.Errorf("%s: %w", path, err)
 	}
 
-	box := src.Bounds()
-	cw, ch := box.Dx()/s.Cols, box.Dy()/s.Rows
 	gate := uint32(s.Gate * 0xffff)
+	box, err := sheetBox(src, s, gate)
+	if err != nil {
+		return nil, 0, fmt.Errorf("%s: %w", path, err)
+	}
+	cw, ch := box.Dx()/s.Cols, box.Dy()/s.Rows
 
 	// Which way round the sheet is, asked of its corners: black on white from
 	// one hand and white on black from another, and taken the wrong way round a
@@ -287,7 +290,10 @@ func cut(path string, s set, tall int) ([]frame, int, error) {
 
 	var out []frame
 	for i := range s.Cols * s.Rows {
-		x0, y0 := (i%s.Cols)*cw, (i/s.Cols)*ch
+		col, row := i%s.Cols, i/s.Cols
+		x0, y0 := cutAt(box.Dx(), s.Cols, col), cutAt(box.Dy(), s.Rows, row)
+		cw := cutAt(box.Dx(), s.Cols, col+1) - x0
+		ch := cutAt(box.Dy(), s.Rows, row+1) - y0
 
 		// Scaled as a whole cell rather than as its own ink, so that where the
 		// figure stands across the cell survives. Only then is the ink found:
@@ -594,3 +600,66 @@ func standing(src image.Image, box image.Rectangle, cw, ch int, scale float64, d
 	}
 	return at.Dy(), true
 }
+
+// sheetBox is the part of a sheet the grid is laid over: the ink's own box
+// rather than the whole canvas.
+//
+// Measured, because it was wrong for a while and the wrongness looked like a
+// drawing. These sheets come back with uneven margins — 39 to 69 pixels of white
+// down the left, 48 to 83 across the top — so an even grid laid over the canvas
+// starts a little off and drifts: by the last row of cells it was cutting a
+// hundred pixels away from the gap, taking a leg off one frame and lending it to
+// the next. Over the ink's box instead, every one of the seven sheets has
+// exactly nothing on any of its seven cutting lines.
+//
+// It also fails loudly rather than quietly: a sheet whose frames really do touch
+// has ink on a line here, and this says so instead of cutting through a figure
+// and leaving somebody to notice on the screen.
+func sheetBox(src image.Image, s set, gate uint32) (image.Rectangle, error) {
+	b := src.Bounds()
+	dark := lightCorners(src, gate) >= 3
+
+	ink := func(x, y int) bool {
+		r, g, bl, a := src.At(b.Min.X+x, b.Min.Y+y).RGBA()
+		if a < 0x7fff {
+			return false
+		}
+		lum := (299*r + 587*g + 114*bl) / 1000
+		if dark {
+			return lum < gate
+		}
+		return lum >= gate
+	}
+
+	at, ok := inkBox(ink, 0, 0, b.Dx(), b.Dy())
+	if !ok {
+		return image.Rectangle{}, fmt.Errorf("the sheet has nothing on it")
+	}
+	box := at.Add(b.Min)
+
+	// And the lines the grid will cut along have to be clear. A frame that
+	// reaches into its neighbour is a frame that cannot be cut out, and it is
+	// worth saying so here rather than on the screen.
+	for c := 1; c < s.Cols; c++ {
+		for y := range box.Dy() {
+			if ink(box.Min.X-b.Min.X+cutAt(box.Dx(), s.Cols, c), box.Min.Y-b.Min.Y+y) {
+				return box, fmt.Errorf("a drawing crosses the cut between columns %d and %d", c, c+1)
+			}
+		}
+	}
+	for r := 1; r < s.Rows; r++ {
+		for x := range box.Dx() {
+			if ink(box.Min.X-b.Min.X+x, box.Min.Y-b.Min.Y+cutAt(box.Dy(), s.Rows, r)) {
+				return box, fmt.Errorf("a drawing crosses the cut between rows %d and %d", r, r+1)
+			}
+		}
+	}
+	return box, nil
+}
+
+// cutAt is where the ith line of an even split falls, worked out from the whole
+// rather than from a cell size.
+//
+// Five cells of 250 in a box 1253 across are three pixels short by the last of
+// them, and three pixels was enough to cut a foot off the bottom row of a sheet.
+func cutAt(span, count, i int) int { return i * span / count }

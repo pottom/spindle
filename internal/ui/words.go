@@ -1942,6 +1942,11 @@ func (m *Model) wordsGrind() tea.Cmd {
 	cast := ""
 	if dancing {
 		cast = danceCast
+
+		// One move ends and the next begins, for as long as the bar is his. The
+		// guard below returns on every frame after the first, so the routine is
+		// carried on from here rather than from where the picture is adopted.
+		m.danceCarryOn(m.words.forTrack, starts)
 	}
 	if m.words.beats && marksDrawn && !dancing {
 		cast = markCastFor(m.words.forTrack, starts)
@@ -2009,10 +2014,8 @@ func (m *Model) wordsGrind() tea.Cmd {
 	// same string of notes — so once a row of notes had been sent for, the
 	// drawings were never reached again for the rest of the record.
 	if dancing {
-		// His move is dealt once a bar rather than once a frame, and the picture
-		// adopted here is only his first frame: what is on the screen after it
-		// comes from the baked frames. See danceDraw.
-		m.danceDeal(m.words.forTrack, starts)
+		// The picture adopted here is only his first frame: what is on the
+		// screen after it comes from the baked frames. See danceDraw.
 		if grain, layout, ok := m.dancePicture(m.width, m.height); ok {
 			m.words.dancing = true
 			m.wordsAdopt(grain, layout, text)
