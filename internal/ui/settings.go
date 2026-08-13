@@ -332,7 +332,7 @@ func (m Model) settingsPanel(l layout, rows int) []string {
 	}
 
 	if m.settings.changed {
-		what := warnGlyph + " The device has not heard this yet — press R to restart it"
+		what := warnGlyph + " The device has not heard this yet — press " + keyRestart + " to restart it"
 		if m.settings.restarting {
 			what = warnGlyph + " Restarting the device…"
 		}

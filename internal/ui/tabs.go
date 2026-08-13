@@ -48,6 +48,25 @@ func tabAt(digit string) (tabID, bool) {
 	return tabID(n), true
 }
 
+// tabDigits is the keys that go straight to a screen: one per screen there is,
+// counted from the tabs themselves so that adding or dropping one cannot leave
+// a digit bound to nothing or a screen with no digit. Nine screens is where
+// counting on one hand runs out, and there are six.
+func tabDigits() []string {
+	out := make([]string, len(tabNames))
+	for i := range tabNames {
+		out[i] = string(rune('1' + i))
+	}
+	return out
+}
+
+// tabDigitRange names that run of digits, with the dash set as the caller sets
+// its ranges: the bar is one line and has no room for air around it, the page
+// of keys has both.
+func tabDigitRange(dash string) string {
+	return "1" + dash + string(rune('0'+len(tabNames)))
+}
+
 // next cycles through the tabs, wrapping in either direction.
 func (t tabID) next(delta int) tabID {
 	n := len(tabNames)

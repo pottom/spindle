@@ -63,7 +63,7 @@ const debugFile = "debug.jsonl"
 // debugKey takes the toggle. Ctrl and shift together, because ctrl alone is
 // spoken for: ctrl+d is half a page down in the lists.
 func (m *Model) debugKey(k string) bool {
-	if k != "ctrl+shift+d" {
+	if k != keyDebug {
 		return false
 	}
 	m.debug.level = (m.debug.level + 1) % debugDepths

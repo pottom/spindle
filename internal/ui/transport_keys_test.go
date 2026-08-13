@@ -3,8 +3,8 @@ package ui
 import (
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/player"
 )
@@ -22,13 +22,24 @@ func press(s string) tea.KeyPressMsg {
 func TestSkippingIsOnThePlainKeys(t *testing.T) {
 	m := New(player.NewMock(), nil, defaultTestCell)
 
-	for _, k := range []string{"n", "ctrl+n"} {
-		if !key.Matches(tea.KeyPressMsg{Code: 'n', Text: "n", Mod: modOf(k)}, m.keys.Next) {
-			t.Errorf("%q does not skip forward", k)
-		}
+	if !key.Matches(press("n"), m.keys.Next) {
+		t.Error("n does not skip forward")
 	}
 	if !key.Matches(press("p"), m.keys.Prev) {
 		t.Error("p does not skip back")
+	}
+
+	// And nothing is left on the held ones. They sat beside the letters after
+	// the transport took them, doing the same thing a finger later — and not
+	// even that where it would have mattered: a query being typed swallows
+	// them, so the case they were kept for was one they never answered.
+	for _, k := range []struct {
+		code rune
+		b    key.Binding
+	}{{'n', m.keys.Next}, {'p', m.keys.Prev}} {
+		if key.Matches(tea.KeyPressMsg{Code: k.code, Mod: tea.ModCtrl}, k.b) {
+			t.Errorf("ctrl+%c still works the transport", k.code)
+		}
 	}
 
 	// The matches moved to what vim repeats a search with.
@@ -47,11 +58,4 @@ func TestSkippingIsOnThePlainKeys(t *testing.T) {
 	if got := m.find.query; got != "n" {
 		t.Errorf("the query came out %q", got)
 	}
-}
-
-func modOf(k string) tea.KeyMod {
-	if k == "ctrl+n" {
-		return tea.ModCtrl
-	}
-	return 0
 }

@@ -1,6 +1,10 @@
 package ui
 
-import "charm.land/bubbles/v2/key"
+import (
+	"strings"
+
+	"charm.land/bubbles/v2/key"
+)
 
 // keyMap is the full key set of the player screen. Bindings that form a pair
 // (next/previous, seek, volume) carry the combined help text on the first of the
@@ -53,8 +57,9 @@ type keyMap struct {
 	// drawing can be put side by side on the one record.
 	Loose  key.Binding
 	Lyrics key.Binding
-	Peek   key.Binding
-	Mute   key.Binding
+
+	Peek key.Binding
+	Mute key.Binding
 
 	// Queue editing. Only the tracks put there by hand can be moved or dropped,
 	// so these do nothing on the rest of the list.
@@ -107,117 +112,122 @@ type keyMap struct {
 func newKeyMap() keyMap {
 	k := keyMap{
 		PlayPause: key.NewBinding(
-			key.WithKeys("space"),
-			key.WithHelp("space", "play / pause"),
+			key.WithKeys(keyPlayPause),
+			key.WithHelp(keyPlayPause, "play / pause"),
 		),
 		Next: key.NewBinding(
-			// Plain, and the control ones kept beside them. Skipping is the most
-			// pressed key on the transport after play, and it was the only one
-			// asking for two fingers.
-			key.WithKeys("n", "ctrl+n"),
-			key.WithHelp("n / p", "next / previous"),
+			// The plain keys, and only those. Skipping is the most pressed key
+			// on the transport after play, and it was the only one asking for
+			// two fingers; ctrl+n and ctrl+p were kept beside them for a while
+			// afterwards and did nothing the letters did not — including in the
+			// one place they might have earned their keep, since a query being
+			// typed swallows them rather than skipping a track.
+			key.WithKeys(keyNext),
+			key.WithHelp(pair(keyNext, keyPrev), "next / previous"),
 		),
-		Prev: key.NewBinding(key.WithKeys("p", "ctrl+p")),
+		Prev: key.NewBinding(key.WithKeys(keyPrev)),
 		SeekFwd: key.NewBinding(
-			key.WithKeys("right"),
+			key.WithKeys(keySeekFwd),
 			key.WithHelp("← / →", "seek ∓5s"),
 		),
-		SeekBack: key.NewBinding(key.WithKeys("left")),
+		SeekBack: key.NewBinding(key.WithKeys(keySeekBack)),
 		VolUp: key.NewBinding(
-			key.WithKeys("up"),
+			key.WithKeys(keyVolUp),
 			key.WithHelp("↑ / ↓", "volume ±5"),
 		),
-		VolDown: key.NewBinding(key.WithKeys("down")),
+		VolDown: key.NewBinding(key.WithKeys(keyVolDown)),
 		Shuffle: key.NewBinding(
-			key.WithKeys("s"),
-			key.WithHelp("s", "shuffle"),
+			key.WithKeys(keyShuffle),
+			key.WithHelp(keyShuffle, "shuffle"),
 		),
 		Repeat: key.NewBinding(
-			key.WithKeys("r"),
-			key.WithHelp("r", "cycle repeat"),
+			key.WithKeys(keyRepeat),
+			key.WithHelp(keyRepeat, "cycle repeat"),
 		),
 		Help: key.NewBinding(
-			key.WithKeys("?"),
-			key.WithHelp("?", "help"),
+			key.WithKeys(keyHelp),
+			key.WithHelp(keyHelp, "help"),
 		),
 		Quit: key.NewBinding(
-			key.WithKeys("q", "ctrl+c"),
-			key.WithHelp("q", "quit"),
+			key.WithKeys(keyQuit, keyQuitAlt),
+			key.WithHelp(keyQuit, "quit"),
 		),
 		QuitAll: key.NewBinding(
-			key.WithKeys("Q"),
-			key.WithHelp("Q", "quit and stop playback"),
+			key.WithKeys(keyQuitAll),
+			key.WithHelp(keyQuitAll, "quit and stop playback"),
 		),
 
 		NextTab: key.NewBinding(
-			key.WithKeys("tab"),
-			key.WithHelp("tab", "next tab"),
+			key.WithKeys(keyNextTab),
+			key.WithHelp(keyNextTab, "next tab"),
 		),
-		PrevTab: key.NewBinding(key.WithKeys("shift+tab")),
+		PrevTab: key.NewBinding(key.WithKeys(keyPrevTab)),
 		GoTab: key.NewBinding(
-			key.WithKeys("1", "2", "3", "4", "5", "6"),
-			key.WithHelp("1–6", "go to tab"),
+			// One digit per screen there is, so a screen added or taken away
+			// cannot leave a digit that goes nowhere.
+			key.WithKeys(tabDigits()...),
+			key.WithHelp(tabDigitRange("–"), "go to tab"),
 		),
-		Up:   key.NewBinding(key.WithKeys("up")),
-		Down: key.NewBinding(key.WithKeys("down"), key.WithHelp("↑↓", "select")),
+		Up:   key.NewBinding(key.WithKeys(keyUp)),
+		Down: key.NewBinding(key.WithKeys(keyDown), key.WithHelp("↑↓", "select")),
 		PageDown: key.NewBinding(
-			key.WithKeys("pgdown", "ctrl+f"),
+			key.WithKeys(keyPageDown, keyPageDnVim),
 			key.WithHelp("pgdn / pgup", "page down / up"),
 		),
-		PageUp: key.NewBinding(key.WithKeys("pgup", "ctrl+b")),
+		PageUp: key.NewBinding(key.WithKeys(keyPageUp, keyPageUpVim)),
 
 		// Half a screen at a time, as vim moves. The whole-screen keys keep
 		// theirs: ctrl+f and ctrl+b are the same pair in the same place.
-		HalfDown: key.NewBinding(key.WithKeys("ctrl+d")),
-		HalfUp:   key.NewBinding(key.WithKeys("ctrl+u")),
+		HalfDown: key.NewBinding(key.WithKeys(keyHalfDown)),
+		HalfUp:   key.NewBinding(key.WithKeys(keyHalfUp)),
 
 		Restart: key.NewBinding(
-			key.WithKeys("R"),
-			key.WithHelp("R", "restart the device"),
+			key.WithKeys(keyRestart),
+			key.WithHelp(keyRestart, "restart the device"),
 		),
 		FindNext: key.NewBinding(
 			// Semicolon and comma, which is what vim repeats a search with, and
 			// what n and N were before skipping a track wanted them. A list is
 			// the only place these mean anything, and skipping a track is
 			// wanted in every place there is.
-			key.WithKeys(";"),
-			key.WithHelp("; / ,", "next / previous match"),
+			key.WithKeys(keyFindNext),
+			key.WithHelp(pair(keyFindNext, keyFindPrev), "next / previous match"),
 		),
-		FindPrev: key.NewBinding(key.WithKeys(",")),
+		FindPrev: key.NewBinding(key.WithKeys(keyFindPrev)),
 		First: key.NewBinding(
-			key.WithKeys("home"),
-			key.WithHelp("home / end", "first / last"),
+			key.WithKeys(keyFirst),
+			key.WithHelp(pair(keyFirst, keyLast), "first / last"),
 		),
-		Last:     key.NewBinding(key.WithKeys("end")),
-		FirstVim: key.NewBinding(key.WithKeys("g")),
-		LastVim:  key.NewBinding(key.WithKeys("G")),
+		Last:     key.NewBinding(key.WithKeys(keyLast)),
+		FirstVim: key.NewBinding(key.WithKeys(keyFirstVim)),
+		LastVim:  key.NewBinding(key.WithKeys(keyLastVim)),
 		Enter: key.NewBinding(
-			key.WithKeys("enter"),
-			key.WithHelp("enter", "play"),
+			key.WithKeys(keyEnter),
+			key.WithHelp(keyEnter, "play"),
 		),
 		Back: key.NewBinding(
-			key.WithKeys("esc"),
-			key.WithHelp("esc", "back"),
+			key.WithKeys(keyBack),
+			key.WithHelp(keyBack, "back"),
 		),
 		Devices: key.NewBinding(
-			key.WithKeys("d"),
-			key.WithHelp("d", "devices"),
+			key.WithKeys(keyDevices),
+			key.WithHelp(keyDevices, "devices"),
 		),
 		Refresh: key.NewBinding(
-			key.WithKeys("r"),
-			key.WithHelp("r", "refresh"),
+			key.WithKeys(keyRefresh),
+			key.WithHelp(keyRefresh, "refresh"),
 		),
 		Scope: key.NewBinding(
-			key.WithKeys("v"),
-			key.WithHelp("v", "vis"),
+			key.WithKeys(keyScope),
+			key.WithHelp(keyScope, "vis"),
 		),
 		Stage: key.NewBinding(
-			key.WithKeys("f"),
-			key.WithHelp("f", "full vis"),
+			key.WithKeys(keyStage),
+			key.WithHelp(keyStage, "full vis"),
 		),
 		Tell: key.NewBinding(
-			key.WithKeys("t"),
-			key.WithHelp("t", "what is playing"),
+			key.WithKeys(keyTell),
+			key.WithHelp(keyTell, "what is playing"),
 		),
 		Marks: key.NewBinding(
 			// d for the dancers. It was m, which is mute everywhere else in the
@@ -230,67 +240,68 @@ func newKeyMap() keyMap {
 			// silencing the room is something you do while watching, and
 			// choosing which speakers to play through is something you go to the
 			// player for.
-			key.WithKeys("d"),
-			key.WithHelp("d", "the dancers"),
+			key.WithKeys(keyMarks),
+			key.WithHelp(keyMarks, "the dancers"),
 		),
 		Face: key.NewBinding(
-			key.WithKeys("w"),
-			key.WithHelp("w", "a face"),
+			key.WithKeys(keyFace),
+			key.WithHelp(keyFace, "a face"),
 		),
 		Loose: key.NewBinding(
-			key.WithKeys("b"),
-			key.WithHelp("b", "keep time"),
+			key.WithKeys(keyLoose),
+			key.WithHelp(keyLoose, "keep time"),
 		),
 		Lyrics: key.NewBinding(
-			key.WithKeys("l"),
-			key.WithHelp("l", "lyrics"),
+			key.WithKeys(keyLyrics),
+			key.WithHelp(keyLyrics, "lyrics"),
 		),
+
 		Peek: key.NewBinding(
-			key.WithKeys("u"),
-			key.WithHelp("u", "up next"),
+			key.WithKeys(keyPeek),
+			key.WithHelp(keyPeek, "up next"),
 		),
 		Mute: key.NewBinding(
-			key.WithKeys("m"),
-			key.WithHelp("m", "mute"),
+			key.WithKeys(keyMute),
+			key.WithHelp(keyMute, "mute"),
 		),
 
 		SearchType: key.NewBinding(
-			key.WithKeys("/"),
-			key.WithHelp("/", "find"),
+			key.WithKeys(keyFind),
+			key.WithHelp(keyFind, "find"),
 		),
 		SearchKind: key.NewBinding(
-			key.WithKeys("ctrl+right", "ctrl+t"),
-			key.WithHelp("ctrl+t", "kind"),
+			key.WithKeys(keyKindFwd, keyKind),
+			key.WithHelp(keyKind, "kind"),
 		),
-		SearchKindBack: key.NewBinding(key.WithKeys("ctrl+left")),
+		SearchKindBack: key.NewBinding(key.WithKeys(keyKindBack)),
 		Actions: key.NewBinding(
-			key.WithKeys("."),
-			key.WithHelp(".", "actions"),
+			key.WithKeys(keyActions),
+			key.WithHelp(keyActions, "actions"),
 		),
 		ActionsTyped: key.NewBinding(
-			key.WithKeys("ctrl+o"),
-			key.WithHelp("ctrl+o", "actions"),
+			key.WithKeys(keyActionsHeld),
+			key.WithHelp(keyActionsHeld, "actions"),
 		),
 		Enqueue: key.NewBinding(
-			key.WithKeys("a"),
-			key.WithHelp("a", "add to queue"),
+			key.WithKeys(keyEnqueue),
+			key.WithHelp(keyEnqueue, "add to queue"),
 		),
 		PlayOne: key.NewBinding(
-			key.WithKeys("o"),
-			key.WithHelp("o", "play only this"),
+			key.WithKeys(keyPlayOne),
+			key.WithHelp(keyPlayOne, "play only this"),
 		),
 		EnqueueTyped: key.NewBinding(
-			key.WithKeys("ctrl+a"),
-			key.WithHelp("ctrl+a", "add to queue"),
+			key.WithKeys(keyEnqueueHeld),
+			key.WithHelp(keyEnqueueHeld, "add to queue"),
 		),
 		Drop: key.NewBinding(
-			key.WithKeys("x"),
-			key.WithHelp("x", "remove from queue"),
+			key.WithKeys(keyDrop),
+			key.WithHelp(keyDrop, "remove from queue"),
 		),
-		MoveUp: key.NewBinding(key.WithKeys("k")),
+		MoveUp: key.NewBinding(key.WithKeys(keyMoveUp)),
 		MoveDn: key.NewBinding(
-			key.WithKeys("j"),
-			key.WithHelp("j / k", "move down / up"),
+			key.WithKeys(keyMoveDn),
+			key.WithHelp(pair(keyMoveDn, keyMoveUp), "move down / up"),
 		),
 	}
 
@@ -307,10 +318,31 @@ type tabKeys struct {
 func (t tabKeys) ShortHelp() []key.Binding  { return t.short }
 func (t tabKeys) FullHelp() [][]key.Binding { return t.full }
 
-// hint builds a display-only binding. The short bar needs terser wording than
-// the expanded table to survive a 64-column terminal.
+// hint builds a display-only binding, for the entries that are a picture of a
+// key rather than the name of one: the arrows, the page glyphs, the caret
+// shorthand, and "type", which is an instruction.
 func hint(keys, desc string) key.Binding {
 	return key.NewBinding(key.WithKeys(keys), key.WithHelp(keys, desc))
+}
+
+// terse re-words a binding for the short bar, which needs shorter wording than
+// the expanded table to survive a 64-column terminal — "cycle repeat" has to
+// become "repeat", and enter is "open" in a list of records.
+//
+// The key comes from the binding rather than from the call, so the bar cannot
+// name a key that binding does not read. Spelling it twice is how the bar came
+// to offer t for the full-screen visualiser, which is on f: both spellings were
+// written by hand, and only one of them was ever pressed.
+func terse(b key.Binding, desc string) key.Binding {
+	return key.NewBinding(key.WithKeys(b.Keys()...), key.WithHelp(b.Help().Key, desc))
+}
+
+// tight is terse with the air taken out of a pair: "n / p" is three columns
+// wider than "n/p", and the bar is one line that is already full.
+func tight(b key.Binding, desc string) key.Binding {
+	out := terse(b, desc)
+	out.SetHelp(strings.ReplaceAll(b.Help().Key, " / ", "/"), desc)
+	return out
 }
 
 // selectHint is the movement entry every list's short bar opens with. The page
@@ -330,7 +362,7 @@ var selectHint = hint("↑↓ ⇞⇟", "select")
 func (k keyMap) moveKeys(vim bool) []key.Binding {
 	out := []key.Binding{k.PageDown, hint("^d / ^u", "half a page"), k.First}
 	if vim {
-		out = append(out, hint("g / G", "first / last"))
+		out = append(out, hint(pair(keyFirstVim, keyLastVim), "first / last"))
 	}
 	return out
 }
@@ -341,9 +373,9 @@ func (k keyMap) forNoDevice() tabKeys {
 	return tabKeys{
 		short: []key.Binding{
 			hint("↑↓", "select"),
-			hint("enter", "play here"),
-			hint("r", "refresh"),
-			hint("q", "quit"),
+			terse(k.Enter, "play here"),
+			terse(k.Refresh, "refresh"),
+			terse(k.Quit, "quit"),
 		},
 		full: [][]key.Binding{
 			{k.Down, k.Enter, k.Refresh},
@@ -358,9 +390,9 @@ func (k keyMap) forDevices() tabKeys {
 	return tabKeys{
 		short: []key.Binding{
 			hint("↑↓", "select"),
-			hint("enter", "play here"),
-			hint("r", "refresh"),
-			hint("esc", "close"),
+			terse(k.Enter, "play here"),
+			terse(k.Refresh, "refresh"),
+			terse(k.Back, "close"),
 		},
 		full: [][]key.Binding{
 			{k.Down, k.Enter, k.Refresh, k.Back},
@@ -374,9 +406,9 @@ func (k keyMap) forReadOnlyQueue() tabKeys {
 	return tabKeys{
 		short: []key.Binding{
 			selectHint,
-			hint("enter", "play"),
-			hint("tab", "switch"),
-			hint("?", "help"),
+			terse(k.Enter, "play"),
+			terse(k.NextTab, "switch"),
+			terse(k.Help, "help"),
 		},
 		full: [][]key.Binding{
 			{k.Down, k.Enter, k.NextTab, k.GoTab},
@@ -416,23 +448,23 @@ func fitHints(short []key.Binding, width int) []key.Binding {
 
 func (k keyMap) forPlayer(scope, lyrics, peek bool, width int) tabKeys {
 	short := []key.Binding{
-		hint("space", "play/pause"),
-		hint("n/p", "track"),
+		terse(k.PlayPause, "play/pause"),
+		tight(k.Next, "track"),
 		hint("←→", "seek"),
 	}
-	short = append(short, hint("↑↓", "volume"), hint("s", "shuffle"), hint("r", "repeat"))
+	short = append(short, hint("↑↓", "volume"), terse(k.Shuffle, "shuffle"), terse(k.Repeat, "repeat"))
 	if lyrics {
-		short = append(short, hint("l", "lyrics"))
+		short = append(short, terse(k.Lyrics, "lyrics"))
 	}
 	if scope {
-		short = append(short, hint("v", "vis"))
+		short = append(short, terse(k.Scope, "vis"))
 	}
 	if peek {
-		short = append(short, hint("u", "up next"))
+		short = append(short, terse(k.Peek, "up next"))
 	}
 	// No "?" on it. The bar names everything this screen does, so the table
 	// behind that key has nothing left to add here.
-	short = append(short, hint("f", "full vis"), hint("d", "devices"))
+	short = append(short, terse(k.Stage, "full vis"), terse(k.Devices, "devices"))
 	short = fitHints(short, width)
 
 	second := []key.Binding{k.Shuffle, k.Repeat, k.Devices}
@@ -462,26 +494,26 @@ func (k keyMap) forPlayer(scope, lyrics, peek bool, width int) tabKeys {
 // forOpen is the help for an opened playlist, album or artist. An artist's list
 // is of records, so what enter does there is open one rather than play it.
 func (k keyMap) forOpen(albums, scope bool) tabKeys {
-	enter := hint("enter", "play")
+	enter := terse(k.Enter, "play")
 	if albums {
-		enter = hint("enter", "open")
+		enter = terse(k.Enter, "open")
 	}
 
 	short := []key.Binding{
 		selectHint,
 		enter,
-		hint("/", "find"),
-		hint(".", "actions"),
-		hint("a", "queue"),
-		hint("esc", "back"),
+		terse(k.SearchType, "find"),
+		terse(k.Actions, "actions"),
+		terse(k.Enqueue, "queue"),
+		terse(k.Back, "back"),
 	}
 	second := []key.Binding{k.Actions, k.PlayOne, k.PlayPause, k.Next, k.Help}
 	if scope {
-		short = append(short, hint("v", "vis"))
+		short = append(short, terse(k.Scope, "vis"))
 		second = append(second, k.Scope)
 	}
 	return tabKeys{
-		short: append(short, hint("?", "help")),
+		short: append(short, terse(k.Help, "help")),
 		full: [][]key.Binding{
 			{k.Down, k.Enter, k.Enqueue, k.Back, k.NextTab},
 			second,
@@ -495,19 +527,19 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 	case tabQueue:
 		short := []key.Binding{
 			selectHint,
-			hint("enter", "play"),
-			hint("/", "find"),
-			hint(".", "actions"),
-			hint("x", "remove"),
-			hint("j/k", "move"),
+			terse(k.Enter, "play"),
+			terse(k.SearchType, "find"),
+			terse(k.Actions, "actions"),
+			terse(k.Drop, "remove"),
+			tight(k.MoveDn, "move"),
 		}
 		second := []key.Binding{k.Actions, k.PlayPause, k.Next, k.NextTab, k.Help}
 		if scope {
-			short = append(short, hint("v", "vis"))
+			short = append(short, terse(k.Scope, "vis"))
 			second = append(second, k.Scope)
 		}
 		return tabKeys{
-			short: append(short, hint("?", "help")),
+			short: append(short, terse(k.Help, "help")),
 			full: [][]key.Binding{
 				{k.Down, k.Enter, k.Drop, k.MoveDn},
 				second,
@@ -518,19 +550,19 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 	case tabLibrary:
 		short := []key.Binding{
 			selectHint,
-			hint("enter", "open"),
-			hint("/", "find"),
-			hint("ctrl+t", "kind"),
-			hint(".", "actions"),
-			hint("a", "queue"),
+			terse(k.Enter, "open"),
+			terse(k.SearchType, "find"),
+			terse(k.SearchKind, "kind"),
+			terse(k.Actions, "actions"),
+			terse(k.Enqueue, "queue"),
 		}
 		second := []key.Binding{k.Actions, k.PlayOne, k.PlayPause, k.Next, k.Help}
 		if scope {
-			short = append(short, hint("v", "vis"))
+			short = append(short, terse(k.Scope, "vis"))
 			second = append(second, k.Scope)
 		}
 		return tabKeys{
-			short: append(short, hint("?", "help")),
+			short: append(short, terse(k.Help, "help")),
 			full: [][]key.Binding{
 				{k.Down, k.Enter, k.SearchKind, k.Enqueue, k.NextTab},
 				{k.SearchType, k.FindNext, k.PageDown, k.FirstVim},
@@ -544,8 +576,8 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 			short: []key.Binding{
 				selectHint,
 				hint("← / →", "change it"),
-				hint("R", "restart the device"),
-				hint("?", "help"),
+				terse(k.Restart, "restart the device"),
+				terse(k.Help, "help"),
 			},
 			full: [][]key.Binding{
 				{k.Down, hint("← / →", "change the setting"), k.NextTab, k.Quit},
@@ -554,7 +586,7 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 
 	case tabHelp:
 		return tabKeys{
-			short: []key.Binding{hint("1–6", "go to a screen"), hint("tab", "next"), hint("q", "quit")},
+			short: []key.Binding{terse(k.GoTab, "go to a screen"), terse(k.NextTab, "next"), terse(k.Quit, "quit")},
 			full:  [][]key.Binding{{k.NextTab, k.GoTab, k.Quit, k.QuitAll}},
 		}
 
@@ -562,15 +594,16 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 		return tabKeys{
 			short: []key.Binding{
 				hint("type", "to search"),
-				hint("/", "search"),
+				terse(k.SearchType, "search"),
 				selectHint,
-				hint("enter", "play"),
-				hint("ctrl+t", "kind"),
-				hint(".", "actions"),
+				terse(k.Enter, "play"),
+				terse(k.SearchKind, "kind"),
+				terse(k.Actions, "actions"),
 			},
 			full: [][]key.Binding{
 				{k.SearchType, k.Down, k.Enter, k.SearchKind, k.Actions},
-				{hint("ctrl+c", "quit"), k.Help},
+				// The held quit rather than q, which types here.
+				{hint(keyQuitAlt, "quit"), k.Help},
 				// No g and G here: the query has them.
 				k.moveKeys(false),
 			},

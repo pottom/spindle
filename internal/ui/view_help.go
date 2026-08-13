@@ -48,57 +48,61 @@ type helpGroup struct {
 
 // helpGroups is every key spindle answers, in the order somebody meets them.
 //
-// Written out here rather than derived from the key map: the bindings know
-// which keys they are, and this knows what they are for — which is a different
-// question, is what a reader is asking, and is worth writing in sentences
-// somebody chose.
+// The words are written out here rather than derived from the key map: the
+// bindings know which keys they are, and this knows what they are for — which
+// is a different question, is what a reader is asking, and is worth writing in
+// sentences somebody chose.
+//
+// The keys themselves are not written out. They are the same names the bindings
+// are made from, so a key that moves moves here too, and this page cannot go on
+// teaching a letter nothing answers to.
 func helpGroups() []helpGroup {
 	return []helpGroup{{
 		title: "Getting around",
 		keys: [][2]string{
-			{"1 – 6", "go to a screen"},
-			{"tab", "the next screen"},
-			{"esc", "back, out of a list or a search"},
-			{"?", "these keys"},
-			{"q", "leave, and let the music play on"},
-			{"Q", "leave and stop the music"},
+			{tabDigitRange(" – "), "go to a screen"},
+			{keyNextTab, "the next screen"},
+			{keyBack, "back, out of a list or a search"},
+			{keyHelp, "these keys"},
+			{keyQuit, "leave, and let the music play on"},
+			{keyQuitAll, "leave and stop the music"},
 		},
 	}, {
 		title: "Playing",
 		keys: [][2]string{
-			{"space", "play or pause"},
-			{"n / p", "next or previous track"},
+			{keyPlayPause, "play or pause"},
+			{pair(keyNext, keyPrev), "next or previous track"},
 			{"← / →", "seek five seconds"},
 			{"↑ / ↓", "the music's volume, by five"},
-			{"m", "mute, and back to where it was"},
-			{"s", "shuffle"},
-			{"r", "repeat: off, all, one"},
-			{"d", "play somewhere else"},
+			{keyMute, "mute, and back to where it was"},
+			{keyShuffle, "shuffle"},
+			{keyRepeat, "repeat: off, all, one"},
+			{keyDevices, "play somewhere else"},
 		},
 	}, {
 		title: "On the player",
 		keys: [][2]string{
-			{"v", "waveform, spectrum, water, lamps, off"},
-			{"f", "full screen, and v switches it there"},
-			{"l", "the words, as they are sung"},
-			{"u", "what is coming next"},
+			{keyScope, "waveform, spectrum, water, lamps, off"},
+			{keyStage, "full screen, and " + keyScope + " switches it there"},
+			{keyLyrics, "the words, as they are sung"},
+			{keyPeek, "what is coming next"},
 		},
 	}, {
 		title: "On the full screen",
 		keys: [][2]string{
-			{"space ← → ↑ ↓", "the transport, without leaving"},
-			{"n / p", "next or previous track"},
-			{"d", "another company of dancers"},
-			{"t", "what is playing, said there and then"},
-			{"s / r", "shuffle and repeat, said by the one with the placard"},
-			{"any other key", "back"},
+			{keyPlayPause + " ← → ↑ ↓", "the transport, without leaving"},
+			{pair(keyNext, keyPrev), "next or previous track"},
+			{keyMarks, "another company of dancers"},
+			{keyTell, "what is playing, said there and then"},
+			{pair(keyShuffle, keyRepeat), "shuffle and repeat, said by the one with the placard"},
+			{pair(keyBack, keyQuit), "back — and nothing else is, so it can be leaned on"},
 		},
 	}, {
 		title: "On this page",
 		keys: [][2]string{
 			{"pgup/pgdn", "the keys scroll under the head"},
 			{"^u / ^d", "half a screenful"},
-			{"g / G", "the top, the end"},
+			{pair(keyFirstVim, keyLastVim), "the top, the end"},
 		},
 	}, {
 		title: "In a list",
@@ -106,41 +110,41 @@ func helpGroups() []helpGroup {
 			{"↑ ↓", "move"},
 			{"pgup/pgdn", "a screenful"},
 			{"^u / ^d", "half a screenful"},
-			{"g / G", "the top, the end"},
-			{"/", "find in this list"},
-			{"; / ,", "the next match, the one before"},
-			{"enter", "play it, or open it"},
-			{"o", "play only this one"},
-			{"a", "add it to the queue"},
-			{".", "everything else it can do"},
+			{pair(keyFirstVim, keyLastVim), "the top, the end"},
+			{keyFind, "find in this list"},
+			{pair(keyFindNext, keyFindPrev), "the next match, the one before"},
+			{keyEnter, "play it, or open it"},
+			{keyPlayOne, "play only this one"},
+			{keyEnqueue, "add it to the queue"},
+			{keyActions, "everything else it can do"},
 		},
 	}, {
 		title: "In the queue",
 		keys: [][2]string{
-			{"j / k", "move a track down or up"},
-			{"x", "take it out"},
-			{"enter", "bring it forward and play it"},
+			{pair(keyMoveDn, keyMoveUp), "move a track down or up"},
+			{keyDrop, "take it out"},
+			{keyEnter, "bring it forward and play it"},
 		},
 	}, {
 		title: "Searching",
 		keys: [][2]string{
-			{"/", "type a query"},
+			{keyFind, "type a query"},
 			{"^t", "tracks, albums, artists, playlists"},
-			{"enter", "play a track, open anything else"},
+			{keyEnter, "play a track, open anything else"},
 			{"^a", "add to the queue while typing"},
 		},
 	}, {
 		title: "In the library",
 		keys: [][2]string{
 			{"^t", "playlists, albums, artists, recent"},
-			{"enter", "open it"},
-			{"a", "add the whole of it to the queue"},
+			{keyEnter, "open it"},
+			{keyEnqueue, "add the whole of it to the queue"},
 		},
 	}, {
 		title: "On the settings",
 		keys: [][2]string{
 			{"← / →", "change what the cursor is on"},
-			{"R", "restart the device, to hear it"},
+			{keyRestart, "restart the device, to hear it"},
 		},
 	}, {
 		title: "From the shell",

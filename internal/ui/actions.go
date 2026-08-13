@@ -48,7 +48,7 @@ type verb struct {
 func (m Model) actionsFor(t player.Track) []verb {
 	id := t.ID
 	verbs := []verb{{
-		key:   "o",
+		key:   keyPlayOne,
 		label: "Play now, keeping the queue",
 		do: func(m *Model) tea.Cmd {
 			return m.startPlay(playRequest{
@@ -61,13 +61,13 @@ func (m Model) actionsFor(t player.Track) []verb {
 
 	if m.tab == tabQueue {
 		verbs = append(verbs, verb{
-			key:   "x",
+			key:   keyDrop,
 			label: "Remove from the queue",
 			do:    func(m *Model) tea.Cmd { return m.dropQueued() },
 		})
 	} else {
 		verbs = append(verbs, verb{
-			key:   "a",
+			key:   keyEnqueue,
 			label: "Add to the queue",
 			do:    func(m *Model) tea.Cmd { return m.enqueue(id) },
 		})
@@ -101,7 +101,7 @@ func (m Model) actionsFor(t player.Track) []verb {
 func (m Model) actionsForAlbum(a player.Album) []verb {
 	album, id := a, a.ID
 	verbs := []verb{{
-		key:   "enter",
+		key:   keyEnter,
 		label: "Open it",
 		do:    func(m *Model) tea.Cmd { return m.push(openedAlbum(album)) },
 	}, {
@@ -112,7 +112,7 @@ func (m Model) actionsForAlbum(a player.Album) []verb {
 			})
 		},
 	}, {
-		key:   "a",
+		key:   keyEnqueue,
 		label: "Add all of it to the queue",
 		do:    func(m *Model) tea.Cmd { return m.enqueueList(openAlbum, id, album.Name) },
 	}}
@@ -130,7 +130,7 @@ func (m Model) actionsForAlbum(a player.Album) []verb {
 func (m Model) actionsForArtist(a player.Artist) []verb {
 	artist, id := a, a.ID
 	return []verb{{
-		key:   "enter",
+		key:   keyEnter,
 		label: "Open their records",
 		do:    func(m *Model) tea.Cmd { return m.push(openedArtist(artist)) },
 	}, {
@@ -174,7 +174,7 @@ func (m Model) actionsForPlaylist(pl player.Playlist) []verb {
 			})
 		},
 	}, {
-		key:   "a",
+		key:   keyEnqueue,
 		label: "Add all of it to the queue",
 		do:    func(m *Model) tea.Cmd { return m.enqueueList(openPlaylist, id, name) },
 	}}

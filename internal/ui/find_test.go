@@ -87,18 +87,19 @@ func TestNAndShiftNWalkTheMatches(t *testing.T) {
 	}
 }
 
-// The transport moved off n and p, and has to still work from a list.
-func TestTheTransportKeysMovedToControl(t *testing.T) {
+// The transport is on n and p, and has to work from a list too — where the
+// letters could just as easily have been the query, and are not.
+func TestTheTransportKeysWorkInAList(t *testing.T) {
 	m := openLibraryList(t)
 	m.ps = &player.State{TrackID: "now", Title: "playing", Playing: true}
 
 	var tm tea.Model = m
-	tm, cmd := tm.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
+	tm, cmd := tm.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	if cmd == nil {
-		t.Error("ctrl+n did not ask for the next track")
+		t.Error("n did not ask for the next track")
 	}
 	if got := tm.(Model); got.find.typing {
-		t.Error("ctrl+n opened a query")
+		t.Error("n opened a query")
 	}
 }
 

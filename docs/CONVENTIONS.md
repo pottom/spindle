@@ -53,6 +53,10 @@ resolving the four risks listed in `DESIGN.md`, not production readiness.
 - Small files, one type per file. Split anything over 300 lines.
 - Every Lipgloss style lives in `internal/ui/style`. No hex codes in `View()`.
 - Wrap errors: `fmt.Errorf("fetch player state: %w", err)`.
+- A key is named once, in `internal/ui/keynames.go`, and never spelled again.
+  What a hint bar advertises comes from the binding itself — `terse` and `tight`
+  in `keys.go` — because somebody reading the bar presses what it says, and the
+  bar once said `t` for a screen that is on `f`.
 - Tests only where the logic is non-trivial: progress arithmetic, PKCE, halfblock
   encoding. No UI tests in this phase.
 - Commit messages: short, imperative, lowercase. `add device picker overlay`.
