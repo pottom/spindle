@@ -7,6 +7,7 @@ import (
 	"math"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -221,6 +222,9 @@ func wordsImage(lines []string, w, h int) (*image.Gray, msg.WordLayout, bool) {
 			}
 		}
 	}
+	// Every word's middle, once, rather than once per word per frame. See
+	// WordLayout.Settle.
+	layout.Settle()
 	return img, layout, true
 }
 
@@ -905,6 +909,19 @@ type wordsState struct {
 	asked          string
 	askedX, askedY int
 
+	// sync is whether the singer is being followed along the line, and which
+	// way of showing it — see wordsync.go. Off unless the key has asked for it.
+	sync syncMode
+
+	// syncDark says the words ahead of the voice are nearly out rather than
+	// merely dimmer. The stronger effect and the weaker lyric, on its own key so
+	// the two can be put side by side.
+	syncDark bool
+
+	// line is which line of the lyric is up, so that the three ways of following
+	// the singer can be rotated one to a line.
+	line int
+
 	// since is when this line arrived. The dots gather over the moment after
 	// it, which is what makes a line change something you see rather than
 	// something you notice has happened.
@@ -1153,12 +1170,13 @@ func (m Model) wordsLines(w, rows int) []string {
 	dotsX, dotsY := w*dotsPerCellX, rows*dotsPerCellY
 	freqs, levels := len(m.styles.Words), len(m.styles.Words[0])
 
-	grid := make([]uint8, w*rows)
-	paint := make([]int8, w*rows)
-	hue := make([]int8, w*rows)
-	for i := range paint {
-		paint[i] = -1
-	}
+	// Borrowed rather than made afresh: at the size this screen is drawn on,
+	// three buffers a frame is five megabytes a second of work for the
+	// collector, and the collector is where the missing frames were going. See
+	// frames.go.
+	buf := takeFrame(w, rows)
+	defer giveFrame(buf)
+	grid, paint, hue := buf.grid, buf.paint, buf.hue
 	for r := range rows {
 		for c := range w {
 			hue[r*w+c] = int8(min(c*freqs/w, freqs-1))
@@ -1183,6 +1201,9 @@ func (m Model) wordsLines(w, rows int) []string {
 	// And this beat's sparks coming off the underside of the type. See
 	// wordspark.go, which is the fall held down to almost nothing.
 	m.wordsSparkDraw(g, grid, paint, w, rows, levels)
+	// And the burst off whichever word the voice has just reached, where that is
+	// the way this line is following it. See wordburst.go.
+	m.wordsSyncBurstDraw(g, grid, paint, w, rows, levels)
 
 	// What each word is burning at, and in what colour.
 	//
@@ -1199,12 +1220,17 @@ func (m Model) wordsLines(w, rows int) []string {
 	paints := make([]wordPaint, m.words.where.Count)
 	for i := range paints {
 		paints[i] = m.wordsPaint(i, len(paints), freqs, levels)
+		// And what the singer is doing to it, where the screen is following
+		// along. See wordsync.go.
+		paints[i].level = m.wordsSyncPaint(i, paints[i].level, levels)
 		if gather < 1 {
 			paints[i].level = int8(float32(paints[i].level) * gather)
 		}
 	}
 
 	bounce := m.wordsRiding(len(paints))
+	lifted := m.wordsSyncLifts(len(paints))
+	shaken := m.wordsSyncShakes(len(paints))
 	tilt, middle := m.wordsTilting(len(paints))
 	turned := m.wordsTurning(len(paints))
 
@@ -1225,6 +1251,18 @@ func (m Model) wordsLines(w, rows int) []string {
 			if word := m.words.where.WordAt(x, y); word >= 0 {
 				if word < len(bounce) {
 					to += bounce[word]
+				}
+				// The word in the singer's mouth, raised and falling back. It is
+				// added to the ride rather than replacing it: the sound still
+				// owns the height, and this is a nudge on top of it.
+				if word < len(lifted) {
+					to += lifted[word]
+				}
+				// And the tremble, which moves it both ways at once. See
+				// wordburst.go for why a shake is allowed where a height is not.
+				if word < len(shaken) {
+					at += shaken[word][0]
+					to += shaken[word][1]
 				}
 				// Turned round on the spot, about its own ink rather than about
 				// the space it stands in — mirrored about the middle of its
@@ -1381,9 +1419,29 @@ func (m Model) wordsUnder(grid []uint8, paint, hue []int8, w, rows, tall, head i
 // type would be, and that is what decides how tall they are. The question is
 // how many of them fit beside each other at that height, and the answer is
 // found by asking the setter: add one until it would have to make them smaller.
+// wordsMarksHeld is the last row built and the size it was built for.
+//
+// The row is a pure function of the screen's size, and it was being worked out
+// afresh on every frame — opening a font, measuring a note in it, and stepping
+// the size until it fitted — because the picture asks what it should be showing
+// sixty times a second. Measured at 352 by 84: seventeen kilobytes and a font
+// face per frame, for a string that changes when the window is resized and never
+// otherwise.
+var wordsMarksHeld struct {
+	sync.Mutex
+	w, h int
+	row  string
+}
+
 func wordsMarks(w, h int) string {
 	if w <= 0 || h <= 0 {
 		return wordsNotes
+	}
+
+	wordsMarksHeld.Lock()
+	defer wordsMarksHeld.Unlock()
+	if wordsMarksHeld.row != "" && wordsMarksHeld.w == w && wordsMarksHeld.h == h {
+		return wordsMarksHeld.row
 	}
 
 	fit := int(wordsMark * float64(h))
@@ -1402,6 +1460,8 @@ func wordsMarks(w, h int) string {
 		}
 		line = try
 	}
+
+	wordsMarksHeld.w, wordsMarksHeld.h, wordsMarksHeld.row = w, h, line
 	return line
 }
 
@@ -1785,6 +1845,7 @@ func (m *Model) wordsGrind() tea.Cmd {
 	}
 	was := m.words.starts
 	m.words.starts, m.words.ends = starts, m.wordsEnds(starts)
+	m.words.line = m.wordsAt()
 	m.words.beats = len(lines) == 1 && wordsBeats(lines[0])
 	// What is going up is the record's name when it is the record's name: asked
 	// of the lines rather than of the clock, so that the one place which knows

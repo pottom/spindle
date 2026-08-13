@@ -62,6 +62,13 @@ type WordLayout struct {
 	// on the spot without it sliding sideways as it goes.
 	Lefts, Rights []int
 
+	// Mids is where each word's ink has its middle, worked out once when the
+	// layout is made. Without it the middle was found by walking the whole map
+	// of which word is under which dot — a quarter of a million entries on a
+	// screen this size — once per word per frame, which a profile put at two
+	// fifths of everything the big screen does between frames.
+	Mids [][2]int
+
 	// Turns says, mark by mark, whether it has a front that may be turned round
 	// on the beat. A drum seen head on has none; anything with feet has. It is
 	// per mark rather than per row because a company is dealt across the sets
@@ -70,8 +77,17 @@ type WordLayout struct {
 }
 
 // Middle is the dot in the middle of a word, which is what a piece bursting
-// apart flies out from.
+// apart flies out from. Worked out when the layout was made where it could be;
+// the walk below is what answers for a layout that was put together by hand.
 func (l WordLayout) Middle(word int) (int, int) {
+	if word >= 0 && word < len(l.Mids) {
+		return l.Mids[word][0], l.Mids[word][1]
+	}
+	return l.middleByWalking(word)
+}
+
+// middleByWalking is the same answer taken the slow way.
+func (l WordLayout) middleByWalking(word int) (int, int) {
 	var first, last, top, bottom = l.DotsX, -1, 1 << 30, -1
 	for i, at := range l.At {
 		if int(at) != word {
@@ -87,6 +103,39 @@ func (l WordLayout) Middle(word int) (int, int) {
 		return 0, 0
 	}
 	return (first + last) / 2, (top + bottom) / 2
+}
+
+// Settle works out every word's middle at once, in one pass over the map rather
+// than one pass per word. Called when a layout is finished.
+func (l *WordLayout) Settle() {
+	if l.Count <= 0 || l.DotsX <= 0 {
+		return
+	}
+	firsts := make([]int, l.Count)
+	lasts := make([]int, l.Count)
+	tops := make([]int, l.Count)
+	bottoms := make([]int, l.Count)
+	for i := range firsts {
+		firsts[i], lasts[i], tops[i], bottoms[i] = l.DotsX, -1, 1<<30, -1
+	}
+	for i, at := range l.At {
+		w := int(at)
+		if w < 0 || w >= l.Count {
+			continue
+		}
+		x, line := i%l.DotsX, i/l.DotsX
+		firsts[w], lasts[w] = min(firsts[w], x), max(lasts[w], x)
+		if line < len(l.Tops) && line < len(l.Bottoms) {
+			tops[w], bottoms[w] = min(tops[w], l.Tops[line]), max(bottoms[w], l.Bottoms[line])
+		}
+	}
+	l.Mids = make([][2]int, l.Count)
+	for w := range l.Mids {
+		if lasts[w] < 0 {
+			continue
+		}
+		l.Mids[w] = [2]int{(firsts[w] + lasts[w]) / 2, (tops[w] + bottoms[w]) / 2}
+	}
 }
 
 // WordAt is the word under a dot, or -1 where there is none.

@@ -28,14 +28,20 @@ import (
 // state has actually changed.
 func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	out, cmd := m.answer(message)
-	if got, ok := out.(Model); ok {
-		got.splashFlow()
-		return got, cmd
-	}
+	out.splashFlow()
 	return out, cmd
 }
 
-func (m Model) answer(message tea.Msg) (tea.Model, tea.Cmd) {
+// answer hands back the model itself rather than the interface it will be
+// wrapped in.
+//
+// The model is seventy-three kilobytes, and putting it into a tea.Model costs a
+// copy of all of it on the heap. This used to happen twice for every message —
+// once here and once on the way out of Update — which at sixty frames a second
+// is nine megabytes a second of rubbish for the collector to walk, and the
+// collector is where the missing frames were going. The interface is put on
+// once, at the edge, where the framework asks for it.
+func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 	switch message := message.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = message.Width, message.Height
@@ -253,7 +259,7 @@ func (m Model) answer(message tea.Msg) (tea.Model, tea.Cmd) {
 		if message.Result == nil {
 			return m, next
 		}
-		model, cmd := m.Update(message.Result)
+		model, cmd := m.answer(message.Result)
 		return model, tea.Batch(next, cmd)
 
 	case msg.ControlDone:
@@ -426,7 +432,7 @@ func (m *Model) resize() {
 }
 
 // handleTick advances the local clock and resynchronises every fifth second.
-func (m Model) handleTick() (tea.Model, tea.Cmd) {
+func (m Model) handleTick() (Model, tea.Cmd) {
 	m.tickCount++
 	cmds := []tea.Cmd{tickCmd()}
 
@@ -602,7 +608,7 @@ func (m *Model) fillFromQueue() {
 	}
 }
 
-func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 	// The big screen outranks even the tabs: it is watched rather than worked
 	// on, so the next key is the way out of it whatever that key was.
 	if cmd, handled := m.stageKey(k); handled {

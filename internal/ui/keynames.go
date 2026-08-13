@@ -65,7 +65,16 @@ const (
 	keyLoose = "b"
 
 	keyLyrics = "l"
-	keyPeek   = "u"
+
+	// keySync follows the singer along the line on the big screen, and cycles
+	// the two ways of treating what has not been sung yet. Not s, which is the
+	// shuffle everywhere including up there.
+	keySync = "y"
+
+	// keySyncDark leaves the words ahead of the voice nearly out. Shifted,
+	// because it is the same question asked louder.
+	keySyncDark = "Y"
+	keyPeek     = "u"
 
 	keyFind     = "/"
 	keyFindNext = ";"

@@ -106,10 +106,10 @@ func (m Model) wordsSway() (float32, bool) {
 type swayFigure int
 
 const (
-	swayTogether   swayFigure = iota // all of them the same way
-	swayFacing                       // the two halves at each other
-	swayAlternating                  // every other one the other way
-	swayTrailing                     // later the further along the row
+	swayTogether    swayFigure = iota // all of them the same way
+	swayFacing                        // the two halves at each other
+	swayAlternating                   // every other one the other way
+	swayTrailing                      // later the further along the row
 	swayFigures
 )
 

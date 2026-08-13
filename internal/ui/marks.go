@@ -536,6 +536,9 @@ func markPicture(name string, w, rows int, seed int64) (cover.Grain, msg.WordLay
 			}
 		}
 	}
+	// Every mark's middle, once. See WordLayout.Settle — a row of marks turns
+	// and leans about those middles on every frame.
+	layout.Settle()
 	return grain, layout, true
 }
 
