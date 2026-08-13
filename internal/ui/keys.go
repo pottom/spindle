@@ -389,21 +389,51 @@ func (k keyMap) forReadOnlyQueue() tabKeys {
 // forPlayer is the player screen's help. The waveform key is only listed where
 // there is room to draw one: advertising a key that does nothing is worse than
 // a shorter bar.
-func (k keyMap) forPlayer(scope, lyrics, peek bool) tabKeys {
+// fitHints drops entries off the end of a hint bar until it fits.
+//
+// Whole entries, because the alternative is what happened when the bar was
+// first filled out: the frame cut it mid-word and left an ellipsis. Off the end
+// rather than out of the middle, so what a narrow terminal loses is what was
+// reached for least — losing "quit" is better than being shown the wrong four.
+func fitHints(short []key.Binding, width int) []key.Binding {
+	if width <= 0 {
+		return short
+	}
+	room := width - leftMargin - rightMargin
+	used := 0
+	for i, b := range short {
+		w := len([]rune(b.Help().Key)) + 1 + len([]rune(b.Help().Desc))
+		if i > 0 {
+			w += 3 // the " · " between them
+		}
+		if used+w > room {
+			return short[:max(i, 1)]
+		}
+		used += w
+	}
+	return short
+}
+
+func (k keyMap) forPlayer(scope, lyrics, peek bool, width int) tabKeys {
 	short := []key.Binding{
 		hint("space", "play/pause"),
 		hint("n/p", "track"),
 		hint("←→", "seek"),
 	}
-	switch {
-	case lyrics:
+	short = append(short, hint("↑↓", "volume"), hint("s", "shuffle"), hint("r", "repeat"))
+	if lyrics {
 		short = append(short, hint("l", "lyrics"))
-	case scope:
-		short = append(short, hint("v", "waveform"))
-	default:
-		short = append(short, hint("d", "devices"))
 	}
-	short = append(short, hint("?", "help"))
+	if scope {
+		short = append(short, hint("v", "waveform"))
+	}
+	if peek {
+		short = append(short, hint("u", "up next"))
+	}
+	// No "?" on it. The bar names everything this screen does, so the table
+	// behind that key has nothing left to add here.
+	short = append(short, hint("t", "big screen"), hint("d", "devices"))
+	short = fitHints(short, width)
 
 	second := []key.Binding{k.Shuffle, k.Repeat, k.Devices}
 	if scope {

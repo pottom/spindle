@@ -397,7 +397,7 @@ func (m Model) helpKeysWith(scope, lyrics, peek bool) tabKeys {
 		// keys that do nothing would be worse than a shorter bar.
 		return m.keys.forReadOnlyQueue()
 	case m.tab == tabPlayer:
-		return m.keys.forPlayer(scope, lyrics, peek)
+		return m.keys.forPlayer(scope, lyrics, peek, m.width)
 	default:
 		return m.keys.forTab(m.tab, scope)
 	}
