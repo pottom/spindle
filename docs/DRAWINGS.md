@@ -23,6 +23,10 @@ repository.
 This file is what to ask for. It is written to be pasted: the style block and
 each sheet below go into an image generator as they stand, one sheet at a time.
 
+A dance is asked for differently — a conversation rather than a sheet, because a
+move has to be drawn once small to settle the character and again large to be
+usable. See `MOVES.md`.
+
 ## How a sheet is used
 
 1. Paste the style block and one sheet's brief. Ask for one image.
