@@ -540,6 +540,10 @@ func (m *Model) adoptLyrics(res msg.LyricsFetched) {
 	m.lyrics.synced = res.Synced
 	m.lyrics.language = res.Language
 	m.lyrics.missing = len(res.Lines) == 0
+
+	// And what the sheet says about itself goes down, once, for the one number
+	// still being guessed. See sheets.go.
+	m.keepSheet()
 }
 
 // wrapWords breaks a line to fit a width, on spaces where it can and mid-word
