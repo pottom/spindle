@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"math/bits"
 	"strings"
 	"testing"
 	"time"
@@ -1231,7 +1232,7 @@ func TestTheMarksPopInTurn(t *testing.T) {
 				if piece < 0 {
 					continue
 				}
-				if at, to, _, ok := m.wordsPop(x, y, gone, 6); ok && at == x && to == y {
+				if pop := m.wordsPops(gone, 6)[piece]; pop.holds {
 					out[piece] = true
 				}
 			}
@@ -1271,6 +1272,49 @@ func TestTheMarksPopInTurn(t *testing.T) {
 	}
 	if was != 0 {
 		t.Errorf("%d marks were still standing at the end", was)
+	}
+}
+
+// The row of marks empties as it pops, drawn the way the screen draws it.
+//
+// The turns were tested above and the drawing was not, which is where the cost
+// was: the picture asked which piece every dot belonged to, one dot at a time,
+// and it was a fifth of the frame. The dots are walked band by band now, so this
+// watches the picture rather than the arithmetic — that it thins out, that it is
+// gone at the end, and that nothing is thrown off the screen on the way.
+func TestTheMarksPopOffTheScreen(t *testing.T) {
+	const w, rows = 120, 40
+	m := benchModel(w, rows, scopeWords)
+	benchLeaving(&m, w, rows, wordsPopping)
+
+	dots := func(gone float32) int {
+		grid := make([]uint8, w*rows)
+		paint, hue := make([]int8, w*rows), make([]int8, w*rows)
+		m.drawLeaving(grid, paint, hue, w, rows, gone, 6)
+
+		var on int
+		for _, cell := range grid {
+			on += bits.OnesCount8(cell)
+		}
+		return on
+	}
+
+	// Every dot of the row it was drawn with, before any of it has gone.
+	var drawn int
+	for _, lum := range m.words.was.Lum {
+		if lum >= wordsLit {
+			drawn++
+		}
+	}
+
+	if at, want := dots(0), drawn; at != want {
+		t.Errorf("as it began to go the row had %d dots on the screen, want the %d it was drawn with", at, want)
+	}
+	if half, all := dots(0.5), drawn; half == 0 || half >= all {
+		t.Errorf("halfway out the row had %d dots of %d, want some of it gone and some of it left", half, all)
+	}
+	if end := dots(1); end != 0 {
+		t.Errorf("%d dots of the row were still on the screen after it had gone", end)
 	}
 }
 

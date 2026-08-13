@@ -1636,6 +1636,14 @@ func (m Model) drawLeaving(grid []uint8, paint, hue []int8, w, rows int, gone fl
 		return
 	}
 
+	// The one way out that has to know which piece a dot belongs to is drawn on
+	// its own, because asking that per dot is what made it the most expensive
+	// thing on the screen. See drawPopping.
+	if m.words.leave == wordsPopping {
+		m.drawPopping(grid, paint, w, dotsX, dotsY, gone, levels)
+		return
+	}
+
 	step := int8(min(int((1-gone)*wordsAhead*float32(levels)), levels-1))
 	if step < 0 {
 		return
@@ -1647,20 +1655,9 @@ func (m Model) drawLeaving(grid []uint8, paint, hue []int8, w, rows int, gone fl
 				continue
 			}
 
-			var at, to int
-			var burn int8
-
-			if m.words.leave == wordsPopping {
-				var ok bool
-				at, to, burn, ok = m.wordsPop(x, y, gone, levels)
-				if !ok {
-					continue
-				}
-			} else {
-				p := 1 - wordsAlong(m.words.leave, gone, x, y, dotsX, dotsY)
-				dx, dy := wordsFrom(m.words.leave, x, y, dotsX, dotsY)
-				at, to, burn = x+int(dx*(1-p)), y+int(dy*(1-p)), step
-			}
+			p := 1 - wordsAlong(m.words.leave, gone, x, y, dotsX, dotsY)
+			dx, dy := wordsFrom(m.words.leave, x, y, dotsX, dotsY)
+			at, to, burn := x+int(dx*(1-p)), y+int(dy*(1-p)), step
 
 			if at < 0 || to < 0 || at >= dotsX || to >= dotsY {
 				continue
@@ -1686,44 +1683,121 @@ func (m Model) drawLeaving(grid []uint8, paint, hue []int8, w, rows int, gone fl
 	}
 }
 
-// wordsPop is where a dot of the picture on its way out has got to, when the
-// picture is going off one piece at a time.
+// wordsPop is what one piece of the picture on its way out is doing: standing
+// where it was drawn, flying apart, or gone.
 //
 // A row of marks does not want to be wiped or slid away: it wants to go the way
 // a row of anything goes when somebody walks down it — the first one bursts, and
 // then the next, and then the next. Each piece waits its turn, holds still while
 // it waits, and then flies apart from its own middle and is gone.
-func (m Model) wordsPop(x, y int, gone float32, levels int) (int, int, int8, bool) {
+type wordsPop struct {
+	holds bool    // standing where it was drawn, waiting its turn
+	off   bool    // already gone, or out of light
+	fly   float32 // how far from its own middle its dots have got
+	cx    int
+	cy    int
+	burn  int8
+}
+
+// wordsPops is that worked out for every piece, once for the frame.
+//
+// Once for the piece rather than once for every dot of it, which is how it was
+// asked at first and what made it the most expensive thing on the screen: of 153
+// frames that went missing on a wall-sized screen, 146 had a picture leaving and
+// every one of the 146 was popping. The arithmetic is the same; only a piece has
+// a few thousand dots, and a screen has a dozen pieces.
+func (m Model) wordsPops(gone float32, levels int) []wordsPop {
 	where := m.words.wasWhere
-	piece := where.WordAt(x, y)
-	if piece < 0 || where.Count == 0 {
-		return 0, 0, 0, false
+	if where.Count <= 0 {
+		return nil
 	}
 
-	// Whose turn it is, and how far into that turn we are. The turns are spread
-	// over what is left after one burst's own length, so the last of them
-	// finishes exactly as the leaving does rather than being cut off.
-	start := float32(piece) / float32(max(where.Count-1, 1)) * (1 - wordsPopHold)
-	mine := (gone - start) / wordsPopHold
-	switch {
-	case mine <= 0:
-		// Still standing there, waiting to go.
-		return x, y, int8(min(int(wordsAhead*float32(levels)), levels-1)), true
-	case mine >= 1:
-		return 0, 0, 0, false
+	out := make([]wordsPop, where.Count)
+	held := int8(min(int(wordsAhead*float32(levels)), levels-1))
+	for piece := range out {
+		// Whose turn it is, and how far into that turn we are. The turns are
+		// spread over what is left after one burst's own length, so the last of
+		// them finishes exactly as the leaving does rather than being cut off.
+		start := float32(piece) / float32(max(where.Count-1, 1)) * (1 - wordsPopHold)
+		mine := (gone - start) / wordsPopHold
+		switch {
+		case mine <= 0:
+			out[piece] = wordsPop{holds: true, burn: held}
+		case mine >= 1:
+			out[piece] = wordsPop{off: true}
+		default:
+			// Gone off: out from the middle of its own piece, fast at first, and
+			// out of light before it has gone far.
+			burn := int8(float32(levels-1) * (1 - mine) * wordsAhead * 2)
+			cx, cy := where.Middle(piece)
+			out[piece] = wordsPop{off: burn < 0, fly: mine * mine * wordsPopFlies, cx: cx, cy: cy, burn: burn}
+		}
+	}
+	return out
+}
+
+// drawPopping puts the picture that is going off a piece at a time where it has
+// got to.
+//
+// The dots are walked band by band rather than row by row, because the map that
+// says which piece is where is laid out that way: one row of DotsX entries per
+// line of type, so within a band the piece under a dot is a column lookup and
+// not a search. Asked the other way round — WordAt for each of a quarter of a
+// million dots, every frame — this was a fifth of the whole picture's time.
+func (m Model) drawPopping(grid []uint8, paint []int8, w, dotsX, dotsY int, gone float32, levels int) {
+	g, where := m.words.was, m.words.wasWhere
+	pops := m.wordsPops(gone, levels)
+	if pops == nil || where.DotsX <= 0 {
+		return
 	}
 
-	// Gone off: out from the middle of its own piece, fast at first, and out of
-	// light before it has gone far.
-	cx, cy := where.Middle(piece)
-	dx, dy := float32(x-cx), float32(y-cy)
-	fly := mine * mine * wordsPopFlies
+	wide := min(dotsX, where.DotsX)
+	for band, top := range where.Tops {
+		if band >= len(where.Bottoms) {
+			break
+		}
+		row := band * where.DotsX
+		for y := max(top, 0); y <= min(where.Bottoms[band], dotsY-1); y++ {
+			for x := range wide {
+				if g.Lum[y*dotsX+x] < wordsLit {
+					continue
+				}
+				at := row + x
+				if at >= len(where.At) {
+					break
+				}
+				piece := int(where.At[at])
+				if piece < 0 || piece >= len(pops) {
+					continue
+				}
 
-	burn := int8(float32(levels-1) * (1 - mine) * wordsAhead * 2)
-	if burn < 0 {
-		return 0, 0, 0, false
+				pop := pops[piece]
+				if pop.off {
+					continue
+				}
+				to, along := y, x
+				if !pop.holds {
+					along = x + int(float32(x-pop.cx)*pop.fly)
+					to = y + int(float32(y-pop.cy)*pop.fly)
+				}
+
+				// A dot can be thrown clear off the screen, so the last word on
+				// where it lands is here. Left to the movements to check for
+				// themselves, one of them did not: a turned mark leaning took a
+				// dot to a negative column, and the picture went down with an
+				// index of minus one.
+				if along < 0 || to < 0 || along >= dotsX || to >= dotsY {
+					continue
+				}
+
+				cell := (to/dotsPerCellY)*w + along/dotsPerCellX
+				grid[cell] |= 1 << brailleBit[along%dotsPerCellX][to%dotsPerCellY]
+				if pop.burn > paint[cell] {
+					paint[cell] = pop.burn
+				}
+			}
+		}
 	}
-	return x + int(dx*fly), y + int(dy*fly), burn, true
 }
 
 // wordsStep is one dot's share of the gathering, given how far down the queue

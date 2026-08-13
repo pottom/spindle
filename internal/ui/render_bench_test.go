@@ -40,6 +40,13 @@ func benchModel(w, rows int, mode scopeMode) Model {
 	return m
 }
 
+// benchLeaving hands the model a line on its way out, the way wordsAdopt does
+// when the picture changes.
+func benchLeaving(m *Model, w, rows int, leave wordsMove) {
+	m.words.was, m.words.wasWhere = m.words.have, m.words.where
+	m.words.went, m.words.leave = time.Now(), leave
+}
+
 func benchFrame(b *testing.B, w, rows int, mode scopeMode) {
 	m := benchModel(w, rows, mode)
 	b.ReportAllocs()
@@ -55,9 +62,34 @@ func benchFrame(b *testing.B, w, rows int, mode scopeMode) {
 
 var sink string
 
+// What a picture on its way out costs on top of the one arriving. Measured
+// because the recording said it was everything: of 153 frames that went missing
+// on a wall-sized screen, 146 had a line leaving, and every one of the 146 was
+// going off by popping.
+func benchFrameLeaving(b *testing.B, w, rows int, leave wordsMove) {
+	m := benchModel(w, rows, scopeWords)
+	benchLeaving(&m, w, rows, leave)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		sink = m.render()
+	}
+}
+
 func BenchmarkFrameWords120x40(b *testing.B)  { benchFrame(b, 120, 40, scopeWords) }
 func BenchmarkFrameWords200x50(b *testing.B)  { benchFrame(b, 200, 50, scopeWords) }
 func BenchmarkFrameWords300x80(b *testing.B)  { benchFrame(b, 300, 80, scopeWords) }
 func BenchmarkFrameBars200x50(b *testing.B)   { benchFrame(b, 200, 50, scopeBars) }
 func BenchmarkFrameLadder200x50(b *testing.B) { benchFrame(b, 200, 50, scopeLadder) }
 func BenchmarkFrameWave200x50(b *testing.B)   { benchFrame(b, 200, 50, scopeWave) }
+
+func BenchmarkFrameStill352x84(b *testing.B) { benchFrame(b, 352, 84, scopeWords) }
+func BenchmarkFramePopping352x84(b *testing.B) {
+	benchFrameLeaving(b, 352, 84, wordsPopping)
+}
+func BenchmarkFrameSpilling352x84(b *testing.B) {
+	benchFrameLeaving(b, 352, 84, wordsSpilling)
+}
+func BenchmarkFrameWiping352x84(b *testing.B) {
+	benchFrameLeaving(b, 352, 84, wordsWiping)
+}
