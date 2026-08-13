@@ -209,3 +209,71 @@ func stripStyles(s string) string {
 	}
 	return b.String()
 }
+
+// The outlines are a measuring tool, so the one thing they may never do is
+// change what they measure. Turning them on must leave every row count and every
+// row width exactly as it was — a border that added a column would move
+// everything inside it, and the screen being inspected would stop being the
+// screen that ships.
+func TestOutlinesDoNotMoveAnything(t *testing.T) {
+	for _, which := range []tabID{tabPlayer, tabQueue, tabLibrary, tabSearch, tabSettings, tabHelp} {
+		for _, s := range probeSizes {
+			plain := strings.Split(sizedModel(which, s[0], s[1]).render(), "\n")
+
+			m := sizedModel(which, s[0], s[1])
+			m.debug.level = debugOutlines
+			drawn := strings.Split(m.render(), "\n")
+
+			if len(plain) != len(drawn) {
+				t.Errorf("tab %v %dx%d: %d rows with outlines, %d without",
+					which, s[0], s[1], len(drawn), len(plain))
+				continue
+			}
+			for i := range plain {
+				was, now := len([]rune(stripStyles(plain[i]))), len([]rune(stripStyles(drawn[i])))
+				if was != now {
+					t.Errorf("tab %v %dx%d: row %d is %d cells with outlines, %d without",
+						which, s[0], s[1], i, now, was)
+					break
+				}
+			}
+		}
+	}
+}
+
+// And the border of a block is the block's own edge, not an extra one.
+func TestAnOutlineKeepsTheBlocksShape(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.debug.level = debugOutlines
+
+	rows := []string{"aaaaaaaa", "bbbbbbbb", "cccccccc", "dddddddd"}
+	out := m.outline(rows, 8, "thing")
+
+	if len(out) != len(rows) {
+		t.Fatalf("outline returned %d rows for %d", len(out), len(rows))
+	}
+	for i, row := range out {
+		if w := len([]rune(stripStyles(row))); w != 8 {
+			t.Errorf("row %d came out %d cells wide, want 8", i, w)
+		}
+	}
+	if bare := stripStyles(out[0]); !strings.HasPrefix(bare, outlineTL) || !strings.HasSuffix(bare, outlineTR) {
+		t.Errorf("the top edge is %q", bare)
+	}
+	if bare := stripStyles(out[len(out)-1]); !strings.HasPrefix(bare, outlineBL) {
+		t.Errorf("the foot is %q", bare)
+	}
+}
+
+// Off, it does nothing at all — the check that keeps a debug tool out of the
+// picture everybody else sees.
+func TestOutlinesDrawNothingWhenOff(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	rows := []string{"aaaa", "bbbb", "cccc"}
+	out := m.outline(rows, 4, "thing")
+	for i := range rows {
+		if out[i] != rows[i] {
+			t.Errorf("row %d was drawn on with the outlines off: %q", i, out[i])
+		}
+	}
+}

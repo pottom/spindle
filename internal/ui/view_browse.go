@@ -90,7 +90,7 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	w := queueBlockWidth(l)
 
 	top := min(l.artHeight, rows)
-	art := alignTop(strings.Split(m.artworkCells(), "\n"), l.artWidth, top)
+	art := m.outline(alignTop(strings.Split(m.artworkCells(), "\n"), l.artWidth, top), l.artWidth, "art")
 
 	// The picture decides how far the panel beside it may reach: the box the
 	// layout gives the artwork is a row or two taller than the cover drawn in
@@ -110,15 +110,16 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	switch {
 	case m.scopeVisible():
 		detailWidth = queueDetailWidth(l)
-		right = stack(m.scopeRender(queueScopeWidth(l)), queueScopeWidth(l), top)
+		right = m.outline(stack(m.scopeRender(queueScopeWidth(l)), queueScopeWidth(l), top), queueScopeWidth(l), "trace")
 	case m.showsNowPanel():
 		detailWidth = queueDetailWidth(l)
-		right = m.nowPanel(l, nowPanelWidth(l), top, foot)
+		right = m.outline(m.nowPanel(l, nowPanelWidth(l), top, foot), nowPanelWidth(l), "now")
 	}
 	detail := stack(opts.detail(detailWidth, foot), detailWidth, foot)
 	for len(detail) < top {
 		detail = append(detail, strings.Repeat(" ", detailWidth))
 	}
+	detail = m.outline(detail, detailWidth, "detail")
 
 	out := make([]string, 0, rows)
 	gap := strings.Repeat(" ", columnGap)
@@ -180,12 +181,16 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	bar := m.scrollColumn(body, opts.count, opts.state.top)
 	rowWidth := queueRowWidth(l)
 
+	listFrom := len(out)
 	for i := from; i < to; i++ {
 		row := fit(opts.row(i, rowWidth, i == opts.state.cursor), rowWidth)
 		if bar != nil {
 			row += " " + bar[i-from]
 		}
 		out = append(out, row)
+	}
+	if lines := m.outline(out[listFrom:], w, "list"); len(lines) == len(out)-listFrom {
+		copy(out[listFrom:], lines)
 	}
 
 	for len(out) < rows {

@@ -77,8 +77,10 @@ func (m Model) render() string {
 func (m Model) renderPlayer() string {
 	l := m.layout()
 
+	inner := l.interior - leftMargin - rightMargin
+
 	var lines []string
-	for _, row := range m.header(l.interior - leftMargin - rightMargin) {
+	for _, row := range m.outline(m.header(inner), inner, "header") {
 		lines = append(lines, m.pad(row, l))
 	}
 	lines = append(lines, m.pad("", l))
@@ -91,7 +93,7 @@ func (m Model) renderPlayer() string {
 	if m.peekVisible() {
 		body = m.drawPeek(body, l)
 	}
-	lines = append(lines, body...)
+	lines = append(lines, m.outline(body, l.interior, "body")...)
 
 	// A blank row before the bottom block, so the help never reads as one more
 	// entry in whatever list ends above it.
@@ -99,7 +101,8 @@ func (m Model) renderPlayer() string {
 	if text, style, ok := m.notice(); ok {
 		lines = append(lines, m.pad(style.Render(text), l))
 	}
-	for _, row := range strings.Split(m.help.View(m.helpKeys()), "\n") {
+	help := strings.Split(m.help.View(m.helpKeys()), "\n")
+	for _, row := range m.outline(help, inner, "help") {
 		lines = append(lines, m.pad(row, l))
 	}
 
@@ -153,17 +156,19 @@ func (m Model) body(l layout) []string {
 		}
 
 		var right []string
+		var rightName string
 		switch {
 		case m.devices.open:
-			right = m.devicePicker(l.infoWidth, rows)
+			right, rightName = m.devicePicker(l.infoWidth, rows), "devices"
 		case m.lyricsVisible():
 			// The words need room, so the information goes to the top of the
 			// body rather than sitting in the middle of it, and they take
 			// everything under it.
-			right = m.infoWithLyrics(l, rows)
+			right, rightName = m.infoWithLyrics(l, rows), "info+lyrics"
 		default:
-			right = stack(m.infoBlock(l.infoWidth), l.infoWidth, rows)
+			right, rightName = stack(m.infoBlock(l.infoWidth), l.infoWidth, rows), "info"
 		}
+		right = m.outline(right, l.infoWidth, rightName)
 
 		// Without a picture the text and the list take the whole width, which
 		// is the point of dropping it.
@@ -185,6 +190,7 @@ func (m Model) body(l layout) []string {
 		} else {
 			art = alignTop(cells, l.artWidth, rows)
 		}
+		art = m.outline(art, l.artWidth, "art")
 		gap := strings.Repeat(" ", columnGap)
 
 		block = make([]string, rows)

@@ -46,6 +46,13 @@ const (
 	debugOff = iota
 	debugTerse
 	debugFull
+
+	// debugOutlines draws every block's border with its name and size. It comes
+	// after the readings rather than with them: the bar is written over the top
+	// few rows, and the two together would have the bar covering the outlines of
+	// whatever it sits on.
+	debugOutlines
+
 	debugDepths
 )
 
@@ -111,7 +118,9 @@ func (m Model) debugGroups() []debugGroup {
 
 // debugRows is the bar itself: one line, the block, or nothing at all.
 func (m Model) debugRows() []string {
-	if m.debug.level == debugOff || m.width < 40 || m.height < 2 {
+	// Nothing on the outlines level: the bar is written over the top rows, and
+	// it would be covering the very outlines it sits on.
+	if m.debug.level == debugOff || m.debug.level == debugOutlines || m.width < 40 || m.height < 2 {
 		return nil
 	}
 	if m.debug.level == debugTerse {
