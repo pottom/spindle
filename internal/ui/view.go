@@ -125,32 +125,32 @@ func (m Model) pad(s string, l layout) string {
 // body is everything above the help bar: the artwork beside the track
 // information, centred in what is left once the status line has its row.
 func (m Model) body(l layout) []string {
-	var block []string
+	var pane []string
 	switch {
 	case m.tab == tabPlayer && m.noDevice:
-		block = m.noDevicePanel(l, max(l.bodyHeight-1, 1))
+		pane = m.noDevicePanel(l, max(l.bodyHeight-1, 1))
 
 	case m.tab == tabPlayer && m.ps == nil:
 		// The picture, while there is nothing else to look at. See splash.go.
-		block = append(m.splashRows(), "", m.styles.Detail.Render("Connecting…"))
+		pane = append(m.splashRows(), "", m.styles.Detail.Render("Connecting…"))
 
 	case m.tab == tabSettings && !m.devices.open:
-		block = m.settingsPanel(l, max(l.bodyHeight, 1))
+		pane = m.settingsPanel(l, max(l.bodyHeight, 1))
 
 	case m.tab == tabHelp && !m.devices.open:
-		block = m.helpPanel(l, max(l.bodyHeight, 1))
+		pane = m.helpPanel(l, max(l.bodyHeight, 1))
 
 	case m.open() != nil && !m.devices.open:
-		block = m.openPageView(l, max(l.bodyHeight, 1))
+		pane = m.openPageView(l, max(l.bodyHeight, 1))
 
 	case m.tab == tabQueue && !m.devices.open:
-		block = m.queueBlock(l, max(l.bodyHeight, 1))
+		pane = m.queueBlock(l, max(l.bodyHeight, 1))
 
 	case m.tab == tabLibrary && !m.devices.open:
-		block = m.libraryPaneView(l, max(l.bodyHeight, 1))
+		pane = m.libraryPaneView(l, max(l.bodyHeight, 1))
 
 	case m.tab == tabSearch && !m.devices.open:
-		block = m.searchPaneView(l, max(l.bodyHeight, 1))
+		pane = m.searchPaneView(l, max(l.bodyHeight, 1))
 
 	default:
 		// The player centres its text against the cover. The browsing tabs, and
@@ -163,59 +163,60 @@ func (m Model) body(l layout) []string {
 		}
 
 		var right []string
-		var rightName string
 		switch {
 		case m.devices.open:
-			right, rightName = m.devicePicker(l.infoWidth, rows), "devices"
+			right = m.place(m.devicesBlock(), l.infoWidth, rows)
 		case m.lyricsVisible():
 			// The words need room, so the information goes to the top of the
 			// body rather than sitting in the middle of it, and they take
 			// everything under it.
 			// Outlined inside, as "player" and "lyrics": one border round both
 			// would say less than the two say separately.
-			right, rightName = m.infoWithLyrics(l, rows), ""
+			// Outlined inside, as "player" and "lyrics": one border round both
+			// would say less than the two say separately.
+			right = m.infoWithLyrics(l, rows)
 		default:
-			right, rightName = stack(m.infoBlock(l.infoWidth), l.infoWidth, rows), "player"
-		}
-		if rightName != "" {
-			right = m.outline(right, l.infoWidth, rightName)
+			right = m.place(m.playerBlock(), l.infoWidth, rows)
 		}
 
 		// Without a picture the text and the list take the whole width, which
 		// is the point of dropping it.
 		if !l.hasArt() {
-			block = right
+			pane = right
 			break
 		}
 
 		// The picture stays where it is. It is laid out in its own area first
-		// and only then padded into whatever the block turns out to be, so
+		// and only then padded into whatever the pane turns out to be, so
 		// showing the words moves the column beside it and nothing else —
-		// centring it in the taller block instead lands a row out, because two
+		// centring it in the taller pane instead lands a row out, because two
 		// halvings round differently from one. The browsing tabs align it to
 		// the top, where it heads a list rather than sitting beside a caption.
-		cells := strings.Split(m.artworkCells(), "\n")
+		// The player centres its cover twice: once in the box the layout gave it,
+		// then again in the taller pane, so showing the words moves the column
+		// beside it and nothing else.
 		var art []string
 		if m.tab == tabPlayer {
-			art = center(center(cells, l.artWidth, l.artHeight), l.artWidth, rows)
+			art = m.place(block{"art", func(w, h int) []string {
+				return center(center(strings.Split(m.artworkCells(), "\n"), w, l.artHeight), w, h)
+			}}, l.artWidth, rows)
 		} else {
-			art = alignTop(cells, l.artWidth, rows)
+			art = m.place(m.artBlock(false), l.artWidth, rows)
 		}
-		art = m.outline(art, l.artWidth, "art")
 		gap := strings.Repeat(" ", columnGap)
 
-		block = make([]string, rows)
+		pane = make([]string, rows)
 		for i := range art {
-			block[i] = art[i] + gap + right[i]
+			pane[i] = art[i] + gap + right[i]
 		}
 	}
 
 	lines := make([]string, 0, l.bodyHeight)
-	top := max((l.bodyHeight-len(block))/2, 0)
+	top := max((l.bodyHeight-len(pane))/2, 0)
 	for range top {
 		lines = append(lines, m.pad("", l))
 	}
-	for _, row := range block {
+	for _, row := range pane {
 		lines = append(lines, m.pad(row, l))
 	}
 	for len(lines) < l.bodyHeight {

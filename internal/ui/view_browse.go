@@ -90,7 +90,7 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	w := queueBlockWidth(l)
 
 	top := min(l.artHeight, rows)
-	art := m.outline(alignTop(strings.Split(m.artworkCells(), "\n"), l.artWidth, top), l.artWidth, "art")
+	art := m.place(m.artBlock(false), l.artWidth, top)
 
 	// The picture decides how far the panel beside it may reach: the box the
 	// layout gives the artwork is a row or two taller than the cover drawn in
@@ -110,10 +110,10 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	switch {
 	case m.scopeVisible():
 		detailWidth = queueDetailWidth(l)
-		right = m.outline(stack(m.scopeRender(queueScopeWidth(l)), queueScopeWidth(l), top), queueScopeWidth(l), "trace")
+		right = m.place(m.traceBlock(), queueScopeWidth(l), top)
 	case m.showsNowPanel():
 		detailWidth = queueDetailWidth(l)
-		right = m.outline(m.nowPanel(l, nowPanelWidth(l), top, foot), nowPanelWidth(l), "now")
+		right = m.place(m.nowBlock(l, foot), nowPanelWidth(l), top)
 	}
 	detail := stack(opts.detail(detailWidth, foot), detailWidth, foot)
 	for len(detail) < top {

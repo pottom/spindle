@@ -353,11 +353,7 @@ func (m Model) infoWithLyrics(l layout, rows int) []string {
 	// The track information and the transport, outlined on their own: they are
 	// what somebody means by "the player part", and lumping them in with the
 	// words made the one block on this screen that nobody could point at.
-	player := m.infoBlock(l.infoWidth)
-	for i := range player {
-		player[i] = fit(player[i], l.infoWidth)
-	}
-	for _, line := range m.outline(player, l.infoWidth, "player") {
+	for _, line := range m.place(m.playerBlock(), l.infoWidth, len(m.infoBlock(l.infoWidth))) {
 		if len(out) == rows {
 			return out
 		}
@@ -369,8 +365,7 @@ func (m Model) infoWithLyrics(l layout, rows int) []string {
 	if len(out) < rows {
 		out = append(out, strings.Repeat(" ", l.infoWidth))
 	}
-	words := m.lyricsBlock(l.infoWidth, min(rows-len(out), m.lyricsFit(l)))
-	out = append(out, m.outline(words, l.infoWidth, "lyrics")...)
+	out = append(out, m.place(m.wordsBlock(), l.infoWidth, min(rows-len(out), m.lyricsFit(l)))...)
 
 	for len(out) < rows {
 		out = append(out, strings.Repeat(" ", l.infoWidth))

@@ -544,7 +544,7 @@ func (m Model) drawScope(body []string, l layout) []string {
 		return body
 	}
 
-	lines := m.outline(m.scopeRender(m.scopeWidth(l)), m.scopeWidth(l), "trace")
+	lines := m.place(m.traceBlock(), m.scopeWidth(l), scopeRows)
 	for i, line := range lines {
 		body[at+i] = m.pad(line, l)
 	}
