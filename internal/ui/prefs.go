@@ -22,6 +22,7 @@ type prefs struct {
 	Scope  []scopeMode `json:"scope"`
 	Lyrics bool        `json:"lyrics"`
 	Peek   bool        `json:"peek"`
+
 }
 
 // prefsMsg carries the file's contents back into the model.
@@ -89,4 +90,5 @@ func (m *Model) applyPrefs(p prefs) {
 	}
 	m.lyrics.on = p.Lyrics
 	m.peek.on = p.Peek
+
 }

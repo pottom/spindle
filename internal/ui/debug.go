@@ -387,23 +387,6 @@ func (m Model) debugSheet() []debugField {
 	b.put("lines", "%d", len(m.lyrics.lines))
 	if m.lyrics.synced {
 		b.put("at", "%d", m.wordsAt())
-
-		// What a line is being taken to be sung for, which is the one number on
-		// this screen that is set by hand. See lyricsHeld.
-		at := m.wordsAt()
-		window := m.lyricsWindow(at)
-		b.put("held", "%.0f%%/%.1fs", lyricsHelds[m.lyrics.held%len(lyricsHelds)]*100,
-			m.lyricsHeld(window).Seconds())
-
-		// And what the line has in it against how long it has: the two numbers a
-		// ceiling could be read off, which is the open question. A record whose
-		// lines are short and far apart needs a shorter ceiling than one whose
-		// lines are long and close together, and neither the window nor the count
-		// says that on its own.
-		if at >= 0 && at < len(m.lyrics.lines) {
-			b.put("win", "%.1fs", window.Seconds())
-			b.put("syl", "%d", lyricsSyllables(m.lyrics.lines[at].Words, m.lyrics.language))
-		}
 	}
 	if m.lyrics.fetching != "" {
 		b.put("fetch", "%s", debugShort(m.lyrics.fetching, 8))

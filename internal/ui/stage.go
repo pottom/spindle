@@ -265,24 +265,6 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		m.marksWalk()
 		return nil, true
 
-	case key.Matches(k, m.keys.Sync):
-		// Off, then each of the four held in turn so it can be watched, then all
-		// of them rotating a line each. See wordsync.go, and the label at the
-		// foot, which is there so that what is on can be named afterwards.
-		m.words.sync = m.words.sync.next()
-		return nil, true
-
-	case key.Matches(k, m.keys.SyncDark):
-		m.words.syncDark = !m.words.syncDark
-		return nil, true
-
-	case key.Matches(k, m.keys.Held):
-		// How long a line is taken to be sung for, a stop at a time. Both screens
-		// follow it, so it can be set from up here and judged down there as well.
-		// See lyricsHeld.
-		m.lyrics.held = (m.lyrics.held + 1) % len(lyricsHelds)
-		return nil, true
-
 	case key.Matches(k, m.keys.Face):
 		// Puts a face up, and walks its expressions a press at a time.
 		m.faceShow()
@@ -341,13 +323,6 @@ func (m Model) stageView() string {
 	// of it. See stageEdge.
 	art := m.stagePicture(m.width, rows)
 
-	// While the singer is being followed, the foot of the screen says which of
-	// the three ways is on this line. It is there to be judged by — a movement
-	// nobody can name afterwards cannot be chosen between — and it goes when the
-	// choosing is done. See wordsync.go.
-	if m.words.sync != syncOff && m.scopeMode().words() && len(art) > 0 {
-		art[len(art)-1] = m.wordsSyncLabel(m.width)
-	}
 	return strings.Join(art, "\n")
 }
 

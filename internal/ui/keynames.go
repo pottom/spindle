@@ -66,21 +66,6 @@ const (
 
 	keyLyrics = "l"
 
-	// keySync follows the singer along the line on the big screen, and cycles
-	// the two ways of treating what has not been sung yet. Not s, which is the
-	// shuffle everywhere including up there.
-	keySync = "y"
-
-	// keySyncDark leaves the words ahead of the voice nearly out. Shifted,
-	// because it is the same question asked louder.
-	keySyncDark = "Y"
-
-	// keyHeld shortens how long a line is taken to be sung for, in steps, on
-	// both screens at once. A measuring key: the share was fitted on three
-	// sections of two records and a record that holds its lines for less than
-	// that has the light trailing the voice by the end of every line, which is
-	// what it was reached for.
-	keyHeld = "h"
 	keyPeek = "u"
 
 	keyFind     = "/"

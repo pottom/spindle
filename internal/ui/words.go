@@ -912,15 +912,6 @@ type wordsState struct {
 	asked          string
 	askedX, askedY int
 
-	// sync is whether the singer is being followed along the line, and which
-	// way of showing it — see wordsync.go. Off unless the key has asked for it.
-	sync syncMode
-
-	// syncDark says the words ahead of the voice are nearly out rather than
-	// merely dimmer. The stronger effect and the weaker lyric, on its own key so
-	// the two can be put side by side.
-	syncDark bool
-
 	// line is which line of the lyric is up, so that the three ways of following
 	// the singer can be rotated one to a line.
 	line int
@@ -1204,9 +1195,6 @@ func (m Model) wordsLines(w, rows int) []string {
 	// And this beat's sparks coming off the underside of the type. See
 	// wordspark.go, which is the fall held down to almost nothing.
 	m.wordsSparkDraw(g, grid, paint, w, rows, levels)
-	// And the burst off whichever word the voice has just reached, where that is
-	// the way this line is following it. See wordburst.go.
-	m.wordsSyncBurstDraw(g, grid, paint, w, rows, levels)
 
 	// What each word is burning at, and in what colour.
 	//
@@ -1223,17 +1211,12 @@ func (m Model) wordsLines(w, rows int) []string {
 	paints := make([]wordPaint, m.words.where.Count)
 	for i := range paints {
 		paints[i] = m.wordsPaint(i, len(paints), freqs, levels)
-		// And what the singer is doing to it, where the screen is following
-		// along. See wordsync.go.
-		paints[i].level = m.wordsSyncPaint(i, paints[i].level, levels)
 		if gather < 1 {
 			paints[i].level = int8(float32(paints[i].level) * gather)
 		}
 	}
 
 	bounce := m.wordsRiding(len(paints))
-	lifted := m.wordsSyncLifts(len(paints))
-	shaken := m.wordsSyncShakes(len(paints))
 	tilt, middle := m.wordsTilting(len(paints))
 	turned := m.wordsTurning(len(paints))
 
@@ -1254,18 +1237,6 @@ func (m Model) wordsLines(w, rows int) []string {
 			if word := m.words.where.WordAt(x, y); word >= 0 {
 				if word < len(bounce) {
 					to += bounce[word]
-				}
-				// The word in the singer's mouth, raised and falling back. It is
-				// added to the ride rather than replacing it: the sound still
-				// owns the height, and this is a nudge on top of it.
-				if word < len(lifted) {
-					to += lifted[word]
-				}
-				// And the tremble, which moves it both ways at once. See
-				// wordburst.go for why a shake is allowed where a height is not.
-				if word < len(shaken) {
-					at += shaken[word][0]
-					to += shaken[word][1]
 				}
 				// Turned round on the spot, about its own ink rather than about
 				// the space it stands in — mirrored about the middle of its

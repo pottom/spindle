@@ -58,15 +58,6 @@ type keyMap struct {
 	Loose  key.Binding
 	Lyrics key.Binding
 
-	// Sync follows the singer word by word on the big screen, and SyncDark says
-	// how much of the line ahead of the voice is left visible. See wordsync.go.
-	Sync     key.Binding
-	SyncDark key.Binding
-
-	// Held shortens how long a line is taken to be sung for, on both screens.
-	// See lyricsHeld.
-	Held key.Binding
-
 	Peek key.Binding
 	Mute key.Binding
 
@@ -263,18 +254,6 @@ func newKeyMap() keyMap {
 		Lyrics: key.NewBinding(
 			key.WithKeys(keyLyrics),
 			key.WithHelp(keyLyrics, "lyrics"),
-		),
-		Sync: key.NewBinding(
-			key.WithKeys(keySync),
-			key.WithHelp(keySync, "follow the singer"),
-		),
-		SyncDark: key.NewBinding(
-			key.WithKeys(keySyncDark),
-			key.WithHelp(keySyncDark, "dim what is not sung yet"),
-		),
-		Held: key.NewBinding(
-			key.WithKeys(keyHeld),
-			key.WithHelp(keyHeld, "how long a line is sung"),
 		),
 
 		Peek: key.NewBinding(

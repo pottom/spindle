@@ -372,9 +372,10 @@ a third of it.
 
 ### When a line actually stops being sung (measured 2026-08-13)
 
-Thirty-six lines, tapped by ear against the daemon's playhead — see
-`cmd/spindle-tap`, and the lag each pass measures against the line stamps it
-already knows, which is what makes a hand a usable instrument here.
+Thirty-six lines, tapped by ear against the daemon's playhead, with a guided
+tapper — `cmd/spindle-tap`, removed along with the feature — that measures each
+pass's own lag against the line stamps it already knows, which is what makes a
+hand a usable instrument here.
 
 | | lines | sung share of the window | ms a syllable |
 |---|---|---|---|
@@ -555,3 +556,54 @@ the 33 hand-tapped line endings, at the moment the last word is actually sung th
 model sits at 91% (Tony Joe White) and 92% (Majka) of the line, which is within
 one piece of where it should be. The error was between the two screens, not
 between the model and the music.
+
+### Why the word-level following was taken out (2026-08-13)
+
+Everything above about where the voice is inside a line was measured, and the
+measurements hold. The feature built on them does not, and it is gone: the four
+followings on the big screen, the sweep across the line on the player, the
+syllable ruler, and the key that let a record be held to a shorter span.
+
+What closed it, in order:
+
+**The line model is right on the records it was fitted on.** Against the 33
+tapped line endings, at the moment the last word is actually sung the model sits
+at 91% (Tony Joe White) and 92% (Majka) of the line — inside one word of where it
+should be.
+
+**It is half a second wrong on a record it was not.** Mike Mana's "Never The
+Same" has fifteen lines in two minutes fifty-three; every window is longer than
+three and a half seconds, so the share never binds and the ceiling is the whole
+answer. Judged by ear in the room, a line there is sung for 1.8 s where the
+ceiling gives 3.
+
+**The ceiling cannot be a constant, and syllables do not fix it.** Sweeping a
+per-syllable ceiling across the tapped lines and that record together:
+
+| ceiling | tapped, median error | what it gives Mike Mana |
+|---|---|---|
+| 3 s (what was shipped) | 514 ms | 3.00 s |
+| 300 ms a syllable | 1037 ms | 1.80 s ✓ |
+| 400 ms a syllable | 694 ms | 2.40 s |
+| 500 ms a syllable | 390 ms ✓ | 3.00 s |
+
+Tony Joe White's five-syllable lines really are held for three seconds — 600 ms a
+syllable — and Mike Mana's five-syllable lines are done in 1.8. Same count,
+double the pace. Whatever is right for one is twice wrong for the other.
+
+**And a sheet cannot say which it is.** Thirty-one sheets were collected as they
+arrived and asked the only question a sheet can answer about pace: the tightest
+line in it, window over syllables, which the singing must fit inside. The range
+across records runs 155 to 640 ms — and the two records above land at 441 and
+422, adjacent, with opposite answers. A record whose singing never fills a window
+leaves no trace of how fast it sings, because nothing marks where the singing
+stopped and the band played on.
+
+The audio was already closed for the same question (see above: 1.15σ at best, and
+the harmonic comb finds the bass guitar).
+
+So the position of a voice inside a line is not knowable from what arrives, it
+is wrong by half a second on records that are not rare, and the only alternative
+was a knob for the room to set per record. A screen that has to be corrected by
+hand to stop lying is worse than a screen that only claims what it knows. The
+words are lit a line at a time, which is exactly what a sheet says.

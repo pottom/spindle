@@ -85,7 +85,6 @@ func helpGroups() []helpGroup {
 			{keyScope, "waveform, spectrum, water, lamps, off"},
 			{keyStage, "full screen, and " + keyScope + " switches it there"},
 			{keyLyrics, "the words, as they are sung"},
-			{keyHeld, "how long a line is sung for, if the light trails the voice"},
 			{keyPeek, "what is coming next"},
 		},
 	}, {
@@ -96,8 +95,6 @@ func helpGroups() []helpGroup {
 			{keyMarks, "another company of dancers"},
 			{keyTell, "what is playing, said there and then"},
 			{pair(keyShuffle, keyRepeat), "shuffle and repeat, said by the one with the placard"},
-			{pair(keySync, keySyncDark), "follow the singer along the line, and dim what is ahead"},
-			{keyHeld, "how long a line is sung for, a stop at a time"},
 			{pair(keyBack, keyQuit), "back — and nothing else is, so it can be leaned on"},
 		},
 	}, {
