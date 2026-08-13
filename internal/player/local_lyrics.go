@@ -31,8 +31,9 @@ func (l *Local) Lyrics(ctx context.Context, trackID string) (*Lyrics, error) {
 	}
 
 	var out struct {
-		Synced bool `json:"synced"`
-		Lines  []struct {
+		Synced   bool   `json:"synced"`
+		Language string `json:"language"`
+		Lines    []struct {
 			At    int64  `json:"at"`
 			Words string `json:"words"`
 		} `json:"lines"`
@@ -44,7 +45,7 @@ func (l *Local) Lyrics(ctx context.Context, trackID string) (*Lyrics, error) {
 		return nil, nil
 	}
 
-	lyrics := &Lyrics{Synced: out.Synced, Lines: make([]Lyric, 0, len(out.Lines))}
+	lyrics := &Lyrics{Synced: out.Synced, Language: out.Language, Lines: make([]Lyric, 0, len(out.Lines))}
 	for _, line := range out.Lines {
 		lyrics.Lines = append(lyrics.Lines, Lyric{At: line.At, Words: line.Words})
 	}

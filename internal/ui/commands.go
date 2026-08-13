@@ -108,7 +108,7 @@ func lyricsCmd(source player.LyricSource, trackID string) tea.Cmd {
 		if err != nil || lyrics == nil {
 			return out
 		}
-		out.Synced, out.Lines = lyrics.Synced, lyrics.Lines
+		out.Synced, out.Language, out.Lines = lyrics.Synced, lyrics.Language, lyrics.Lines
 		return out
 	}
 }

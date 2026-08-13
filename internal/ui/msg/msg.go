@@ -124,9 +124,10 @@ type DevicesFetched struct {
 // lyrics is the ordinary case rather than a failure. TrackID is what they
 // belong to, so an answer that arrives after a skip can be thrown away.
 type LyricsFetched struct {
-	TrackID string
-	Synced  bool
-	Lines   []player.Lyric
+	TrackID  string
+	Synced   bool
+	Language string
+	Lines    []player.Lyric
 }
 
 // WaveformReady carries one frame of what is being heard, and paces the trace:

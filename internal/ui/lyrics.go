@@ -3,7 +3,6 @@ package ui
 import (
 	"strings"
 	"time"
-	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -18,12 +17,24 @@ const (
 	// the point.
 	lyricsMinRows = 6
 
-	// lyricsAhead is how far in front of the playhead the words are read. See
-	// lyricsClock. Raised from 300ms after listening: a line lit at the moment
-	// its first syllable sounds has already been passed by the time it is read,
-	// so the words want to arrive slightly before the voice, the way a singer
-	// reads ahead of themselves.
+	// lyricsAhead is the most a line may arrive in front of the voice that sings
+	// it. Raised from 300ms after listening: a line lit at the moment its first
+	// syllable sounds has already been passed by the time it is read, so the
+	// words want to arrive slightly before the voice, the way a singer reads
+	// ahead of themselves.
 	lyricsAhead = 550 * time.Millisecond
+
+	// lyricsLeadShare is how much of a line's own window that lead may take.
+	//
+	// Half a second is a comfortable head start on a ballad and a quarter of the
+	// line on a rap. Fixed, it cost the fast records dearly: a line that gives
+	// way 550 ms early has to be swept in whatever is left, and measured against
+	// the tapped lines it finished a median of 446 ms before the singer did.
+	// Fifteen per cent of the window brings that to 162 ms and the whole
+	// screen's error from 414 to 233. Below ten per cent the slow records start
+	// to suffer instead — the lead is what makes a lyric readable, and taking it
+	// all away is not free.
+	lyricsLeadShare = 0.15
 
 	// lyricsMaxRows is the most shown at once. A whole lyric on screen is a
 	// page of text to search through; a handful of lines around the one being
@@ -39,7 +50,78 @@ const (
 	// lyricsDefaultLine is how long the last line of a lyric is assumed to last,
 	// there being nothing after it to measure against.
 	lyricsDefaultLine = 4 * time.Second
+
+	// lyricsSungShare and lyricsSungMost are how much of a line's window is
+	// actually sung. See lyricsSung.
+	lyricsSungShare = 0.85
+	lyricsSungMost  = 3 * time.Second
+
+	// lyricsStampsEarly is how far a line's timestamp sits in front of the
+	// voice it belongs to.
+	//
+	// A stamp is written by somebody watching a bar go past, and a singer comes
+	// in a moment after the bar does; every transcriber leans the same way, and
+	// the lyric is timed to the music rather than to the mouth. It shows in the
+	// tapping: the same hand landed +346, +350 and +430 ms after the stamps on
+	// three different sections, and a hand answering a sound it is waiting for
+	// is worth about two hundred of that. What is left over is the stamp.
+	//
+	// Only the lighting is moved by it. Which line is on screen still follows
+	// the stamp, because that is a matter of reading and reading wants to be
+	// early. See lyricsVoice.
+	lyricsStampsEarly = 200 * time.Millisecond
 )
+
+// lyricsSung is how long a line is sung for, which is not how long it is on
+// screen.
+//
+// A lyric is timed by the line and never by the word, so the only thing a line
+// carries is when it begins; when it stops has to be guessed, and spreading it
+// evenly until the next line begins is the guess this made for a long time.
+// Measured, that guess is a second out: 36 lines tapped by ear against the
+// playhead — a slow ballad, a Hungarian verse and the rap from the same record —
+// put the end of the singing at a median of 0.68, 0.76 and 0.82 of the way to
+// the next line. The rest of each window is the band playing on alone.
+//
+// Eighty-five per cent of the window, and never more than three seconds,
+// answers all three: a median error of 211 ms against 734 for running the whole
+// window, and it needs neither the tempo nor a syllable count — the syllables
+// were tried and are worth nothing here, because the same singer takes 442 ms
+// over one in the verse and 141 in the rap. See FINDINGS.md, and cmd/spindle-tap
+// for how the tapping was measured.
+//
+// Both numbers were fitted on those 36 lines and nothing above 160 bpm has been
+// checked, so the ceiling is the part to doubt first.
+func lyricsSung(window time.Duration) time.Duration {
+	return min(time.Duration(float64(window)*lyricsSungShare), lyricsSungMost)
+}
+
+// lyricsHeadStart is how far in front of its own stamp a line takes the screen.
+func lyricsHeadStart(window time.Duration) time.Duration {
+	return min(lyricsAhead, time.Duration(float64(window)*lyricsLeadShare))
+}
+
+// lyricsWindow is how long a line has before the next one is due, which is not
+// how long it is sung for — see lyricsSung.
+func (m Model) lyricsWindow(i int) time.Duration {
+	if i < 0 || i >= len(m.lyrics.lines) {
+		return 0
+	}
+	if i+1 >= len(m.lyrics.lines) {
+		return lyricsDefaultLine
+	}
+	return time.Duration(m.lyrics.lines[i+1].At-m.lyrics.lines[i].At) * time.Millisecond
+}
+
+// lyricsShows is the moment a line takes the screen: its own stamp, less the
+// head start it is allowed. Everything about a line is measured from here — when
+// the one before it gives way, and how much time the sweep has.
+func (m Model) lyricsShows(i int) int64 {
+	if i < 0 || i >= len(m.lyrics.lines) {
+		return 0
+	}
+	return m.lyrics.lines[i].At - lyricsHeadStart(m.lyricsWindow(i)).Milliseconds()
+}
 
 // lyricsState is the words of the track playing, and whether they are on screen.
 type lyricsState struct {
@@ -52,6 +134,10 @@ type lyricsState struct {
 	forTrack string
 	lines    []player.Lyric
 	synced   bool
+
+	// language is what the words are in, which is how a syllable is counted in
+	// them. See syllables.go.
+	language string
 
 	// missing records that the track was asked about and has none, which is a
 	// different thing from not having asked yet.
@@ -260,10 +346,10 @@ func (m Model) lyricsAt() int {
 
 	// Songs open with a bar or two of music. Lighting the first line through it
 	// says it is being sung when it is not.
-	pos := m.lyricsClock()
+	pos := m.elapsed().Milliseconds()
 	at := -1
-	for i, line := range m.lyrics.lines {
-		if line.At > pos {
+	for i := range m.lyrics.lines {
+		if m.lyricsShows(i) > pos {
 			break
 		}
 		at = i
@@ -272,7 +358,7 @@ func (m Model) lyricsAt() int {
 }
 
 // lyricsSweep is how much of the current line has been reached, spread evenly
-// over the time the line is given, and rounded to a whole word.
+// over the time the line is sung, and rounded to a whole word.
 //
 // Evenly is a guess — nobody sings at a constant rate — and the guess is why it
 // moves a word at a time rather than a letter at a time. A letter-by-letter
@@ -280,6 +366,10 @@ func (m Model) lyricsAt() int {
 // most of every word; a word lights as its turn comes and stays lit, which is
 // the same claim a progress bar makes about a track and is what the eye follows
 // anyway.
+//
+// Over the time the line is sung, not the time until the next one: those are
+// different by about a second, and it is the second that used to be given away.
+// See lyricsSung.
 func (m Model) lyricsSweep(i int, line string) int {
 	length := len([]rune(line))
 	if !m.lyrics.synced || i < 0 || i >= len(m.lyrics.lines) {
@@ -287,44 +377,50 @@ func (m Model) lyricsSweep(i int, line string) int {
 	}
 
 	start := m.lyrics.lines[i].At
-	end := start + int64(lyricsDefaultLine/time.Millisecond)
-	if i+1 < len(m.lyrics.lines) {
-		end = m.lyrics.lines[i+1].At
+	window := m.lyricsWindow(i)
+	onScreen := time.Duration(m.lyricsShows(i+1)-start) * time.Millisecond
+	if i+1 >= len(m.lyrics.lines) {
+		onScreen = window
 	}
-	if end <= start {
+
+	// Never longer than the line is the lit one. The next line takes over a
+	// lead ahead of its own stamp — that is what makes it readable — so a line
+	// on a short window gives way before 85% of it has passed, and the last word
+	// of it would never light at all. Measured on screen: below about three and
+	// a half seconds of window, which is most of a fast verse.
+	//
+	// The singing is being cut short here rather than the truth being told, and
+	// that is the right way round: a word that lights a little early is a small
+	// lie, and a word that never lights is a broken screen.
+	sung := min(lyricsSung(window), onScreen-lyricsStampsEarly)
+	if sung <= 0 {
 		return length
 	}
+	end := start + sung.Milliseconds()
 
-	frac := float64(m.lyricsClock()-start) / float64(end-start)
-	at := min(max(int(frac*float64(length)+0.5), 0), length)
-	return wordEnd(line, at)
+	// Before the voice has reached the line, nothing of it is lit. The line is
+	// on screen by then — it arrives early on purpose — and it stands there to
+	// be read rather than pretending to be sung. See lyricsVoice.
+	voice := m.lyricsVoice()
+	if voice < start {
+		return 0
+	}
+
+	frac := float64(voice-start) / float64(end-start)
+	return sweepTo(line, m.lyrics.language, min(max(frac, 0), 1))
 }
 
-// wordEnd rounds a position in a line out to the end of the word it lands in,
-// so a word is lit whole or not at all. A position inside the space between two
-// words has already left the one behind it and not reached the next.
-func wordEnd(line string, at int) int {
-	runes := []rune(line)
-	if at >= len(runes) {
-		return len(runes)
-	}
-	for i := at; i < len(runes); i++ {
-		if unicode.IsSpace(runes[i]) {
-			return i
-		}
-	}
-	return len(runes)
-}
-
-// lyricsClock is the playhead the words are read against, run a little ahead of
-// the one the progress bar shows.
+// lyricsVoice is the playhead the sweep is lit against: the one the singer is
+// actually at, with nothing added.
 //
-// The lead covers what sits between the sound and the eye: the daemon reports
-// where it is a moment after it is there, the screen is redrawn on a tick, and
-// a line lit exactly on its timestamp is read after it has been sung. Measured
-// by ear it ran a third of a second late, which is what this gives back.
-func (m Model) lyricsClock() int64 {
-	return m.elapsed().Milliseconds() + int64(lyricsAhead/time.Millisecond)
+// The lead belongs to the line and not to the word. A line wants to arrive
+// before the voice — that is what makes it readable, and it is why lyricsClock
+// exists — but a word lit half a second before it is sung is the screen saying
+// something untrue about this moment, and it was the first thing anybody
+// noticed once the ends were right. So the line comes early and unlit, and each
+// word lights as it is sung.
+func (m Model) lyricsVoice() int64 {
+	return m.elapsed().Milliseconds() - int64(lyricsStampsEarly/time.Millisecond)
 }
 
 // lyricsNote is what stands in the words' place when there are none to show.
@@ -416,6 +512,7 @@ func (m *Model) adoptLyrics(res msg.LyricsFetched) {
 	m.lyrics.forTrack = res.TrackID
 	m.lyrics.lines = res.Lines
 	m.lyrics.synced = res.Synced
+	m.lyrics.language = res.Language
 	m.lyrics.missing = len(res.Lines) == 0
 }
 

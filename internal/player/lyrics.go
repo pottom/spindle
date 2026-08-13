@@ -14,7 +14,14 @@ type Lyrics struct {
 	// Synced says whether the lines carry timings. Without them there is
 	// something to read but nothing to follow.
 	Synced bool
-	Lines  []Lyric
+
+	// Language is what the words are in, as the provider tags them: "en",
+	// "hu", and so on. It is carried because a syllable is counted differently
+	// in different languages, and how many syllables a word has is how long it
+	// takes to sing — see the sweep in internal/ui.
+	Language string
+
+	Lines []Lyric
 }
 
 // LyricSource is implemented by backends that can fetch the words of a track.

@@ -399,26 +399,47 @@ func TestLyricSweep(t *testing.T) {
 	const line = "and here is the second one"
 	length := len([]rune(line))
 
-	// The sweep moves a word at a time, so as the line's timestamp arrives its
-	// first word is lit whole — that word is what is being sung — and nothing
-	// beyond it. The clock runs a little ahead of the playhead, hence the lead.
-	m.setProgress(4*time.Second - lyricsAhead)
+	// The line arrives before the voice does — that is the head start, and it is
+	// what makes a lyric readable — and until the singing reaches it, none of it
+	// is lit. A word lit half a second early says it is being sung when it is not.
+	m.setProgress(time.Duration(m.lyricsShows(1)) * time.Millisecond)
+	if got := m.lyricsSweep(1, line); got != 0 {
+		t.Errorf("before the voice reached the line %d characters were lit, want none", got)
+	}
+
+	// And once the voice has reached it, its first word is lit whole — that word
+	// is what is being sung — and nothing beyond it. A stamp is written a little
+	// ahead of the singer it belongs to, which is what lyricsStampsEarly gives
+	// back, so the light comes that much after the stamp.
+	m.setProgress(4*time.Second + lyricsStampsEarly)
 	if got, want := m.lyricsSweep(1, line), len("and"); got != want {
 		t.Errorf("at the line's start %d characters are swept, want the first word's %d", got, want)
 	}
 
 	// And it always lands on a word's end, never inside one.
-	for at := 4 * time.Second; at < 8*time.Second; at += 200 * time.Millisecond {
-		m.setProgress(at - lyricsAhead)
+	for at := 4*time.Second + lyricsStampsEarly; at < 8*time.Second; at += 200 * time.Millisecond {
+		m.setProgress(at)
 		cut := m.lyricsSweep(1, line)
 		if cut < length && line[cut] != ' ' {
 			t.Errorf("at %v the sweep stops mid-word, at %q", at, line[:cut])
 		}
 	}
 
-	m.setProgress(6*time.Second - lyricsAhead)
-	if got := m.lyricsSweep(1, line); got < length/2-2 || got > length/2+2 {
-		t.Errorf("halfway through the line %d of %d are swept, want about half", got, length)
+	// Halfway through the singing — which is not halfway to the next line. The
+	// line is given four seconds of window and sung for three of them, so half
+	// of it lands at a second and a half. See lyricsSung.
+	sung := lyricsSung(4 * time.Second)
+	m.setProgress(4*time.Second + lyricsStampsEarly + sung/2)
+	if got := m.lyricsSweep(1, line); got < length/2-4 || got > length/2+4 {
+		t.Errorf("halfway through the singing %d of %d are swept, want about half", got, length)
+	}
+
+	// And the whole line is lit by the time the singing stops, with the rest of
+	// the window left to the band. Running it to the next line's start is what
+	// this used to do, and it lit the last word a second after it was sung.
+	m.setProgress(4*time.Second + lyricsStampsEarly + sung)
+	if got := m.lyricsSweep(1, line); got != length {
+		t.Errorf("at the end of the singing %d of %d are swept, want all of it", got, length)
 	}
 
 	// It never runs past the line, whatever the clock says.
@@ -435,6 +456,37 @@ func TestLyricSweep(t *testing.T) {
 	}
 }
 
+// Every line is lit to its last word before it gives way — even a short one.
+//
+// The next line takes over a lead ahead of its own stamp, and the singing is
+// reckoned at 85% of the window, so on anything under about three and a half
+// seconds the second number is the later one and the end of the line was still
+// dark when the screen moved on. Whole verses of a fast song lost their last
+// word that way, which reads as a screen that has missed something rather than
+// as a lyric that has been sung.
+func TestEveryLineIsLitBeforeItGivesWay(t *testing.T) {
+	m := lyricsModel(120, 44)
+	const line = "one two three four five"
+
+	for _, window := range []time.Duration{
+		1500 * time.Millisecond, 2 * time.Second, 3 * time.Second,
+		4 * time.Second, 6 * time.Second,
+	} {
+		m.lyrics.lines = []player.Lyric{
+			{At: 10000, Words: "before"},
+			{At: 10000 + window.Milliseconds(), Words: line},
+			{At: 10000 + 2*window.Milliseconds(), Words: "after"},
+		}
+		// The moment the line gives way, which is when the next one takes the
+		// screen — a head start that is itself a share of the window.
+		m.setProgress(time.Duration(m.lyricsShows(2)) * time.Millisecond)
+		if got, want := m.lyricsSweep(1, line), len([]rune(line)); got != want {
+			t.Errorf("with a %v window the line gave way with %d of %d lit — its last words never came on",
+				window, got, want)
+		}
+	}
+}
+
 // The sweep runs across the whole line, not restarting on each wrapped row: it
 // is one line however many rows it takes.
 func TestSweepCarriesAcrossWrappedRows(t *testing.T) {
@@ -448,12 +500,14 @@ func TestSweepCarriesAcrossWrappedRows(t *testing.T) {
 	line := strings.Join(words, " ")
 	length := len([]rune(line))
 
-	// A quarter of the way in, the sweep is a quarter through the whole line —
-	// which is well past the end of the first wrapped row.
-	m.setProgress(6 * time.Second)
+	// A third of the way through the singing, the sweep is a third through the
+	// whole line — which is well past the end of the first wrapped row. The
+	// line has an eight second window and is sung for three of them.
+	sung := lyricsSung(8 * time.Second)
+	m.setProgress(4*time.Second + lyricsStampsEarly + sung/3)
 	at := m.lyricsSweep(1, line)
-	if at < length/5 || at > length/3 {
-		t.Errorf("a quarter of the way in %d of %d is swept, want about a quarter", at, length)
+	if at < length/4 || at > length/2 {
+		t.Errorf("a third of the way in %d of %d is swept, want about a third", at, length)
 	}
 
 	// Later in the line it has to reach past the first wrapped row, which only
