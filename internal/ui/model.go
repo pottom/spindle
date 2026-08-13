@@ -253,6 +253,10 @@ type Model struct {
 	// has to line its second column up with something else on the screen rather
 	// than with the row's own arithmetic. Zero leaves the row to divide itself.
 	rowsMainAt int
+
+	// rowsAreTheQueue says every row of this list is already in the queue, so
+	// the column that marks queued tracks has nothing to say and is dropped.
+	rowsAreTheQueue bool
 }
 
 // New wires a model around a playback backend and an artwork loader. The palette

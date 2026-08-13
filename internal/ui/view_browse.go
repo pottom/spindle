@@ -385,7 +385,7 @@ func (m Model) withMark(t player.Track, title string) string {
 // has been picked over, and marks scattered along the titles cannot be counted
 // at a glance the way a column can.
 func (m Model) queuedColumn(t player.Track) string {
-	if m.tab == tabQueue {
+	if m.tab == tabQueue || m.rowsAreTheQueue {
 		// Everything here is in the queue by definition; a column saying so
 		// would be a column of dots.
 		return ""
