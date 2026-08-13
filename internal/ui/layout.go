@@ -133,14 +133,24 @@ func computeLayout(w, h, helpHeight int, hasBanner bool, mode layoutMode, cell c
 		infoWidth = room - leftMargin - rightMargin - artWidth - columnGap
 
 		if mode == modePlayer {
+			// The picture takes what it can of the surplus first, since it is the
+			// subject of this screen. It is usually held back by the rows rather
+			// than the columns, so this runs out quickly.
 			if infoWidth > maxInfoCols {
 				artWidth, artHeight = squareOff(artWidth+infoWidth-maxInfoCols, bodyHeight, cell)
-				infoWidth = maxInfoCols
 			}
-			infoWidth = max(min(infoWidth, maxInfoCols), minInfoCols)
-			// And the frame closes around the two of them, so what is left over
-			// is blank either side rather than a stretched caption.
-			interior = min(leftMargin+artWidth+columnGap+infoWidth+rightMargin, w)
+
+			// And the rest goes to the column beside it, all of it.
+			//
+			// It was capped here, and the frame closed around the two of them and
+			// centred, on the reasoning that a caption two hundred columns wide is
+			// not more readable for it. That reasoning is sound and the result was
+			// still wrong: it left a blank band down both sides of a wide terminal,
+			// which is exactly what shrinking the font is meant to get rid of. The
+			// line length is the text's business — the words are short and ragged
+			// right, so a wider column costs nothing — and the frame's business is
+			// to fill the screen.
+			infoWidth = max(interior-leftMargin-rightMargin-artWidth-columnGap, minInfoCols)
 		}
 		artRows = artworkRows(artWidth, artHeight, cell)
 	}

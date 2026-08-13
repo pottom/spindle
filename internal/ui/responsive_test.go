@@ -47,16 +47,22 @@ func TestThePlayerGrowsIntoTheRoomItIsGiven(t *testing.T) {
 }
 
 // And it grows sideways too, into the picture rather than into the line length.
-func TestThePlayerSpendsWidthOnThePictureNotTheCaption(t *testing.T) {
+func TestThePlayerFillsTheWidthItIsGiven(t *testing.T) {
 	var wasArt int
 	for _, s := range probeSizes {
 		l := computeLayout(s[0], s[1], 2, false, modePlayer, defaultTestCell)
 		if !l.hasArt() {
 			continue
 		}
-		if l.infoWidth > maxInfoCols {
-			t.Errorf("%dx%d: the caption is %d columns, wider than the %d it can be read at",
-				s[0], s[1], l.infoWidth, maxInfoCols)
+		// The frame reaches the edge of what the terminal offers, the same as
+		// every list does. A player centred in a blank band was the bug.
+		if want := min(s[0], maxTableWidth); l.interior != want {
+			t.Errorf("%dx%d: the player is %d wide, want %d — it is leaving a blank band down the sides",
+				s[0], s[1], l.interior, want)
+		}
+		if used := leftMargin + l.artWidth + columnGap + l.infoWidth + rightMargin; used < l.interior {
+			t.Errorf("%dx%d: the two columns come to %d inside a frame of %d",
+				s[0], s[1], used, l.interior)
 		}
 		if l.artWidth < wasArt {
 			t.Errorf("%dx%d: the picture shrank to %d from %d on a wider terminal",
