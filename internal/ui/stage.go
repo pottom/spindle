@@ -24,6 +24,12 @@ import (
 // it move like water rather than like a meter: a band that jumps throws what it
 // gained into the air, and it falls back.
 
+// stageOpens is the picture the big screen comes up in, every time it is
+// opened: the line being sung, and between the lines the marks, the dancers and
+// the faces. It is the picture a room is for — the one with somebody in it —
+// and the keys up here that call for a company or a face are its keys.
+const stageOpens = scopeWords
+
 const (
 	// stageReach is how much of the half-height a band at the top of the scale
 	// takes, leaving somewhere for the drops to go.
@@ -127,14 +133,26 @@ type stageDrop struct {
 }
 
 // stageState is what the big screen carries between frames.
-//
-// Which picture it shows is not one of them: the big screen and the strip under
-// the artwork are the same choice at two sizes, so they share it. Pressing the
-// key on either moves both.
 type stageState struct {
 	// on is whether the screen is up. It is not a tab: it is something you fall
 	// into and leave with the next key, the way turning the lights down is.
 	on bool
+
+	// mode is the picture up here, which is the big screen's own and nobody
+	// else's.
+	//
+	// It used to be the strip's: one choice at two sizes, moved by the key on
+	// either. That was wrong in both directions. The strip is a setting — it is
+	// chosen once per screen and kept, because it is the corner of the eye you
+	// work beside. This is not: it is opened to be watched, and what was worth
+	// watching last time is not what is worth watching now. Sharing meant the
+	// key pressed for the room changed what the working screens looked like
+	// afterwards, and it meant the picture the big screen was built for was not
+	// what it came up in.
+	//
+	// So it starts at stageOpens every time, and nothing it does here is
+	// written down or carried out.
+	mode scopeMode
 
 	// loose says the picture keeps time with the record rather than only
 	// answering how loud it is. On unless the key has turned it off, because
@@ -193,13 +211,22 @@ func (m *Model) stageEdgeFlow() {
 	m.stage.edgeAt += time.Duration(float64(now-m.stage.edgeAt) * (1 - float64(paceKeep(stageEdgeRun))))
 }
 
-// stageKey answers while the big screen is up, which it mostly does by leaving.
+// stageKey answers while the big screen is up.
 //
-// Any key at all: this is a screen you watch rather than work on, so the way
-// out is whatever your hand does next. The transport and the volume are the
-// exception — stopping the music or turning it down without losing the picture
-// is what anybody would expect of those keys, so they are left to the handlers
-// they have everywhere else.
+// Two keys leave: esc and q, the two that mean "back" everywhere else. Nothing
+// else does, and a key this screen has no use for does nothing at all rather
+// than putting the picture away.
+//
+// Any key at all used to be the way out, on the grounds that this is a screen
+// you watch rather than work on. In a room that is not what happens: a hand
+// finds the keyboard, something gets pressed, and the picture the room was
+// watching is gone — and it was never clear which key did it, because they all
+// did. A screen that has to survive being leaned on needs a way out you mean.
+//
+// The transport and the volume are the other exception, as they always were:
+// stopping the music or turning it down without losing the picture is what
+// anybody would expect of those keys, so they are left to the handlers they have
+// everywhere else.
 func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	if !m.stage.on {
 		return nil, false
@@ -207,16 +234,17 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 
 	switch {
 	case key.Matches(k, m.keys.Scope):
-		// The one key that changes the picture rather than putting it away, and
-		// it changes the same setting the strip uses — with the difference that
-		// there is no "off" up here: a blank full screen is not a picture,
-		// it is a mistake.
-		m.scope.modes[m.tab] = m.scopeMode().next()
-		if m.scopeMode() == scopeOff {
-			m.scope.modes[m.tab] = scopeOff.next()
+		// The one key that changes the picture rather than putting it away. It
+		// moves this screen's own picture and no other: what the working
+		// screens are set to is not touched, and nothing is written down. There
+		// is no "off" in the round either — a blank full screen is not a
+		// picture, it is a mistake.
+		m.stage.mode = m.stage.mode.next()
+		if m.stage.mode == scopeOff {
+			m.stage.mode = scopeOff.next()
 		}
 		m.stage.drops = nil
-		return tea.Batch(m.startScope(), m.savePrefs()), true
+		return m.startScope(), true
 
 	case key.Matches(k, m.keys.Loose):
 		// The two ways of drawing, side by side on the one record: keeping time
@@ -249,17 +277,26 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		key.Matches(k, m.keys.SeekFwd), key.Matches(k, m.keys.SeekBack),
 		key.Matches(k, m.keys.Shuffle), key.Matches(k, m.keys.Repeat):
 		// The transport, which belongs to whatever is playing rather than to
-		// whichever screen is up. Everything not named here closes the picture,
-		// which is what makes it a picture rather than a screen with a way out:
-		// any key gets you back. Seeking was missing from the list, so the two
-		// keys nearest to hand did the one thing nobody wanted.
+		// whichever screen is up. Seeking was missing from this list once, so
+		// the two keys nearest to hand did the one thing nobody wanted.
 		return nil, false
+
+	case key.Matches(k, m.keys.Back), key.Matches(k, m.keys.Quit):
+		// The way out. q and ctrl+c are the same binding, and only one of them
+		// means this: ctrl+c is not "leave this screen", it is "leave", and it
+		// has to mean that wherever it is pressed.
+		if k.Mod&tea.ModCtrl != 0 {
+			return nil, false
+		}
+		m.stage.on = false
+		m.stage.drops = nil
+		m.stage.was = nil
+		return keepAwake(false), true
 	}
 
-	m.stage.on = false
-	m.stage.drops = nil
-	m.stage.was = nil
-	return keepAwake(false), true
+	// Everything else: nothing. A key this screen has no use for is a key that
+	// was not meant, and it leaves the picture where it is.
+	return nil, true
 }
 
 // stageView draws the whole screen: the picture, with the track and the clock

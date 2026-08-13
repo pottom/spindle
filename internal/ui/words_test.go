@@ -1336,7 +1336,7 @@ func TestTheMeterDoesNotJumpBetweenPictures(t *testing.T) {
 func TestALineIsLitEvenly(t *testing.T) {
 	m := scopeModel(120, 44)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.words.text = "do you think you're better off alone"
 
 	// A spectrum that leans hard on one end, which is what used to pull a line

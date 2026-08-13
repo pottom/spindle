@@ -14,7 +14,7 @@ func swayModel(t *testing.T) Model {
 
 	m := scopeModel(120, 44)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.words.beats, m.words.text = true, wordsNotes
 	m.scope.bands = make([]float32, 28)
 

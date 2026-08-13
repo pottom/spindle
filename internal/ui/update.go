@@ -370,9 +370,9 @@ func (m Model) answer(message tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Batch(cmd, tideAsk, scopeFrameCmd(m.player, m.frameMode()))
 			}
 		}
-		// The water is only stirred where it is being drawn, and the big screen
-		// falls back to it when the strip is switched off.
-		if mirror := m.scopeMode().mirror() || (m.stage.on && m.scopeMode() == scopeOff); mirror {
+		// The water is only stirred where it is being drawn: the big screen at
+		// the size of the terminal, or the strip at four rows.
+		if m.scopeMode().mirror() {
 			if m.stage.on {
 				m.stageFlow(m.width, m.height)
 			} else {
@@ -661,7 +661,11 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.tab != tabPlayer || m.ps == nil {
 			return m, nil
 		}
-		m.stage.on = true
+		// Always the picture this screen was built for, whatever the strip
+		// under the artwork is set to and whatever was left up here last time.
+		// Somebody who puts the room's screen on wants the room's picture, not
+		// the waveform they left running in the corner of a working screen.
+		m.stage.on, m.stage.mode = true, stageOpens
 		return m, tea.Batch(m.startScope(), keepAwake(true))
 
 	case key.Matches(k, m.keys.Lyrics):

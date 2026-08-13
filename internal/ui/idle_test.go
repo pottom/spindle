@@ -15,7 +15,7 @@ func wordless(t *testing.T) Model {
 
 	m := scopeModel(100, 44)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.TrackID, m.ps.Title, m.ps.Album = "instrumental", "Windowlicker", "Windowlicker EP"
 	m.ps.Artists = []string{"Aphex Twin"}
 	m.ps.Duration = 6 * time.Minute
@@ -81,7 +81,7 @@ func TestTheBigScreenSendsForTheWords(t *testing.T) {
 	}
 
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	if cmd := m.fetchLyrics(); cmd == nil {
 		t.Error("the lyric picture is on the big screen and the words were never sent for")
 	}
@@ -103,7 +103,7 @@ func TestTheBigScreenSendsForTheWords(t *testing.T) {
 func TestTheMarksKeepTheScreenUntilTheSheetLands(t *testing.T) {
 	m := scopeModel(100, 44)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.TrackID, m.ps.Title = "new", "A Song"
 	m.ps.Artists = []string{"The Band"}
 	m.ps.Duration = 3 * time.Minute
@@ -151,7 +151,7 @@ func TestNothingSetIsStillTheSamePicture(t *testing.T) {
 
 	m := scopeModel(w, rows)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 
 	bands := make([]float32, 28)
 	for i := range bands {

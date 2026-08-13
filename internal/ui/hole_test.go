@@ -20,7 +20,7 @@ import (
 func stageWords(id string) Model {
 	m := scopeModel(160, 44)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps = &player.State{TrackID: id, Title: "a record", Artists: []string{"someone"},
 		Playing: true, Duration: 4 * time.Minute}
 	m.words.forTrack = id

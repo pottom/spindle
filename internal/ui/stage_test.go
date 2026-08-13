@@ -15,7 +15,7 @@ import (
 // stageModel is a player screen with the big picture up and something to draw.
 func stageModel(w, h int) Model {
 	m := scopeModel(w, h)
-	m.stage.on = true
+	m.stage.on, m.stage.mode = true, stageOpens
 
 	bands := make([]float32, 28)
 	for i := range bands {
@@ -43,15 +43,37 @@ func TestStageTakesTheScreenAndGivesItBack(t *testing.T) {
 		t.Error("the frames stop while the big screen is up")
 	}
 
-	// Anything at all comes back, including a key that means something else
-	// everywhere: this is the way out and it has to be the first thing tried.
+	// A key this screen has no use for does nothing at all. It used to be the
+	// way out — every key was — and a room only has to lean on the keyboard
+	// once to lose the picture it was watching.
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
+	if held := tm.(Model); !held.stage.on {
+		t.Error("a key the big screen has no use for put it away")
+	}
+
+	// esc comes back, and takes nothing with it.
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	back := tm.(Model)
 	if back.stage.on {
-		t.Error("a key press left the big screen up")
+		t.Error("esc left the big screen up")
 	}
 	if back.tab != tabPlayer {
 		t.Errorf("the key that closed the screen also changed tab, to %d", back.tab)
+	}
+}
+
+// And q is the other way out: the key that means "back" everywhere else means
+// it here too, so a hand that wants the working screen back has two answers and
+// does not have to remember which.
+func TestQLeavesTheBigScreen(t *testing.T) {
+	m := scopeModel(100, 40)
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+
+	if got := tm.(Model); got.stage.on {
+		t.Error("q left the big screen up")
 	}
 }
 
@@ -197,8 +219,9 @@ func TestTheWaterIgnoresTheBeat(t *testing.T) {
 	}
 }
 
-// The same key that cycles the strip cycles the big screen, and it is the one
-// key up there that does not put the picture away.
+// The key that cycles the strip cycles the big screen too, and it is the one
+// key up there that does not put the picture away. It walks this screen's own
+// picture, from the one it opened in.
 func TestStageCyclesItsPictures(t *testing.T) {
 	m := stageModel(100, 40)
 	m.scope.frame = make([]float32, 2*256)
@@ -207,9 +230,9 @@ func TestStageCyclesItsPictures(t *testing.T) {
 	}
 
 	var tm tea.Model = m
-	// The same three the strip cycles, and never "off": a blank full screen is
-	// not one of the pictures.
-	for i, want := range []scopeMode{scopeBars, scopeMirror, scopeLadder, scopeWords, scopeWave} {
+	// Round from the picture it opens in, and never "off": a blank full screen
+	// is not one of the pictures.
+	for i, want := range []scopeMode{scopeWave, scopeBars, scopeMirror, scopeLadder, scopeWords} {
 		tm, _ = tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
 		got := tm.(Model)
 		if !got.stage.on {
@@ -227,7 +250,7 @@ func TestStageFillsTheScreenInEveryPicture(t *testing.T) {
 	for mode := scopeWave; mode < scopeModes; mode++ {
 		for _, ready := range []bool{false, true} {
 			m := stageModel(100, 40)
-			m.scope.modes[m.tab] = mode
+			m.stage.mode = mode
 			if ready {
 				m.scope.frame = make([]float32, 2*256)
 				m.scope.follow(m.scope.frame)
@@ -273,24 +296,62 @@ func TestStageStandsOnTheFloorWhenItIsShallow(t *testing.T) {
 	}
 }
 
-// The strip and the big screen are one choice: what is showing under the
-// artwork is what fills the screen when it is asked to.
-func TestStageAndStripAgree(t *testing.T) {
+// The strip and the big screen are two choices, not one.
+//
+// They shared a setting once. The room's screen then came up in whatever was
+// running in the corner of a working screen, and whatever was pressed for the
+// room was still there on the working screens afterwards — one key, two
+// meanings, and neither of them what was wanted.
+func TestStageKeepsItsOwnPicture(t *testing.T) {
 	m := scopeModel(100, 40)
 	m.scope.modes[tabPlayer] = scopeBars
 
+	// It opens in its own picture, whatever the strip is set to.
 	var tm tea.Model = m
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
-	if got := tm.(Model); got.scopeMode() != scopeBars {
-		t.Errorf("the big screen opened showing %d, want the strip's %d", got.scopeMode(), scopeBars)
+	if got := tm.(Model); got.scopeMode() != stageOpens {
+		t.Errorf("the big screen opened showing %d, want %d", got.scopeMode(), stageOpens)
 	}
 
-	// And changing it up there is the same change down here.
+	// Changed up there, and left in something else.
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
 	after := tm.(Model)
-	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
-	if got := tm.(Model); got.scopeMode() != after.scopeMode() {
-		t.Errorf("the strip came back as %d after the big screen was left at %d", got.scopeMode(), after.scopeMode())
+	if after.scopeMode() == stageOpens {
+		t.Fatal("the key did not change the big screen's picture, so there is nothing to leave it in")
+	}
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	back := tm.(Model)
+	if back.stage.on {
+		t.Fatal("the big screen is still up")
+	}
+	if back.scopeMode() != scopeBars {
+		t.Errorf("the strip came back as %d after the big screen was left at %d, want the %d it was set to",
+			back.scopeMode(), after.scopeMode(), scopeBars)
+	}
+
+	// And opening it again starts where it always starts, not where it was left.
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+	if got := tm.(Model); got.scopeMode() != stageOpens {
+		t.Errorf("the big screen came back showing %d, want %d — it is not a setting", got.scopeMode(), stageOpens)
+	}
+}
+
+// Each working screen keeps its own picture, and the big screen does not touch
+// any of them.
+func TestTheStripStaysPerTab(t *testing.T) {
+	m := scopeModel(100, 40)
+	m.scope.modes[tabPlayer], m.scope.modes[tabQueue] = scopeBars, scopeWave
+
+	var tm tea.Model = m
+	for _, k := range []string{"f", "v", "v"} {
+		tm, _ = tm.Update(tea.KeyPressMsg{Code: rune(k[0]), Text: k})
+	}
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	got := tm.(Model)
+	if got.scope.modes[tabPlayer] != scopeBars || got.scope.modes[tabQueue] != scopeWave {
+		t.Errorf("the screens came back as %v, want the bars on the player and the wave on the queue", got.scope.modes)
 	}
 }
 
@@ -300,6 +361,9 @@ func TestStageAndStripAgree(t *testing.T) {
 // would have left it instead.
 func TestPausedPictureSettles(t *testing.T) {
 	m := stageModel(100, 40)
+	// The water, because it is the picture that keeps something of its own
+	// between frames: the drops already thrown have to land as well.
+	m.stage.mode = scopeMirror
 	m.scope.frame = make([]float32, 2*256)
 	for i := range m.scope.frame {
 		m.scope.frame[i] = 0.9
@@ -336,7 +400,21 @@ func TestPausedPictureSettles(t *testing.T) {
 		}
 	}
 
-	// And the picture that draws them is empty rather than held.
+	// And the picture that draws them is empty rather than held — once what was
+	// already in the air has landed. The measurements settle in the second
+	// above; the drops thrown off them are still falling for a fifth of one
+	// after that, which is the arc doing what it is meant to and not the
+	// picture being held. Measured: the last of them is down by frame 36.
+	for range 10 {
+		tm, _ = tm.Update(msg.WaveformReady{
+			Bands:   []float32{0.9, 0.9, 0.9},
+			Samples: []float32{0.9, -0.9, 0.9, -0.9},
+		})
+	}
+	got = tm.(Model)
+	if len(got.stage.drops) > 0 {
+		t.Errorf("%d drops are still in the air", len(got.stage.drops))
+	}
 	for r, line := range got.stageArt(100, 40) {
 		if strings.TrimSpace(ansiOff(line)) != "" {
 			t.Errorf("row %d of the paused picture still has %q in it", r, strings.TrimSpace(ansiOff(line)))
@@ -370,7 +448,7 @@ func TestTheEdgeIsTheProgress(t *testing.T) {
 	m := scopeModel(100, 44)
 	m.width, m.height = w, rows
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeBars
+	m.stage.mode = scopeBars
 
 	bands := make([]float32, 28)
 	m.scope.bands = bands // silent, so the only ink is the edge
@@ -436,7 +514,7 @@ func TestTheEdgeClosesWhereTheNextRecordStarts(t *testing.T) {
 	m := scopeModel(100, 44)
 	m.width, m.height = w, rows
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeBars
+	m.stage.mode = scopeBars
 	m.scope.bands = make([]float32, 28)
 	m.ps.Duration = 100 * time.Second
 
@@ -461,7 +539,7 @@ func TestTheEdgeClosesWhereTheNextRecordStarts(t *testing.T) {
 func TestTheBigScreenIsAllPicture(t *testing.T) {
 	m := scopeModel(100, 40)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeBars
+	m.stage.mode = scopeBars
 	m.ps.Title, m.ps.Artists = "A Title Nobody Wants Up There", []string{"An Artist"}
 
 	drawn := m.stageView()

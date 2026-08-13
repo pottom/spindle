@@ -234,8 +234,15 @@ func (m Model) listTab() bool {
 	return m.tab == tabQueue
 }
 
-// scopeMode is the visualiser the current tab is set to.
-func (m Model) scopeMode() scopeMode { return m.scope.modes[m.tab] }
+// scopeMode is the visualiser being drawn: the big screen's own while it is up,
+// and otherwise whatever this tab is set to. The two are separate choices —
+// see stageState.mode.
+func (m Model) scopeMode() scopeMode {
+	if m.stage.on {
+		return m.stage.mode
+	}
+	return m.scope.modes[m.tab]
+}
 
 // scopeWidth is how many cells the trace has on the current tab.
 func (m Model) scopeWidth(l layout) int {
@@ -281,17 +288,11 @@ func (m Model) scopeVisible() bool {
 	return m.stage.on || (m.scopeMode() != scopeOff && m.scopeAvailable())
 }
 
-// frameMode is what the next frame should be fetched for. The big screen is
-// drawn from the bands whatever the strip underneath it was set to.
-func (m Model) frameMode() scopeMode {
-	// The big screen always draws something, so it always needs something: with
-	// the strip switched off it shows the mirrored picture, which is drawn from
-	// the bands.
-	if m.stage.on && m.scopeMode() == scopeOff {
-		return scopeBars
-	}
-	return m.scopeMode()
-}
+// frameMode is what the next frame should be fetched for: whichever picture is
+// being drawn. The big screen is never off — it opens on the mirrored picture
+// and the key steps over off — so there is no case here for a screen that shows
+// something and asks for nothing.
+func (m Model) frameMode() scopeMode { return m.scopeMode() }
 
 // scopeLines renders the trace across w cells.
 //

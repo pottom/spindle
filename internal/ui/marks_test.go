@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pottom/spindle/internal/ui/msg"
 	"github.com/pottom/spindle/internal/player"
+	"github.com/pottom/spindle/internal/ui/msg"
 )
 
 // A bar of marks is dealt its cast, and the notes are one of them.
@@ -174,7 +174,7 @@ func TestADrawnRowNeedsNoRoundTrip(t *testing.T) {
 	}
 	m := scopeModel(160, 44)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 4 * time.Minute
 	m.lyrics.forTrack, m.lyrics.missing = m.ps.TrackID, true
 	m.words.forTrack = m.ps.TrackID
@@ -266,7 +266,7 @@ func TestTheCastIsDealtEveryBar(t *testing.T) {
 	}
 	m := scopeModel(160, 44)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 6 * time.Minute
 	m.lyrics.forTrack, m.lyrics.missing = m.ps.TrackID, true
 	m.words.forTrack = m.ps.TrackID

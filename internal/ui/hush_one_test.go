@@ -51,7 +51,7 @@ func TestTheHushDoesNotDanceToWhatItCannotHear(t *testing.T) {
 	m := New(player.NewMock(), nil, defaultTestCell)
 	m.width, m.height = 120, 40
 	m.stage.on = true
-	m.scope.modes[m.tab] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps = &player.State{TrackID: "one", Title: "x", Duration: 3 * time.Minute, Playing: true, Volume: 60}
 	m.setProgress(40 * time.Second)
 	m.words.forTrack = "one"

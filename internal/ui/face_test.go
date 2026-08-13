@@ -128,7 +128,7 @@ func TestTheEyeClosesToALine(t *testing.T) {
 func TestHeNeverComesOnByHimself(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 6 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
@@ -162,7 +162,7 @@ func TestHeNeverComesOnByHimself(t *testing.T) {
 func TestHeVisitsABarRatherThanTakingIt(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 4 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
@@ -267,7 +267,7 @@ func TestEveryTurnShows(t *testing.T) {
 func TestTheFaceCanBeAskedFor(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.words.beats, m.words.text = true, wordsNotes
 	m.words.starts = 1
 
@@ -309,7 +309,7 @@ func TestTheFaceFillsTheScreen(t *testing.T) {
 
 	m := scopeModel(w, rows)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.words.beats, m.words.text = true, wordsNotes
 	m.face.shown = time.Now()
 
@@ -457,7 +457,7 @@ func TestHeHasHands(t *testing.T) {
 func TestHisHandsThrowTheWater(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.stage.drops = nil
 
 	m.faceSparks(m.width, m.height)
@@ -538,7 +538,7 @@ func TestHisArmsRideTheMusic(t *testing.T) {
 func TestHeWalksOnAndOff(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 4 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
@@ -771,7 +771,7 @@ func TestHeTakesHisCueFromTheMusic(t *testing.T) {
 	at := func(gone float64, rise bool) faceDoing {
 		m := scopeModel(160, 46)
 		m.stage.on = true
-		m.scope.modes[tabPlayer] = scopeWords
+		m.stage.mode = scopeWords
 		m.ps.Duration = 4 * time.Minute
 		m.words.beats, m.words.text = true, wordsNotes
 
@@ -856,7 +856,7 @@ func TestHisNoseFollowsHim(t *testing.T) {
 	// And it agrees with where he is actually going.
 	m := scopeModel(160, 46)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 4 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 	summon(&m, 21_000)
@@ -896,7 +896,7 @@ func TestHisNoseFollowsHim(t *testing.T) {
 func TestAVisitSurvivesTheBarChangingUnderIt(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 20 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 

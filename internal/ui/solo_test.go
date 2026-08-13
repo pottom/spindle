@@ -15,7 +15,7 @@ import (
 func sung(at ...int) Model {
 	m := scopeModel(100, 44)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.TrackID, m.ps.Title = "sung", "A Long Song"
 	m.ps.Artists = []string{"The Band"}
 	m.ps.Duration = 5 * time.Minute
@@ -340,7 +340,7 @@ func TestACutNameIsMarked(t *testing.T) {
 func TestTheRecordNeverSaysItsNameUnasked(t *testing.T) {
 	m := scopeModel(100, 44)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.TrackID, m.ps.Title = "late", "A Long Song"
 	m.ps.Artists, m.ps.Album = []string{"The Band"}, "An Album"
 	m.ps.Duration = 5 * time.Minute
@@ -428,7 +428,7 @@ func TestTheMarksAreNotDealtOnTopOfThemselves(t *testing.T) {
 func TestTheRunOutIsAGapLikeAnyOther(t *testing.T) {
 	m := scopeModel(120, 44)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 2*time.Minute + 54*time.Second
 	m.lyrics.forTrack, m.lyrics.synced = m.ps.TrackID, true
 	m.lyrics.lines = []player.Lyric{
@@ -479,7 +479,7 @@ func TestTheRunOutIsAGapLikeAnyOther(t *testing.T) {
 func TestAnEmptyLineIsKeptByTheMarks(t *testing.T) {
 	m := scopeModel(120, 44)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 2*time.Minute + 54*time.Second
 	m.lyrics.forTrack, m.lyrics.synced = m.ps.TrackID, true
 	m.lyrics.lines = []player.Lyric{

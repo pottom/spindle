@@ -13,7 +13,7 @@ import (
 func benchModel(w, rows int, mode scopeMode) Model {
 	m := scopeModel(w, rows)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = mode
+	m.stage.mode = mode
 	m.ps.Duration = 4 * time.Minute
 	m.lyrics.forTrack, m.lyrics.missing = m.ps.TrackID, true
 	m.setProgress(30 * time.Second)

@@ -130,7 +130,7 @@ func TestADrawnFigureTakesTheSlot(t *testing.T) {
 
 	m := scopeModel(w, rows)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 4 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
@@ -373,7 +373,7 @@ func TestEachFigureIsOnlyAskedForWhatItCanDo(t *testing.T) {
 func TestTheDrawingFollowsTheAct(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 4 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
@@ -576,7 +576,7 @@ func TestHeComesAndGoesTwoWays(t *testing.T) {
 func TestHeIsFainterThanTheSparks(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 4 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
@@ -662,7 +662,7 @@ func TestHeComesApartOutOfSpecks(t *testing.T) {
 func TestComingApartHandsHimToTheWater(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 4 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
@@ -733,7 +733,7 @@ func TestHeWalksThroughTheMarks(t *testing.T) {
 
 	m := scopeModel(w, rows)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 4 * time.Minute
 
 	bands := make([]float32, 28)
@@ -834,7 +834,7 @@ func TestHeLeavesNoMarkStanding(t *testing.T) {
 	for bar := range int64(150) {
 		m := scopeModel(w, rows)
 		m.stage.on = true
-		m.scope.modes[tabPlayer] = scopeWords
+		m.stage.mode = scopeWords
 		m.ps.Duration = 90 * time.Minute
 		m.words.starts = bar * 7_000
 		if m.faceWho() == "" {
@@ -881,7 +881,7 @@ func TestTheMarksGoOnRidingWhileHeWalksIn(t *testing.T) {
 
 	m := scopeModel(w, rows)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 4 * time.Minute
 
 	var found bool
@@ -948,7 +948,7 @@ func TestAHopperLeavesTheGround(t *testing.T) {
 	// being measured here is him.
 	m := scopeModel(160, 46)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.scope.bands = nil
 	m.words.beats, m.words.text = true, wordsNotes
 
@@ -1009,7 +1009,7 @@ func TestAHopperLeavesTheGround(t *testing.T) {
 func TestSometimesHeMoonwalks(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 4 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
@@ -1066,7 +1066,7 @@ func TestSometimesHeMoonwalks(t *testing.T) {
 func TestOneVisitIsOneFigure(t *testing.T) {
 	m := scopeModel(160, 46)
 	m.stage.on = true
-	m.scope.modes[tabPlayer] = scopeWords
+	m.stage.mode = scopeWords
 	m.ps.Duration = 6 * time.Minute
 	m.words.beats, m.words.text = true, wordsNotes
 
