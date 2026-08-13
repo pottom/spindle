@@ -96,10 +96,13 @@ func (m Model) renderPlayer() string {
 	if m.tab == tabPlayer && m.scopeVisible() {
 		body = m.drawScope(body, l)
 	}
-	if m.peekVisible() {
-		body = m.drawPeek(body, l)
-	}
 	lines = append(lines, m.outline(body, l.interior, "body")...)
+
+	// After the body is in place, because the glance starts in the blank row
+	// above it and so needs the frame rather than the body.
+	if m.peekVisible() {
+		lines = m.drawPeek(lines, len(lines)-len(body)-1, l)
+	}
 
 	// A blank row before the bottom block, so the help never reads as one more
 	// entry in whatever list ends above it.

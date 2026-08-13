@@ -35,9 +35,13 @@ func (m Model) peekVisible() bool { return m.peek.on && m.peekAvailable() }
 
 // drawPeek writes the glance into the blank rows above the artwork, leaving
 // everything below exactly where it was.
-func (m Model) drawPeek(body []string, l layout) []string {
-	if len(body) < peekRows+peekChrome {
-		return body
+//
+// It starts one row above the body, in the blank the frame keeps between the
+// header and everything else — which is where every other screen's first line
+// sits, and where this one looked a row low.
+func (m Model) drawPeek(lines []string, at int, l layout) []string {
+	if len(lines)-at < peekRows+peekChrome {
+		return lines
 	}
 	// A column in from the frame's own margin. Flush with the artwork and the
 	// device name, the glance reads as part of the chrome rather than as
@@ -46,19 +50,25 @@ func (m Model) drawPeek(body []string, l layout) []string {
 	w := l.interior - leftMargin - rightMargin - inset
 	indent := strings.Repeat(" ", inset)
 
-	for i, row := range m.place(m.upNextBlock(), w, peekRows+1) {
-		body[i] = m.pad(indent+row, l)
+	// The title column is held to the picture's width, so the artists below the
+	// heading start on the same column the track's own artists do further down
+	// the screen. Left to the row's own arithmetic they landed wherever the
+	// division fell, which is a column that lines up with nothing.
+	glance := m
+	glance.rowsMainAt = max(l.artWidth+columnGap-inset-rowGutter-1, 0)
+
+	for i, row := range glance.place(glance.upNextBlock(), w, peekRows+1) {
+		lines[at+i] = m.pad(indent+row, l)
 	}
-	return body
+	return lines
 }
 
+// peekSubtitle is what goes beside the heading. Only the empty case says
+// anything: "and more" was true of almost every queue there is, so it was a
+// word that never varied and never told anybody anything.
 func peekSubtitle(n int) string {
-	switch {
-	case n == 0:
+	if n == 0 {
 		return "nothing queued"
-	case n <= peekRows:
-		return ""
-	default:
-		return "and more"
 	}
+	return ""
 }

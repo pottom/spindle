@@ -248,6 +248,11 @@ type Model struct {
 	// rowsAreFlush drops the cursor column from list rows, for the lists that
 	// have no cursor. Set while drawing one and cleared straight after.
 	rowsAreFlush bool
+
+	// rowsMainAt fixes the width of a row's first column, for the one list that
+	// has to line its second column up with something else on the screen rather
+	// than with the row's own arithmetic. Zero leaves the row to divide itself.
+	rowsMainAt int
 }
 
 // New wires a model around a playback backend and an artwork loader. The palette

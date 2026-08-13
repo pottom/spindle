@@ -33,8 +33,10 @@ func TestPeekMovesNothing(t *testing.T) {
 		t.Fatal("the glance is not showing")
 	}
 
-	// Only the band itself may differ.
-	first := tabBarHeight
+	// Only the band itself may differ. It begins one row above the body, in the
+	// blank the frame keeps under the header — which is where every other
+	// screen's first line sits, and is why this one used to read a row low.
+	first := tabBarHeight - 1
 	for i := range off {
 		if i >= first && i < first+peekRows+peekChrome {
 			continue

@@ -74,7 +74,11 @@ const (
 
 	// tempoCols holds a beat rate, right aligned. It is the first column to go
 	// when the pane is narrow: a tempo is worth knowing, a title is worth more.
-	tempoCols = 4
+	//
+	// Wide enough for the unit as well as the number. A bare 103 sitting next to
+	// a 4:10 reads as a second time, or as nothing at all — nobody asked what it
+	// was because there was nothing there to ask about.
+	tempoCols = 7
 )
 
 // listBlock is the shape every list screen shares: the cover and the details of
@@ -974,7 +978,7 @@ func (m Model) tempoCell(t player.Track) string {
 	if t.Tempo <= 0 {
 		return ""
 	}
-	return m.styles.Quality.Render(fmt.Sprintf("%.0f", t.Tempo))
+	return m.styles.Quality.Render(fmt.Sprintf("%.0f bpm", t.Tempo))
 }
 
 // row lays out the cursor gutter and the three columns of a list row. The two
@@ -1097,6 +1101,13 @@ func (m Model) rowColsAlbum(w int, selected bool, primary, secondary, album, tem
 	}
 
 	main, second, beat, albumWidth := rowWidths(body)
+	if m.rowsMainAt > 0 && m.rowsMainAt < body-trailingCols {
+		// Widened or narrowed to line the second column up with something
+		// elsewhere on the screen. What the first column gives up or takes goes
+		// to the second, so the columns to the right of it stay where they are.
+		second = max(second+main-m.rowsMainAt, 0)
+		main = m.rowsMainAt
+	}
 
 	line := gutter + fit(primary, max(main, 0)) + " "
 	if second > 0 {
