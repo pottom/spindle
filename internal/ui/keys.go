@@ -209,11 +209,11 @@ func newKeyMap() keyMap {
 		),
 		Scope: key.NewBinding(
 			key.WithKeys("v"),
-			key.WithHelp("v", "waveform"),
+			key.WithHelp("v", "vis"),
 		),
 		Stage: key.NewBinding(
 			key.WithKeys("f"),
-			key.WithHelp("f", "full screen"),
+			key.WithHelp("f", "full vis"),
 		),
 		Tell: key.NewBinding(
 			key.WithKeys("t"),
@@ -425,14 +425,14 @@ func (k keyMap) forPlayer(scope, lyrics, peek bool, width int) tabKeys {
 		short = append(short, hint("l", "lyrics"))
 	}
 	if scope {
-		short = append(short, hint("v", "waveform"))
+		short = append(short, hint("v", "vis"))
 	}
 	if peek {
 		short = append(short, hint("u", "up next"))
 	}
 	// No "?" on it. The bar names everything this screen does, so the table
 	// behind that key has nothing left to add here.
-	short = append(short, hint("t", "big screen"), hint("d", "devices"))
+	short = append(short, hint("f", "full vis"), hint("d", "devices"))
 	short = fitHints(short, width)
 
 	second := []key.Binding{k.Shuffle, k.Repeat, k.Devices}
@@ -477,7 +477,7 @@ func (k keyMap) forOpen(albums, scope bool) tabKeys {
 	}
 	second := []key.Binding{k.Actions, k.PlayOne, k.PlayPause, k.Next, k.Help}
 	if scope {
-		short = append(short, hint("v", "waveform"))
+		short = append(short, hint("v", "vis"))
 		second = append(second, k.Scope)
 	}
 	return tabKeys{
@@ -503,7 +503,7 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 		}
 		second := []key.Binding{k.Actions, k.PlayPause, k.Next, k.NextTab, k.Help}
 		if scope {
-			short = append(short, hint("v", "waveform"))
+			short = append(short, hint("v", "vis"))
 			second = append(second, k.Scope)
 		}
 		return tabKeys{
@@ -526,7 +526,7 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 		}
 		second := []key.Binding{k.Actions, k.PlayOne, k.PlayPause, k.Next, k.Help}
 		if scope {
-			short = append(short, hint("v", "waveform"))
+			short = append(short, hint("v", "vis"))
 			second = append(second, k.Scope)
 		}
 		return tabKeys{
