@@ -84,6 +84,16 @@ func syllables(word, lang string) int {
 	return max(runs, 1)
 }
 
+// lyricsSyllables is how many a whole line has, which is what a line has to sing
+// rather than how long it has to sing it in.
+func lyricsSyllables(line, lang string) int {
+	total := 0
+	for _, word := range strings.Fields(line) {
+		total += syllables(word, lang)
+	}
+	return total
+}
+
 // vowel says whether a rune is one, accents and all. The Hungarian long vowels
 // are here because they are vowels, and because a line of Hungarian counted
 // without them comes out half the length it is.
