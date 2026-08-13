@@ -452,6 +452,12 @@ func (m Model) handleTick() (tea.Model, tea.Cmd) {
 	if cmd := m.syncCover(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
+	// And the device itself, which can go away under everything else: a daemon
+	// whose playback loop wedged ends rather than sitting there deaf, and
+	// nothing else is left running to start another. See revive.go.
+	if cmd := m.revive(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 
 	// The tick no longer counts anything: elapsed derives the position from the
 	// clock. It is still what notices a track running out, and what keeps the
@@ -686,7 +692,7 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.peek.on = !m.peek.on
-		return m, m.savePrefs()
+		return m, tea.Batch(m.savePrefs(), m.readSaved())
 
 	case key.Matches(k, m.keys.SearchType):
 		// / looks for something where you are. On a list that means the list —
