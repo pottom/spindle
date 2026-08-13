@@ -81,6 +81,10 @@ func (m Model) upNextBlock() block {
 		// column one would stand in is dead space.
 		flush := m
 		flush.rowsAreFlush = true
+		// And every row of it is in the queue already, which is what turns the
+		// column of queued dots into the column that says which of them are
+		// saved. See queuedColumn.
+		flush.rowsAreTheQueue = true
 		for i := range h - 1 {
 			row := strings.Repeat(" ", w)
 			if i < len(m.queue) {

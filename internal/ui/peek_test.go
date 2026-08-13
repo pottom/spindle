@@ -7,8 +7,10 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/pottom/spindle/internal/player"
+	"github.com/pottom/spindle/internal/ui/msg"
 )
 
 func peekModel() Model {
@@ -130,6 +132,77 @@ func TestPeekRowsAreFlushWithTheHeading(t *testing.T) {
 	}
 	if heading != device+1 {
 		t.Errorf("the glance starts at column %d and the device name at %d, want one column in", heading, device)
+	}
+}
+
+// The column in front of the titles carries a heart for the tracks that are
+// saved, and nothing for the rest.
+//
+// It used to carry a dot on every row, saying each was in the queue — which is
+// the one thing every row of a list of what is queued can be relied on to be.
+func TestTheGlanceMarksTheSavedTracks(t *testing.T) {
+	m := peekModel()
+	m.peek.on = true
+	m.library.adoptLiked([]player.Track{{ID: "1", Title: "second"}}, false)
+
+	rows := map[string]string{}
+	for _, row := range strings.Split(plain(m.render()), "\n") {
+		for _, title := range []string{"first", "second", "third"} {
+			if strings.Contains(row, title) {
+				rows[title] = row
+			}
+		}
+	}
+	if len(rows) != 3 {
+		t.Fatalf("found %d of the glance's rows", len(rows))
+	}
+
+	if !strings.Contains(rows["second"], likedMark) {
+		t.Errorf("the saved track has no heart: %q", rows["second"])
+	}
+	for _, title := range []string{"first", "third"} {
+		if strings.Contains(rows[title], likedMark) {
+			t.Errorf("%q is not saved and carries a heart: %q", title, rows[title])
+		}
+	}
+
+	// And the column is held open on the rows without one, so a track being
+	// saved elsewhere does not shunt the list sideways. In cells: the heart is
+	// three bytes and a variation selector, and one column.
+	at := func(row, title string) int { return lipgloss.Width(row[:strings.Index(row, title)]) }
+	if a, b := at(rows["first"], "first"), at(rows["second"], "second"); a != b {
+		t.Errorf("the titles start at columns %d and %d, want the column held open", a, b)
+	}
+}
+
+// Nothing has been read of the saved tracks until something asks, and opening
+// the glance is something asking: a blank column because nobody fetched the
+// list reads exactly like a queue with nothing saved in it.
+func TestTheGlanceSendsForTheSavedTracks(t *testing.T) {
+	m := peekModel()
+	if m.readSaved() != nil {
+		t.Error("the saved tracks were sent for with no glance to show them")
+	}
+
+	m.peek.on = true
+	if m.readSaved() == nil {
+		t.Fatal("the glance is up and the saved tracks were never sent for")
+	}
+
+	// The answer fills the set the marks are read from. This is the wire
+	// between asking and drawing, and a set that stayed empty would show as a
+	// glance with no hearts in it — which is also what a queue of nothing saved
+	// looks like, so nothing on screen would say it was broken.
+	var tm tea.Model = m
+	tm, _ = tm.Update(msg.OpenedFetched{ID: likedID, Tracks: []player.Track{{ID: "3"}}})
+	if got := tm.(Model); !got.library.saved("3") {
+		t.Error("the saved tracks arrived and the glance still does not know them")
+	}
+
+	// And only once: what has been read is not read again on every keystroke.
+	m.library.adoptLiked(nil, true)
+	if m.readSaved() != nil {
+		t.Error("the saved tracks were sent for again after being read")
 	}
 }
 

@@ -31,7 +31,35 @@ type libraryPane struct {
 	// only time the count on the row can be trusted.
 	liked    []player.Track
 	likedAll bool
+
+	// likedIDs is the same page as a set, for the lists that ask a track at a
+	// time whether it is saved. Built where the page is taken, so it cannot say
+	// something the list beside it does not.
+	//
+	// A set rather than a walk down the slice: the glance asks once per row per
+	// frame, and the whole saved collection can be thousands of tracks long.
+	likedIDs map[string]bool
 }
+
+// adoptLiked takes a freshly read first page of the saved tracks.
+func (p *libraryPane) adoptLiked(tracks []player.Track, all bool) {
+	p.liked, p.likedAll = tracks, all
+	p.likedIDs = make(map[string]bool, len(tracks))
+	for _, t := range tracks {
+		p.likedIDs[t.ID] = true
+	}
+}
+
+// saved reports whether a track is one of the saved ones — as far as what has
+// been read of them says.
+//
+// As far as: the Web API refuses to answer whether one track is saved for this
+// client id (measured, 403 on /me/tracks/contains), so the only source is the
+// list itself. What has not been read cannot be marked, which is why nothing is
+// drawn for the tracks it does not know: a blank column says "not in the part I
+// have read", and a mark on every row it did not check would say something
+// stronger and wrong.
+func (p libraryPane) saved(id string) bool { return p.likedIDs[id] }
 
 // libraryKind is which of the three is on screen.
 type libraryKind int

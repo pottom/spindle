@@ -385,9 +385,20 @@ func (m Model) withMark(t player.Track, title string) string {
 // has been picked over, and marks scattered along the titles cannot be counted
 // at a glance the way a column can.
 func (m Model) queuedColumn(t player.Track) string {
-	if m.tab == tabQueue || m.rowsAreTheQueue {
-		// Everything here is in the queue by definition; a column saying so
-		// would be a column of dots.
+	if m.rowsAreTheQueue {
+		// Everything here is in the queue by definition, so a column of dots
+		// saying so is a column that says nothing. It is kept and spent on the
+		// one thing this list cannot say otherwise: whether what is coming is
+		// something you have saved. Held open on the rows without a heart, so
+		// no title moves as the list turns over.
+		if m.library.saved(t.ID) {
+			return m.styles.Cursor.Render(likedMark) + " "
+		}
+		return blankMark
+	}
+	if m.tab == tabQueue {
+		// Same again, and nothing to put in its place: the queue screen is a
+		// list to work on, and its own marks are already in this column.
 		return ""
 	}
 

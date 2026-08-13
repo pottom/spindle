@@ -80,7 +80,9 @@ func (m Model) answer(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	case prefsMsg:
 		m.applyPrefs(prefs(message))
-		return m, tea.Batch(m.startScope(), m.fetchLyrics())
+		// The glance can come back on from the file, and it wants the saved
+		// tracks the same way a glance opened by hand does.
+		return m, tea.Batch(m.startScope(), m.fetchLyrics(), m.readSaved())
 
 	case msg.Tick:
 		return m.handleTick()
@@ -188,7 +190,7 @@ func (m Model) answer(message tea.Msg) (tea.Model, tea.Cmd) {
 		// The saved tracks are read whether or not they are open: the library
 		// asks for the first page as it loads, for the cover and the count.
 		if isLiked(message.ID) && message.Offset == 0 {
-			m.library.liked, m.library.likedAll = message.Tracks, !message.More
+			m.library.adoptLiked(message.Tracks, !message.More)
 			m.refreshLikedRow()
 		}
 

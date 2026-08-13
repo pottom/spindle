@@ -1,6 +1,8 @@
 package ui
 
 import (
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui/cover"
 )
@@ -50,6 +52,21 @@ func likedPlaylist(tracks []player.Track, all bool) player.Playlist {
 // been read of them so far.
 func (m Model) likedRow() player.Playlist {
 	return likedPlaylist(m.library.liked, m.library.likedAll)
+}
+
+// readSaved asks for the first page of the saved tracks, for the sake of the
+// glance's hearts, and only where there is something to ask for and nothing
+// read yet.
+//
+// The library reads the same page when it opens, for the row at the top of it.
+// This is the other way in: somebody who opens the glance and never opens the
+// library would otherwise be shown a column that is blank because nothing was
+// ever read, which is indistinguishable from a queue of nothing saved.
+func (m Model) readSaved() tea.Cmd {
+	if !m.peek.on || m.library.likedIDs != nil {
+		return nil
+	}
+	return fetchOpenCmd(m.player, openPlaylist, likedID, 0)
 }
 
 // refreshLikedRow puts a freshly read first page onto the row already on
