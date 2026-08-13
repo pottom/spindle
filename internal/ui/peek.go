@@ -46,11 +46,13 @@ func (m Model) drawPeek(body []string, l layout) []string {
 	w := l.interior - leftMargin - rightMargin - inset
 	indent := strings.Repeat(" ", inset)
 
-	body[0] = m.pad(indent+spread(
+	// Built as a block and then written in, rather than a row at a time, so it
+	// can carry an outline like everything else does.
+	block := []string{spread(
 		m.styles.Title.Render("Up next"),
 		m.styles.Album.Render(peekSubtitle(len(m.queue))),
 		w,
-	), l)
+	)}
 
 	flush := m
 	flush.rowsAreFlush = true
@@ -59,7 +61,11 @@ func (m Model) drawPeek(body []string, l layout) []string {
 		if i < len(m.queue) {
 			row = flush.trackRow(m.queue[i], w, false, i+1)
 		}
-		body[i+1] = m.pad(indent+row, l)
+		block = append(block, row)
+	}
+
+	for i, row := range m.outline(block, w, "up next") {
+		body[i] = m.pad(indent+row, l)
 	}
 	return body
 }

@@ -164,11 +164,15 @@ func (m Model) body(l layout) []string {
 			// The words need room, so the information goes to the top of the
 			// body rather than sitting in the middle of it, and they take
 			// everything under it.
-			right, rightName = m.infoWithLyrics(l, rows), "info+lyrics"
+			// Outlined inside, as "player" and "lyrics": one border round both
+			// would say less than the two say separately.
+			right, rightName = m.infoWithLyrics(l, rows), ""
 		default:
-			right, rightName = stack(m.infoBlock(l.infoWidth), l.infoWidth, rows), "info"
+			right, rightName = stack(m.infoBlock(l.infoWidth), l.infoWidth, rows), "player"
 		}
-		right = m.outline(right, l.infoWidth, rightName)
+		if rightName != "" {
+			right = m.outline(right, l.infoWidth, rightName)
+		}
 
 		// Without a picture the text and the list take the whole width, which
 		// is the point of dropping it.

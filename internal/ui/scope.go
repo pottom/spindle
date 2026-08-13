@@ -544,7 +544,7 @@ func (m Model) drawScope(body []string, l layout) []string {
 		return body
 	}
 
-	lines := m.scopeRender(m.scopeWidth(l))
+	lines := m.outline(m.scopeRender(m.scopeWidth(l)), m.scopeWidth(l), "trace")
 	for i, line := range lines {
 		body[at+i] = m.pad(line, l)
 	}
@@ -677,5 +677,4 @@ const (
 	// beatRise is how much of a beat is spent coming up to it. Small: the rise
 	// is there so the strike is not a discontinuity, not so it can be watched.
 	beatRise = 0.12
-
 )
