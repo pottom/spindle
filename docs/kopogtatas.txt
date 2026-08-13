@@ -1,0 +1,97 @@
+KOPOGTATÁS
+==========
+
+Egy parancs, a többit ő intézi. Felteszi a számokat, megmondja, mit figyelj,
+számol, és magától továbbmegy a következőre.
+
+
+INDÍTÁS
+-------
+
+Nyiss egy terminálablakot (NE azt, amelyikben a spindle fut), és:
+
+    cd ~/Work/personal/spindle
+    go run ./cmd/spindle-tap
+
+Ennyi. A daemonnak futnia kell (ha nem fut: spindle daemon start).
+A spindle felületére nem lesz szükség, és ne is kattints rá közben — ott a
+szóköz megállítja a zenét.
+
+
+AMIT LÁTSZ
+----------
+
+    tap   record 1 of 7   pass 1 of 3
+
+      Tony Joe White — The Other Side
+      the worst fit there is: 41% off a musical value
+
+      SPACE THE MOMENT EACH LINE STARTS        5 of 12 lines
+
+      ▸ Well I've been down to the other side
+
+      12.47s  line 4 Well
+
+      space  a line starts
+      backspace undo   r restart this record   n skip on   p play/pause   q quit
+
+Felül: hányadik számnál és hányadik menetnél tartasz.
+Nagybetűvel: mit kell csinálnod ebben a menetben.
+Jobbra: hány sor van meg a szükségesből.
+A ▸ jelnél: az éppen szóló sor.
+Alatta: az utolsó ütésed visszaigazolása.
+
+
+A MENETEK
+---------
+
+Számonként kettő (a legelsőn három). Mindig kiírja, melyikben vagy.
+Néhány szám nem az elejéről indul, hanem ott, ahol az érdekes rész van —
+Majkánál például a rapnél, mert a bevezető lassú és arról már van mérés.
+
+1. SPACE THE MOMENT EACH LINE STARTS
+   Szóköz, amikor egy sor éneklése elkezdődik. Semmi más.
+   12 sor után magától továbbmegy, és kiírja, mennyivel nyomsz későn.
+
+2. SPACE WHEN A LINE STARTS, E WHEN ITS SINGING STOPS
+   Szóköz a sor elején, "e" amikor elhallgat az ének abban a sorban.
+   Ha a következő sor szünet nélkül jön: arra a sorra ne nyomj "e"-t.
+   12 sor után továbbmegy.
+
+3. SPACE ON EVERY WORD, IN ORDER  (csak az első számon)
+   Minden szóra egy szóköz, sorban. 8 sor után továbbmegy.
+
+
+A GOMBOK
+--------
+
+    szóköz      itt kezdődik (sor vagy szó — a menet mondja)
+    e           itt hallgat el az ének (csak a 2. menetben)
+    enter       átugrik egy szót (csak a 3. menetben)
+    backspace   visszavonja az utolsó ütést
+    r           ezt a számot elölről, az eddigi ütések eldobásával
+    f / b       előre / vissza 15 másodperc (ha nem a jó résznél tartasz)
+    n           ugorj a következő menetre/számra
+    p           zene indít / megállít
+    q           kilépés, a mostani menet mentésével
+
+
+HA VALAMI FÉLREMEGY
+-------------------
+
+- Rossz ütés: backspace. Vagy hagyd — mediánnal dolgozom, pár rossz ütés nem
+  számít, és a kilógók látszanak.
+- Lemaradtál sorokról: nem baj, azok egyszerűen hiányoznak.
+- Elrontottad az egészet: "r", és kezdi elölről ugyanazt a számot.
+- Nem tetszik a szám / nincs időzített szövege: "n", továbbmegy.
+- Kiírja, hogy "the playhead jumped": tekertél. "r".
+- Bármikor abbahagyhatod "q"-val, ami addig megvan, az mentve van.
+
+Nem kell egy szuszra végigcsinálni. Ha csak az első két számra van időd, az is
+használható; a lényeg a második menet (ahol az "e"-t nyomod).
+
+A fájlok ide kerülnek:
+
+    ~/.config/spindle/spike/taps/
+
+Ha kész vagy, szólj, és megnézem, mit mondanak.
