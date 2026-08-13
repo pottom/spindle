@@ -1,0 +1,27 @@
+{
+  "name": "break",
+  "from": "drawn for spindle",
+  "licence": "ours",
+  "cols": 4,
+  "rows": 5,
+  "gate": 0.5,
+  "thick": 1,
+  "//": "Seven moves, one sheet each, asked for in the shape docs/MOVES.md sets out: the first cell standing, three going in, twelve that repeat, three coming out, and standing again. The frame numbers below are what the sheets actually came back with, which is measured rather than assumed — see the -report flag on cmd/spindle-moves, and the loop join it prints.",
+  "heights": [60, 90, 130],
+  "moves": [
+    {
+      "name": "bounce",
+      "file": "bounce.png",
+      "//": "The one he does standing, and the one he comes back to between the others. All of it is the loop: there is nothing to go into and nothing to come out of.",
+      "in": [0, -1],
+      "loop": [0, 18],
+      "out": [0, -1]
+    },
+    { "name": "drop", "file": "drop.png", "in": [1, 3], "loop": [4, 15], "out": [16, 18] },
+    { "name": "sweep", "file": "sweep.png", "in": [1, 3], "loop": [4, 15], "out": [16, 18] },
+    { "name": "headstand", "file": "headstand.png", "in": [1, 4], "loop": [5, 16], "out": [17, 18] },
+    { "name": "sixstep", "file": "sixstep.png", "in": [1, 4], "loop": [5, 16], "out": [17, 18] },
+    { "name": "backspin", "file": "backspin.png", "in": [1, 2], "loop": [3, 14], "out": [15, 18] },
+    { "name": "sidekick", "file": "sidekick.png", "in": [1, 4], "loop": [5, 16], "out": [17, 18] }
+  ]
+}
