@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/pottom/spindle/internal/build"
 	"github.com/pottom/spindle/internal/player"
 )
 
@@ -374,6 +375,11 @@ func (m Model) statusLine() string {
 		mark = m.device.View()
 	}
 	line := device.Render(mark + " " + m.ps.DeviceName)
+
+	// Which build this is, beside the name. The version exists to settle "am I
+	// looking at the fix or at the binary from before it", and the header is
+	// where the eye already goes.
+	line += m.styles.Quality.Render(" " + build.Version())
 
 	// The bitrate is the stream actually arriving, so it only appears once one
 	// is: a rate printed over a paused device would be describing nothing.
