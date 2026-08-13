@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"math"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/pottom/spindle/internal/ui/cover"
@@ -559,14 +558,6 @@ func (m *Model) marksWalk() {
 	}
 	sort.Strings(sets)
 
-	// And then the dancer's own moves, because he is the other thing this bar
-	// can hold and a move dealt one bar in three is a move nobody can judge. The
-	// key walks the whole cast: the rooms, then the man, then back to the deal.
-	if set, ok := moveSetFor(danceSet); ok {
-		for _, name := range set.names() {
-			sets = append(sets, danceCast+" "+name)
-		}
-	}
 	sets = append(sets, "") // and back to whatever the record would have given
 
 	at := len(sets) - 1
@@ -578,12 +569,6 @@ func (m *Model) marksWalk() {
 	}
 	m.words.picked = sets[(at+1)%len(sets)]
 	m.words.showed = time.Now()
-
-	// A move asked for by name is the dancer's business rather than the row's.
-	m.dance.picked = ""
-	if move, ok := strings.CutPrefix(m.words.picked, danceCast+" "); ok {
-		m.dance.picked = move
-	}
 
 	// Thrown away rather than left up: the picture on screen was made for the
 	// set that was on, and wordsGrind only asks for a new one when what it holds

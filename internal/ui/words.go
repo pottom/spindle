@@ -933,11 +933,6 @@ type wordsState struct {
 	// ends is when the line on screen gives way to the next.
 	ends int64
 
-	// dancing says the bar is the dancer's rather than the marks'. What is held
-	// in have is his first frame, and what is on the screen comes from the baked
-	// frames every frame. See dance.go.
-	dancing bool
-
 	// beats says what is on screen is a mark rather than words — the note a
 	// lyric sheet puts where a line would be if anyone were singing one.
 	//
@@ -1213,18 +1208,6 @@ func (m Model) wordsLines(w, rows int) []string {
 	// nothing else, so where the singer is inside it is a guess; and a guess
 	// that is right most of the time is worse than no guess at all, because the
 	// times it is wrong are the times you are looking straight at it.
-	// The dancer is drawn from his own frames rather than from the picture held
-	// here, which is only his first. Everything around him — the gathering, the
-	// meter under him, the water crossing him — is the same as for any other
-	// picture in this bar. See dance.go.
-	if m.danceUp() {
-		m.danceDraw(grid, paint, hue, w, rows, gather, freqs, levels)
-		if tall, head := m.wordsBandNow(w, rows); tall >= wordsBand {
-			m.wordsUnder(grid, paint, hue, w, rows, tall, head)
-		}
-		return m.drawCellsIn(w, rows, grid, paint, hue, m.styles.Words, m.styles.WordsSeq)
-	}
-
 	paints := make([]wordPaint, m.words.where.Count)
 	for i := range paints {
 		paints[i] = m.wordsPaint(i, len(paints), freqs, levels)
@@ -1925,30 +1908,8 @@ func (m *Model) wordsGrind() tea.Cmd {
 	// marks is the same string of notes, so a later bar dealt the drawings was
 	// taken for the picture already held and never asked for. Over a whole
 	// wordless record that is one deal rather than one every half minute.
-	// Whose bar this is. The marks have had it to themselves since the
-	// beginning; now one in three falls to the dancer, dealt the same way from
-	// the record and the bar so that a record does the same thing twice. See
-	// dance.go.
-	// Never while the room is silenced or the record is stopped: those are
-	// states rather than deals, and what they have to say is said by a row of
-	// people with their fingers in their ears. A dancer would be the screen
-	// carrying on as if nothing had happened.
-	dancing := m.words.beats && marksDrawn && !m.held() && !m.muted() &&
-		danceCastFor(m.words.forTrack, starts)
-	if m.dance.picked != "" && m.marksForcing() {
-		dancing = m.words.beats && marksDrawn && !m.held() && !m.muted()
-	}
-
 	cast := ""
-	if dancing {
-		cast = danceCast
-
-		// One move ends and the next begins, for as long as the bar is his. The
-		// guard below returns on every frame after the first, so the routine is
-		// carried on from here rather than from where the picture is adopted.
-		m.danceCarryOn(m.words.forTrack, starts)
-	}
-	if m.words.beats && marksDrawn && !dancing {
+	if m.words.beats && marksDrawn {
 		cast = markCastFor(m.words.forTrack, starts)
 
 		// A set asked for by hand holds the screen for as long as the asking
@@ -2013,20 +1974,6 @@ func (m *Model) wordsGrind() tea.Cmd {
 	// the setter and refuses to ask twice, and every bar of marks asks for the
 	// same string of notes — so once a row of notes had been sent for, the
 	// drawings were never reached again for the rest of the record.
-	if dancing {
-		// The picture adopted here is only his first frame: what is on the
-		// screen after it comes from the baked frames. See danceDraw.
-		if grain, layout, ok := m.dancePicture(m.width, m.height); ok {
-			m.words.dancing = true
-			m.wordsAdopt(grain, layout, text)
-			m.words.cast = danceCast
-			m.words.cellsX, m.words.cellsY = m.width, m.height
-			m.words.leanAt = starts
-			return nil
-		}
-	}
-	m.words.dancing = false
-
 	if cast != "" {
 		if grain, layout, ok := markPicture(cast, m.width, m.height, starts); ok {
 			m.wordsAdopt(grain, layout, text)
