@@ -675,7 +675,10 @@ func wordsFits(g cover.Grain, dotsX, dotsY int) bool {
 	return g.DotsX == dotsX && g.DotsY == dotsY && len(g.Lum) >= dotsX*dotsY
 }
 
-// grayToImage is the words as something the grinder can take.
+// grayToImage is the words as something that takes a general picture. The
+// grinder no longer needs it — it reads a grey one straight, which is what the
+// words always hand it — and it is kept for the tests that build a picture the
+// long way round.
 func grayToImage(g *image.Gray) image.Image {
 	out := image.NewRGBA(g.Bounds())
 	draw.Draw(out, out.Bounds(), g, g.Bounds().Min, draw.Src)

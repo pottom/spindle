@@ -56,19 +56,37 @@ func Grind(img image.Image, cellsX, cellsY, perX, perY int) Grain {
 	}
 	offX, offY := (g.DotsX-pw)/2, (g.DotsY-ph)/2
 
-	scaled := image.NewRGBA(image.Rect(0, 0, pw, ph))
-	draw.CatmullRom.Scale(scaled, scaled.Bounds(), img, img.Bounds(), draw.Src, nil)
-
 	// The brightness is stretched over the picture alone: with the dark margin
 	// counted in, every cover would come out as an overexposed stamp in the
 	// middle of a black screen.
 	lum := make([]uint8, pw*ph)
-	for y := range ph {
-		for x := range pw {
-			c := scaled.RGBAAt(x, y)
-			// Rec. 601 luma: what the eye reads as brightness, rather than the
-			// average of three channels it does not weigh equally.
-			lum[y*pw+x] = uint8((299*int(c.R) + 587*int(c.G) + 114*int(c.B)) / 1000)
+
+	// A picture that is already the size it will be drawn at, and already grey,
+	// is read straight.
+	//
+	// This is not the rare case: it is every line of every lyric. The words are
+	// set at exactly the dots they will occupy, and sending them through the
+	// scaler resampled a picture into itself — one RGBA copy to go in, another
+	// to come out, and the kernel's working buffers between them. Measured at
+	// 352 by 84 cells, a line change cost 9.1 ms and 12.4 MB, and 12 MB arriving
+	// every two seconds is a collection every two seconds. The frames that went
+	// missing went missing at changes, which is exactly when this ran.
+	if grey, ok := img.(*image.Gray); ok && img.Bounds().Dx() == pw && img.Bounds().Dy() == ph {
+		b := grey.Bounds()
+		for y := range ph {
+			row := grey.Pix[(y+b.Min.Y-b.Min.Y)*grey.Stride:]
+			copy(lum[y*pw:(y+1)*pw], row[:pw])
+		}
+	} else {
+		scaled := image.NewRGBA(image.Rect(0, 0, pw, ph))
+		draw.CatmullRom.Scale(scaled, scaled.Bounds(), img, img.Bounds(), draw.Src, nil)
+		for y := range ph {
+			for x := range pw {
+				c := scaled.RGBAAt(x, y)
+				// Rec. 601 luma: what the eye reads as brightness, rather than
+				// the average of three channels it does not weigh equally.
+				lum[y*pw+x] = uint8((299*int(c.R) + 587*int(c.G) + 114*int(c.B)) / 1000)
+			}
 		}
 	}
 	stretch(lum)

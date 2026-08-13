@@ -194,7 +194,7 @@ func wordsCmd(lines []string, cellsX, cellsY int) tea.Cmd {
 		return msg.WordsReady{
 			Text:   strings.Join(lines, "\n"),
 			CellsX: cellsX, CellsY: cellsY,
-			Grain: cover.Grind(grayToImage(img), cellsX, cellsY, dotsPerCellX, dotsPerCellY),
+			Grain: cover.Grind(img, cellsX, cellsY, dotsPerCellX, dotsPerCellY),
 			Words: layout,
 		}
 	}
