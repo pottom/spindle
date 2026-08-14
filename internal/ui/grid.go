@@ -75,6 +75,7 @@ type gridShape struct {
 	tileW     int // cells one tile takes across
 	coverRows int // rows its picture fills
 	tileH     int // rows the whole tile takes, picture and words
+	gap       int // cells between two tiles across
 }
 
 // page is how many tiles are on screen at once.
@@ -103,10 +104,27 @@ func gridFor(width, height int, cell cover.CellSize) gridShape {
 	// The picture is square, and a cell is not. The same arithmetic the artwork
 	// area uses, so a tile's cover is as square as any other cover on screen.
 	coverRows := max(tileW*cell.Width/cell.Height, 1)
-	tileH := coverRows + tileTextRows
 
+	// And the tile is then as wide as that picture really comes out, rather than
+	// as wide as it was offered. A square cover fills whole cells only, and on a
+	// cell that is not exactly twice as tall as it is wide the last column or two
+	// of the tile is never drawn into — which put all the slack on one side of
+	// the picture and left the corner marks lopsided.
+	tileW = min(max(coverRows*cell.Height/cell.Width, 1), tileW)
+
+	// What that gives back goes between the tiles, so the wall still reaches both
+	// margins and the gap is never tighter than the frame needs.
+	gap := tileGap
+	if cols > 1 {
+		gap = max((width-cols*tileW)/(cols-1), tileGap)
+	}
+
+	tileH := coverRows + tileTextRows
 	rows := max((height+tileRowGap)/(tileH+tileRowGap), 0)
-	return gridShape{cols: cols, rows: rows, tileW: tileW, coverRows: coverRows, tileH: tileH}
+	return gridShape{
+		cols: cols, rows: rows,
+		tileW: tileW, coverRows: coverRows, tileH: tileH, gap: gap,
+	}
 }
 
 // gridWindow is the run of tiles on screen, scrolling a whole row at a time.
@@ -174,7 +192,7 @@ func (m Model) drawGrid(tiles []gridTile, g gridShape, width, height int) []stri
 // names, then the line under them.
 func (m Model) drawTileRow(row []gridTile, g gridShape, width int) []string {
 	out := make([]string, 0, g.tileH)
-	gap := strings.Repeat(" ", tileGap)
+	gap := strings.Repeat(" ", g.gap)
 	lead := strings.Repeat(" ", gridGutter)
 
 	for line := range g.coverRows {
@@ -212,7 +230,7 @@ func (m Model) frameTile(rows []string, at, top int, g gridShape, width int) {
 	col := at % g.cols
 	// The far side is measured from the tile's own far edge rather than from the
 	// near line, or the air is only even when a corner stands one cell out.
-	left := gridGutter + col*(g.tileW+tileGap) - frameCols
+	left := gridGutter + col*(g.tileW+g.gap) - frameCols
 	right := left + g.tileW - 1 + 2*frameCols
 	head := top + (at/g.cols)*(g.tileH+tileRowGap) - frameRows
 	foot := head + g.tileH - 1 + 2*frameRows

@@ -554,3 +554,35 @@ func TestTheTilesCornersStandOffItEvenly(t *testing.T) {
 		t.Errorf("the picture has %d columns of air, want %d", before, frameCols-1)
 	}
 }
+
+// A tile is as wide as the picture it holds really comes out, not as wide as it
+// was offered: a square cover fills whole cells only, and the columns it cannot
+// use would all sit on one side of it.
+func TestATileIsAsWideAsItsPicture(t *testing.T) {
+	for _, cell := range []cover.CellSize{
+		{Width: 10, Height: 20}, // exactly twice as tall as wide
+		{Width: 9, Height: 19},  // and the awkward ones
+		{Width: 7, Height: 15},
+		{Width: 16, Height: 32},
+	} {
+		g := gridFor(150, 40, cell)
+		if !g.ok() {
+			t.Fatalf("%+v: no wall at all", cell)
+		}
+
+		// The picture's width, from the rows it fills and the shape of a cell.
+		if want := g.coverRows * cell.Height / cell.Width; g.tileW > want {
+			t.Errorf("%+v: the tile is %d cells wide and its picture %d", cell, g.tileW, want)
+		}
+
+		// And the gap is never tighter than the frame needs.
+		if g.gap < tileGap {
+			t.Errorf("%+v: the gap is %d cells, under the %d the frame needs", cell, g.gap, tileGap)
+		}
+
+		// The wall still fits the width it was given.
+		if used := g.cols*g.tileW + (g.cols-1)*g.gap; used > 150 {
+			t.Errorf("%+v: the wall comes to %d cells of 150", cell, used)
+		}
+	}
+}
