@@ -1644,3 +1644,37 @@ func TestTheHeadingStandsClearOfTheBand(t *testing.T) {
 		t.Errorf("the heading is not two rows under the band: %q", plain(block[band+2]))
 	}
 }
+
+// The panel beside a cover wears that cover's colour, and nothing else does.
+//
+// Everywhere else the accent is the sounding record's — walking a queue must not
+// repaint the program — but this one block is explicitly about another record.
+// The frame round it says so; the colour inside it says which.
+func TestThePanelWearsTheCoversOwnColour(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.ps = &player.State{TrackID: "now", Title: "sounding", Playing: true}
+
+	sounding := color.RGBA{R: 220, G: 40, B: 40, A: 255}
+	onScreen := color.RGBA{R: 40, G: 60, B: 220, A: 255}
+
+	m.toneTook(cover.Art{Accent: sounding, HasAccent: true})
+	m.cover.accent, m.cover.hasAccent = onScreen, true
+	m.restyle()
+
+	if m.coverStyles.Artist.GetForeground() == m.styles.Artist.GetForeground() {
+		t.Error("the panel is wearing the same colour as the rest of the screen")
+	}
+
+	// The screen at large keeps the sounding record's.
+	if got, ok := m.toneAccent(); !ok || got != sounding {
+		t.Errorf("the screen's accent is %v, want the sounding record's", got)
+	}
+
+	// And with no cover of its own to take a colour from, it falls in with the
+	// rest rather than going grey.
+	m.cover.hasAccent = false
+	m.restyle()
+	if m.coverStyles.Artist.GetForeground() != m.styles.Artist.GetForeground() {
+		t.Error("with no cover colour the panel did not fall back to the screen's")
+	}
+}

@@ -209,7 +209,13 @@ type Model struct {
 	width, height int
 	isDark        bool
 
-	styles  style.Styles
+	styles style.Styles
+
+	// coverStyles is the same set in the colour of the cover on screen rather
+	// than of the record sounding. Only the panel that describes that cover
+	// wears it. See restyle and tone.go.
+	coverStyles style.Styles
+
 	keys    keyMap
 	help    help.Model
 	spinner spinner.Model
@@ -332,6 +338,17 @@ func (m *Model) restyle() {
 		accent = cover.Readable(rgb, m.isDark)
 	}
 	m.styles = style.New(m.isDark, accent)
+
+	// And a second set in the colour of the cover on screen, for the panel that
+	// describes it. Everything else is the sounding record's — see tone.go — but
+	// the band at the top is explicitly about another record when the cursor has
+	// moved off, and the frame round it says so. Saying it in that record's own
+	// colour as well costs one palette a cover rather than a comparison a frame.
+	m.coverStyles = m.styles
+	if m.cover.hasAccent {
+		m.coverStyles = style.New(m.isDark, cover.Readable(m.cover.accent, m.isDark))
+	}
+
 	m.help.Styles = help.DefaultStyles(m.isDark)
 	m.spinner.Style = m.styles.Detail
 

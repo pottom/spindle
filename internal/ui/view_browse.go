@@ -8,6 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/pottom/spindle/internal/player"
+	"github.com/pottom/spindle/internal/ui/style"
 )
 
 const (
@@ -313,7 +314,12 @@ func (m Model) trackDetail(w, rows int) []string {
 	if t == nil {
 		return nil
 	}
-	s := m.styles
+
+	// In the colour of the cover it is standing beside. Everywhere else on the
+	// screen the accent is the sounding record's — see tone.go — and this is the
+	// one block that is explicitly about another one: the frame round it says so,
+	// and the colour inside it says which.
+	s := m.coverStyles
 
 	title := s.Title.Render(t.Title)
 	if t.Explicit {
@@ -333,7 +339,7 @@ func (m Model) trackDetail(w, rows int) []string {
 		s.Artist.Render(strings.Join(t.Artists, ", ")),
 	}
 	if t.Popularity != nil {
-		lines = append(lines, m.stars(*t.Popularity))
+		lines = append(lines, m.starsIn(s, *t.Popularity))
 	}
 	lines = append(lines, "")
 
@@ -397,10 +403,14 @@ func starsFor(popularity int) int {
 // stars renders a rating as five of them, filled in fifths. Spotify's number is
 // out of a hundred, which reads as a measurement; a row of stars reads as an
 // opinion, which is what it is.
-func (m Model) stars(popularity int) string {
+func (m Model) stars(popularity int) string { return m.starsIn(m.styles, popularity) }
+
+// starsIn is the same in a given set, so the panel beside a cover can wear that
+// cover's colour rather than the sounding record's.
+func (m Model) starsIn(s style.Styles, popularity int) string {
 	filled := starsFor(popularity)
-	return m.styles.StarOn.Render(strings.Repeat(starFull, filled)) +
-		m.styles.StarOff.Render(strings.Repeat(starEmpty, starCount-filled))
+	return s.StarOn.Render(strings.Repeat(starFull, filled)) +
+		s.StarOff.Render(strings.Repeat(starEmpty, starCount-filled))
 }
 
 // hot reports whether a track is worth flagging in a list. The rating is on the
