@@ -27,9 +27,11 @@ type keyMap struct {
 	NextTab key.Binding
 	PrevTab key.Binding
 	// GoTab is the digits: one per screen, in the order they are drawn.
-	GoTab key.Binding
-	Up    key.Binding
-	Down  key.Binding
+	GoTab    key.Binding
+	Up       key.Binding
+	Down     key.Binding
+	NextTile key.Binding
+	PrevTile key.Binding
 	// PageDown and PageUp move by whatever the list is showing, so a page is a
 	// screenful rather than a number somebody picked.
 	PageDown key.Binding
@@ -131,15 +133,15 @@ func newKeyMap() keyMap {
 		),
 		Prev: key.NewBinding(key.WithKeys(keyPrev)),
 		SeekFwd: key.NewBinding(
-			key.WithKeys(keySeekFwd),
+			key.WithKeys(keySeekFwd, keySeekFwdAlt),
 			key.WithHelp("← / →", "seek ∓5s"),
 		),
-		SeekBack: key.NewBinding(key.WithKeys(keySeekBack)),
+		SeekBack: key.NewBinding(key.WithKeys(keySeekBack, keySeekBackAlt)),
 		VolUp: key.NewBinding(
-			key.WithKeys(keyVolUp),
+			key.WithKeys(keyVolUp, keyVolUpAlt),
 			key.WithHelp("↑ / ↓", "volume ±5"),
 		),
-		VolDown: key.NewBinding(key.WithKeys(keyVolDown)),
+		VolDown: key.NewBinding(key.WithKeys(keyVolDown, keyVolDownAlt)),
 		Shuffle: key.NewBinding(
 			key.WithKeys(keyShuffle),
 			key.WithHelp(keyShuffle, "shuffle"),
@@ -174,6 +176,12 @@ func newKeyMap() keyMap {
 		),
 		Up:   key.NewBinding(key.WithKeys(keyUp)),
 		Down: key.NewBinding(key.WithKeys(keyDown), key.WithHelp("↑↓", "select")),
+
+		// The wall's own pair. Separate from the transport's, which answers to
+		// the same two arrows off a list: a binding that matched both would move
+		// the cursor when somebody asked to seek.
+		NextTile: key.NewBinding(key.WithKeys(keyNextTile)),
+		PrevTile: key.NewBinding(key.WithKeys(keyPrevTile)),
 		PageDown: key.NewBinding(
 			key.WithKeys(keyPageDown, keyPageDnVim),
 			key.WithHelp("pgdn / pgup", "page down / up"),

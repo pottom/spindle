@@ -237,9 +237,9 @@ func (m *Model) libraryGridKey(k tea.KeyPressMsg) bool {
 		state.move(g.cols, count)
 	case key.Matches(k, m.keys.Up):
 		state.move(-g.cols, count)
-	case key.Matches(k, m.keys.SeekFwd):
+	case key.Matches(k, m.keys.NextTile):
 		state.move(1, count)
-	case key.Matches(k, m.keys.SeekBack):
+	case key.Matches(k, m.keys.PrevTile):
 		state.move(-1, count)
 	case key.Matches(k, m.keys.PageDown):
 		state.move(g.page(), count)

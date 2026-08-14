@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -57,5 +59,53 @@ func TestSkippingIsOnThePlainKeys(t *testing.T) {
 	}
 	if got := m.find.query; got != "n" {
 		t.Errorf("the query came out %q", got)
+	}
+}
+
+// The transport keeps a second pair of arrows, for the screens where the plain
+// ones belong to what is on them.
+//
+// A list took up and down for its cursor and the volume has been unreachable
+// there ever since; the wall takes left and right as well. Shift gives both back
+// by one rule, on every screen.
+func TestShiftArrowsSeekAndSetTheVolume(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.width, m.height = 150, 40
+	m.tab = tabLibrary
+	m.resize()
+	m.ps = &player.State{TrackID: "a", Playing: true, Volume: 50,
+		Duration: 3 * time.Minute, Progress: time.Minute}
+	for i := range 8 {
+		m.library.playlists = append(m.library.playlists,
+			player.Playlist{ID: fmt.Sprintf("p%d", i), Name: fmt.Sprintf("List %d", i)})
+	}
+
+	for _, c := range []struct {
+		name string
+		key  tea.KeyPressMsg
+	}{
+		{"shift+right", tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModShift}},
+		{"shift+left", tea.KeyPressMsg{Code: tea.KeyLeft, Mod: tea.ModShift}},
+		{"shift+up", tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}},
+		{"shift+down", tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift}},
+	} {
+		was := m.library.cursors[m.library.kind].cursor
+		next, cmd := m.handleKey(c.key)
+		if cmd == nil {
+			t.Errorf("%s did nothing", c.name)
+		}
+		if now := next.library.cursors[next.library.kind].cursor; now != was {
+			t.Errorf("%s moved the cursor from %d to %d", c.name, was, now)
+		}
+	}
+
+	// And the plain arrows still walk the wall.
+	for _, c := range []tea.KeyPressMsg{{Code: tea.KeyRight}, {Code: tea.KeyDown}} {
+		was := m.library.cursors[m.library.kind].cursor
+		next, _ := m.handleKey(c)
+		if now := next.library.cursors[next.library.kind].cursor; now == was {
+			t.Errorf("a plain arrow did not move the cursor from %d", was)
+		}
+		m = next
 	}
 }

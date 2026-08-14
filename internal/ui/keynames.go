@@ -18,12 +18,23 @@ const (
 	keyNext      = "n"
 	keyPrev      = "p"
 	keySeekFwd   = "right"
-	keySeekBack  = "left"
-	keyVolUp     = "up"
-	keyVolDown   = "down"
-	keyShuffle   = "s"
-	keyRepeat    = "r"
-	keyMute      = "m"
+	keyNextTile  = "right"
+	keyPrevTile  = "left"
+
+	// The transport's second pair, for the screens where the arrows belong to
+	// what is on them. A list took the up and down arrows for its cursor and the
+	// volume has been unreachable there ever since; the wall takes left and
+	// right as well. Shift gives both back, everywhere and by one rule.
+	keySeekFwdAlt  = "shift+right"
+	keySeekBackAlt = "shift+left"
+	keyVolUpAlt    = "shift+up"
+	keyVolDownAlt  = "shift+down"
+	keySeekBack    = "left"
+	keyVolUp       = "up"
+	keyVolDown     = "down"
+	keyShuffle     = "s"
+	keyRepeat      = "r"
+	keyMute        = "m"
 
 	keyHelp    = "?"
 	keyQuit    = "q"

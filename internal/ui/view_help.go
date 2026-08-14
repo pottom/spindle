@@ -72,8 +72,8 @@ func helpGroups() []helpGroup {
 		keys: [][2]string{
 			{keyPlayPause, "play or pause"},
 			{pair(keyNext, keyPrev), "next or previous track"},
-			{"← / →", "seek five seconds"},
-			{"↑ / ↓", "the music's volume, by five"},
+			{"← / →", "seek five seconds — shift+← / → where a list has the arrows"},
+			{"↑ / ↓", "the music's volume, by five — shift+↑ / ↓ in a list"},
 			{keyMute, "mute, and back to where it was"},
 			{keyShuffle, "shuffle"},
 			{keyRepeat, "repeat: off, all, one"},
@@ -108,7 +108,7 @@ func helpGroups() []helpGroup {
 	}, {
 		title: "In a list",
 		keys: [][2]string{
-			{"↑ ↓", "move"},
+			{"↑ ↓", "move — and ← → as well on the library, which is a wall"},
 			{"pgup/pgdn", "a screenful"},
 			{"^u / ^d", "half a screenful"},
 			{pair(keyFirstVim, keyLastVim), "the top, the end"},
