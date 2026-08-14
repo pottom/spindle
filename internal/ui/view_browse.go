@@ -164,7 +164,9 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 		}
 		out = append(out, row)
 	}
-	if len(out) < rows {
+	// The air under the band, where there is a band. Folded away, the heading
+	// stands at the top of the screen rather than a row down from nothing.
+	if band > 0 && len(out) < rows {
 		out = append(out, strings.Repeat(" ", w))
 	}
 
@@ -172,7 +174,7 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	// screen once everything is laid out — see finder.go — and what it needs from
 	// here is the rows, so that the table steps down for it rather than being
 	// covered by it.
-	for range m.listChrome() - listChromeRows {
+	for range m.finderTakes() {
 		if len(out) < rows {
 			out = append(out, strings.Repeat(" ", w))
 		}

@@ -64,9 +64,13 @@ func (m Model) drawFinder(lines []string, l layout, top int) []string {
 	}
 	left := leftMargin
 
-	// Directly over the heading, in the rows the block stood aside for — a blank
-	// under the band, and then these. See listChrome.
-	boxTop := top + m.listBandRows(l) + 1
+	// Directly over the heading, in the rows the block stood aside for — under
+	// the band and the blank that goes with it. See listChrome.
+	band := m.listBandRows(l)
+	boxTop := top + band
+	if band > 0 {
+		boxTop += listBandGap
+	}
 	if boxTop < 0 || boxTop+finderRows > len(lines) {
 		return lines
 	}
@@ -87,6 +91,15 @@ func (m Model) drawFinder(lines []string, l layout, top int) []string {
 	// shade off the screen, on a screen with a photograph at the top of it, reads
 	// as a second window rather than as part of this one.
 	return out
+}
+
+// finderTakes is what the field costs the list it is searching: its own height
+// while it is up, and nothing when it is not.
+func (m Model) finderTakes() int {
+	if !m.finding() {
+		return 0
+	}
+	return finderRows
 }
 
 // finding reports whether the field is up: a query being written, or one written

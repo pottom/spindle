@@ -442,3 +442,46 @@ func TestTheLineUnderTheNamesFades(t *testing.T) {
 		t.Errorf("cell %d is %s, want the line at full strength past the fade", columnFade, cells[columnFade])
 	}
 }
+
+// With the band folded away the blank that goes under it goes too: the table
+// stands at the top of the screen rather than a row down from nothing.
+func TestTheFoldedListLosesTheBandsBlank(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.width, m.height = 150, 30
+	m.resize()
+	m.queue[1] = player.Track{ID: "t1", Title: "Mockingbird", Artists: []string{"ReMan"},
+		Duration: 3 * time.Minute}
+
+	rowOf := func(m Model, want string) int {
+		for i, row := range strings.Split(plain(fmt.Sprint(m.View())), "\n") {
+			if strings.Contains(row, want) {
+				return i
+			}
+		}
+		return -1
+	}
+
+	m.queuePane.room = queueRoomBoth
+	with := rowOf(m, "title")
+	withRows := m.visibleListRows()
+
+	m.queuePane.room = queueRoomList
+	folded := rowOf(m, "title")
+	if with < 0 || folded < 0 {
+		t.Fatalf("the names are on row %d with the band and %d without", with, folded)
+	}
+
+	// The band's own rows and the blank under it, all of them given back.
+	l := m.layout()
+	m.queuePane.room = queueRoomBoth
+	band := m.listBandRows(l)
+	if want := with - band - listBandGap; folded != want {
+		t.Errorf("folded, the names are on row %d, want %d", folded, want)
+	}
+
+	// And the list is that much longer.
+	m.queuePane.room = queueRoomList
+	if got, want := m.visibleListRows(), withRows+band+listBandGap; got != want {
+		t.Errorf("the folded list holds %d rows, want %d", got, want)
+	}
+}

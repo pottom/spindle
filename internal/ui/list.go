@@ -62,25 +62,35 @@ func (l *listState) window(count, height int) (from, to int) {
 // names of the columns, and the line under those.
 const listChromeRows = 4
 
-// listChrome is that, and the field where a list is being searched.
+// listChrome is that, given the band over it, and the field where a list is
+// being searched.
+//
+// The blank goes with the band. It is the air under the picture, and folded away
+// there is no picture for it to be under — it was a row of nothing between the
+// top of the screen and the table, which on the screen that is only a table is
+// the one row nobody asked for.
 //
 // The field takes its rows rather than lying over them. It lay over the heading
 // first, which cost nothing and hid the heading — and a list you are searching
 // is a list whose heading says which list it is and what its columns are, which
 // is worth more while you are reading it through than at any other time. So the
 // table steps down and makes room, and steps back up when the search closes.
-func (m Model) listChrome() int {
-	if m.finding() {
-		return listChromeRows + finderRows
+func (m Model) listChrome(band int) int {
+	rows := listChromeRows
+	if band <= 0 {
+		rows -= listBandGap
 	}
-	return listChromeRows
+	return rows + m.finderTakes()
 }
+
+// listBandGap is that blank: the air between the band and the heading under it.
+const listBandGap = 1
 
 // listBodyRows is how many rows of the list itself a block of the given height
 // has room for. listBlock draws exactly this many and the page keys move by
 // exactly this many, which is the only way a page can mean a screenful.
 func (m Model) listBodyRows(height, artHeight int) int {
-	return max(height-min(artHeight, height)-m.listChrome(), 0)
+	return max(height-min(artHeight, height)-m.listChrome(artHeight), 0)
 }
 
 // visibleListRows is how many rows the list on screen is showing. Only the view
