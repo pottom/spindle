@@ -427,11 +427,18 @@ func TestTheLineUnderTheNamesFades(t *testing.T) {
 		}
 	}
 
-	// And it walks between the two rather than stepping: a quarter along is
-	// neither end of it.
+	// The fade is the ends of it rather than the whole of it: a quarter along is
+	// the line at full strength, and inside the span it is neither one nor the
+	// other.
 	for _, at := range []int{len(cells) / 4, 3 * len(cells) / 4} {
-		if cells[at] == accent || cells[at] == "10;10;14" {
-			t.Errorf("cell %d of the line is %s, want a step between the two", at, cells[at])
+		if cells[at] != accent {
+			t.Errorf("cell %d of the line is %s, want the accent %s", at, cells[at], accent)
 		}
+	}
+	if cells[1] == accent || cells[1] == "10;10;14" {
+		t.Errorf("the second cell is %s, want a step between the accent and the ground", cells[1])
+	}
+	if cells[columnFade] != accent {
+		t.Errorf("cell %d is %s, want the line at full strength past the fade", columnFade, cells[columnFade])
 	}
 }

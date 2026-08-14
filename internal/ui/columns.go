@@ -40,11 +40,22 @@ import (
 // resting on, which is explicitly about another record.
 func (m Model) columnRule(w int) string {
 	var out string
-	for _, step := range style.Crest(m.styles.Accent, m.screenGround(), w) {
+	for _, step := range style.Crest(m.styles.Accent, m.screenGround(), w, min(columnFade, w/4)) {
 		out += step.Render(pointerH)
 	}
 	return out
 }
+
+// columnFade is how many cells at each end the line is given to go out in.
+//
+// The fewest that still reads as going out rather than stopping. It was the whole
+// half of the line, walked from the middle, and a line whose strength changes at
+// every cell is one the eye follows along the row instead of reading across; at
+// four cells the ends are soft and everything between them is simply the line.
+//
+// Cut to a quarter of the width where that is less, so a narrow row keeps a
+// middle to have.
+const columnFade = 4
 
 // screenGround is the terminal's own background colour, or the nearest thing to
 // it worth fading into before the terminal has said what it is.

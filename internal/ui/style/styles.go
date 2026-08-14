@@ -395,21 +395,24 @@ func Fade(from, to color.Color, n int) []lipgloss.Style {
 	return out
 }
 
-// Crest is that walk out and back: full strength in the middle of a run and gone
-// at both ends.
+// Crest is a colour at full strength along a run, given up to another over the
+// last span cells at either end.
 //
 // For a line that divides rather than one that begins somewhere. A fade from one
 // end to the other has a bright end and a dead one, which says the left of the
 // row matters more than the right; this says only that there is a line, and lets
 // it go where it meets the edges of the screen.
-func Crest(from, to color.Color, n int) []lipgloss.Style {
+//
+// The span is what makes it a line with soft ends rather than a swell. Walking
+// the whole way out from the middle, the strength is a thing that changes
+// everywhere and the eye follows it along the row instead of reading across it.
+func Crest(from, to color.Color, n, span int) []lipgloss.Style {
 	out := make([]lipgloss.Style, max(n, 0))
-	mid := float64(n-1) / 2
+	span = max(span, 1)
 	for i := range out {
-		at := 1.0
-		if mid > 0 {
-			at = math.Abs(float64(i)-mid) / mid
-		}
+		// How far this cell is from whichever end is nearer.
+		edge := min(i, n-1-i)
+		at := 1 - min(float64(edge)/float64(span), 1)
 		out[i] = lipgloss.NewStyle().Foreground(blend(from, to, at))
 	}
 	return out
