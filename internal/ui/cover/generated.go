@@ -164,11 +164,13 @@ var (
 
 // The note, in the square's own coordinates: 0 to 1 across and down.
 const (
-	// Centred on the square by measurement: the drawing runs from the left edge
-	// of the left head to the right stem, and from the top of the beam to the
-	// bottom of a head, and both of those are put in the middle.
-	noteLeft   = 0.385 // where the left stem stands
-	noteRight  = 0.765 // and the right one
+	// Centred on the square by weight rather than by extent, which is what the
+	// eye does. The drawing's outermost points are the left head and the right
+	// stem, and putting those two in the middle left the beam and both stems —
+	// nearly all of the ink — sitting to the right of centre: measured, the
+	// centre of mass was at 0.544 of the width. It is at 0.500 here.
+	noteLeft   = 0.343 // where the left stem stands
+	noteRight  = 0.723 // and the right one
 	noteTop    = 0.25  // the top of the beam
 	noteFoot   = 0.65  // where the stems end, at the middle of the heads
 	noteStroke = 0.05  // how thick a stem is
