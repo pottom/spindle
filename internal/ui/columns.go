@@ -48,14 +48,16 @@ func (m Model) columnRule(w int) string {
 
 // columnFade is how many cells at each end the line is given to go out in.
 //
-// The fewest that still reads as going out rather than stopping. It was the whole
-// half of the line, walked from the middle, and a line whose strength changes at
-// every cell is one the eye follows along the row instead of reading across; at
-// four cells the ends are soft and everything between them is simply the line.
+// It was the whole half of the line, walked from the middle, and a line whose
+// strength changes at every cell is one the eye follows along the row instead of
+// reading across. Four cells was the fewest that reads as going out rather than
+// stopping, and looked it — the ends were soft over about a word's width and the
+// line still ended somewhere. Eight is far enough to be a fade and short enough
+// that everything between them is simply the line.
 //
 // Cut to a quarter of the width where that is less, so a narrow row keeps a
 // middle to have.
-const columnFade = 4
+const columnFade = 8
 
 // screenGround is the terminal's own background colour, or the nearest thing to
 // it worth fading into before the terminal has said what it is.
