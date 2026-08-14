@@ -30,9 +30,17 @@ func spread(left, right string, w int) string {
 
 // stack centres lines vertically in an h-row block of w cells, leaving them left
 // aligned. Used for text, where centring the lines themselves would look sloppy.
-func stack(lines []string, w, h int) []string {
+func stack(lines []string, w, h int) []string { return stackLift(lines, w, h, 0) }
+
+// stackLift is the same with the block set a number of rows above the middle.
+//
+// Because exactly centred is not always where a block looks centred. A column of
+// words beside a picture reads low when the arithmetic is obeyed: the picture's
+// weight is even from top to bottom and the words' is not, so the air under them
+// counts for more than the air over them.
+func stackLift(lines []string, w, h, lift int) []string {
 	out := make([]string, h)
-	top := max((h-len(lines))/2, 0)
+	top := max((h-len(lines))/2-lift, 0)
 	for i := range out {
 		row := i - top
 		if row >= 0 && row < len(lines) {

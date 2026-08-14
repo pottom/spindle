@@ -1756,3 +1756,50 @@ func TestTheMarkedBlockKeepsItsContent(t *testing.T) {
 		}
 	}
 }
+
+// The panel sits a row above the middle of its band, unless there is a playhead
+// in it — and then the middle is not a choice.
+func TestThePanelSitsAboveTheMiddle(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.ps = &player.State{TrackID: "a", Duration: 2 * time.Minute, Playing: true}
+	m.width, m.height = 200, 48
+	m.resize()
+	m.queue[1] = player.Track{ID: "b", Title: "Mockingbird", Artists: []string{"ReMan"},
+		Album: "Mockingbird", Duration: 3 * time.Minute}
+
+	l := m.layout()
+	band := m.listBandRows(l)
+	if band < 8 {
+		t.Skip("the band is too short at this size to say anything")
+	}
+
+	// Off the playing track: a row above the middle.
+	m.queuePane.cursor.cursor = queueRowOf(1)
+	if got := m.detailLift(); got != 1 {
+		t.Errorf("the panel is lifted %d rows, want 1", got)
+	}
+	panel := stackLift(m.trackDetail(queueDetailWidth(l), band), queueDetailWidth(l), band, m.detailLift())
+	flat := stack(m.trackDetail(queueDetailWidth(l), band), queueDetailWidth(l), band)
+
+	at, was := -1, -1
+	for i := range panel {
+		if strings.Contains(plain(panel[i]), "Mockingbird") && at < 0 {
+			at = i
+		}
+		if strings.Contains(plain(flat[i]), "Mockingbird") && was < 0 {
+			was = i
+		}
+	}
+	if at < 0 || was < 0 {
+		t.Fatal("the name is not in the panel at all")
+	}
+	if at != was-1 {
+		t.Errorf("the name is on row %d lifted and %d flat, want one row up", at, was)
+	}
+
+	// On it: the bar has to land on the picture's middle, so nothing is lifted.
+	m.queuePane.cursor.cursor = queueRowOf(0)
+	if got := m.detailLift(); got != 0 {
+		t.Errorf("the panel with the playhead is lifted %d rows, want none", got)
+	}
+}

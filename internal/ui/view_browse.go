@@ -141,7 +141,7 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 
 	var detail []string
 	if room.showsNow() {
-		detail = stack(opts.detail(detailWidth, foot), detailWidth, foot)
+		detail = stackLift(opts.detail(detailWidth, foot), detailWidth, foot, m.detailLift())
 		for len(detail) < top {
 			detail = append(detail, strings.Repeat(" ", detailWidth))
 		}
@@ -422,6 +422,21 @@ func (m Model) trackDetail(w, rows int) []string {
 		lines = append(lines, "")
 	}
 	return append(append(lines, bar), under...)
+}
+
+// detailLift is how far above the middle of its band the panel beside the cover
+// sits.
+//
+// A row, unless there is a playhead in it. A block of words centred exactly
+// beside a picture reads as sitting low, because a picture's weight is even and
+// a block of words is heavier at the top. With a playhead the middle is not a
+// choice: the bar has to land on the picture's own middle, which is what puts
+// the two on one line.
+func (m Model) detailLift() int {
+	if t := m.cursorTrack(); t != nil && m.ps != nil && m.ps.TrackID == t.ID {
+		return 0
+	}
+	return 1
 }
 
 // starsFor is how many of the five a rating earns. Nothing scores none: a track
