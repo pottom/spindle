@@ -187,7 +187,10 @@ func TestTheWallIsNotMarked(t *testing.T) {
 			player.Playlist{ID: fmt.Sprintf("p%d", i), Name: n, Owner: "pottom", Tracks: 30})
 	}
 
-	if got := plain(fmt.Sprint(m.View())); strings.Contains(got, pointerTL) {
+	// The wall's own tiles are ringed with the same pen, so what says a band was
+	// marked is the tee the line down to a row hangs from — which only the
+	// bracket round a band draws.
+	if got := plain(fmt.Sprint(m.View())); strings.Contains(got, pointerTee) {
 		t.Error("the wall was marked as though it had a band")
 	}
 
@@ -196,7 +199,7 @@ func TestTheWallIsNotMarked(t *testing.T) {
 	m.stack = append(m.stack, openPage{kind: openPlaylist, id: "p0", name: "Deep House",
 		tracks: []player.Track{{ID: "t0", Title: "One"}, {ID: "t1", Title: "Two"}}})
 	m.stack[0].cursor.cursor = 1
-	if got := plain(fmt.Sprint(m.View())); !strings.Contains(got, pointerTL) {
+	if got := plain(fmt.Sprint(m.View())); !strings.Contains(got, pointerTee) {
 		t.Error("a page opened from the library was not marked")
 	}
 }
