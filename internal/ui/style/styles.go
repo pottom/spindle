@@ -45,6 +45,12 @@ type Styles struct {
 	Remaining lipgloss.Style
 	Knob      lipgloss.Style
 
+	// Rule is a quiet line drawn over the screen rather than in it: a frame
+	// round a block, a leader from one thing to another. The border grey, which
+	// is what the unplayed half of the progress bar is drawn in — so a rule
+	// reads as part of the furniture rather than as something with an opinion.
+	Rule lipgloss.Style
+
 	// Transport row.
 	Controls  lipgloss.Style
 	ToggleOn  lipgloss.Style
@@ -169,6 +175,7 @@ func New(isDark bool, accent color.Color) Styles {
 
 		Elapsed:   fg(accent),
 		Remaining: fg(t.Border),
+		Rule:      fg(t.Border),
 		Knob:      fg(accent),
 
 		// The transport is the artwork's colour, like everything else on the

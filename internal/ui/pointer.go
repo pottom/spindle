@@ -89,7 +89,10 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 		return lines
 	}
 
-	style := m.styles.Cursor
+	// Quiet on purpose. It is an annotation over a picture: what it has to do is
+	// answer "which track is this" when the question comes up, not compete with
+	// the picture it is drawn around.
+	style := m.styles.Rule
 	rule := strings.Repeat(pointerH, right-pointerAt-1)
 
 	out := append([]string(nil), lines...)
