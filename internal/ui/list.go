@@ -86,20 +86,6 @@ func (m Model) listChrome(band int) int {
 // listBandGap is that blank: the air between the band and the heading under it.
 const listBandGap = 1
 
-// listRowHeight is how many screen rows one entry of the list on screen takes.
-//
-// One, except inside an opened record: there a track carries its own sleeve, and
-// a sleeve is not one row tall. Everything that turns a place in a list into a
-// place on the screen — the pager, the block that draws it, the line that points
-// at a row — asks here, because a list drawn at one height and paged at another
-// scrolls by the wrong amount and nobody can say why.
-func (m Model) listRowHeight() int {
-	if m.open() != nil && m.showsRowArt() {
-		return openRowRows
-	}
-	return 1
-}
-
 // listBodyRows is how many rows of the list itself a block of the given height
 // has room for. listBlock draws exactly this many and the page keys move by
 // exactly this many, which is the only way a page can mean a screenful.
@@ -124,7 +110,7 @@ func (m Model) visibleListRows() int {
 	}
 
 	l := m.layout()
-	return m.listBodyRows(max(l.bodyHeight, 1), m.listBandRows(l)) / m.listRowHeight()
+	return m.listBodyRows(max(l.bodyHeight, 1), m.listBandRows(l))
 }
 
 // listBandRows is how tall the band above a list is: the artwork's height, and

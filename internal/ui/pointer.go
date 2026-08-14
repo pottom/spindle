@@ -106,7 +106,7 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 		return lines
 	}
 	from, _ := cursor.window(count, m.visibleListRows())
-	at := top + band + m.listChrome(band) + (cursor.cursor-from)*m.listRowHeight()
+	at := top + band + m.listChrome(band) + (cursor.cursor - from)
 
 	// The arms stand in the blank rows either side of the band.
 	head, foot := top-1, top+band

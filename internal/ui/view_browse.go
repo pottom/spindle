@@ -252,26 +252,17 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 		out = append(out, fit(empty, w))
 	}
 
-	// The window is in entries and the block is in rows, which are the same
-	// thing everywhere but inside an opened record. See listRowHeight.
-	tall := m.listRowHeight()
-	from, to := opts.state.window(opts.count, body/tall)
-	bar := m.scrollColumn(body/tall, opts.count, opts.state.top)
+	from, to := opts.state.window(opts.count, body)
+	bar := m.scrollColumn(body, opts.count, opts.state.top)
 	rowWidth := queueRowWidth(l)
 
 	listFrom := len(out)
 	for i := from; i < to; i++ {
-		lines := []string{opts.row(i, rowWidth, i == opts.state.cursor)}
-		if opts.tallRow != nil {
-			lines = opts.tallRow(i, rowWidth, i == opts.state.cursor)
+		row := fit(opts.row(i, rowWidth, i == opts.state.cursor), rowWidth)
+		if bar != nil {
+			row += " " + bar[i-from]
 		}
-		for at, line := range lines {
-			row := fit(line, rowWidth)
-			if bar != nil && at == 0 {
-				row += " " + bar[i-from]
-			}
-			out = append(out, row)
-		}
+		out = append(out, row)
 	}
 	if lines := m.outline(out[listFrom:], w, "list"); len(lines) == len(out)-listFrom {
 		copy(out[listFrom:], lines)
@@ -306,11 +297,6 @@ type listScreen struct {
 	waiting string
 
 	row func(i, w int, selected bool) string
-
-	// tallRow draws one entry over more than one row, for the lists whose
-	// entries carry a picture. Where it is set, listRowHeight has to agree with
-	// how many rows it returns.
-	tallRow func(i, w int, selected bool) []string
 }
 
 // queueBlock is the queue screen. The playing track heads the list and is not
@@ -783,11 +769,6 @@ func (m Model) openPageView(l layout, rows int) []string {
 			// where they sit in it. The two happen to be written the same way.
 			return m.trackRow(page.tracks[i], w, selected, i+1)
 		},
-	}
-	if m.showsRowArt() {
-		screen.tallRow = func(i, w int, selected bool) []string {
-			return m.openTrackRows(page.tracks[i], w, selected, i+1)
-		}
 	}
 
 	if page.holdsAlbums() {

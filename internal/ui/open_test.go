@@ -2,10 +2,8 @@ package ui
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -159,66 +157,5 @@ func TestTheMenuGoesToTheAlbumAndTheArtist(t *testing.T) {
 		if strings.HasPrefix(v.label, "Go to") {
 			t.Errorf("the menu offers %q for a track with no ids", v.label)
 		}
-	}
-}
-
-// Inside an opened record every track carries its own sleeve, which costs the
-// list half its rows: two rows a track, the title on one and the artists under
-// it.
-func TestAnOpenedRecordCarriesItsSleeves(t *testing.T) {
-	m := queueModel(0, "a", "b")
-	m.width, m.height = 150, 40
-	m.tab = tabLibrary
-	m.resize()
-
-	var tracks []player.Track
-	for i := range 20 {
-		tracks = append(tracks, player.Track{
-			ID: fmt.Sprintf("t%d", i), Title: fmt.Sprintf("Track %d", i),
-			Artists: []string{"Someone"}, CoverURL: "http://example.invalid/a.jpg",
-			Duration: 3 * time.Minute,
-		})
-	}
-	m.stack = append(m.stack, openPage{kind: openPlaylist, id: "p0", name: "Deep Cuts", tracks: tracks})
-
-	if !m.showsRowArt() {
-		t.Fatal("a wide terminal does not draw the sleeves")
-	}
-	if got := m.listRowHeight(); got != openRowRows {
-		t.Errorf("a track takes %d rows, want %d", got, openRowRows)
-	}
-
-	// The pager counts tracks, not rows: half as many fit.
-	l := m.layout()
-	rows := m.listBodyRows(l.bodyHeight, m.listBandRows(l))
-	if got, want := m.visibleListRows(), rows/openRowRows; got != want {
-		t.Errorf("the page holds %d tracks, want %d", got, want)
-	}
-
-	// Each track is drawn over two rows, its artists under its title.
-	screen := strings.Split(plain(fmt.Sprint(m.View())), "\n")
-	title, under := -1, -1
-	for i, row := range screen {
-		if strings.Contains(row, "Track 3") {
-			title = i
-			under = i + 1
-			break
-		}
-	}
-	if title < 0 || under >= len(screen) {
-		t.Fatal("the third track is not on the screen")
-	}
-	if !strings.Contains(screen[under], "Someone") {
-		t.Errorf("the row under the title is %q, want the artists", screen[under])
-	}
-
-	// And with no room for a sleeve it is a table again.
-	m.width = rowArtFrom - 1
-	m.resize()
-	if m.showsRowArt() {
-		t.Error("a narrow terminal still draws the sleeves")
-	}
-	if got := m.listRowHeight(); got != 1 {
-		t.Errorf("a track takes %d rows without its sleeve, want 1", got)
 	}
 }
