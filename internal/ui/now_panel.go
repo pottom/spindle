@@ -33,15 +33,19 @@ const minCoverCols = 8
 // playhead beside it. The same order as the screen's other half, so the band
 // reads across rather than as two unrelated boxes.
 func (m Model) nowPanel(l layout, w, rows, foot int) []string {
-	coverW, coverH := nowCoverBox(l)
-	art := alignTop(strings.Split(m.nowCover.art, "\n"), coverW, min(coverH, rows))
-
 	// The caption is set in the same rows as the panel on the other half, so
 	// the two read as one band rather than as two boxes that happen to be side
 	// by side. Those rows end at the foot of the pictures: a line hanging below
 	// them reads as a mistake.
+	coverW, _ := nowCoverBox(l)
 	captionWidth := w - coverW - columnGap
 	caption := stack(m.nowCaption(captionWidth), captionWidth, foot)
+
+	// And the picture is centred in the same rows rather than hung from the top
+	// of the band. It is half the height of the one on the other half now, and
+	// left at the top it floated above its own words with the band's air under
+	// it — two things that belong together, arranged as though they did not.
+	art := center(strings.Split(m.nowCover.art, "\n"), coverW, min(foot, rows))
 	for len(caption) < len(art) {
 		caption = append(caption, strings.Repeat(" ", captionWidth))
 	}

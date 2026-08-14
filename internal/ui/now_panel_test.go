@@ -92,3 +92,30 @@ func TestTheTwoPicturesDoNotCrossOver(t *testing.T) {
 		t.Error("the answer for the second slot landed in the first picture")
 	}
 }
+
+// The picture of what is playing is the smaller of the two in that band, and it
+// stands level with its own words rather than at the top of the band.
+//
+// Two covers of equal size said nothing about which was which — and less than
+// nothing once a bracket was drawn round the band claiming it for the row under
+// the cursor. This half is a footnote to that half.
+func TestTheNowPanelsPictureIsTheSmallerOne(t *testing.T) {
+	m := libraryPlaying(t, 200, 50)
+	l := m.layout()
+
+	small, _ := nowCoverBox(l)
+	if small <= 0 {
+		t.Fatal("the panel for what is playing is not on screen")
+	}
+	if small >= l.artWidth {
+		t.Errorf("the second picture is %d cells wide against the first's %d", small, l.artWidth)
+	}
+	if want := l.artWidth / nowCoverShare; small != min(want, small) {
+		t.Errorf("the second picture is %d cells wide, want no more than %d", small, want)
+	}
+
+	// It is still a picture rather than a smudge.
+	if small < minCoverCols {
+		t.Errorf("the second picture is %d cells wide, under the %d it needs", small, minCoverCols)
+	}
+}

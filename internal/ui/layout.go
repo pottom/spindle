@@ -319,15 +319,26 @@ func nowPanelWidth(l layout) int {
 	return w
 }
 
-// nowCoverBox is the picture inside that panel: as tall as the picture beside
+// nowCoverBox is the picture inside that panel: a share of the picture beside
 // it, and no wider than the panel can spare with the caption still readable.
+//
+// A share rather than the same size. Drawn as wide as the other one, the band
+// held two covers of equal weight and nothing said which was which — and less
+// than nothing once a bracket was drawn round the band claiming it for the row
+// under the cursor. This half is a footnote to that: what is playing while you
+// look at something else. Half the width says so before a word is read.
 func nowCoverBox(l layout) (w, h int) {
 	panel := nowPanelWidth(l)
 	if panel == 0 {
 		return 0, 0
 	}
-	return min(l.artWidth, panel-nowCaptionMin-columnGap), l.artHeight
+	return min(l.artWidth/nowCoverShare, panel-nowCaptionMin-columnGap), l.artHeight
 }
+
+// nowCoverShare is how much smaller that picture is than the one it stands
+// beside. Half: enough to read as secondary at a glance, and not so little that
+// the cover stops being a cover — see minCoverCols, which is what stops it.
+const nowCoverShare = 2
 
 // queueDetailWidth is what the detail panel keeps once the trace has its share.
 func queueDetailWidth(l layout) int {
