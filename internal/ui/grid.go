@@ -44,10 +44,14 @@ const (
 	frameCols = 2
 	frameRows = 1
 
-	// tileTextRows is what a tile spends on words: the name, and a line saying
-	// what the thing is. Two, always — a tile that took a third row for a long
-	// name would stand out of line with the ones beside it.
-	tileTextRows = 2
+	// tileTextRows is what a tile spends under its picture: a row of air, the
+	// name, and a line saying what the thing is.
+	//
+	// Always these three — a tile that took a fourth row for a long name would
+	// stand out of line with the ones beside it. The air is the picture's own:
+	// the frame round the tile under the cursor closes there, so what it marks is
+	// the cover and not the caption.
+	tileTextRows = 3
 
 	// tileWant is the width a tile is drawn at where the room allows, and
 	// tileLeast the narrowest worth drawing at all. Under that a cover is a
@@ -171,10 +175,10 @@ func (m Model) drawGrid(tiles []gridTile, g gridShape, width, height int) []stri
 	rows := (len(tiles) + g.cols - 1) / g.cols
 	for r := range rows {
 		row := tiles[r*g.cols : min((r+1)*g.cols, len(tiles))]
-		out = append(out, m.gapRow(g, width, selectedIn(tiles, g, r-1), selectedIn(tiles, g, r)))
-		out = append(out, m.drawTileRow(row, g, width, selectedIn(tiles, g, r))...)
+		at := selectedIn(tiles, g, r)
+		out = append(out, m.armRow(g, width, at, pointerTL, pointerTR))
+		out = append(out, m.drawTileRow(row, g, width, at)...)
 	}
-	out = append(out, m.gapRow(g, width, selectedIn(tiles, g, rows-1), -1))
 
 	blank := strings.Repeat(" ", width)
 	for len(out) < height {
@@ -207,15 +211,16 @@ func (m Model) drawTileRow(row []gridTile, g gridShape, width, at int) []string 
 	// squared off when they arrived and the words are cut to the tile. So the row
 	// is written out and padded at the end, and nothing walks a picture through
 	// an escape-sequence parser to ask how wide it is. See coverState.took.
-	tall := min(frameTall, (g.tileH-1)/2)
+	tall := min(frameTall, (g.coverRows-1)/2)
 	fade := style.Fade(m.styles.Accent, m.screenGround(), tall+1)
 
 	join := func(cells []string, line int) string {
-		// How far down the frame this line is, from whichever end is nearer, and
-		// nothing at all where it is past the corners' reach.
+		// How far down the picture this line is, from whichever end is nearer,
+		// and nothing at all where it is past the corners' reach or below the
+		// picture altogether.
 		edge := ""
-		if at >= 0 {
-			if step := min(line+1, g.tileH-line); step <= tall {
+		if at >= 0 && line < g.coverRows {
+			if step := min(line+1, g.coverRows-line); step <= tall {
 				edge = fade[step].Render(pointerV)
 			}
 		}
@@ -251,14 +256,18 @@ func (m Model) drawTileRow(row []gridTile, g gridShape, width, at int) []string 
 		}
 		out = append(out, join(cells, line))
 	}
-	for i, words := range []func(gridTile) string{
+
+	// The row of air under the picture, where the frame closes.
+	out = append(out, m.armRow(g, width, at, pointerElbow, pointerBR))
+
+	for _, words := range []func(gridTile) string{
 		func(t gridTile) string { return m.tileName(t) },
 		func(t gridTile) string { return m.styles.Empty.Render(t.sub) },
 	} {
 		for j, tile := range row {
 			cells[j] = fit(words(tile), g.tileW)
 		}
-		out = append(out, join(cells, g.coverRows+i))
+		out = append(out, join(cells, g.coverRows))
 	}
 	return out
 }
@@ -277,8 +286,8 @@ func (m Model) frameGap(gap int, edge string, at, tile int) string {
 	return strings.Repeat(" ", frameCols-1) + edge + strings.Repeat(" ", gap-frameCols)
 }
 
-// gapRow is the air between two rows of tiles, carrying the foot of the frame
-// round a tile in the row above or the head of one in the row below.
+// armRow is a row of air carrying the arms of the frame round one tile: the two
+// top corners over a picture, or the two bottom ones under it.
 //
 // The frame is written into these rows rather than over them afterwards. Drawn
 // over, every corner and every cell of every arm was a splice into a finished
@@ -286,15 +295,9 @@ func (m Model) frameGap(gap int, edge string, at, tile int) string {
 // which has to be walked through an escape-sequence parser to find the column
 // asked for. Measured on a wall of sixty covers: two hundred milliseconds a
 // frame, four fifths of it in that splicing.
-func (m Model) gapRow(g gridShape, width, above, below int) string {
-	blank := strings.Repeat(" ", width)
-	if above < 0 && below < 0 {
-		return blank
-	}
-
-	at, near, far := above, pointerElbow, pointerBR
-	if below >= 0 {
-		at, near, far = below, pointerTL, pointerTR
+func (m Model) armRow(g gridShape, width, at int, near, far string) string {
+	if at < 0 {
+		return strings.Repeat(" ", width)
 	}
 
 	arm := min(frameArm, (g.tileW-1)/2)
