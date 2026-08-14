@@ -444,10 +444,18 @@ func (m Model) helpKeys() tabKeys {
 
 // layoutMode is how the current tab divides its body.
 func (m Model) layoutMode() layoutMode {
-	if m.tab == tabPlayer {
+	switch {
+	case m.tab == tabPlayer:
 		return modePlayer
+	case m.tab == tabLibrary && m.open() == nil:
+		// The library's band is two previews side by side rather than one
+		// picture with facts beside it. Whatever is opened from it is the other
+		// thing again — a record, with its tracks under it — and takes the
+		// picture the queue takes.
+		return modeLibrary
+	default:
+		return modeList
 	}
-	return modeList
 }
 
 // layout resolves the current geometry. It is pure, so View and Update can both

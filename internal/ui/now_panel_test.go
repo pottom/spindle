@@ -93,29 +93,34 @@ func TestTheTwoPicturesDoNotCrossOver(t *testing.T) {
 	}
 }
 
-// The picture of what is playing is the smaller of the two in that band, and it
-// stands level with its own words rather than at the top of the band.
+// The library's two pictures are the same size, and both are previews: neither
+// the row under the cursor nor what is playing is the subject of that band.
 //
-// Two covers of equal size said nothing about which was which — and less than
-// nothing once a bracket was drawn round the band claiming it for the row under
-// the cursor. This half is a footnote to that half.
-func TestTheNowPanelsPictureIsTheSmallerOne(t *testing.T) {
+// And the band is half what the queue gives a cover. Drawn at that size, a
+// playlist's tile took a third of the screen while the list it belongs to
+// scrolled underneath it.
+func TestTheLibrarysPicturesAreAPair(t *testing.T) {
 	m := libraryPlaying(t, 200, 50)
 	l := m.layout()
 
-	small, _ := nowCoverBox(l)
-	if small <= 0 {
+	now, _ := nowCoverBox(l)
+	if now <= 0 {
 		t.Fatal("the panel for what is playing is not on screen")
 	}
-	if small >= l.artWidth {
-		t.Errorf("the second picture is %d cells wide against the first's %d", small, l.artWidth)
+	if now != l.artWidth {
+		t.Errorf("the second picture is %d cells wide against the first's %d", now, l.artWidth)
 	}
-	if want := l.artWidth / nowCoverShare; small != min(want, small) {
-		t.Errorf("the second picture is %d cells wide, want no more than %d", small, want)
+	if now < minCoverCols {
+		t.Errorf("the pictures are %d cells wide, under the %d a cover needs", now, minCoverCols)
 	}
 
-	// It is still a picture rather than a smudge.
-	if small < minCoverCols {
-		t.Errorf("the second picture is %d cells wide, under the %d it needs", small, minCoverCols)
+	// Half of what the same terminal gives the queue.
+	queue := m
+	queue.tab = tabQueue
+	queue.resize()
+	// Within a cell of half: the width is halved and then squared off against
+	// the cell's own shape, which can leave it a column over.
+	if big := queue.layout().artWidth; l.artWidth > big/2+1 {
+		t.Errorf("the library draws its picture %d cells wide against the queue's %d", l.artWidth, big)
 	}
 }

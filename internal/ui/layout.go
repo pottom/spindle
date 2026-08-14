@@ -91,15 +91,20 @@ func tierFor(w int) widthTier {
 	}
 }
 
-// layoutMode is how a screen divides its body. The two differ in what the
-// artwork is competing with: nothing on the player, and a list beneath it on
-// every screen that is a list.
+// layoutMode is how a screen divides its body. They differ in what the artwork is
+// competing with: nothing on the player, a list beneath it on every screen that
+// is a list, and on the library a second picture beside it as well.
 type layoutMode int
 
 const (
 	modePlayer layoutMode = iota
 	modeList
+	modeLibrary
 )
+
+// isList reports whether this mode puts a list under the artwork, which the
+// library does as much as the queue does.
+func (m layoutMode) isList() bool { return m == modeList || m == modeLibrary }
 
 // layout is the geometry of one screen, derived purely from the terminal size
 // and the pixel size of a cell.
@@ -196,6 +201,14 @@ func computeLayout(w, h, helpHeight int, hasBanner bool, mode layoutMode, cell c
 func artworkArea(interior, bodyHeight int, mode layoutMode, cell cover.CellSize) (width, height int) {
 	share := interior / 2
 	switch {
+	case mode == modeLibrary:
+		// Half of what the other lists give it. The library's band holds two
+		// pictures — the row under the cursor and what is playing — and the one
+		// that reads as a preview rather than as a subject is the size the second
+		// one has to be anyway to leave its caption room. Drawn at the size the
+		// queue draws its cover, this one was a third of the screen given over to
+		// a playlist's tile while the list it belongs to scrolled beneath it.
+		share = min(interior*2/5, maxBrowseArt) / 2
 	case mode != modePlayer:
 		share = min(interior*2/5, maxBrowseArt)
 	case interior < narrowBelow:
@@ -230,7 +243,7 @@ func artworkArea(interior, bodyHeight int, mode layoutMode, cell cover.CellSize)
 		grown := max(bodyHeight-playerBelowArt, bodyHeight*2/3)
 		maxHeight = max(min(maxHeight, grown), 1)
 	}
-	if mode == modeList {
+	if mode.isList() {
 		maxHeight = max(min(maxHeight, bodyHeight/3), 1)
 	}
 
@@ -319,26 +332,21 @@ func nowPanelWidth(l layout) int {
 	return w
 }
 
-// nowCoverBox is the picture inside that panel: a share of the picture beside
-// it, and no wider than the panel can spare with the caption still readable.
+// nowCoverBox is the picture inside that panel: the size of the one beside it,
+// and no wider than the panel can spare with the caption still readable.
 //
-// A share rather than the same size. Drawn as wide as the other one, the band
-// held two covers of equal weight and nothing said which was which — and less
-// than nothing once a bracket was drawn round the band claiming it for the row
-// under the cursor. This half is a footnote to that: what is playing while you
-// look at something else. Half the width says so before a word is read.
+// The same size, because on the library neither of them is the subject. It was
+// half the other one for a day, which was the answer while the other one was the
+// size the queue draws a cover at — a picture that large is a subject whatever is
+// beside it. Both are previews now: one of what the cursor is on, one of what is
+// playing, and the bracket down the band says which is which.
 func nowCoverBox(l layout) (w, h int) {
 	panel := nowPanelWidth(l)
 	if panel == 0 {
 		return 0, 0
 	}
-	return min(l.artWidth/nowCoverShare, panel-nowCaptionMin-columnGap), l.artHeight
+	return min(l.artWidth, panel-nowCaptionMin-columnGap), l.artHeight
 }
-
-// nowCoverShare is how much smaller that picture is than the one it stands
-// beside. Half: enough to read as secondary at a glance, and not so little that
-// the cover stops being a cover — see minCoverCols, which is what stops it.
-const nowCoverShare = 2
 
 // queueDetailWidth is what the detail panel keeps once the trace has its share.
 func queueDetailWidth(l layout) int {
