@@ -61,12 +61,18 @@ const (
 // pointable reports whether this screen has a band that follows the cursor and a
 // list under it for the line to reach.
 //
-// The queue, the library, and whatever has been opened from either. Not the
-// search, whose band follows the cursor too but whose heading is the field being
-// typed into — a bracket drawn round the results while somebody is still writing
-// the question is an answer arriving early. Not the player, which has no list.
+// The queue, and whatever has been opened from the queue or the library — a
+// record with its tracks under it. Not the library itself, which is a wall of
+// covers with no band at all: everything on it is already showing its own
+// picture. Not the search, whose band follows the cursor too but whose heading is
+// the field being typed into, and a bracket round the results while the question
+// is still being written is an answer arriving early. Not the player, which has
+// no list.
 func (m Model) pointable() bool {
-	return m.tab == tabQueue || m.tab == tabLibrary
+	if m.tab == tabLibrary {
+		return m.open() != nil
+	}
+	return m.tab == tabQueue
 }
 
 // pointAtCursor draws the frame and the line, over rows already laid out.

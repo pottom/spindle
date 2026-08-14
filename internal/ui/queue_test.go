@@ -802,20 +802,19 @@ func TestQueuePlayheadDoesNotFlickerAsTheCoverLoads(t *testing.T) {
 	}
 }
 
-// Every list screen is the same act — looking down a list of tracks — and has
-// to be the same composition: the cover and a detail panel across the top, the
-// list across the full width below.
-func TestPlaylistsUseTheSameShapeAsTheQueue(t *testing.T) {
+// The library is not a list of tracks and is not composed like one: it is a wall
+// of covers, and every tile on it shows its own picture rather than one of them
+// being enlarged across the top of the screen.
+func TestTheLibraryIsAWallOfCovers(t *testing.T) {
 	p := player.NewMock()
 	m := New(p, nil, defaultTestCell)
 	m.ps = &player.State{TrackID: "t01", Playing: true}
 	m.tab = tabLibrary
 	listPage, err := p.PlaylistsPage(t.Context(), 0)
-	lists := listPage.Items
 	if err != nil {
 		t.Fatalf("Playlists: %v", err)
 	}
-	m.library.playlists = lists
+	m.library.playlists = listPage.Items
 	m.width, m.height = 200, 45
 	m.resize()
 
@@ -825,49 +824,29 @@ func TestPlaylistsUseTheSameShapeAsTheQueue(t *testing.T) {
 		t.Fatalf("the block is %d rows, want the whole body of %d", len(block), l.bodyHeight)
 	}
 
-	// The panel beside the cover describes what the cursor rests on.
-	head := plain(strings.Join(block[:l.artRows], "\n"))
-	if !strings.Contains(head, lists[0].Name) || !strings.Contains(head, "Tracks") {
-		t.Errorf("the panel = %q, want the playlist under the cursor described", head)
+	// Several across, each named under its picture.
+	g := m.libraryShape(l, l.bodyHeight)
+	if g.cols < 3 {
+		t.Errorf("a 200-column terminal holds %d tiles across, want at least 3", g.cols)
+	}
+	screen := plain(strings.Join(block, "\n"))
+	for _, want := range listPage.Items[:min(g.cols, len(listPage.Items))] {
+		if !strings.Contains(screen, want.Name) {
+			t.Errorf("the wall does not name %q:\n%s", want.Name, screen)
+		}
 	}
 
-	// The list starts below the artwork and runs the whole width.
-	row := plain(block[l.artHeight+3])
-	if !strings.Contains(row, lists[0].Name) {
-		t.Errorf("row = %q, want the list under the heading", row)
+	// And the names of two tiles beside each other are on the same row, which is
+	// what makes it a wall rather than a list.
+	for _, row := range strings.Split(screen, "\n") {
+		if strings.Contains(row, listPage.Items[0].Name) {
+			if !strings.Contains(row, listPage.Items[1].Name) {
+				t.Errorf("the first two tiles are not on one row: %q", row)
+			}
+			return
+		}
 	}
-	if at := strings.Index(row, lists[0].Owner); at < len(row)/3 {
-		t.Errorf("the owner sits at column %d of %d, want it out where the artists are", at, len(row))
-	}
-}
-
-// Inside a playlist the panel describes the track under the cursor, so the
-// picture beside it has to be that track's.
-func TestOpenPlaylistFollowsTheCursor(t *testing.T) {
-	p := player.NewMock()
-	m := New(p, nil, defaultTestCell)
-	m.tab = tabLibrary
-	listPage, _ := p.PlaylistsPage(t.Context(), 0)
-	lists := listPage.Items
-	open := lists[0]
-	trackPage, err := p.PlaylistTracksPage(t.Context(), open.ID, 0)
-	tracks := trackPage.Items
-	if err != nil || len(tracks) < 2 {
-		t.Fatalf("PlaylistTracks: %v (%d tracks)", err, len(tracks))
-	}
-	showOpen(&m, open, tracks)
-
-	if got := m.cursorTrack(); got == nil || got.ID != tracks[0].ID {
-		t.Fatalf("cursorTrack = %v, want the first track", got)
-	}
-	if got := m.coverTarget(); got != tracks[0].CoverURL {
-		t.Errorf("coverTarget = %q, want the track's own cover", got)
-	}
-
-	m.openMut().cursor.move(1, len(tracks))
-	if got := m.cursorTrack(); got == nil || got.ID != tracks[1].ID {
-		t.Errorf("cursorTrack = %v, want the panel to follow the cursor", got)
-	}
+	t.Error("the first tile is not on the screen at all")
 }
 
 // Enter plays the list from the track under the cursor, so the rest of it

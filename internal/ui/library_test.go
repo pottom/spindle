@@ -173,45 +173,29 @@ func TestAFailedPageDoesNotEndTheList(t *testing.T) {
 	}
 }
 
-// The library's band is marked the same way the queue's is: a bracket down its
-// left and a line to the row it describes.
-//
-// Always, rather than only sometimes. On the queue the band is the cursor's
-// track while the list begins with the sounding one, so the mark answers a
-// question that only comes up off that row; here the band follows the cursor and
-// nothing else, so what it belongs to is worth saying wherever the cursor is.
-func TestTheLibraryBandIsMarkedToo(t *testing.T) {
+// The library is a wall of covers with no band over it, so there is nothing to
+// mark: every tile is already showing its own picture.
+func TestTheWallIsNotMarked(t *testing.T) {
 	m := queueModel(0, "a", "b")
 	m.width, m.height = 150, 40
 	m.tab = tabLibrary
 	m.resize()
-	for i, n := range []string{"Deep House", "Chill", "Runners", "Party"} {
+	for i, n := range []string{"Deep House", "Chill", "Runners"} {
 		m.library.playlists = append(m.library.playlists,
 			player.Playlist{ID: fmt.Sprintf("p%d", i), Name: n, Owner: "pottom", Tracks: 30})
 	}
 
-	for _, at := range []int{0, 2, 3} {
-		m.library.cursors[m.library.kind].cursor = at
+	if got := plain(fmt.Sprint(m.View())); strings.Contains(got, pointerTL) {
+		t.Error("the wall was marked as though it had a band")
+	}
 
-		rows := strings.Split(plain(fmt.Sprint(m.View())), "\n")
-		head, elbow := -1, -1
-		for i, row := range rows {
-			if strings.Contains(row, pointerTL) {
-				head = i
-			}
-			if strings.Contains(row, pointerElbow) {
-				elbow = i
-			}
-		}
-		if head < 0 || elbow < 0 {
-			t.Fatalf("cursor %d: the band was not marked: bracket at %d, line ends at %d", at, head, elbow)
-		}
-
-		// It ends on the row the band is about.
-		want := []string{"Deep House", "Runners", "Party"}[map[int]int{0: 0, 2: 1, 3: 2}[at]]
-		if !strings.Contains(rows[elbow], want) {
-			t.Errorf("cursor %d: the line points at %q, want %q", at, strings.TrimSpace(rows[elbow]), want)
-		}
+	// What is opened from it is a record with its tracks under it, and that is
+	// marked like any other.
+	m.stack = append(m.stack, openPage{kind: openPlaylist, id: "p0", name: "Deep House",
+		tracks: []player.Track{{ID: "t0", Title: "One"}, {ID: "t1", Title: "Two"}}})
+	m.stack[0].cursor.cursor = 1
+	if got := plain(fmt.Sprint(m.View())); !strings.Contains(got, pointerTL) {
+		t.Error("a page opened from the library was not marked")
 	}
 }
 
@@ -226,5 +210,58 @@ func TestTheSearchBandIsNotMarked(t *testing.T) {
 
 	if got := plain(fmt.Sprint(m.View())); strings.Contains(got, pointerTL) {
 		t.Error("the search's band was marked")
+	}
+}
+
+// The wall is walked across as well as down, and it scrolls a whole row at a
+// time: a row of covers split across two screenfuls is not a row any more.
+func TestTheWallIsWalkedInTwoDirections(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.width, m.height = 150, 40
+	m.tab = tabLibrary
+	m.resize()
+	for i := range 24 {
+		m.library.playlists = append(m.library.playlists,
+			player.Playlist{ID: fmt.Sprintf("p%d", i), Name: fmt.Sprintf("List %d", i), Owner: "pottom"})
+	}
+
+	l := m.layout()
+	g := m.libraryShape(l, l.bodyHeight)
+	if g.cols < 2 || g.rows < 1 {
+		t.Fatalf("the wall is %d by %d", g.cols, g.rows)
+	}
+
+	press := func(name string, code rune) {
+		t.Helper()
+		if !m.libraryGridKey(tea.KeyPressMsg{Code: code}) {
+			t.Fatalf("the wall did not take %s", name)
+		}
+	}
+	at := func() int { return m.library.cursors[m.library.kind].cursor }
+
+	press("right", tea.KeyRight)
+	if at() != 1 {
+		t.Errorf("right moved to %d, want the next tile", at())
+	}
+	press("down", tea.KeyDown)
+	if want := 1 + g.cols; at() != want {
+		t.Errorf("down moved to %d, want %d — a row down", at(), want)
+	}
+	press("left", tea.KeyLeft)
+	if want := g.cols; at() != want {
+		t.Errorf("left moved to %d, want %d", at(), want)
+	}
+	press("up", tea.KeyUp)
+	if at() != 0 {
+		t.Errorf("up moved to %d, want the first tile", at())
+	}
+
+	// The window scrolls by rows: whatever is at the top of the screen is the
+	// start of a row.
+	state := &m.library.cursors[m.library.kind]
+	state.cursor = len(m.library.playlists) - 1
+	from, _ := state.gridWindow(len(m.library.playlists), g)
+	if from%g.cols != 0 {
+		t.Errorf("the wall starts at tile %d, which is %d into a row", from, from%g.cols)
 	}
 }

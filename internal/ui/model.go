@@ -83,11 +83,11 @@ type Model struct {
 
 	cover coverState
 
-	// nowCover is the second picture: what is playing, beside what the cursor
-	// is on. Only the screens that show both fill it. It carries no accent —
-	// the palette follows the cover the reader is looking at, and two of them
-	// pulling at it would leave the colours changing for no reason.
-	nowCover coverState
+	// tiles are the library's wall: one picture per thing on it, keyed by the
+	// thing rather than by where it sits, so scrolling a row does not re-fetch
+	// what only moved. What has scrolled away is dropped — see syncGridCovers.
+	tiles map[string]coverState
+
 
 	// coverSeq debounces the artwork preview: arrowing down a list should not
 	// fire an upload per row, only once the cursor settles.

@@ -166,10 +166,8 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 			m.toneTook(message.Art)
 			return m, nil
 		}
-		if message.Slot == nowSlot {
-			if m.nowCover.matches(message.URL, message.Width, message.Height) {
-				m.nowCover.art = message.Art.Cells
-			}
+		if message.Slot >= gridSlotFrom {
+			m.gridTook(message.URL, message.Width, message.Height, message.Art.Cells)
 			return m, nil
 		}
 		if m.cover.matches(message.URL, message.Width, message.Height) {
@@ -189,10 +187,8 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 			// before it, which is better than the program going grey mid-song.
 			return m, nil
 		}
-		if message.Slot == nowSlot {
-			if m.nowCover.matches(message.URL, message.Width, message.Height) {
-				m.nowCover.failed = true
-			}
+		if message.Slot >= gridSlotFrom {
+			m.gridFailed(message.URL, message.Width, message.Height)
 			return m, nil
 		}
 		if m.cover.matches(message.URL, message.Width, message.Height) {
@@ -208,7 +204,7 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 
 	case msg.LibraryFetched:
 		m.library.adopt(message, m.likedRow())
-		return m, m.syncCover()
+		return m, tea.Batch(m.syncCover(), m.syncGridCovers())
 
 	case msg.OpenedFetched:
 		// The saved tracks are read whether or not they are open: the library
@@ -852,7 +848,7 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 // changes when the track does, and the track changes in a dozen places that
 // have no reason to know a second picture exists.
 func (m *Model) syncCover() tea.Cmd {
-	return tea.Batch(m.syncCursorCover(), m.syncNowCover())
+	return m.syncCursorCover()
 }
 
 // syncCursorCover is the picture of whatever the screen is about: the track
@@ -885,33 +881,6 @@ func (m *Model) syncCursorCover() tea.Cmd {
 		coverCmd(m.covers, m.cover.url, l.artWidth, l.artHeight, cursorSlot),
 		m.spinner.Tick,
 	)
-}
-
-// syncNowCover is the same for the second picture, the one of what is playing.
-// It is only asked for on the screens that show it: everywhere else the field
-// is left as it is, so coming back to such a screen does not start from a blank
-// square.
-func (m *Model) syncNowCover() tea.Cmd {
-	if m.covers == nil || !fitsMinimum(m.width, m.height) || !m.showsNowPanel() {
-		return nil
-	}
-
-	l := m.layout()
-	w, h := nowCoverBox(l)
-	url := ""
-	if m.ps != nil && !m.noDevice {
-		url = m.ps.CoverURL
-	}
-	if m.nowCover.matches(url, w, h) {
-		return nil
-	}
-
-	m.nowCover = coverState{url: url, width: w, height: h}
-	if url == "" {
-		m.nowCover.failed = true
-		return nil
-	}
-	return coverCmd(m.covers, url, w, h, nowSlot)
 }
 
 // setProgress records a position and when it was true, which is what elapsed

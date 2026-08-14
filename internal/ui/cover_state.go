@@ -5,13 +5,9 @@ import "image/color"
 // coverState is what the view needs to know about the artwork area: which URL
 // and cell size it was rendered for, the art itself, the colour the cover reads
 // as, and whether the attempt failed.
-// cursorSlot and nowSlot are the two pictures a screen may show at once: what
-// the cursor is resting on, and what is playing. They are the renderer's slots,
-// which is why they are numbers.
-const (
-	cursorSlot = 0
-	nowSlot    = 1
-)
+// cursorSlot is the picture of what the cursor is resting on. It is the
+// renderer's slot, which is why it is a number — see gridSlotFrom for the wall's.
+const cursorSlot = 0
 
 type coverState struct {
 	url           string

@@ -127,9 +127,6 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	case m.scopeVisible() && room.showsTrace():
 		detailWidth = queueDetailWidth(l)
 		right = m.place(m.traceBlock(), queueScopeWidth(l), top)
-	case m.showsNowPanel():
-		detailWidth = queueDetailWidth(l)
-		right = m.place(m.nowBlock(l, foot), nowPanelWidth(l), top)
 	}
 
 	// With the player folded away the picture has the band to itself, which is
@@ -705,45 +702,9 @@ func queueSubtitle(tracks []player.Track) string {
 }
 
 func (m Model) libraryPaneView(l layout, rows int) []string {
-	screen := listScreen{
-		detail:   m.libraryDetail,
-		heading:  func(int) string { return m.styles.Title.Render("Library") },
-		subtitle: m.libraryKinds,
-		count:    m.library.count(),
-		state:    &m.library.cursors[m.library.kind],
-		empty:    "Nothing saved yet.",
-		waiting:  "Reading your library…",
-	}
-
-	switch m.library.kind {
-	case libraryAlbums:
-		screen.columns = func(w int) string { return m.albumColumns(w, blankMark) }
-		screen.empty, screen.waiting = "No saved albums.", "Reading your albums…"
-		screen.row = func(i, w int, selected bool) string {
-			return m.albumRow(blankMark, m.library.albums[i], w, selected)
-		}
-	case libraryArtists:
-		screen.columns = func(w int) string { return m.artistColumns(w, blankMark) }
-		screen.empty, screen.waiting = "Nobody followed yet.", "Reading who you follow…"
-		screen.row = func(i, w int, selected bool) string {
-			return m.artistRow(blankMark, m.library.artists[i], w, selected)
-		}
-	case libraryRecent:
-		screen.columns = func(w int) string { return m.trackColumns(w, true) }
-		screen.detail = m.trackDetail
-		screen.empty, screen.waiting = "Nothing played yet.", "Reading what you played…"
-		screen.row = func(i, w int, selected bool) string {
-			// Numbered by how far back it was, which is what the list is: the
-			// first row is the last thing heard.
-			return m.trackRow(m.library.recent[i], w, selected, i+1)
-		}
-	default:
-		screen.columns = m.playlistColumns
-		screen.row = func(i, w int, selected bool) string {
-			return m.playlistRow(m.library.playlists[i], w, selected)
-		}
-	}
-	return m.listBlock(l, rows, screen)
+	// The tab itself is a wall of covers. What is opened from it is a list, and
+	// comes back through here as one — see openPageView.
+	return m.libraryPaneGrid(l, rows)
 }
 
 // libraryKinds is the strip beside the heading: the three lists the tab holds,
@@ -1220,11 +1181,10 @@ func (m Model) likedCell(t player.Track) string {
 // rowsCarryTheSplit reports whether something in the band is hung from the
 // column a row's artists begin at.
 //
-// Two things are: the queue's trace, and the panel the library puts what is
-// playing in. Both start on that column so the screen reads as two halves rather
-// than four columns, and where one of them is up the title's width is not the
-// row's business alone — it keeps whatever the division gives it. Where neither
-// is, the title takes a ceiling and the row keeps its columns together.
+// The queue's trace is: it starts on that column so the screen reads as two
+// halves rather than four columns, and where it is up the title's width is not
+// the row's business alone — it keeps whatever the division gives it. Where it is
+// not, the title takes a ceiling and the row keeps its columns together.
 //
 // The same question listBlock asks to decide what to draw there, asked the same
 // way: the two must agree, or the rows line up with a panel that is not there.
@@ -1233,7 +1193,7 @@ func (m Model) rowsCarryTheSplit() bool {
 	if m.tab == tabQueue && m.open() == nil && !m.devices.open {
 		room = m.queuePane.room
 	}
-	return (m.scopeVisible() && room.showsTrace()) || m.showsNowPanel()
+	return m.scopeVisible() && room.showsTrace()
 }
 
 // tempoCell is the beat rate for a list row, or nothing for a track that has

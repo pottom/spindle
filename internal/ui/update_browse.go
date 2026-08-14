@@ -45,6 +45,7 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 		cmds = append(cmds,
 			fetchLibraryCmd(m.player, m.library.kind, 0),
 			fetchOpenCmd(m.player, openPlaylist, likedID, 0),
+			m.syncGridCovers(),
 			m.spinner.Tick,
 		)
 	case t == tabQueue:
@@ -145,6 +146,11 @@ func (m *Model) openKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 }
 
 func (m *Model) libraryKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
+	// The tab is a wall of covers, and a wall is walked across as well as down.
+	if m.libraryGridKey(k) {
+		return tea.Batch(m.previewCover(), m.readAhead(), m.syncGridCovers()), true
+	}
+
 	if m.listKey(k, m.library.cursor(), m.library.count(), true) {
 		return tea.Batch(m.previewCover(), m.readAhead()), true
 	}
@@ -155,7 +161,7 @@ func (m *Model) libraryKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		if key.Matches(k, m.keys.SearchKindBack) {
 			delta = -1
 		}
-		return m.turnLibraryKind(delta), true
+		return tea.Batch(m.turnLibraryKind(delta), m.syncGridCovers()), true
 
 	case key.Matches(k, m.keys.Enter):
 		// A row in the history is a track, and a track plays rather than opens.

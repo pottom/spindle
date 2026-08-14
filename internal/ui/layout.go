@@ -309,45 +309,6 @@ func queueScopeWidth(l layout) int {
 	return w
 }
 
-// nowPanelMin is the narrowest right-hand half worth giving to what is playing:
-// a small cover and a caption beside it. Below this the caption is a column of
-// broken words, and the rows are better left to the list.
-const nowPanelMin = 34
-
-// nowCaptionMin is what the words beside that cover need.
-const nowCaptionMin = 18
-
-// nowPanelWidth is the right-hand half of a browsing screen's top band, where
-// what is playing goes. It starts at the same column the artists below do, so
-// the band and the list read as the same two halves — the trace on the queue
-// hangs from that column for the same reason.
-func nowPanelWidth(l layout) int {
-	if !l.hasArt() || queueDetailWidth(l) < minInfoCols {
-		return 0
-	}
-	w := queueBlockWidth(l) - queueSplit(l)
-	if w < nowPanelMin {
-		return 0
-	}
-	return w
-}
-
-// nowCoverBox is the picture inside that panel: the size of the one beside it,
-// and no wider than the panel can spare with the caption still readable.
-//
-// The same size, because on the library neither of them is the subject. It was
-// half the other one for a day, which was the answer while the other one was the
-// size the queue draws a cover at — a picture that large is a subject whatever is
-// beside it. Both are previews now: one of what the cursor is on, one of what is
-// playing, and the bracket down the band says which is which.
-func nowCoverBox(l layout) (w, h int) {
-	panel := nowPanelWidth(l)
-	if panel == 0 {
-		return 0, 0
-	}
-	return min(l.artWidth, panel-nowCaptionMin-columnGap), l.artHeight
-}
-
 // queueDetailWidth is what the detail panel keeps once the trace has its share.
 func queueDetailWidth(l layout) int {
 	return queueSplit(l) - l.artWidth - 2*columnGap

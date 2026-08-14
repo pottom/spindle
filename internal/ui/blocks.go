@@ -126,14 +126,6 @@ func blankRows(w, n int) []string {
 	return out
 }
 
-// nowBlock is the small cover and caption of what is playing, for the screens
-// whose subject is a list rather than a track.
-func (m Model) nowBlock(l layout, foot int) block {
-	return block{"now", func(w, h int) []string {
-		return m.nowPanel(l, w, h, foot)
-	}}
-}
-
 // devicesBlock is the picker, which stands in for whatever it is opened over.
 func (m Model) devicesBlock() block {
 	return block{"devices", func(w, h int) []string {
