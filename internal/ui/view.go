@@ -102,7 +102,7 @@ func (m Model) renderPlayer() string {
 	// After the body is in place, because the glance starts in the blank row
 	// above it and so needs the frame rather than the body.
 	if m.peekVisible() {
-		lines = m.drawPeek(lines, len(lines)-len(body)-1, l)
+		lines = m.drawPeek(lines, len(lines)-len(body), l)
 	}
 
 	// And for the same reason: where the band at the top belongs to a different

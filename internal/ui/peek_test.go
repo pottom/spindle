@@ -287,3 +287,30 @@ func TestTheGlanceIsATable(t *testing.T) {
 		t.Errorf("the glance's rows carry no album and no rating: %q", got)
 	}
 }
+
+// The glance stands at the top of the body rather than in the blank the frame
+// keeps under the header, where it read as hanging off the tabs.
+func TestTheGlanceStandsUnderTheBlank(t *testing.T) {
+	m := lyricsModel(190, 44)
+	m.queue = append(m.queue, player.Track{ID: "1", Title: "first",
+		Artists: []string{"someone"}, Duration: time.Minute})
+	m.peek.on = true
+
+	rows := strings.Split(plain(m.render()), "\n")
+	at := -1
+	for i, row := range rows {
+		if strings.Contains(row, "Up next") {
+			at = i
+			break
+		}
+	}
+	if at < 2 {
+		t.Fatalf("the glance is on row %d", at)
+	}
+	if got := strings.TrimSpace(rows[at-1]); got != "" {
+		t.Errorf("the row over the glance carries %q, want the frame's blank", got)
+	}
+	if got := rows[at-2]; !strings.Contains(got, "━") {
+		t.Errorf("row %d is %q, want the rule under the tabs two over the glance", at-2, got)
+	}
+}

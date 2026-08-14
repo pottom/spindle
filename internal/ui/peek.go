@@ -41,14 +41,18 @@ func (m Model) peekVisible() bool { return m.peek.on && m.peekAvailable() }
 // drawPeek writes the glance into the blank rows above the artwork, leaving
 // everything below exactly where it was.
 //
-// It starts one row above the body, in the blank the frame keeps between the
-// header and everything else — which is where every other screen's first line
-// sits, and where this one looked a row low.
+// It starts at the top of the body, a row under the blank the frame keeps
+// between the header and everything else. It stood in that blank for a while and
+// read as hanging off the header rather than as the first thing on the screen.
 func (m Model) drawPeek(lines []string, at int, l layout) []string {
 	// As many tracks as the blank above the artwork can hold, up to four. It was
 	// four or nothing, which on the terminals where the room is five or six rows
 	// meant nothing — and the glance is worth having at three.
-	room := len(lines) - at
+	//
+	// The room is measured to the top of the picture rather than to the end of
+	// the rows laid out so far: the picture is in those rows, and a block that
+	// counted them as room would draw itself over the sleeve.
+	room := min(m.artTop(l, l.bodyHeight), len(lines)-at)
 	if room < peekLeast+peekChrome {
 		return lines
 	}
