@@ -425,6 +425,13 @@ func (m Model) nowPlayingRow() (player.Track, bool) {
 		Album:    m.ps.Album,
 		CoverURL: m.ps.CoverURL,
 		Duration: m.ps.Duration,
+
+		// The measurement of what is sounding, which is in hand either way.
+		// Left off, this row and the panel beside it said the tempo was unknown
+		// while the header two lines above printed it — the number was there
+		// and dropped on the way past. It is the first listen this branch is
+		// for, and a first listen is exactly when nothing has it written down.
+		Tempo: m.ps.Tempo,
 	}, true
 }
 

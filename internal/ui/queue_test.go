@@ -1476,3 +1476,40 @@ func TestTheSoundingColourIsAskedForOncePerRecord(t *testing.T) {
 		t.Error("the record changed and its colour was not sent for")
 	}
 }
+
+// What the header says about the tempo, the row and the panel say too.
+//
+// The row for what is sounding is built two ways: from the queue's own record of
+// it where there is one, and from the player's state where there is not. The
+// second built it without the tempo, so the panel said the tempo was unknown
+// while the header two lines above printed it. That branch is the first listen,
+// which is exactly when nothing has it written down yet.
+func TestTheSoundingTempoReachesTheRowAndThePanel(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.ps = &player.State{
+		TrackID: "unheard", Title: "Supergirl", Artists: []string{"Dream Chaos"},
+		Album: "Supergirl", Duration: 3*time.Minute + 17*time.Second,
+		Tempo: 112, Playing: true,
+	}
+	m.nowQueued = nil
+
+	now, ok := m.nowPlayingRow()
+	if !ok {
+		t.Fatal("nothing is sounding")
+	}
+	if now.Tempo != 112 {
+		t.Errorf("the row for what is sounding says %.0f bpm, want the 112 the header says", now.Tempo)
+	}
+
+	m.queuePane.cursor.cursor = 0
+	if got := plain(strings.Join(m.trackDetail(40, 20), "\n")); !strings.Contains(got, "112 bpm") {
+		t.Errorf("the panel = %q, want the measured tempo in it", got)
+	}
+
+	// And where the queue has its own record, the live measurement still wins:
+	// it is fresher than whatever was written down last time.
+	m.nowQueued = &player.Track{ID: "unheard", Title: "Supergirl", Tempo: 90}
+	if now, _ := m.nowPlayingRow(); now.Tempo != 112 {
+		t.Errorf("the row says %.0f bpm, want the live 112 over the remembered 90", now.Tempo)
+	}
+}
