@@ -185,8 +185,14 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 		}
 		out = append(out, spread(opts.heading(w), subtitle, w))
 	}
+	// The blank under the heading names the columns, where the list has any and
+	// has anything in them. Over an empty list it would be a header for nothing.
 	if len(out) < rows {
-		out = append(out, strings.Repeat(" ", w))
+		head := strings.Repeat(" ", w)
+		if opts.columns != nil && opts.count > 0 && listBodyRows(rows, m.listBandRows(l)) > 0 {
+			head = fit(opts.columns(queueRowWidth(l)), w)
+		}
+		out = append(out, head)
 	}
 
 	// What is left is the list. It is asked for rather than counted off what has
@@ -248,6 +254,10 @@ type listScreen struct {
 	heading  func(w int) string
 	subtitle func() string
 
+	// columns names the cells of a row, drawn in the blank under the heading.
+	// Nil where a list has nothing worth naming.
+	columns func(w int) string
+
 	count int
 	state *listState
 
@@ -271,6 +281,7 @@ func (m Model) queueBlock(l layout, rows int) []string {
 		detail:   m.trackDetail,
 		heading:  func(int) string { return m.styles.Title.Render("Queue") },
 		subtitle: func() string { return m.styles.Album.Render(queueSubtitle(m.queue)) },
+		columns:  func(w int) string { return m.trackColumns(w, true) },
 		count:    len(rowsOf),
 		state:    &m.queuePane.cursor,
 		empty:    "Nothing is queued.",
@@ -534,6 +545,12 @@ func (m Model) queuedColumn(t player.Track) string {
 	}
 }
 
+// blankQueuedColumn is that column with nothing in it, which is what the row
+// naming the columns needs: the width the marks take, without a mark.
+func (m Model) blankQueuedColumn() string {
+	return m.queuedColumn(player.Track{})
+}
+
 // isQueued reports whether a track is one of those waiting by hand. Only those:
 // everything the album or playlist supplies is in the list as well, and marking
 // all of it would say nothing about what was chosen.
@@ -651,16 +668,19 @@ func (m Model) libraryPaneView(l layout, rows int) []string {
 
 	switch m.library.kind {
 	case libraryAlbums:
+		screen.columns = func(w int) string { return m.albumColumns(w, blankMark) }
 		screen.empty, screen.waiting = "No saved albums.", "Reading your albums…"
 		screen.row = func(i, w int, selected bool) string {
 			return m.albumRow(blankMark, m.library.albums[i], w, selected)
 		}
 	case libraryArtists:
+		screen.columns = func(w int) string { return m.artistColumns(w, blankMark) }
 		screen.empty, screen.waiting = "Nobody followed yet.", "Reading who you follow…"
 		screen.row = func(i, w int, selected bool) string {
 			return m.artistRow(blankMark, m.library.artists[i], w, selected)
 		}
 	case libraryRecent:
+		screen.columns = func(w int) string { return m.trackColumns(w, true) }
 		screen.detail = m.trackDetail
 		screen.empty, screen.waiting = "Nothing played yet.", "Reading what you played…"
 		screen.row = func(i, w int, selected bool) string {
@@ -669,6 +689,7 @@ func (m Model) libraryPaneView(l layout, rows int) []string {
 			return m.trackRow(m.library.recent[i], w, selected, i+1)
 		}
 	default:
+		screen.columns = m.playlistColumns
 		screen.row = func(i, w int, selected bool) string {
 			return m.playlistRow(m.library.playlists[i], w, selected)
 		}
@@ -730,6 +751,7 @@ func (m Model) openPageView(l layout, rows int) []string {
 		subtitle: func() string { return m.styles.Album.Render(m.openSubtitle(page)) },
 		count:    page.count(),
 		state:    &m.stack[len(m.stack)-1].cursor,
+		columns:  func(w int) string { return m.trackColumns(w, true) },
 		empty:    "Nothing here.",
 		waiting:  "Reading it…",
 		row: func(i, w int, selected bool) string {
@@ -740,6 +762,7 @@ func (m Model) openPageView(l layout, rows int) []string {
 	}
 
 	if page.holdsAlbums() {
+		screen.columns = func(w int) string { return m.albumColumns(w, "") }
 		screen.detail = m.openAlbumDetail
 		screen.empty, screen.waiting = "No records here.", "Reading their records…"
 		screen.row = func(i, w int, selected bool) string {
@@ -861,6 +884,7 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 		// of its own above one.
 		heading:  func(w int) string { return m.searchField(max(w/3, 8)) },
 		subtitle: m.searchKinds,
+		columns:  m.searchColumns,
 		count:    found.count(),
 		state:    &found.cursor,
 		empty:    empty,
@@ -914,6 +938,22 @@ func (m Model) searchRow(i, w int, selected bool) string {
 		return m.playlistRow(found.playlists[i], w, selected)
 	default:
 		return m.trackRow(found.tracks[i], w, selected, 0)
+	}
+}
+
+// searchColumns names the columns of whichever kind of result is on screen.
+func (m Model) searchColumns(w int) string {
+	switch m.search.kind {
+	case player.SearchAlbums:
+		return m.albumColumns(w, "")
+	case player.SearchArtists:
+		return m.artistColumns(w, "")
+	case player.SearchPlaylists:
+		return m.playlistColumns(w)
+	default:
+		// Search results carry no ordinal: what a track's place in a list of
+		// answers is worth is nothing.
+		return m.trackColumns(w, false)
 	}
 }
 
@@ -1041,9 +1081,13 @@ func (m Model) playlistRow(p player.Playlist, w int, selected bool) string {
 	// A count of nothing is not a count. The saved tracks arrive a page at a
 	// time and their number is not known until the last of them has, so the
 	// column stays empty rather than saying zero.
+	//
+	// The number alone: the column is named now, and "30 tracks" under a heading
+	// reading tracks is the word twice — which is what it was, except that the
+	// column is too narrow for it and it came out as "30 trac…".
 	count := ""
 	if p.Tracks > 0 {
-		count = m.styles.RowTrailing.Render(fmt.Sprintf("%d tracks", p.Tracks))
+		count = m.styles.RowTrailing.Render(fmt.Sprintf("%d", p.Tracks))
 	}
 
 	return m.row(w, selected, name, m.lit(m.styles.RowSecondary, p.Owner), count)

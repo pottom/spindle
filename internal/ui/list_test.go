@@ -3,7 +3,9 @@ package ui
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -247,5 +249,60 @@ func TestThePickerTakesTheSameKeys(t *testing.T) {
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyPgUp})
 	if sel := tm.(Model).devices.selected(); sel == nil || sel.ID != "laptop" {
 		t.Errorf("page up landed on %v, want the first device", sel)
+	}
+}
+
+// The row under the heading names the columns, and stands over the words it
+// names rather than beside them.
+func TestTheColumnsAreNamed(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.width, m.height = 150, 32
+	m.resize()
+	for i := range m.queue {
+		m.queue[i] = player.Track{ID: fmt.Sprintf("t%d", i), Title: "Mockingbird",
+			Artists: []string{"ReMan"}, Album: "Nightfall", Duration: 3 * time.Minute, Tempo: 108}
+	}
+	m.queuePane.room = queueRoomList
+
+	rows := strings.Split(plain(fmt.Sprint(m.View())), "\n")
+	head, first := -1, -1
+	for i, row := range rows {
+		if head < 0 && strings.Contains(row, "title") && strings.Contains(row, "artist") {
+			head = i
+		}
+		if head >= 0 && first < 0 && strings.Contains(row, "Mockingbird") {
+			first = i
+		}
+	}
+	if head < 0 {
+		t.Fatal("the columns are not named anywhere")
+	}
+	if first != head+2 {
+		t.Fatalf("the names are on row %d and the first track on %d, want it two under", head, first)
+	}
+
+	// Each name over its own column, to the column.
+	for name, cell := range map[string]string{
+		"title": "Mockingbird", "artist": "ReMan", "album": "Nightfall", "time": "3:00",
+	} {
+		at, under := strings.Index(rows[head], name), strings.Index(rows[first], cell)
+		if at < 0 || under < 0 {
+			t.Errorf("%q or %q is missing from the screen", name, cell)
+			continue
+		}
+		if name == "time" {
+			// Set to the right, like the cell under it.
+			at, under = at+len(name), under+len(cell)
+		}
+		if at != under {
+			t.Errorf("%q starts at %d and %q at %d", name, at, cell, under)
+		}
+	}
+
+	// Nothing to name over an empty list.
+	m.queue, m.ps = nil, nil
+	m.queuePane.cursor = listState{}
+	if got := plain(fmt.Sprint(m.View())); strings.Contains(got, " title ") {
+		t.Error("an empty list still names its columns")
 	}
 }
