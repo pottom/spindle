@@ -341,3 +341,36 @@ func TestNoTabLeavesABandDownTheSides(t *testing.T) {
 		}
 	}
 }
+
+// On a wide row the title stops growing and what it gives up becomes one gap
+// before the columns at the right, rather than air spread through the row.
+func TestTheTitleStopsGrowing(t *testing.T) {
+	for body := 60; body <= 400; body++ {
+		span := rowWidths(body).capped()
+		if span.main > titleCols {
+			t.Errorf("row %d: the title has %d columns, past its ceiling of %d", body, span.main, titleCols)
+		}
+		if span.second > span.main {
+			t.Errorf("row %d: the artists have %d columns and the title %d", body, span.second, span.main)
+		}
+		if span.gap < 0 {
+			t.Errorf("row %d: the gap is %d", body, span.gap)
+		}
+
+		// The row still adds up to what it was given.
+		used := span.main + span.second + span.gap + span.album + span.stars + span.liked + span.beat + trailingCols
+		if used > body {
+			t.Errorf("row %d: the columns come to %d, past the row", body, used)
+		}
+	}
+
+	// And the ceiling is what opens the gap, not something else: on a row wide
+	// enough, the pair is the ceiling and the rest is the gap.
+	wide := rowWidths(400).capped()
+	if wide.gap == 0 {
+		t.Error("a 400-column row has no gap, so the pair took everything")
+	}
+	if narrow := rowWidths(100).capped(); narrow.gap != 0 {
+		t.Errorf("a 100-column row has a gap of %d, want the pair to use it", narrow.gap)
+	}
+}

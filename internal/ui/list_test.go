@@ -357,8 +357,20 @@ func TestTheRowCarriesTheRatingAndTheHeart(t *testing.T) {
 	if got := rows["Saved"]; !strings.Contains(got, strings.Repeat(starFull, 5)) {
 		t.Errorf("a track rated 95 does not carry five stars: %q", got)
 	}
-	if got := rows["Unsaved"]; !strings.Contains(got, starEmpty) {
-		t.Errorf("a track rated 8 does not carry its empty stars: %q", got)
+	// The filled ones only: down a column the length is the reading, and the
+	// empty ones are a wall saying the same thing on every row.
+	if got := rows["Unsaved"]; strings.Contains(got, starEmpty) {
+		t.Errorf("a row carries the empty half of its rating: %q", got)
+	}
+	if got := rows["Unsaved"]; !strings.Contains(got, starFull) {
+		t.Errorf("a track rated 8 carries no star at all: %q", got)
+	}
+
+	// And beside the cover, where one rating stands alone, the scale it is out
+	// of is still drawn.
+	m.queuePane.cursor.moveTo(2, len(m.queueRows()))
+	if got := plain(strings.Join(m.trackDetail(60, 12), "\n")); !strings.Contains(got, starEmpty) {
+		t.Errorf("the panel dropped the empty half of the rating: %q", got)
 	}
 
 	// The heart, on the row that is saved and no other.

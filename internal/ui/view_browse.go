@@ -189,7 +189,18 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 		if m.listLoading() && opts.count > 0 {
 			subtitle += " " + m.spinner.View()
 		}
-		out = append(out, spread(opts.heading(w), subtitle, w))
+
+		// Set against the heading, or at the left where there is no heading to
+		// set it against. The queue gave its name up — the tab it is under is
+		// called queue — and what was left was a count alone at the far end of an
+		// empty row, which reads as something dropped in a corner rather than as
+		// the line that says what the table below holds.
+		head := opts.heading(w)
+		if lipgloss.Width(head) == 0 {
+			out = append(out, fit(subtitle, w))
+		} else {
+			out = append(out, spread(head, subtitle, w))
+		}
 	}
 	// The blank under the heading names the columns, where the list has any and
 	// has anything in them. Over an empty list it would be a header for nothing.
@@ -1180,11 +1191,17 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 // starsCell is a track's rating for a list row, and nothing at all for a track
 // Spotify sent no rating for: five empty stars would be a rating of none, which
 // is a different thing from not knowing.
+//
+// The filled ones only. Beside the cover, where one rating stands alone, the
+// empty stars are the scale it is out of and are worth their room; down a column
+// of thirty rows they are a wall of grey that says the same thing on every line.
+// What a column wants is the length, which is the whole of the reading — so the
+// stars start on one line and run as far as the rating goes, like any other bar.
 func (m Model) starsCell(t player.Track) string {
 	if t.Popularity == nil {
 		return ""
 	}
-	return m.stars(*t.Popularity)
+	return m.styles.StarOn.Render(strings.Repeat(starFull, starsFor(*t.Popularity)))
 }
 
 // likedCell is the heart on the rows that are saved.
@@ -1198,6 +1215,25 @@ func (m Model) likedCell(t player.Track) string {
 		return ""
 	}
 	return m.styles.Queued.Render(likedMark)
+}
+
+// rowsCarryTheSplit reports whether something in the band is hung from the
+// column a row's artists begin at.
+//
+// Two things are: the queue's trace, and the panel the library puts what is
+// playing in. Both start on that column so the screen reads as two halves rather
+// than four columns, and where one of them is up the title's width is not the
+// row's business alone — it keeps whatever the division gives it. Where neither
+// is, the title takes a ceiling and the row keeps its columns together.
+//
+// The same question listBlock asks to decide what to draw there, asked the same
+// way: the two must agree, or the rows line up with a panel that is not there.
+func (m Model) rowsCarryTheSplit() bool {
+	room := queueRoomBoth
+	if m.tab == tabQueue && m.open() == nil && !m.devices.open {
+		room = m.queuePane.room
+	}
+	return (m.scopeVisible() && room.showsTrace()) || m.showsNowPanel()
 }
 
 // tempoCell is the beat rate for a list row, or nothing for a track that has
@@ -1248,6 +1284,15 @@ const (
 	// it the row has nothing spare, and taking them would come out of the title.
 	albumFrom = 2*secondaryCols + albumCols + tempoCols + trailingCols
 
+	// titleCols is the most the title takes, however wide the terminal is.
+	//
+	// Without a ceiling the title and the artists divide everything left over
+	// between them, and on a wide screen that is a lot: measured at 240 columns,
+	// the title's column came to 98 cells and the longest title in it used 15. A
+	// row like that is two words at opposite ends of the screen, and reading it
+	// means travelling. Sixty-four is past all but the most parenthesised titles.
+	titleCols = 64
+
 	// starsCols is the rating's column, which is five stars wide because a
 	// rating is five stars, and likedCols the heart's — as wide as the word over
 	// it rather than as the glyph in it, so the name is not the thing it names
@@ -1266,6 +1311,7 @@ const (
 type rowSpan struct {
 	main   int
 	second int
+	gap    int
 	album  int
 	stars  int
 	liked  int
@@ -1304,7 +1350,28 @@ func rowWidths(body int) rowSpan {
 	if grown := min(secondaryCols+(body-shareAbove)/2, free/2); grown > span.second {
 		span.second, span.main = grown, free-grown
 	}
+
 	return span
+}
+
+// capped is the same widths with a ceiling on the title, and what neither it nor
+// the artists can use put between the pair and the columns to the right of them.
+//
+// The artists never wider than the title, because past that point the row reads
+// as being about whoever made the record rather than about the record. What the
+// two give up becomes one gap rather than air spread through the row, so the
+// title and the artists stay a readable distance apart and the album, the rating
+// and the clock stay a block at the edge.
+//
+// Not always applied: on the queue the column the artists begin at is the line
+// the trace hangs from, and moving it moves the picture above the list. See
+// rowsCarryTheSplit.
+func (s rowSpan) capped() rowSpan {
+	pair := s.main + s.second
+	s.main = min(s.main, titleCols)
+	s.second = min(s.second, s.main)
+	s.gap = pair - s.main - s.second
+	return s
 }
 
 // rowSecondaryAt is the column a track row's artists begin at, counted from the
@@ -1365,10 +1432,16 @@ func (m Model) drawRow(w int, selected bool, c rowCells) string {
 		span.second = max(span.second+span.main-m.rowsMainAt, 0)
 		span.main = m.rowsMainAt
 	}
+	if !m.rowsCarryTheSplit() {
+		span = span.capped()
+	}
 
 	line := gutter + fit(c.primary, max(span.main, 0)) + " "
 	if span.second > 0 {
 		line += fit(c.secondary, span.second) + " "
+	}
+	if span.gap > 0 {
+		line += strings.Repeat(" ", span.gap)
 	}
 	if span.album > 0 {
 		line += fit(c.album, span.album) + " "
