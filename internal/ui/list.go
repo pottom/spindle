@@ -58,19 +58,29 @@ func (l *listState) window(count, height int) (from, to int) {
 }
 
 // listChromeRows is what a list block spends on itself above the rows, once the
-// artwork has taken its share: two blank lines, the heading, and another blank.
-//
-// Two above rather than one. The heading stands a row clear of the band over it,
-// and the row that opens up is where a field to search the list will go — it is
-// left empty until then rather than moving everything down on the day it
-// arrives.
+// artwork has taken its share: a blank line under the band, the heading, the
+// names of the columns, and the line under those.
 const listChromeRows = 4
+
+// listChrome is that, and the field where a list is being searched.
+//
+// The field takes its rows rather than lying over them. It lay over the heading
+// first, which cost nothing and hid the heading — and a list you are searching
+// is a list whose heading says which list it is and what its columns are, which
+// is worth more while you are reading it through than at any other time. So the
+// table steps down and makes room, and steps back up when the search closes.
+func (m Model) listChrome() int {
+	if m.finding() {
+		return listChromeRows + finderRows
+	}
+	return listChromeRows
+}
 
 // listBodyRows is how many rows of the list itself a block of the given height
 // has room for. listBlock draws exactly this many and the page keys move by
 // exactly this many, which is the only way a page can mean a screenful.
-func listBodyRows(height, artHeight int) int {
-	return max(height-min(artHeight, height)-listChromeRows, 0)
+func (m Model) listBodyRows(height, artHeight int) int {
+	return max(height-min(artHeight, height)-m.listChrome(), 0)
 }
 
 // visibleListRows is how many rows the list on screen is showing. Only the view
@@ -90,7 +100,7 @@ func (m Model) visibleListRows() int {
 	}
 
 	l := m.layout()
-	return listBodyRows(max(l.bodyHeight, 1), m.listBandRows(l))
+	return m.listBodyRows(max(l.bodyHeight, 1), m.listBandRows(l))
 }
 
 // listBandRows is how tall the band above a list is: the artwork's height, and

@@ -71,7 +71,7 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 	// and how far down its window the cursor has got.
 	cursor := m.queuePane.cursor
 	from, _ := cursor.window(len(m.queueRows()), m.visibleListRows())
-	at := top + band + listChromeRows + (cursor.cursor - from)
+	at := top + band + m.listChrome() + (cursor.cursor - from)
 
 	// The frame stands in the blank rows either side of the band.
 	head, foot := top-1, top+band

@@ -9,17 +9,16 @@ import (
 
 // The field a list is searched in.
 //
-// It floats over the list rather than standing in a row of its own, which is the
-// whole of why it is drawn this way: a field with a row of its own would have to
-// take that row from somewhere, and every list on this screen is already as long
-// as the terminal allows. Opening a search to look through a list, and losing a
-// line of the list to do it, is paying in the currency you came to spend.
+// A box over the head of the list rather than a line at the foot of the screen,
+// where the query used to be written among the notices: there it read as one more
+// thing the program had to say, rather than as the one place the keyboard was
+// going.
 //
-// So it is laid over the rows the way the pointer is laid over the band — same
-// pen, same rounded corners, same ground a step off the screen's — and the rows
-// under it are still there the moment it closes. It stands in the list's own
-// chrome, over the heading and the names of the columns, so what it hides is
-// furniture rather than a record — and so it is in the same place every time.
+// So it is drawn the way the pointer is — same pen, same rounded corners, same
+// ground a step off the screen's — over rows the list has stood aside for. It
+// covers nothing: the table steps down by the height of the box while a search
+// is open and steps back up when it closes, so what a search costs is three rows
+// of the list for as long as it is being made, and nothing at all after.
 //
 // What it holds is the query and how many rows matched, because a query that
 // matches nothing and one that matches everything look the same on a list you
@@ -51,44 +50,27 @@ func (m Model) drawFinder(lines []string, l layout, top int) []string {
 		return lines
 	}
 
-	rows := m.visibleListRows()
-	if rows <= finderRows {
-		// The box would be the list. On a terminal this short the query goes
-		// unshown rather than the rows it is searching.
+	// The width of the list it searches, and the block's width rather than a
+	// row's: the count beside the heading is set to the block, and a box a row
+	// wide left the tail of it sticking out.
+	//
+	// The whole width rather than cut to its contents, because a box the size of
+	// four letters floating in the middle of the heading reads as something
+	// dropped on the screen. At the list's width it is the head of the list while
+	// the search is open, which is what it is.
+	box := min(queueBlockWidth(l), l.interior-leftMargin-rightMargin)
+	if box < finderLeast {
 		return lines
 	}
-
-	// The block's width rather than a row's: the count beside the heading is set
-	// to the block, and a box a row wide left the tail of it sticking out.
-	width := min(queueBlockWidth(l), l.interior-leftMargin-rightMargin)
-	if width < finderLeast {
-		return lines
-	}
-
-	// The width of the list it searches. A box cut to its contents floated in the
-	// middle of the heading with the heading either side of it, which reads as
-	// something dropped on the screen; at the list's own width it is the head of
-	// the list while the search is open, which is what it is.
-	typed, count := m.finderParts()
-	box := width
 	left := leftMargin
 
-	// In the list's own chrome, directly over the first track: the heading, the
-	// names of the columns and the line under them are three rows, which is
-	// exactly the box.
-	//
-	// So it covers no track at all, and it is in the same place every time. It
-	// stood over the head of the list first, and that hid three rows of the queue
-	// for as long as the search was open — which on the queue is the record
-	// playing and the two after it. Stepping out of the way of whatever it found
-	// only made where it would appear a thing to work out. What it hides here is
-	// furniture, and furniture is what a list can spare while it is being read
-	// through.
-	bodyTop := top + m.listBandRows(l) + listChromeRows
-	boxTop := bodyTop - finderRows
+	// Directly over the heading, in the rows the block stood aside for — a blank
+	// under the band, and then these. See listChrome.
+	boxTop := top + m.listBandRows(l) + 1
 	if boxTop < 0 || boxTop+finderRows > len(lines) {
 		return lines
 	}
+	typed, count := m.finderParts()
 
 	rule := strings.Repeat(pointerH, box-2)
 	out := append([]string(nil), lines...)

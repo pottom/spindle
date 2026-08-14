@@ -208,8 +208,8 @@ func searchingQueue(t *testing.T, query string) Model {
 	return m
 }
 
-// The field is a box over the list, and it says what the query did.
-func TestTheFieldFloatsOverTheList(t *testing.T) {
+// The field is a box above the list, and it says what the query did.
+func TestTheFieldStandsOverTheList(t *testing.T) {
 	m := searchingQueue(t, "tit")
 	screen := plain(fmt.Sprint(m.View()))
 	if !strings.Contains(screen, pointerTL) {
@@ -222,17 +222,35 @@ func TestTheFieldFloatsOverTheList(t *testing.T) {
 		}
 	}
 
-	// It costs the list nothing: the same rows are on screen with it up.
+	// It takes its rows from the list rather than lying over them: the table
+	// steps down by exactly the height of the box.
 	m.find = find{}
-	was := strings.Count(plain(fmt.Sprint(m.View())), "Nightfall")
+	was := strings.Split(plain(fmt.Sprint(m.View())), "\n")
 	m = searchingQueue(t, "tit")
-	if now := strings.Count(plain(fmt.Sprint(m.View())), "Nightfall"); now != was {
-		t.Errorf("the list holds %d rows with the field up and %d without", now, was)
+	now := strings.Split(plain(fmt.Sprint(m.View())), "\n")
+
+	find := func(rows []string, want string) int {
+		for i, row := range rows {
+			if strings.Contains(row, want) {
+				return i
+			}
+		}
+		return -1
+	}
+	for _, of := range []string{"Queue", "title", "Titanium"} {
+		before, after := find(was, of), find(now, of)
+		if before < 0 || after < 0 {
+			t.Errorf("%q is on row %d without the field and %d with it", of, before, after)
+			continue
+		}
+		if after != before+finderRows {
+			t.Errorf("%q moved from row %d to %d, want it %d down", of, before, after, finderRows)
+		}
 	}
 }
 
-// It stands in the list's chrome, so it covers no track at all — and it stands
-// there whatever the search has found, so it is in one place.
+// It covers no track at all — the list makes room for it — and it stands in the
+// same place whatever the search has found.
 func TestTheFieldCoversNoTrack(t *testing.T) {
 	for _, at := range []int{0, 3, 7} {
 		m := searchingQueue(t, "tit")

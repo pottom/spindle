@@ -1619,7 +1619,7 @@ func TestTheBandIsAsTallAsTheCover(t *testing.T) {
 		if len(block) != l.bodyHeight {
 			t.Errorf("%dx%d: the block is %d rows, want %d", size[0], size[1], len(block), l.bodyHeight)
 		}
-		if got, want := m.visibleListRows(), listBodyRows(l.bodyHeight, l.artRows); got != want {
+		if got, want := m.visibleListRows(), m.listBodyRows(l.bodyHeight, l.artRows); got != want {
 			t.Errorf("%dx%d: the keys page by %d rows and the list draws %d", size[0], size[1], got, want)
 		}
 	}

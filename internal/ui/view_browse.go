@@ -168,6 +168,16 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 		out = append(out, strings.Repeat(" ", w))
 	}
 
+	// The room the field a list is searched in stands in. It is drawn over the
+	// screen once everything is laid out — see finder.go — and what it needs from
+	// here is the rows, so that the table steps down for it rather than being
+	// covered by it.
+	for range m.listChrome() - listChromeRows {
+		if len(out) < rows {
+			out = append(out, strings.Repeat(" ", w))
+		}
+	}
+
 	// The heading carries the count on the right, where a subtitle line would
 	// otherwise cost a row the list could use. A page on its way turns the
 	// spinner beside it: the rows already on screen are not all of them, and
@@ -181,7 +191,7 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	}
 	// The blank under the heading names the columns, where the list has any and
 	// has anything in them. Over an empty list it would be a header for nothing.
-	named := opts.columns != nil && opts.count > 0 && listBodyRows(rows, m.listBandRows(l)) > 0
+	named := opts.columns != nil && opts.count > 0 && m.listBodyRows(rows, m.listBandRows(l)) > 0
 	if len(out) < rows {
 		head := strings.Repeat(" ", w)
 		if named {
@@ -194,9 +204,8 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	// the names are the first entry in the list, set in a lighter grey.
 	//
 	// It stands in the row that was held over the heading for a field to search
-	// the list. The field floats over the rows now and needs no row of its own,
-	// so the one it was promised goes to this — the list is no shorter and the
-	// heading no closer to the band than they were.
+	// the list, which the field no longer wants: it is given rows of its own above
+	// the heading while it is open, rather than a row kept empty against the day.
 	if len(out) < rows {
 		rule := strings.Repeat(" ", w)
 		if named {
@@ -208,7 +217,7 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	// What is left is the list. It is asked for rather than counted off what has
 	// been drawn, because the page keys have to move by the same number and
 	// cannot see this function.
-	body := listBodyRows(rows, m.listBandRows(l))
+	body := m.listBodyRows(rows, m.listBandRows(l))
 
 	// The menu takes the list's rows rather than floating over them. What the
 	// verbs apply to is described in the panel above either way, so the list is
