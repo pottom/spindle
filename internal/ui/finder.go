@@ -17,10 +17,9 @@ import (
 //
 // So it is laid over the rows the way the pointer is laid over the band — same
 // pen, same rounded corners, same ground a step off the screen's — and the rows
-// under it are still there the moment it closes. It stands over the top of the
-// list, and moves to the foot of it when the row the cursor found is one of the
-// three it would otherwise cover: a search that hides what it found has answered
-// a question by taking the answer away.
+// under it are still there the moment it closes. It stands in the list's own
+// chrome, over the heading and the names of the columns, so what it hides is
+// furniture rather than a record — and so it is in the same place every time.
 //
 // What it holds is the query and how many rows matched, because a query that
 // matches nothing and one that matches everything look the same on a list you
@@ -59,36 +58,34 @@ func (m Model) drawFinder(lines []string, l layout, top int) []string {
 		return lines
 	}
 
-	width := min(queueRowWidth(l), l.interior-leftMargin-rightMargin)
+	// The block's width rather than a row's: the count beside the heading is set
+	// to the block, and a box a row wide left the tail of it sticking out.
+	width := min(queueBlockWidth(l), l.interior-leftMargin-rightMargin)
 	if width < finderLeast {
 		return lines
 	}
 
-	// As wide as what is in it, between a floor and a ceiling. A field the width
-	// of the list would be a banner across the screen for four letters; one cut
-	// to the letters would twitch on every key. The floor is where it opens and
-	// stays for any ordinary query, and past that it grows.
+	// The width of the list it searches. A box cut to its contents floated in the
+	// middle of the heading with the heading either side of it, which reads as
+	// something dropped on the screen; at the list's own width it is the head of
+	// the list while the search is open, which is what it is.
 	typed, count := m.finderParts()
-	box := lipgloss.Width(typed) + lipgloss.Width(count) + finderGap + 2*finderPad + 2
-	box = min(max(box, finderLeast), max(width*2/3, finderLeast))
-	left := leftMargin + (width-box)/2
+	box := width
+	left := leftMargin
 
-	// Over the head of the list, unless the row it found is up there — and then
-	// over the foot of it, which is the foot of the rows a list actually has
-	// rather than of the room it was given: a box floating in the blank under a
-	// list of eight is a box floating in nothing.
+	// In the list's own chrome, directly over the first track: the heading, the
+	// names of the columns and the line under them are three rows, which is
+	// exactly the box.
+	//
+	// So it covers no track at all, and it is in the same place every time. It
+	// stood over the head of the list first, and that hid three rows of the queue
+	// for as long as the search was open — which on the queue is the record
+	// playing and the two after it. Stepping out of the way of whatever it found
+	// only made where it would appear a thing to work out. What it hides here is
+	// furniture, and furniture is what a list can spare while it is being read
+	// through.
 	bodyTop := top + m.listBandRows(l) + listChromeRows
-	row, filled := m.finderAt(rows)
-	if filled < finderRows {
-		return lines
-	}
-
-	boxTop := bodyTop
-	foot := bodyTop + filled - finderRows
-	if at := bodyTop + row; at >= boxTop && at < boxTop+finderRows &&
-		(at < foot || at >= foot+finderRows) {
-		boxTop = foot
-	}
+	boxTop := bodyTop - finderRows
 	if boxTop < 0 || boxTop+finderRows > len(lines) {
 		return lines
 	}
@@ -121,17 +118,6 @@ func (m Model) finding() bool {
 		return false
 	}
 	return m.find.typing || m.find.query != ""
-}
-
-// finderAt is how far down the visible list the cursor is sitting, and how many
-// of the rows on screen have anything in them.
-func (m Model) finderAt(rows int) (row, filled int) {
-	state, count := (&m).listCursor()
-	if state == nil {
-		return -1, 0
-	}
-	from, to := state.window(count, rows)
-	return state.cursor - from, to - from
 }
 
 // finderParts is what the field holds: the prompt and what has been typed into

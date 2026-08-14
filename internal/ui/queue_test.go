@@ -1030,7 +1030,7 @@ func TestSearchUsesTheSameShapeAsTheQueue(t *testing.T) {
 
 	// The field is the heading, and what else the query matched is set against
 	// it — which is the whole argument for showing one kind at a time.
-	heading := plain(block[l.artHeight+1])
+	heading := plain(block[l.artHeight])
 	if !strings.Contains(heading, "queen") || !strings.Contains(heading, "tracks") {
 		t.Errorf("heading = %q, want the query and the kinds", heading)
 	}
@@ -1625,9 +1625,8 @@ func TestTheBandIsAsTallAsTheCover(t *testing.T) {
 	}
 }
 
-// The row over the heading is left empty on purpose: it is where a field to
-// search the list will go, and reserving it now means nothing moves on the day
-// it arrives.
+// The heading stands a row clear of the band over it, and the names of the
+// columns and the line under them follow it before the first track does.
 func TestTheHeadingStandsClearOfTheBand(t *testing.T) {
 	m := queueModel(0, "one", "two")
 	m.ps = &player.State{TrackID: "now", Title: "sounding", Playing: true}
@@ -1641,13 +1640,17 @@ func TestTheHeadingStandsClearOfTheBand(t *testing.T) {
 		t.Fatal("there is no room to say anything about")
 	}
 
-	for _, blank := range []int{band, band + 1} {
-		if got := strings.TrimSpace(plain(block[blank])); got != "" {
-			t.Errorf("row %d over the heading carries %q, want it clear", blank, got)
-		}
+	if got := strings.TrimSpace(plain(block[band])); got != "" {
+		t.Errorf("the row over the heading carries %q, want it clear", got)
 	}
-	if !strings.Contains(plain(block[band+2]), "Queue") {
-		t.Errorf("the heading is not two rows under the band: %q", plain(block[band+2]))
+	if !strings.Contains(plain(block[band+1]), "Queue") {
+		t.Errorf("the heading is not a row under the band: %q", plain(block[band+1]))
+	}
+	if got := plain(block[band+2]); !strings.Contains(got, "title") {
+		t.Errorf("the columns are not named under the heading: %q", got)
+	}
+	if got := strings.TrimSpace(plain(block[band+3])); !strings.HasPrefix(got, pointerH) {
+		t.Errorf("there is no line under the names of the columns: %q", got)
 	}
 }
 

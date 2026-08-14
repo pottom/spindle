@@ -168,12 +168,6 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 		out = append(out, strings.Repeat(" ", w))
 	}
 
-	// A second blank over the heading: it stands clear of the band, and the row
-	// is where a field to search the list will go. See listChromeRows.
-	if len(out) < rows {
-		out = append(out, strings.Repeat(" ", w))
-	}
-
 	// The heading carries the count on the right, where a subtitle line would
 	// otherwise cost a row the list could use. A page on its way turns the
 	// spinner beside it: the rows already on screen are not all of them, and
@@ -187,12 +181,28 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	}
 	// The blank under the heading names the columns, where the list has any and
 	// has anything in them. Over an empty list it would be a header for nothing.
+	named := opts.columns != nil && opts.count > 0 && listBodyRows(rows, m.listBandRows(l)) > 0
 	if len(out) < rows {
 		head := strings.Repeat(" ", w)
-		if opts.columns != nil && opts.count > 0 && listBodyRows(rows, m.listBandRows(l)) > 0 {
+		if named {
 			head = fit(opts.columns(queueRowWidth(l)), w)
 		}
 		out = append(out, head)
+	}
+
+	// And a line under them, which is what tells a heading from a row: without it
+	// the names are the first entry in the list, set in a lighter grey.
+	//
+	// It stands in the row that was held over the heading for a field to search
+	// the list. The field floats over the rows now and needs no row of its own,
+	// so the one it was promised goes to this — the list is no shorter and the
+	// heading no closer to the band than they were.
+	if len(out) < rows {
+		rule := strings.Repeat(" ", w)
+		if named {
+			rule = fit(m.styles.Rule.Render(strings.Repeat(pointerH, queueRowWidth(l))), w)
+		}
+		out = append(out, rule)
 	}
 
 	// What is left is the list. It is asked for rather than counted off what has

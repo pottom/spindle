@@ -231,25 +231,38 @@ func TestTheFieldFloatsOverTheList(t *testing.T) {
 	}
 }
 
-// It never covers the row it found.
-func TestTheFieldKeepsOffWhatItFound(t *testing.T) {
-	m := searchingQueue(t, "tit")
+// It stands in the list's chrome, so it covers no track at all — and it stands
+// there whatever the search has found, so it is in one place.
+func TestTheFieldCoversNoTrack(t *testing.T) {
+	for _, at := range []int{0, 3, 7} {
+		m := searchingQueue(t, "tit")
+		m.queuePane.cursor.moveTo(at, len(m.queueRows()))
 
-	rows := strings.Split(plain(fmt.Sprint(m.View())), "\n")
-	found, box := -1, -1
-	for i, row := range rows {
-		if strings.Contains(row, "▸") && found < 0 {
-			found = i
+		rows := strings.Split(plain(fmt.Sprint(m.View())), "\n")
+		box := -1
+		for i, row := range rows {
+			if strings.Contains(row, pointerTL) && box < 0 {
+				box = i
+			}
 		}
-		if strings.Contains(row, pointerTL) {
-			box = i
+		if box < 0 {
+			t.Fatalf("cursor %d: the field is not on the screen", at)
 		}
-	}
-	if found < 0 || box < 0 {
-		t.Fatalf("the cursor is on row %d and the field on %d", found, box)
-	}
-	if found >= box && found < box+finderRows {
-		t.Errorf("the field covers the row it found: cursor %d, field %d", found, box)
+
+		// Nothing of the list under it: the three rows it covers are the heading,
+		// the names of the columns and the line under them.
+		for _, name := range []string{"Titanium", "Mockingbird", "Messy", "Titans"} {
+			for i := box; i < box+finderRows; i++ {
+				if strings.Contains(rows[i], name) {
+					t.Errorf("cursor %d: the field covers %q on row %d", at, name, i)
+				}
+			}
+		}
+
+		// And the first track is the row under it.
+		if got := strings.TrimSpace(rows[box+finderRows]); got == "" {
+			t.Errorf("cursor %d: the list does not start under the field", at)
+		}
 	}
 }
 
@@ -287,5 +300,29 @@ func TestTheSearchBelongsToItsList(t *testing.T) {
 	m.switchTab(tabLibrary)
 	if m.find.query != "" {
 		t.Error("the query outlived the list it was made in")
+	}
+}
+
+// The bar under the screen says how to be rid of a search, because nothing else
+// did: a field that shows a count and no way out is a mode with no door.
+func TestTheBarSaysHowToClearASearch(t *testing.T) {
+	for _, typing := range []bool{true, false} {
+		m := searchingQueue(t, "tit")
+		m.find.typing = typing
+
+		bar := plain(m.help.View(m.helpKeys()))
+		if !strings.Contains(bar, "clear") {
+			t.Errorf("typing=%v: the bar does not offer to clear the search: %q", typing, bar)
+		}
+		if !strings.Contains(bar, "next match") {
+			t.Errorf("typing=%v: the bar does not offer the next match: %q", typing, bar)
+		}
+	}
+
+	// And it is the list's own bar again once the search is off.
+	m := searchingQueue(t, "tit")
+	m.find = find{}
+	if bar := plain(m.help.View(m.helpKeys())); strings.Contains(bar, "clear") {
+		t.Errorf("the search's keys outlived it: %q", bar)
 	}
 }

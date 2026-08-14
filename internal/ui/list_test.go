@@ -274,11 +274,16 @@ func TestTheColumnsAreNamed(t *testing.T) {
 			first = i
 		}
 	}
-	if head < 0 {
-		t.Fatal("the columns are not named anywhere")
+	if head < 0 || first < 0 {
+		t.Fatalf("the columns are named on row %d and the first track is on %d", head, first)
 	}
-	if first != head+2 {
-		t.Fatalf("the names are on row %d and the first track on %d, want it two under", head, first)
+
+	// A line under the names, and the list under that.
+	if got := strings.TrimSpace(rows[head+1]); !strings.HasPrefix(got, pointerH) {
+		t.Errorf("row %d under the names is %q, want the line", head+1, got)
+	}
+	if got := rows[head+2]; strings.TrimSpace(got) == "" {
+		t.Errorf("row %d is blank, want the list to start there", head+2)
 	}
 
 	// Each name over its own column, to the column.

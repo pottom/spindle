@@ -418,6 +418,10 @@ func (m Model) helpKeysWith(scope, lyrics, peek bool) tabKeys {
 		return m.keys.forNoDevice()
 	case m.devices.open:
 		return m.keys.forDevices()
+	case m.finding() && !m.actions.open:
+		// A search open over a list answers the keyboard, so the bar is its
+		// keys — including the one that takes it off again.
+		return m.keys.forFinding(m.find.typing)
 	case m.open() != nil:
 		// What is open is the screen, and its keys are the same wherever it was
 		// opened from — which is the whole reason it is one screen.

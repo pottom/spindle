@@ -394,6 +394,30 @@ func (k keyMap) forNoDevice() tabKeys {
 }
 
 // forDevices is the help while the picker is open over the player.
+// forFinding is the bar while a list is being searched.
+//
+// The keys of the search rather than of the list under it, because the search is
+// what the keyboard is doing — and because the way out of it has to be written
+// somewhere. Esc clears a query as readily as it abandons one being typed, and
+// nothing said so: the field showed a count and no way to be rid of it.
+func (k keyMap) forFinding(typing bool) tabKeys {
+	short := []key.Binding{}
+	if typing {
+		short = append(short, hint("type", "search"), terse(k.Enter, "keep"))
+	}
+	short = append(short,
+		terse(k.FindNext, "next match"),
+		terse(k.Back, "clear"),
+	)
+	return tabKeys{
+		short: short,
+		full: [][]key.Binding{
+			{k.Enter, k.FindNext, k.Back},
+			k.moveKeys(true),
+		},
+	}
+}
+
 func (k keyMap) forDevices() tabKeys {
 	return tabKeys{
 		short: []key.Binding{
