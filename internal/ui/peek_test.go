@@ -49,9 +49,16 @@ func TestPeekMovesNothing(t *testing.T) {
 	}
 }
 
-// It shows what is coming, in order, and no more than a glance's worth.
+// It shows what is coming, in order, as much of it as the room holds and never
+// more than a glance's worth.
 func TestPeekShowsWhatIsNext(t *testing.T) {
-	m := peekModel()
+	// Tall enough for all four: the band above the sleeve is what decides, and
+	// this is a test about the order rather than about the arithmetic.
+	m := lyricsModel(120, 48)
+	for i, n := range []string{"first", "second", "third", "fourth", "fifth", "sixth"} {
+		m.queue = append(m.queue, player.Track{ID: fmt.Sprint(i), Title: n,
+			Artists: []string{"someone"}, Duration: time.Duration(180+i*9) * time.Second})
+	}
 	m.peek.on = true
 
 	out := plain(m.render())
@@ -62,6 +69,18 @@ func TestPeekShowsWhatIsNext(t *testing.T) {
 	}
 	if strings.Contains(out, "fifth") {
 		t.Errorf("the glance shows more than %d tracks", peekRows)
+	}
+
+	// And on a screen with less room over the sleeve it gives up the last of
+	// them rather than the whole glance.
+	short := peekModel()
+	short.peek.on = true
+	out = plain(short.render())
+	if !strings.Contains(out, "third") {
+		t.Error("the glance gave up more than it had to")
+	}
+	if strings.Contains(out, "fourth") {
+		t.Error("the glance took a row the sleeve needs")
 	}
 }
 
