@@ -347,9 +347,9 @@ func TestTheWallAsksAgainWhenTheWindowChanges(t *testing.T) {
 	// What is held now is asked for at the new size.
 	g := m.libraryShape(m.layout(), m.layout().bodyHeight)
 	for id, tile := range m.tiles {
-		if tile.width != g.tileW || tile.height != g.coverRows {
+		if tile.width != g.boxW || tile.height != g.boxH {
 			t.Errorf("%s is held at %dx%d, want the new %dx%d",
-				id, tile.width, tile.height, g.tileW, g.coverRows)
+				id, tile.width, tile.height, g.boxW, g.boxH)
 			break
 		}
 	}
@@ -563,9 +563,10 @@ func TestATileIsAsWideAsItsPicture(t *testing.T) {
 			t.Fatalf("%+v: no wall at all", cell)
 		}
 
-		// The picture's width, from the rows it fills and the shape of a cell.
-		if want := g.coverRows * cell.Height / cell.Width; g.tileW > want {
-			t.Errorf("%+v: the tile is %d cells wide and its picture %d", cell, g.tileW, want)
+		// The picture's size is the renderer's own answer, not ours.
+		if cols, rows := cover.FitCells(640, 640, g.boxW, g.boxH, cell); cols != g.tileW || rows != g.artRows {
+			t.Errorf("%+v: the tile is %dx%d and the renderer draws %dx%d",
+				cell, g.tileW, g.artRows, cols, rows)
 		}
 
 		// And the gap is never tighter than the frame needs.
@@ -607,7 +608,7 @@ func TestATileWithNoCoverGetsTheDrawnOne(t *testing.T) {
 // tileArt is a picture of the size a tile wants, filed the way an arriving one
 // is: split and squared off once, which is what the wall draws from.
 func tileArt(g gridShape) coverState {
-	tile := coverState{url: "u", width: g.tileW, height: g.coverRows}
+	tile := coverState{url: "u", width: g.boxW, height: g.boxH}
 	var art strings.Builder
 	for range g.artRows {
 		art.WriteString(strings.Repeat("#", g.tileW) + "\n")
@@ -638,7 +639,7 @@ func TestTheTileMatchesWhatIsDrawn(t *testing.T) {
 			t.Fatalf("%+v: no wall at all", cell)
 		}
 
-		art, err := cover.NewHalfblock(cell).Render(square, g.tileW, g.coverRows, 1, 0)
+		art, err := cover.NewHalfblock(cell).Render(square, g.boxW, g.boxH, 1, 0)
 		if err != nil {
 			t.Fatalf("%+v: %v", cell, err)
 		}
@@ -650,6 +651,36 @@ func TestTheTileMatchesWhatIsDrawn(t *testing.T) {
 		if got := len(lines); got != g.artRows {
 			t.Errorf("%+v: the picture is %d rows tall and the tile keeps %d for it",
 				cell, got, g.artRows)
+		}
+	}
+}
+
+// A tile is square in pixels, on every cell shape a terminal reports.
+//
+// This is the one that matters, and it is not about our own drawing. A picture
+// is handed to the terminal as a rectangle of cells and the terminal scales it
+// into that rectangle: a square cover in a rectangle that is not square leaves a
+// band down one side which nothing in this program can see, measure or account
+// for — and which stood between the frame and the picture it marks.
+func TestATileIsSquareInPixels(t *testing.T) {
+	for _, cell := range []cover.CellSize{
+		{Width: 10, Height: 20}, {Width: 9, Height: 19}, {Width: 8, Height: 17},
+		{Width: 16, Height: 32}, {Width: 16, Height: 34}, {Width: 7, Height: 15},
+		{Width: 12, Height: 26}, {Width: 11, Height: 24}, {Width: 5, Height: 19},
+	} {
+		for _, width := range []int{60, 100, 140, 200, 300} {
+			g := gridFor(width, 37, cell)
+			if !g.ok() {
+				continue
+			}
+			// Within a cell of square. Whole cells cannot land on it exactly; what
+			// matters is that the band left over is under one cell rather than the
+			// one or two it used to be.
+			across, down := g.tileW*cell.Width, g.artRows*cell.Height
+			if out := across - down; out > cell.Width || out < -cell.Height {
+				t.Errorf("cell %dx%d at %d columns: the tile is %dx%d px, out by %d",
+					cell.Width, cell.Height, width, across, down, out)
+			}
 		}
 	}
 }

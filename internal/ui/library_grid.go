@@ -209,11 +209,11 @@ func (m *Model) syncGridCovers() tea.Cmd {
 		if item.url == "" {
 			continue
 		}
-		if m.tiles[item.id].matches(item.url, g.tileW, g.coverRows) {
+		if m.tiles[item.id].matches(item.url, g.boxW, g.boxH) {
 			continue
 		}
-		m.tiles[item.id] = coverState{url: item.url, width: g.tileW, height: g.coverRows}
-		cmds = append(cmds, coverCmd(m.covers, item.url, g.tileW, g.coverRows, slotFor(i)))
+		m.tiles[item.id] = coverState{url: item.url, width: g.boxW, height: g.boxH}
+		cmds = append(cmds, coverCmd(m.covers, item.url, g.boxW, g.boxH, slotFor(i)))
 	}
 	for id := range m.tiles {
 		if !seen[id] {

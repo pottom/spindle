@@ -53,6 +53,10 @@ const (
 	// the cover and not the caption.
 	tileTextRows = 3
 
+	// coverSquare is the shape a cover is, for asking the renderer how many cells
+	// it will really fill. Album art is square, whatever the pixels of it are.
+	coverSquare = 640
+
 	// tileWant is the width a tile is drawn at where the room allows, and
 	// tileLeast the narrowest worth drawing at all. Under that a cover is a
 	// smudge and a name is two words of three.
@@ -76,11 +80,17 @@ type gridShape struct {
 	cols int // tiles across
 	rows int // rows of tiles down
 
-	tileW     int // cells one tile takes across
-	coverRows int // rows the box its picture is asked for holds
-	artRows   int // rows the picture really fills, which can be one fewer
-	tileH     int // rows the whole tile takes, picture and words
-	gap       int // cells between two tiles across
+	// The box a cover is asked for, and the rectangle of it the renderer will
+	// really draw in. They are not the same: a square picture in whole cells
+	// hardly ever is, and the drawn one is what everything here lines up
+	// against. The box has to be passed on unchanged, or the renderer fits the
+	// picture inside it a second time and it shrinks again.
+	boxW, boxH int
+
+	tileW   int // cells one tile takes across, which is what is drawn
+	artRows int // and rows, likewise
+	tileH   int // rows the whole tile takes, picture and words
+	gap     int // cells between two tiles across
 }
 
 // page is how many tiles are on screen at once.
@@ -110,19 +120,16 @@ func gridFor(width, height int, cell cover.CellSize) gridShape {
 	// area uses, so a tile's cover is as square as any other cover on screen.
 	coverRows := max(tileW*cell.Width/cell.Height, 1)
 
-	// The tile is then as wide as the picture really comes out. A cover is square
-	// and fills whole cells only, so a box is nearly always a column wider than
-	// what it holds — and here the tile is the picture: the frame stands against
-	// its edges and the words start at its left, so a column of slack puts every
-	// mark out of true.
-	tileW = min(max(coverRows*cell.Height/cell.Width, 1), tileW)
-
-	// The rows are the other way about. The box is asked for at its full height
-	// and the picture comes back a row short of it, which is what artworkRows
-	// says and what the artwork area beside a list has always done: the box is
-	// where a picture may go, and this is where it ends. The tile is laid out
-	// against where it ends.
-	artRows := artworkRows(tileW, coverRows, cell)
+	// And the tile is exactly the rectangle the renderer will draw the cover in,
+	// asked of the renderer rather than worked out again here.
+	//
+	// Because the tile is the picture: the frame stands against its edges and the
+	// words start at its left. A box a cell wider than what is drawn in it puts
+	// every one of those marks out of true — and on the renderer that hands the
+	// rectangle to the terminal, it leaves a band down one side of the cover that
+	// nothing here can see. See cover.FitCells, which both sides now ask.
+	boxW, boxH := tileW, coverRows
+	tileW, artRows := cover.FitCells(coverSquare, coverSquare, boxW, boxH, cell)
 
 	// What that gives back goes between the tiles, so the wall still reaches both
 	// margins and the gap is never tighter than the frame needs.
@@ -134,8 +141,8 @@ func gridFor(width, height int, cell cover.CellSize) gridShape {
 	tileH := artRows + tileTextRows
 	rows := max((height+tileRowGap)/(tileH+tileRowGap), 0)
 	return gridShape{
-		cols: cols, rows: rows,
-		tileW: tileW, coverRows: coverRows, artRows: artRows, tileH: tileH, gap: gap,
+		cols: cols, rows: rows, boxW: boxW, boxH: boxH,
+		tileW: tileW, artRows: artRows, tileH: tileH, gap: gap,
 	}
 }
 

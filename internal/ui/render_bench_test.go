@@ -115,7 +115,7 @@ func BenchmarkTheWall(b *testing.B) {
 		// A picture the size of one the kitty renderer hands back: a cell is a
 		// placeholder character, two diacritics and a colour.
 		var art strings.Builder
-		for range g.coverRows {
+		for range g.artRows {
 			art.WriteString("\x1b[38;2;1;2;3m")
 			for range g.tileW {
 				art.WriteString("\U0010EEEE̅̅")
@@ -123,7 +123,7 @@ func BenchmarkTheWall(b *testing.B) {
 			art.WriteString("\x1b[m\n")
 		}
 		tile := coverState{url: "http://example.invalid/" + id,
-			width: g.tileW, height: g.coverRows}
+			width: g.boxW, height: g.boxH}
 		tile.took(art.String())
 		m.tiles[id] = tile
 	}
