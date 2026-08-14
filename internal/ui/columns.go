@@ -24,18 +24,23 @@ import (
 
 // columnRule is the line under those names.
 //
-// The accent at the left, walked out to the screen's own ground at the right —
-// the same pen as the bracket that marks the band above the list, and the same
-// reason: at one weight it is a rule the width of the terminal, which is the
-// loudest thing on a screen made of words. Fading it leaves the end the names
-// begin at and lets the rest go.
+// The accent in the middle of it, walked out to the screen's own ground at both
+// ends — the same pen as the bracket that marks the band above the list, and the
+// same reason: at one weight it is a rule the width of the terminal, which is the
+// loudest thing on a screen made of words.
+//
+// Out to both ends rather than out to one. A line that fades left to right has a
+// bright end and a dead one, which says the left of the row matters more than the
+// right, and nothing about a table is truer on one side than the other. The
+// bracket beside the picture does fade one way, because it starts at a corner and
+// takes hold there; this starts nowhere and only divides.
 //
 // The sounding record's accent rather than the cover's, like the names over it.
 // The one thing on these screens that wears the cover's is the band the cursor is
 // resting on, which is explicitly about another record.
 func (m Model) columnRule(w int) string {
 	var out string
-	for _, step := range style.Fade(m.styles.Accent, m.screenGround(), w) {
+	for _, step := range style.Crest(m.styles.Accent, m.screenGround(), w) {
 		out += step.Render(pointerH)
 	}
 	return out

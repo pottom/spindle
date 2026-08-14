@@ -389,8 +389,8 @@ func TestTheRowCarriesTheRatingAndTheHeart(t *testing.T) {
 	}
 }
 
-// The line under the names is drawn in the accent and fades out across the
-// width, like the bracket that marks the band above the list.
+// The line under the names is drawn in the accent at its middle and fades out to
+// the screen at both ends.
 func TestTheLineUnderTheNamesFades(t *testing.T) {
 	m := queueModel(0, "a", "b")
 	m.width, m.height = 190, 40
@@ -417,13 +417,21 @@ func TestTheLineUnderTheNamesFades(t *testing.T) {
 	}
 
 	r, g, b, _ := m.styles.Accent.RGBA()
-	if got, want := cells[0], fmt.Sprintf("%d;%d;%d", r>>8, g>>8, b>>8); got != want {
-		t.Errorf("the line begins at %s, want the accent %s", got, want)
+	accent := fmt.Sprintf("%d;%d;%d", r>>8, g>>8, b>>8)
+	if got := cells[len(cells)/2]; got != accent {
+		t.Errorf("the middle of the line is %s, want the accent %s", got, accent)
 	}
-	if got, want := cells[len(cells)-1], "10;10;14"; got != want {
-		t.Errorf("the line ends at %s, want the screen's ground %s", got, want)
+	for _, end := range []int{0, len(cells) - 1} {
+		if got, want := cells[end], "10;10;14"; got != want {
+			t.Errorf("cell %d of the line is %s, want the screen's ground %s", end, got, want)
+		}
 	}
-	if cells[len(cells)/2] == cells[0] {
-		t.Error("the line is the same colour halfway along as at its start")
+
+	// And it walks between the two rather than stepping: a quarter along is
+	// neither end of it.
+	for _, at := range []int{len(cells) / 4, 3 * len(cells) / 4} {
+		if cells[at] == accent || cells[at] == "10;10;14" {
+			t.Errorf("cell %d of the line is %s, want a step between the two", at, cells[at])
+		}
 	}
 }
