@@ -396,14 +396,61 @@ func TestTheWallsNamesLineUpWithItsPictures(t *testing.T) {
 		t.Errorf("the picture starts at column %d and its name at %d", art, name)
 	}
 
-	// And the mark is to the left of both, in the gutter.
+	// And the ring round the tile under the cursor stands in the air to the left
+	// of it rather than over it.
 	for _, row := range rows {
-		if at := column(row, gridCursor); at >= 0 {
+		if at := column(row, pointerV); at >= 0 {
 			if at >= name {
-				t.Errorf("the mark is at column %d, want it left of the name at %d", at, name)
+				t.Errorf("the frame is at column %d, want it left of the name at %d", at, name)
 			}
 			return
 		}
 	}
-	t.Error("the cursor's mark is nowhere on the wall")
+	t.Error("the tile under the cursor is not framed")
+}
+
+// The gaps between tiles are what the frame is drawn into, so a frame never
+// stands on a picture and the wall does not move when the cursor arrives.
+func TestTheFrameFitsInTheAirBetweenTiles(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.tab = tabLibrary
+	m.width, m.height = 150, 40
+	m.resize()
+	for i := range 12 {
+		m.library.playlists = append(m.library.playlists, player.Playlist{
+			ID: fmt.Sprintf("p%d", i), Name: fmt.Sprintf("List %d", i), Owner: "pottom",
+		})
+	}
+
+	g := m.libraryShape(m.layout(), m.layout().bodyHeight)
+	art := map[string]coverState{}
+	for i := range 12 {
+		id := fmt.Sprintf("p%d", i)
+		art[id] = coverState{url: "u", width: g.tileW, height: g.coverRows,
+			art: strings.Repeat(strings.Repeat("#", g.tileW)+"\n", g.coverRows)}
+	}
+	m.tiles = art
+
+	// Every picture on screen is whole: the frame took none of their cells.
+	whole := func() int {
+		screen := plain(fmt.Sprint(m.View()))
+		if !strings.Contains(screen, pointerV) {
+			t.Fatal("no tile is framed")
+		}
+		return strings.Count(screen, "#")
+	}
+
+	m.library.cursors[libraryPlaylists].cursor = 0
+	first := whole()
+	m.library.cursors[libraryPlaylists].cursor = 1
+	if second := whole(); second != first {
+		t.Errorf("the wall shows %d cells of picture with the first tile framed and %d with the second",
+			first, second)
+	}
+
+	// And that is all of them: every visible tile's cover, entire.
+	from, to := m.library.cursors[libraryPlaylists].gridWindow(len(m.library.playlists), g)
+	if want := (to - from) * g.tileW * g.coverRows; first != want {
+		t.Errorf("the wall shows %d cells of picture, want %d — the frame ate some", first, want)
+	}
 }

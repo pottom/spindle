@@ -22,8 +22,19 @@ const (
 	// tileGap is the air between two tiles across, and tileRowGap the blank row
 	// between two rows of them. Wider across than down because the tiles are
 	// taller than they are wide: equal air in cells reads as more air across.
-	tileGap    = 3
-	tileRowGap = 1
+	//
+	// Both are held to what the frame round the tile under the cursor needs: an
+	// upright either side of a tile and a column of air between two of them, and
+	// a row over the picture and under the words. The frame is drawn into that
+	// air rather than between the tiles, so nothing on the wall moves when the
+	// cursor arrives — and a wall whose gaps were tighter than this would have
+	// the frame standing on a picture.
+	tileGap    = 2*frameCols + 1
+	tileRowGap = frameRows
+
+	// frameCols and frameRows are what that ring takes on each side.
+	frameCols = 1
+	frameRows = 1
 
 	// tileTextRows is what a tile spends on words: the name, and a line saying
 	// what the thing is. Two, always — a tile that took a third row for a long
@@ -36,15 +47,16 @@ const (
 	tileWant  = 22
 	tileLeast = 12
 
-	// gridGutter is the column the cursor's mark stands in, to the left of the
-	// wall. Every tile has this much air to its left — the first from the
-	// gutter, the rest from the gap between them — so the mark can be drawn
-	// beside a name instead of in front of it.
+	// gridGutter is the air kept to the left of the wall and gridEdge to the
+	// right of it, for the frame that marks the tile under the cursor.
 	//
-	// In front of it was where it was, and it pushed the words two columns off
-	// the left edge of the picture over them. A caption that does not start where
-	// its picture starts reads as belonging to neither.
-	gridGutter = 2
+	// Every tile has a column to itself on either side — the first and last from
+	// these, the rest from the gap between tiles — so the frame is drawn in air
+	// that is already there and nothing on the wall moves when the cursor
+	// arrives. A mark that shifted the tiles would repaint every picture on the
+	// screen to say which one of them is being pointed at.
+	gridGutter = frameCols + 1
+	gridEdge   = frameCols
 )
 
 // gridShape is how a wall of tiles divides a screen.
@@ -122,12 +134,14 @@ type gridTile struct {
 
 // drawGrid lays the tiles out, given the shape they were measured for.
 func (m Model) drawGrid(tiles []gridTile, g gridShape, width, height int) []string {
-	out := make([]string, 0, height)
+	// A row of air over the wall, so the frame round a tile in the first row has
+	// somewhere to stand.
+	out := []string{strings.Repeat(" ", width)}
 	blank := strings.Repeat(" ", width)
 
 	for at := 0; at < len(tiles); at += g.cols {
 		row := tiles[at:min(at+g.cols, len(tiles))]
-		if len(out) > 0 {
+		if at > 0 {
 			for range tileRowGap {
 				out = append(out, blank)
 			}
@@ -137,7 +151,15 @@ func (m Model) drawGrid(tiles []gridTile, g gridShape, width, height int) []stri
 	for len(out) < height {
 		out = append(out, blank)
 	}
-	return out[:min(len(out), height)]
+	out = out[:min(len(out), height)]
+
+	for i, tile := range tiles {
+		if tile.selected {
+			m.frameTile(out, i, 1, g, width)
+			break
+		}
+	}
+	return out
 }
 
 // drawTileRow draws one row of the wall: the pictures side by side, then the
@@ -167,17 +189,35 @@ func (m Model) drawTileRow(row []gridTile, g gridShape, width int) []string {
 		out = append(out, fit(lead+strings.Join(cells, gap), width))
 	}
 
-	// And the mark stands beside the name it belongs to, in the air to the left
-	// of that tile — the gutter for the first of a row, the gap between them for
-	// the rest.
-	for i, tile := range row {
-		if !tile.selected {
-			continue
-		}
-		at := len(out) - 2
-		out[at] = overwrite(out[at], i*(g.tileW+tileGap), m.styles.Cursor.Render(gridCursor), width)
-	}
 	return out
+}
+
+// frameTile draws the ring round the tile under the cursor, over rows already
+// laid out: the row above its picture, the row under its words, and a column
+// either side.
+//
+// Rounded corners and the accent, the same pen the band on a list is bracketed
+// with. What it says is where the cursor is, which on a wall of pictures is a
+// question about one of them rather than about a row of words — so it goes round
+// the picture rather than beside the name.
+func (m Model) frameTile(rows []string, at, top int, g gridShape, width int) {
+	col := at % g.cols
+	left := gridGutter + col*(g.tileW+tileGap) - 1
+	right := left + g.tileW + 1
+	head := top + (at/g.cols)*(g.tileH+tileRowGap) - 1
+	foot := head + g.tileH + 1
+	if head < 0 || foot >= len(rows) || left < 0 || right >= width {
+		return
+	}
+
+	pen := m.styles.Cursor
+	rule := strings.Repeat(pointerH, g.tileW)
+	rows[head] = overwrite(rows[head], left, pen.Render(pointerTL+rule+pointerTR), width)
+	rows[foot] = overwrite(rows[foot], left, pen.Render(pointerElbow+rule+pointerBR), width)
+	for row := head + 1; row < foot; row++ {
+		rows[row] = overwrite(rows[row], left, pen.Render(pointerV), width)
+		rows[row] = overwrite(rows[row], right, pen.Render(pointerV), width)
+	}
 }
 
 // tileName is the name under a picture, lit where the cursor is on it.
@@ -192,9 +232,6 @@ func (m Model) tileName(t gridTile) string {
 	}
 	return m.styles.RowPrimary.Render(t.name)
 }
-
-// gridCursor is the mark beside the name of the tile under the cursor.
-const gridCursor = "▸"
 
 // artLine is one row of a rendered cover, or blank where the picture has not
 // arrived or has run out of rows.
