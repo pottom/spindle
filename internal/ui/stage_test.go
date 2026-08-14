@@ -690,3 +690,57 @@ func TestANewRecordDoesNotRunTheHead(t *testing.T) {
 		t.Errorf("the new record's head started at %s rather than at the top", m.stage.edgeAt)
 	}
 }
+
+// The big screen opens from any screen. It is what the program does while
+// nobody is working in it, and where somebody was standing when they wanted it
+// is their business.
+func TestTheBigScreenOpensFromAnywhere(t *testing.T) {
+	for _, tab := range []tabID{tabPlayer, tabQueue, tabLibrary, tabSearch, tabSettings, tabHelp} {
+		m := queueModel(0, "a", "b")
+		m.width, m.height = 120, 34
+		m.resize()
+		m.tab = tab
+
+		m, _ = m.handleKey(tea.KeyPressMsg{Code: 'f', Text: "f"})
+		if !m.stage.on {
+			t.Errorf("%v: f did not put the big screen up", tab)
+			continue
+		}
+		if m.stage.mode != stageOpens {
+			t.Errorf("%v: the big screen opened on %v, want the picture it is for", tab, m.stage.mode)
+		}
+
+		// And f takes it down again, wherever it was opened from.
+		m, _ = m.handleKey(tea.KeyPressMsg{Code: 'f', Text: "f"})
+		if m.stage.on {
+			t.Errorf("%v: f did not take the big screen down", tab)
+		}
+		if m.tab != tab {
+			t.Errorf("%v: leaving the big screen landed on %v", tab, m.tab)
+		}
+	}
+}
+
+// Except where a letter is being typed: there f is an f.
+func TestTheBigScreenKeepsOutOfAQuery(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.width, m.height = 120, 34
+	m.resize()
+
+	m.startFind()
+	m, _ = m.handleKey(tea.KeyPressMsg{Code: 'f', Text: "f"})
+	if m.stage.on {
+		t.Error("f opened the big screen while a query was being written")
+	}
+	if m.find.query != "f" {
+		t.Errorf("the query is %q, want the letter that was typed", m.find.query)
+	}
+
+	m.tab = tabSearch
+	m.find = find{}
+	m.startTyping()
+	m, _ = m.handleKey(tea.KeyPressMsg{Code: 'f', Text: "f"})
+	if m.stage.on {
+		t.Error("f opened the big screen while the search was being typed into")
+	}
+}

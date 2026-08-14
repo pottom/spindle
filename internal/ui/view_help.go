@@ -78,18 +78,19 @@ func helpGroups() []helpGroup {
 			{keyShuffle, "shuffle"},
 			{keyRepeat, "repeat: off, all, one"},
 			{keyDevices, "play somewhere else"},
+			{keyStage, "the full screen picture, from wherever you are"},
 		},
 	}, {
 		title: "On the player",
 		keys: [][2]string{
 			{keyScope, "waveform, spectrum, water, lamps, off — and no off on the queue"},
-			{keyStage, "full screen, and " + keyScope + " switches it there"},
 			{keyLyrics, "the words, as they are sung"},
 			{keyPeek, "what is coming next"},
 		},
 	}, {
 		title: "On the full screen",
 		keys: [][2]string{
+			{keyScope, "which picture it is"},
 			{keyPlayPause + " ← → ↑ ↓", "the transport, without leaving"},
 			{pair(keyNext, keyPrev), "next or previous track"},
 			{keyMarks, "another company of dancers"},

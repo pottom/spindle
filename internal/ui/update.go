@@ -701,7 +701,16 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, tea.Batch(m.startScope(), m.savePrefs())
 
 	case key.Matches(k, m.keys.Stage):
-		if m.tab != tabPlayer || m.ps == nil {
+		// From any screen. It was the player's key, on the reasoning that the big
+		// picture is the player's screen made big — but it is not: it is what the
+		// program does while nobody is working in it, and where somebody happens
+		// to be standing when they want that is their business. A key that answers
+		// on one tab and does nothing on the next is a key you have to remember
+		// the whereabouts of.
+		//
+		// Nothing to show is still nothing to show: with no player state there is
+		// no picture, no title and no clock to put up.
+		if m.ps == nil {
 			return m, nil
 		}
 		// Always the picture this screen was built for, whatever the strip
