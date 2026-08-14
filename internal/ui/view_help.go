@@ -82,7 +82,7 @@ func helpGroups() []helpGroup {
 	}, {
 		title: "On the player",
 		keys: [][2]string{
-			{keyScope, "waveform, spectrum, water, lamps, off"},
+			{keyScope, "waveform, spectrum, water, lamps, off — and no off on the queue"},
 			{keyStage, "full screen, and " + keyScope + " switches it there"},
 			{keyLyrics, "the words, as they are sung"},
 			{keyPeek, "what is coming next"},

@@ -669,8 +669,14 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		// Nothing about the geometry changes, so the cover is left alone: the
 		// trace only fills rows that were already blank.
+		//
+		// On the queue there is no "off" in the round. Putting the picture away
+		// is what c does there — see queueRoom — and a key that can do it as
+		// well is two ways to the same place, the worse of which leaves the band
+		// standing with a hole in it. So v is what kind of picture, and c is
+		// whether there is one.
 		m.scope.modes[m.tab] = m.scopeMode().next()
-		for m.scopeMode().big() {
+		for m.scopeMode().big() || (m.tab == tabQueue && m.scopeMode() == scopeOff) {
 			m.scope.modes[m.tab] = m.scopeMode().next()
 		}
 		return m, tea.Batch(m.startScope(), m.savePrefs())

@@ -1309,3 +1309,34 @@ func TestTheQueueRemembersHowItWasFolded(t *testing.T) {
 		t.Errorf("a file with nothing to say about it left the queue at %v", older.queuePane.room)
 	}
 }
+
+// On the queue, v is which picture and c is whether there is one.
+//
+// Both keys could once put it away, and two ways to the same place is one too
+// many — the worse of them leaving the band standing with a hole where the
+// picture was.
+func TestOnTheQueueTheScopeKeyNeverTurnsItOff(t *testing.T) {
+	m := scopeModel(120, 44)
+	m.tab = tabQueue
+
+	var tm tea.Model = m
+	for press := range int(scopeModes) + 2 {
+		got := tm.(Model)
+		if got.scopeMode() == scopeOff {
+			t.Fatalf("after %d presses of v the queue's picture was off", press)
+		}
+		if !got.queuePane.room.showsTrace() {
+			t.Fatalf("v folded the picture away, which is c's job")
+		}
+		tm, _ = tm.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
+	}
+
+	// A file written before c existed can still say off, and the tab does not
+	// come up with a hole in it.
+	older := scopeModel(120, 44)
+	older.tab = tabQueue
+	older.scope.modes[tabQueue] = scopeOff
+	if older.scopeMode() == scopeOff {
+		t.Error("a saved off left the queue's band with nothing in it")
+	}
+}

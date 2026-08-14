@@ -241,6 +241,13 @@ func (m Model) scopeMode() scopeMode {
 	if m.stage.on {
 		return m.stage.mode
 	}
+
+	// The queue has no off: c is what puts the picture away there, so a mode of
+	// off could only come from a file written before c existed — and it would
+	// leave the band standing with nothing in it.
+	if mode := m.scope.modes[m.tab]; m.tab == tabQueue && mode == scopeOff {
+		return scopeOff.next()
+	}
 	return m.scope.modes[m.tab]
 }
 
