@@ -117,12 +117,16 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 	// From the picture's right edge only. The cover is put on the screen by the
 	// terminal rather than written into the row, and cutting a row apart at a
 	// column the placement runs through would take the picture with it.
-	if from := leftMargin + l.artWidth; from < right {
+	// A column short of the frame, because there is one on the other side: the
+	// frame stands at the edge of the margin and the picture begins a column
+	// inside it, so a ground that runs flush into the frame on the right and
+	// leaves a gutter on the left is a box with one wall painted.
+	if from := leftMargin + l.artWidth; from < right-1 {
 		for row := head + 1; row < foot; row++ {
 			if row < 0 || row >= len(out) {
 				continue
 			}
-			out[row] = raise(out[row], from, right, m.coverStyles.Raised, l.interior)
+			out[row] = raise(out[row], from, right-1, m.coverStyles.Raised, l.interior)
 		}
 	}
 

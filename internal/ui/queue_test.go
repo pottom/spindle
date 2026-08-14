@@ -739,8 +739,13 @@ func TestQueueDetailShowsThePlayhead(t *testing.T) {
 	if got := plain(strings.Join(other, "\n")); strings.Contains(got, knob) {
 		t.Errorf("detail = %q, want no playhead on a track that is not playing", got)
 	}
-	if len(other) != len(m.trackDetail(40, 20)) || len(other) != len(strings.Split(playing, "\n")) {
-		t.Errorf("the panel is %d rows without the playhead and %d with it",
+	// And it is shorter for it, rather than holding the rows open. They were
+	// held so that nothing moved as the cursor passed the track playing, and
+	// what that bought was two empty rows through the middle of every other
+	// panel — a block that closes up is worth more than a block that never
+	// moves.
+	if len(other) >= len(strings.Split(playing, "\n")) {
+		t.Errorf("the panel is %d rows without the playhead and %d with it, want it shorter",
 			len(other), len(strings.Split(playing, "\n")))
 	}
 }
@@ -1680,55 +1685,35 @@ func TestThePanelWearsTheCoversOwnColour(t *testing.T) {
 	}
 }
 
-// A track that is not the one playing says how long it is, in the row the
-// playhead would have stood in.
+// A track that is not playing has no playhead and no hole where one would be.
 //
-// The rows are kept either way — the panel must not shift as the cursor passes
-// the playing track — and kept empty they were four rows of nothing in the
-// middle of the block. A duration means something beside the track it belongs
-// to, which is where this puts it.
-func TestANonPlayingTrackSaysHowLongItIs(t *testing.T) {
+// The row and the clock were held open for every track so that nothing moved as
+// the cursor passed the one playing. What that bought was a two-row gap through
+// the middle of every other panel, with a duration hanging off it that the row
+// in the list below already says.
+func TestANonPlayingTrackHasNoHoleWhereThePlayheadWas(t *testing.T) {
 	m := queueModel(0, "a", "b")
 	m.ps = &player.State{TrackID: "a", Duration: 2 * time.Minute, Playing: true}
 	m.width, m.height = 200, 48
 	m.resize()
 	m.queue[1] = player.Track{ID: "b", Title: "Gabriela", Artists: []string{"Alosa"},
-		Album: "Gabriela", Duration: 3*time.Minute + 10*time.Second}
+		Album: "Gabriela", Duration: 3*time.Minute + 10*time.Second, Tempo: 108}
 
-	// On the track that is playing: a playhead and both clocks.
-	m.queuePane.cursor.cursor = queueRowOf(0)
-	playing := plain(strings.Join(m.trackDetail(60, 20), "\n"))
-	if !strings.Contains(playing, knob) {
-		t.Error("the track that is playing has no playhead")
-	}
-
-	// On any other: no playhead, and its own length where the total time was.
 	m.queuePane.cursor.cursor = queueRowOf(1)
-	other := m.trackDetail(60, 20)
-	got := plain(strings.Join(other, "\n"))
+	rows := m.trackDetail(60, 20)
+	got := plain(strings.Join(rows, "\n"))
+
 	if strings.Contains(got, knob) {
 		t.Error("a track that is not playing was given a playhead")
 	}
-	if !strings.Contains(got, "3:10") {
-		t.Errorf("detail = %q, want the track's own length in it", got)
+	if strings.Contains(got, "3:10") {
+		t.Errorf("detail = %q, want no clock on a track that is not playing", got)
 	}
 
-	// In the same row, and the panel is the same height: nothing moves as the
-	// cursor passes the playing track.
-	if a, b := len(other), len(m.trackDetail(60, 20)); a != b {
-		t.Errorf("the panel is %d rows and %d rows", a, b)
-	}
-	m.queuePane.cursor.cursor = queueRowOf(0)
-	if a, b := len(other), len(m.trackDetail(60, 20)); a != b {
-		t.Errorf("the panel is %d rows off the playing track and %d rows on it", a, b)
-	}
-
-	// Right where the clock is: the last thing on the row either way.
-	for _, rows := range [][]string{other} {
-		for _, row := range rows {
-			if s := plain(row); strings.Contains(s, "3:10") && strings.TrimRight(s, " ") != s {
-				t.Errorf("the length is not set to the right edge: %q", s)
-			}
+	// Contiguous: the only blank is the row of air over the name.
+	for i, row := range rows {
+		if i > 0 && strings.TrimSpace(plain(row)) == "" {
+			t.Errorf("row %d of the panel is blank: %q", i, plain(strings.Join(rows, "|")))
 		}
 	}
 }

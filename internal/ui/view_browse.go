@@ -341,7 +341,12 @@ func (m Model) trackDetail(w, rows int) []string {
 	if t.Popularity != nil {
 		lines = append(lines, m.starsIn(s, *t.Popularity))
 	}
-	lines = append(lines, "")
+
+	// A row of air under the name, but only where a playhead follows it: it is
+	// what keeps the bar off the rating, and with no bar it is a gap.
+	if m.ps != nil && m.ps.TrackID == t.ID {
+		lines = append(lines, "")
+	}
 
 	// The playhead and the clock either side of it, for the one track they can
 	// belong to. Their rows are kept whether this is that track or not: without
@@ -357,23 +362,21 @@ func (m Model) trackDetail(w, rows int) []string {
 		return lines
 	}
 
-	// The playhead for the one track it can belong to, and for every other the
-	// row it would have stood in says how long that track is — in the same place
-	// the total time sits, which is where a duration means something. The rows
-	// are kept either way: without that the panel would shift every time the
-	// cursor passed the track playing, and a bar is not worth making the facts
-	// beside it move.
-	bar, times := "", ""
-	switch {
-	case m.ps != nil && m.ps.TrackID == t.ID:
+	// The playhead, and only for the one track it can belong to.
+	//
+	// The rows were held open for every other track so that nothing moved as the
+	// cursor passed the one playing, and what that bought was two empty rows
+	// through the middle of every other panel — a hole with a duration hanging
+	// off it, saying a thing the row in the list below already says. A block
+	// that closes up is worth more than a block that never moves.
+	var bar, times string
+	if m.ps != nil && m.ps.TrackID == t.ID {
 		bar = m.progressLine(w)
 		times = spread(
 			s.Time.Render(formatDuration(m.elapsed())),
 			s.Time.Render(formatDuration(m.ps.Duration)),
 			w,
 		)
-	case t.Duration > 0:
-		times = spread("", s.Time.Render(formatDuration(t.Duration)), w)
 	}
 
 	// The album on its own row and everything else on one under it, the way the
@@ -384,7 +387,10 @@ func (m Model) trackDetail(w, rows int) []string {
 	// under it, and what was left between them was rows of nothing. Set as a
 	// caption they come to two, and the block closes up — the air goes outside
 	// it, where air belongs, rather than through the middle of it.
-	under := []string{times}
+	var under []string
+	if times != "" {
+		under = append(under, times)
+	}
 	var rest []string
 	for _, f := range facts {
 		if f.key == "album" {
@@ -405,6 +411,13 @@ func (m Model) trackDetail(w, rows int) []string {
 	//
 	// The air goes above rather than below: under the name it reads as room,
 	// and between the clock and the facts it reads as a gap.
+	//
+	// Only where there is a playhead to place. Without one the block is what it
+	// is and the band centres it, which is where a block with nothing to line up
+	// against belongs.
+	if bar == "" {
+		return append(lines, under...)
+	}
 	for len(lines) < len(under) {
 		lines = append(lines, "")
 	}
