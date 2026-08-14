@@ -58,8 +58,13 @@ func (l *listState) window(count, height int) (from, to int) {
 }
 
 // listChromeRows is what a list block spends on itself above the rows, once the
-// artwork has taken its share: a blank line, the heading, and another blank.
-const listChromeRows = 3
+// artwork has taken its share: two blank lines, the heading, and another blank.
+//
+// Two above rather than one. The heading stands a row clear of the band over it,
+// and the row that opens up is where a field to search the list will go — it is
+// left empty until then rather than moving everything down on the day it
+// arrives.
+const listChromeRows = 4
 
 // listBodyRows is how many rows of the list itself a block of the given height
 // has room for. listBlock draws exactly this many and the page keys move by
@@ -98,6 +103,15 @@ func (m Model) visibleListRows() int {
 func (m Model) listBandRows(l layout) int {
 	if m.tab == tabQueue && m.open() == nil && !m.devices.open && m.queuePane.room == queueRoomList {
 		return 0
+	}
+
+	// The picture's own height rather than the box the layout gave it. A cover
+	// keeps its shape inside that box and so comes out a row shorter than it,
+	// and the band was the box: a blank row under the picture that lined up with
+	// nothing, and a frame drawn round the band standing clear of the thing it
+	// was drawn round. The row goes to the list instead.
+	if l.artRows > 0 {
+		return l.artRows
 	}
 	return l.artHeight
 }

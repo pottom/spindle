@@ -167,6 +167,12 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 		out = append(out, strings.Repeat(" ", w))
 	}
 
+	// A second blank over the heading: it stands clear of the band, and the row
+	// is where a field to search the list will go. See listChromeRows.
+	if len(out) < rows {
+		out = append(out, strings.Repeat(" ", w))
+	}
+
 	// The heading carries the count on the right, where a subtitle line would
 	// otherwise cost a row the list could use. A page on its way turns the
 	// spinner beside it: the rows already on screen are not all of them, and

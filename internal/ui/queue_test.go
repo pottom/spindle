@@ -1583,3 +1583,64 @@ func TestNothingIsMarkedWhenTheBandIsFoldedAway(t *testing.T) {
 		}
 	}
 }
+
+// The band is as tall as the picture in it, and the heading stands a row clear
+// of it.
+//
+// The band was the box the layout gives the artwork, and a cover keeps its own
+// shape inside that box — so it came out a row shorter, and the row under it
+// lined up with nothing. Drawn round the band, the frame stood clear of the very
+// thing it was drawn round.
+func TestTheBandIsAsTallAsTheCover(t *testing.T) {
+	m := queueModel(0, "one", "two", "three")
+	m.ps = &player.State{TrackID: "now", Title: "sounding", Playing: true}
+
+	for _, size := range [][2]int{{120, 34}, {160, 44}, {200, 50}} {
+		m.width, m.height = size[0], size[1]
+		m.resize()
+
+		l := m.layout()
+		if l.artRows <= 0 {
+			continue
+		}
+		if got := m.listBandRows(l); got != l.artRows {
+			t.Errorf("%dx%d: the band is %d rows and the picture in it %d",
+				size[0], size[1], got, l.artRows)
+		}
+
+		// And what is left over is the list's, to the row.
+		block := m.queueBlock(l, l.bodyHeight)
+		if len(block) != l.bodyHeight {
+			t.Errorf("%dx%d: the block is %d rows, want %d", size[0], size[1], len(block), l.bodyHeight)
+		}
+		if got, want := m.visibleListRows(), listBodyRows(l.bodyHeight, l.artRows); got != want {
+			t.Errorf("%dx%d: the keys page by %d rows and the list draws %d", size[0], size[1], got, want)
+		}
+	}
+}
+
+// The row over the heading is left empty on purpose: it is where a field to
+// search the list will go, and reserving it now means nothing moves on the day
+// it arrives.
+func TestTheHeadingStandsClearOfTheBand(t *testing.T) {
+	m := queueModel(0, "one", "two")
+	m.ps = &player.State{TrackID: "now", Title: "sounding", Playing: true}
+	m.width, m.height = 120, 34
+	m.resize()
+
+	l := m.layout()
+	block := m.queueBlock(l, l.bodyHeight)
+	band := m.listBandRows(l)
+	if band+2 >= len(block) {
+		t.Fatal("there is no room to say anything about")
+	}
+
+	for _, blank := range []int{band, band + 1} {
+		if got := strings.TrimSpace(plain(block[blank])); got != "" {
+			t.Errorf("row %d over the heading carries %q, want it clear", blank, got)
+		}
+	}
+	if !strings.Contains(plain(block[band+2]), "Queue") {
+		t.Errorf("the heading is not two rows under the band: %q", plain(block[band+2]))
+	}
+}
