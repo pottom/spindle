@@ -267,7 +267,7 @@ func TestBothScreensDrawTheSameFacts(t *testing.T) {
 	m := New(player.NewMock(), nil, defaultTestCell)
 	caption := ansiOff(strings.Join(m.trackCaption(track, 60), "\n"))
 
-	for _, want := range []string{"The Immaculate Collection", "1990", "compilation", "track 1", starFull} {
+	for _, want := range []string{"The Immaculate Collection", "1990", "compilation", starFull} {
 		if !strings.Contains(caption, want) {
 			t.Errorf("trackCaption() = %q, want %q in it", caption, want)
 		}

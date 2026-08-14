@@ -293,13 +293,17 @@ func TestFactsSkipWhatSpotifyDidNotSay(t *testing.T) {
 		TrackNumber: 3, TotalTracks: 11, DiscNumber: 2, Duration: 4 * time.Minute,
 	}
 	got := factLines(trackFacts(full))
-	for _, want := range []string{"Album", "Released", "Track", "Length"} {
+	for _, want := range []string{"Album", "Released", "Length"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("trackFacts() = %q, want a %s row", got, want)
 		}
 	}
-	if !strings.Contains(got, "3 of 11, disc 2") {
-		t.Errorf("trackFacts() = %q, want the disc named when there is more than one", got)
+
+	// Where the track stands on its album is not among them. It was, and its
+	// row was worth more to the playhead beside it: nobody reading a queue is
+	// asking which side of the record this came from.
+	if strings.Contains(got, "Track") || strings.Contains(got, "3 of 11") {
+		t.Errorf("trackFacts() = %q, want nothing about the track's place on its album", got)
 	}
 	if !strings.Contains(got, "1982") || strings.Contains(got, "1982-05-21") {
 		t.Errorf("trackFacts() = %q, want just the year", got)
@@ -455,10 +459,19 @@ func TestPopularityShownEvenAtZero(t *testing.T) {
 	m.width, m.height = 100, 44
 	m.resize()
 
+	// Stood over the name rather than named among the facts: a row of stars
+	// says what it is, and a label beside them is a caption on a picture.
 	m.queue[0].Popularity = &zero
 	m.queuePane.cursor.cursor = queueRowOf(0)
-	if got := plain(strings.Join(m.trackDetail(40, 20), "\n")); !strings.Contains(got, "Popularity") {
+	got := plain(strings.Join(m.trackDetail(40, 20), "\n"))
+	if !strings.Contains(got, starEmpty) {
 		t.Errorf("trackDetail() = %q, want a rating of zero shown", got)
+	}
+	if strings.Contains(got, "Popularity") {
+		t.Errorf("trackDetail() = %q, want the stars to stand without a label", got)
+	}
+	if rows := strings.Split(got, "\n"); !strings.Contains(rows[0], starEmpty) {
+		t.Errorf("the panel begins %q, want the stars over the name", rows[0])
 	}
 
 	m.queue[1].Popularity = &fifty
@@ -1338,5 +1351,54 @@ func TestOnTheQueueTheScopeKeyNeverTurnsItOff(t *testing.T) {
 	older.scope.modes[tabQueue] = scopeOff
 	if older.scopeMode() == scopeOff {
 		t.Error("a saved off left the queue's band with nothing in it")
+	}
+}
+
+// The playhead stands on the same row as the picture beside it.
+//
+// Two things that answer the same track, a row apart, and the eye catches it.
+// The panel is centred in the band, so the bar is put at the panel's own middle
+// and lands on the band's — which is where the picture is drawn from, at any
+// size and whatever the facts under it come to.
+func TestThePlayheadLinesUpWithThePicture(t *testing.T) {
+	pop := 61
+	m := queueModel(0, "a", "b")
+	m.tab = tabQueue
+
+	for _, size := range [][2]int{{160, 40}, {200, 44}, {120, 50}} {
+		m.width, m.height = size[0], size[1]
+		m.resize()
+
+		m.queue[0] = player.Track{
+			ID: "a", Title: "Daddy Cool", Artists: []string{"Boney M."},
+			Album: "Take The Heat Off Me", Released: "1976-01-01",
+			Duration: 3*time.Minute + 29*time.Second, Tempo: 125, Popularity: &pop,
+		}
+		m.ps = &player.State{TrackID: "a", Duration: m.queue[0].Duration, Playing: true}
+		m.setProgress(3 * time.Minute)
+		m.queuePane.cursor.cursor = queueRowOf(0)
+
+		l := m.layout()
+		band := min(m.listBandRows(l), size[1])
+		if band < 8 {
+			continue
+		}
+		panel := stack(m.trackDetail(queueDetailWidth(l), min(l.artRows, band)), queueDetailWidth(l), band)
+
+		at := -1
+		for i, row := range panel {
+			if strings.Contains(plain(row), knob) {
+				at = i
+			}
+		}
+		if at < 0 {
+			t.Fatalf("%dx%d: the playhead was not drawn at all", size[0], size[1])
+		}
+
+		// The picture's middle, which is where a centred block's own middle is.
+		if want := (band - 1) / 2; at < want-1 || at > want+1 {
+			t.Errorf("%dx%d: the playhead is on row %d of %d, want the band's middle at %d",
+				size[0], size[1], at, band, want)
+		}
 	}
 }

@@ -314,11 +314,20 @@ func (m Model) trackDetail(w, rows int) []string {
 		title += "  " + s.FactLabel.Render(explicitMark)
 	}
 
-	lines := []string{
+	// The rating stands over the name rather than in the facts, and stands
+	// alone: a row of stars says what it is, and "Popularity" beside them is a
+	// label on a picture. Above rather than below, because it is the one fact
+	// about the track that is an opinion — it belongs with the name, not among
+	// the measurements.
+	var lines []string
+	if t.Popularity != nil {
+		lines = append(lines, m.stars(*t.Popularity))
+	}
+	lines = append(lines,
 		title,
 		s.Artist.Render(strings.Join(t.Artists, ", ")),
 		"",
-	}
+	)
 
 	// The playhead and the clock either side of it, for the one track they can
 	// belong to. Their rows are kept whether this is that track or not: without
@@ -327,31 +336,45 @@ func (m Model) trackDetail(w, rows int) []string {
 	// in only where there is room for them at all, because those facts are the
 	// point of the panel.
 	facts := trackFacts(*t)
-	if rows >= len(facts)+6 {
-		bar, times := "", ""
-		if m.ps != nil && m.ps.TrackID == t.ID {
-			bar = m.progressLine(w)
-			times = spread(
-				s.Time.Render(formatDuration(m.elapsed())),
-				s.Time.Render(formatDuration(m.ps.Duration)),
-				w,
-			)
+	if rows < len(facts)+6 {
+		for _, f := range facts {
+			lines = append(lines, m.fact(f.label, f.value, w))
 		}
-		lines = append(lines, bar, times)
-		if rows >= len(facts)+7 {
-			// The air under the clock is the first thing to go: better a
-			// tighter panel than no playhead at all.
-			lines = append(lines, "")
-		}
+		return lines
 	}
 
+	bar, times := "", ""
+	if m.ps != nil && m.ps.TrackID == t.ID {
+		bar = m.progressLine(w)
+		times = spread(
+			s.Time.Render(formatDuration(m.elapsed())),
+			s.Time.Render(formatDuration(m.ps.Duration)),
+			w,
+		)
+	}
+
+	under := []string{times}
+	if rows >= len(facts)+7 {
+		// The air under the clock is the first thing to go: better a tighter
+		// panel than no playhead at all.
+		under = append(under, "")
+	}
 	for _, f := range facts {
-		lines = append(lines, m.fact(f.label, f.value, w))
+		under = append(under, m.fact(f.label, f.value, w))
 	}
-	if t.Popularity != nil {
-		lines = append(lines, m.fact("Popularity", m.stars(*t.Popularity), w))
+
+	// The playhead is the middle row of the panel, and the panel is centred in
+	// the band — so the bar lands on the band's own middle, which is where the
+	// picture beside it is drawn from. Two things that answer the same track
+	// should stand on one line; measured before this, the bar sat a row above
+	// the picture's middle and the eye caught it.
+	//
+	// The air goes above rather than below: under the name it reads as room,
+	// and between the clock and the facts it reads as a gap.
+	for len(lines) < len(under) {
+		lines = append(lines, "")
 	}
-	return lines
+	return append(append(lines, bar), under...)
 }
 
 // starsFor is how many of the five a rating earns. Nothing scores none: a track
@@ -492,16 +515,6 @@ func trackFacts(t player.Track) []trackFact {
 			year += " · " + t.AlbumType
 		}
 		facts = append(facts, trackFact{"released", "Released", year})
-	}
-	if t.TrackNumber > 0 {
-		place := fmt.Sprintf("%d", t.TrackNumber)
-		if t.TotalTracks > 0 {
-			place = fmt.Sprintf("%d of %d", t.TrackNumber, t.TotalTracks)
-		}
-		if t.DiscNumber > 1 {
-			place += fmt.Sprintf(", disc %d", t.DiscNumber)
-		}
-		facts = append(facts, trackFact{"track", "Track", place})
 	}
 	facts = append(facts, trackFact{"length", "Length", formatDuration(t.Duration)})
 
@@ -1203,11 +1216,6 @@ func (m Model) trackCaption(t player.Track, w int) []string {
 		case "album", "length":
 			// The album has a line of its own; the length is already under the
 			// progress bar, where it is read against the elapsed time.
-			continue
-		case "track":
-			// A bare number in a run of facts could be anything. The queue has
-			// a column to name it; here the value has to name itself.
-			rest = append(rest, "track "+f.value)
 			continue
 		}
 		rest = append(rest, f.value)
