@@ -684,3 +684,77 @@ func TestATileIsSquareInPixels(t *testing.T) {
 		}
 	}
 }
+
+// The corners and the uprights of a frame stand in the same two columns, and
+// both stand the same distance from the picture on either side.
+//
+// They were written at different times and the arithmetic of the arms did not
+// follow when the frame moved from one column out to two: every right-hand
+// corner sat one column inside its own upright.
+func TestTheFramesCornersMeetItsUprights(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.tab = tabLibrary
+	m.width, m.height = 150, 40
+	m.resize()
+	for i := range 8 {
+		m.library.playlists = append(m.library.playlists, player.Playlist{
+			ID: fmt.Sprintf("p%d", i), Name: fmt.Sprintf("List %d", i), Owner: "pottom"})
+	}
+	g := m.libraryShape(m.layout(), m.layout().bodyHeight)
+	m.tiles = map[string]coverState{"p0": tileArt(g)}
+
+	col := func(row, of string) int {
+		i := strings.Index(row, of)
+		if i < 0 {
+			return -1
+		}
+		return lipgloss.Width(row[:i])
+	}
+	last := func(row, of string) int {
+		i := strings.LastIndex(row, of)
+		if i < 0 {
+			return -1
+		}
+		return lipgloss.Width(row[:i])
+	}
+
+	var left, right, headL, headR, footL, footR, artL, artR = -1, -1, -1, -1, -1, -1, -1, -1
+	for _, row := range strings.Split(plain(fmt.Sprint(m.View())), "\n") {
+		if at := col(row, pointerTL); at >= 0 {
+			headL, headR = at, last(row, pointerTR)
+		}
+		if at := col(row, pointerElbow); at >= 0 {
+			footL, footR = at, last(row, pointerBR)
+		}
+		if at := col(row, pointerV); at >= 0 && left < 0 {
+			left, right = at, last(row, pointerV)
+		}
+		if at := col(row, "#"); at >= 0 && artL < 0 {
+			artL, artR = at, last(row, "#")
+		}
+	}
+	if left < 0 || headL < 0 || footL < 0 || artL < 0 {
+		t.Fatalf("the frame is not all there: uprights %d/%d, head %d/%d, foot %d/%d, picture %d/%d",
+			left, right, headL, headR, footL, footR, artL, artR)
+	}
+
+	for _, c := range []struct {
+		name       string
+		got, want  int
+	}{
+		{"the head's left corner", headL, left},
+		{"the head's right corner", headR, right},
+		{"the foot's left corner", footL, left},
+		{"the foot's right corner", footR, right},
+	} {
+		if c.got != c.want {
+			t.Errorf("%s is at column %d and its upright at %d", c.name, c.got, c.want)
+		}
+	}
+
+	// And the same air on both sides of the picture.
+	if before, after := artL-left, right-artR; before != after {
+		t.Errorf("the frame stands %d columns from the picture on the left and %d on the right",
+			before, after)
+	}
+}

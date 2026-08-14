@@ -328,7 +328,13 @@ func (m Model) armRow(g gridShape, width, at int, near, far string) string {
 	}
 
 	// The middle of a side is open: two corners rather than a ring.
-	inner := g.tileW - 1 + 2*frameCols - 2*(arm+1)
+	//
+	// The row spans the tile and the air either side of it — the same columns
+	// the uprights stand in, which is the whole point of it. It was a column
+	// short, so every right-hand corner sat one column inside its own upright:
+	// the arithmetic was written when the frame stood one column out and did not
+	// follow when it went to two.
+	inner := g.tileW + 2*frameCols - 2*(arm+1)
 	if inner > 0 {
 		b.WriteString(strings.Repeat(" ", inner))
 	}

@@ -16,6 +16,13 @@ type coverState struct {
 	url           string
 	width, height int
 
+	// want is the width whatever is laying this out has reserved for it. What
+	// comes back from a renderer can be narrower — a square picture in whole
+	// cells is at the mercy of the cell's own shape, and every renderer rounds
+	// its own way — and a line that is not the width the layout believes it is
+	// slides everything after it along the row.
+	want int
+
 	art string
 
 	// lines is that art split into rows and padded to the width it was asked
@@ -39,16 +46,23 @@ func (c coverState) loading() bool {
 	return c.url != "" && c.art == "" && !c.failed
 }
 
-// took files arriving art, split into rows once so that drawing it is a
-// concatenation.
+// took files arriving art, split into rows and squared off to the width it is
+// being laid out in, once, so that drawing it is a concatenation.
 //
-// Split only — not squared off to the width it was asked for. What comes back is
-// as wide as the renderer could draw it, which is a cell or two under the box on
-// most cell shapes, and padding it to the box would put those cells on one side
-// of the picture. Whoever lays it out pads to the width it really is.
+// Squared off to that width and not to the box it was asked for: the two are not
+// the same, and the layout only ever knows the first. A line an inch short of
+// what the layout believes shifts every tile after it along the row, and the
+// marks drawn at reckoned columns — the frame round a tile, the cursor's own —
+// then stand beside nothing.
 func (c *coverState) took(art string) {
 	c.art = art
 	c.lines = strings.Split(art, "\n")
+	if c.want <= 0 {
+		return
+	}
+	for i, line := range c.lines {
+		c.lines[i] = fit(line, c.want)
+	}
 }
 
 // matches reports whether a result belongs to what is currently on screen.
