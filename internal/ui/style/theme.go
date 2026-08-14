@@ -15,6 +15,10 @@ type Theme struct {
 	Faint       color.Color
 	Border      color.Color
 	BorderFocus color.Color
+
+	// Raised is a background a step off the terminal's own, for a block that has
+	// to read as standing apart from the screen around it.
+	Raised color.Color
 	Error       color.Color
 	Warning     color.Color
 }
@@ -31,6 +35,10 @@ func NewTheme(isDark bool) Theme {
 		Muted:       pick(lipgloss.Color("#57606A"), lipgloss.Color("#8B949E")),
 		Faint:       pick(lipgloss.Color("#8C959F"), lipgloss.Color("#484F58")),
 		Border:      pick(lipgloss.Color("#D0D7DE"), lipgloss.Color("#30363D")),
+
+		// Raised is a background a step off the terminal's own, for the one
+		// block that has to read as standing apart from the screen around it.
+		Raised: pick(lipgloss.Color("#F0F3F6"), lipgloss.Color("#161B22")),
 		BorderFocus: pick(lipgloss.Color("#128A3E"), lipgloss.Color("#1DB954")),
 		Error:       pick(lipgloss.Color("#CF222E"), lipgloss.Color("#F85149")),
 		Warning:     pick(lipgloss.Color("#9A6700"), lipgloss.Color("#D29922")),

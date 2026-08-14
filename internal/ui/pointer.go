@@ -108,6 +108,22 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 		out[row] = overwrite(out[row], at, style.Render(s), l.interior)
 	}
 
+	// The block's own ground, a step off the screen's, so that what is inside
+	// the frame reads as standing apart rather than as the same screen with a
+	// line drawn round it.
+	//
+	// From the picture's right edge only. The cover is put on the screen by the
+	// terminal rather than written into the row, and cutting a row apart at a
+	// column the placement runs through would take the picture with it.
+	if from := leftMargin + l.artWidth; from < right {
+		for row := head + 1; row < foot; row++ {
+			if row < 0 || row >= len(out) {
+				continue
+			}
+			out[row] = raise(out[row], from, right, m.styles.Raised, l.interior)
+		}
+	}
+
 	put(head, pointerAt, pointerTL+rule+pointerTR)
 	put(foot, pointerAt, pointerTee+rule+pointerBR)
 	for row := head + 1; row < foot; row++ {
@@ -123,6 +139,33 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 	// beside it put two of them on the one row, both saying the same thing.
 	put(at, pointerAt, pointerElbow+pointerH)
 	return out
+}
+
+// raise lays a background under part of a row, keeping the colours already in
+// it.
+//
+// A style wrapped round text that has styles of its own does not survive: every
+// one of them ends in a reset, and a reset clears the background along with
+// everything else — measured, and the tint stopped at the first word that had a
+// colour. So the background is put back after every reset inside the span.
+func raise(row string, from, to int, bg lipgloss.Style, w int) string {
+	if to <= from {
+		return row
+	}
+	row = fit(row, w)
+
+	open := bg.Render("")
+	if at := strings.Index(open, "m"); at >= 0 {
+		open = open[:at+1] // the sequence that opens it, without its own reset
+	}
+
+	span := ansi.Truncate(ansi.TruncateLeft(row, from, ""), to-from, "")
+	for _, reset := range []string{"\x1b[m", "\x1b[0m"} {
+		span = strings.ReplaceAll(span, reset, reset+open)
+	}
+
+	left := ansi.Truncate(row, from, "")
+	return fit(left+open+span+"\x1b[m"+ansi.TruncateLeft(row, to, ""), w)
 }
 
 // overwrite puts s into a row at a column, keeping what is either side of it.

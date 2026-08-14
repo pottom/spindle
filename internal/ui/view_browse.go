@@ -376,17 +376,25 @@ func (m Model) trackDetail(w, rows int) []string {
 		times = spread("", s.Time.Render(formatDuration(t.Duration)), w)
 	}
 
+	// The album on its own row and everything else on one under it, the way the
+	// player screen sets the same facts.
+	//
+	// Three rows of one short value each is what put a hole in the middle of
+	// this block: the playhead has to sit on the picture's middle, the facts sit
+	// under it, and what was left between them was rows of nothing. Set as a
+	// caption they come to two, and the block closes up — the air goes outside
+	// it, where air belongs, rather than through the middle of it.
 	under := []string{times}
-	if rows >= len(facts)+7 {
-		// The air under the clock is the first thing to go: better a tighter
-		// panel than no playhead at all.
-		under = append(under, "")
-	}
-	// The values alone. A column of names beside three short facts is a table
-	// with one row in every column: the album is an album, the year is a year,
-	// and the tempo says bpm itself.
+	var rest []string
 	for _, f := range facts {
-		under = append(under, fit(f.value, w))
+		if f.key == "album" {
+			under = append(under, fit(s.Album.Render(f.value), w))
+			continue
+		}
+		rest = append(rest, f.value)
+	}
+	if len(rest) > 0 {
+		under = append(under, fit(s.Detail.Render(strings.Join(rest, " · ")), w))
 	}
 
 	// The playhead is the middle row of the panel, and the panel is centred in

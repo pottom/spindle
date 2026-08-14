@@ -1,10 +1,11 @@
 package ui
 
 import (
+	"charm.land/lipgloss/v2"
 	"context"
-	"image/color"
 	"encoding/json"
 	"fmt"
+	"image/color"
 	"strings"
 	"testing"
 	"time"
@@ -1246,7 +1247,7 @@ func TestTheQueueFoldsTheBandAway(t *testing.T) {
 
 	var tm tea.Model = m
 	rooms := []struct {
-		room                queueRoom
+		room                 queueRoom
 		showsNow, showsTrace bool
 	}{
 		{queueRoomBoth, true, true},
@@ -1728,6 +1729,45 @@ func TestANonPlayingTrackSaysHowLongItIs(t *testing.T) {
 			if s := plain(row); strings.Contains(s, "3:10") && strings.TrimRight(s, " ") != s {
 				t.Errorf("the length is not set to the right edge: %q", s)
 			}
+		}
+	}
+}
+
+// The marked block stands on a ground of its own, and laying it down costs the
+// screen nothing: every row is the width it was, and every character still in
+// it.
+//
+// A style wrapped round text that has styles of its own does not survive — each
+// of them ends in a reset, and a reset clears the background with everything
+// else — so this is the check that the tint went on without taking anything off.
+func TestTheMarkedBlockKeepsItsContent(t *testing.T) {
+	m := queueModel(0, "one", "two", "three")
+	m.ps = &player.State{TrackID: "now", Title: "sounding", Playing: true}
+	m.width, m.height = 200, 44
+	m.resize()
+
+	m.queuePane.cursor.cursor = 0
+	was := strings.Split(ansiOff(m.render()), "\n")
+
+	m.queuePane.cursor.cursor = 2
+	got := strings.Split(m.render(), "\n")
+	if len(got) != len(was) {
+		t.Fatalf("the screen is %d rows marked and %d unmarked", len(got), len(was))
+	}
+	for i, row := range got {
+		if w := lipgloss.Width(row); w != m.width {
+			t.Errorf("row %d is %d cells wide, want %d", i, w, m.width)
+		}
+	}
+
+	// The panel still says what it said: the tint is under the words, not over
+	// them.
+	head := ansiOff(strings.Join(got[:12], "\n"))
+	// The sounding track is the first row, so the cursor two down is the second
+	// queue entry.
+	for _, want := range []string{"two", "someone"} {
+		if !strings.Contains(head, want) {
+			t.Errorf("the marked panel = %q, want %q still in it", head, want)
 		}
 	}
 }
