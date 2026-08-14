@@ -164,25 +164,34 @@ func (s Styles) On(ground color.Color) Styles {
 	return s
 }
 
-// found is how a search match is marked: the accent behind the letters, and an
-// ink taken from the accent's own hue at whichever end of the scale it is not.
+// foundArc is how far round the wheel a search match sits from the accent.
 //
-// A background rather than a colour, because the colour is already spoken for.
-// The row under the cursor is drawn in the accent to begin with, and a match
-// coloured accent on it would be a highlight that disappears on exactly the row
-// being looked at — which is the row it is most wanted on.
+// Far enough to be another colour and near enough to be its relation. The whole
+// screen is cut from the accent, so a mark in some colour of its own would be a
+// sticker from another program; a mark in the accent itself would vanish on the
+// playing row, which is drawn in the accent already. Sixty degrees is the step
+// the ladder and the spectrum are built out of — a neighbour on the wheel, not a
+// stranger and not a twin.
+const foundArc = 60
+
+// found is what a search match is drawn in: that neighbouring hue, at a
+// lightness the row it lands on cannot take away.
 //
-// The ink is picked off the accent rather than off the theme because the accent
-// is a photograph's average and arrives at any lightness at all: dark text on a
-// dark cover's accent is a black bar, and the theme's own text would be that on
-// half the records in a library.
-func found(accent color.Color) lipgloss.Style {
-	h, sat, l := toHSL(accent)
-	ink := fromHSL(h, min(sat, 0.25), 0.08)
-	if l < 0.45 {
-		ink = fromHSL(h, min(sat, 0.25), 0.96)
+// Set rather than scaled off the accent, because an accent is a photograph's
+// average and arrives at any lightness at all — a dark cover's would give a mark
+// too dim to find, which is a mark that has failed at its one job. Bold, because
+// the rows it competes with are: the cursor's is the text colour in bold and the
+// playing one is the accent.
+func found(isDark bool, accent color.Color) lipgloss.Style {
+	h, sat, _ := toHSL(accent)
+	h = math.Mod(h+foundArc, 360)
+	sat = min(max(sat, 0.6), 0.95)
+
+	light := 0.42
+	if isDark {
+		light = 0.66
 	}
-	return lipgloss.NewStyle().Background(accent).Foreground(ink)
+	return lipgloss.NewStyle().Foreground(fromHSL(h, sat, light)).Bold(true)
 }
 
 func New(isDark bool, accent color.Color) Styles {
@@ -236,7 +245,7 @@ func New(isDark bool, accent color.Color) Styles {
 		Elapsed:   fg(accent),
 		Remaining: fg(t.Border),
 		Rule:      fg(t.Border),
-		Found:     found(accent),
+		Found:     found(isDark, accent),
 		Raised:    lipgloss.NewStyle().Background(t.Raised),
 		Knob:      fg(accent),
 
