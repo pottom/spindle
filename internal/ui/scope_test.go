@@ -130,7 +130,7 @@ func TestScopeDrawsAContinuousLine(t *testing.T) {
 	// A step from bottom to top inside two dots: every row between has to be lit.
 	m.scope.frame = []float32{-1, -1, 1, 1}
 	m.scope.follow(m.scope.frame)
-	lines := m.scopeLines(4)
+	lines := m.scopeRender(4, scopeRows)
 	if len(lines) != scopeRows {
 		t.Fatalf("scopeLines = %d rows, want %d", len(lines), scopeRows)
 	}
@@ -144,7 +144,7 @@ func TestScopeDrawsAContinuousLine(t *testing.T) {
 	m.scope.frame = []float32{0, 0, 0, 0}
 	m.scope.follow(m.scope.frame)
 	lit := 0
-	for _, line := range m.scopeLines(4) {
+	for _, line := range m.scopeRender(4, scopeRows) {
 		if strings.TrimSpace(plain(line)) != "" {
 			lit++
 		}
@@ -162,7 +162,7 @@ func TestScopeWithoutASourceRestsFlat(t *testing.T) {
 	m.resize()
 	m.scope.frame = nil
 
-	if got := m.scopeLines(20); len(got) != scopeRows {
+	if got := m.scopeRender(20, scopeRows); len(got) != scopeRows {
 		t.Fatalf("scopeLines = %d rows, want %d", len(got), scopeRows)
 	}
 }
@@ -300,7 +300,7 @@ func TestTriggerSteadiesThePicture(t *testing.T) {
 
 			lines := m.scopeLinesFrom(w, scopeRows, 0)
 			if triggered {
-				lines = m.scopeLines(w)
+				lines = m.scopeRender(w, scopeRows)
 			}
 			if prev != nil {
 				for i := range lines {
@@ -849,9 +849,9 @@ func TestTraceThrowsSparks(t *testing.T) {
 	t.Logf("the hit threw %d sparks", len(m.scope.sparks))
 
 	// They are drawn with the trace rather than in a layer of their own.
-	off := m.scopeLines(w)
+	off := m.scopeRender(w, scopeRows)
 	m.scope.sparks = nil
-	bare := m.scopeLines(w)
+	bare := m.scopeRender(w, scopeRows)
 	if strings.Join(off, "\n") == strings.Join(bare, "\n") {
 		t.Error("the sparks changed nothing on screen")
 	}
@@ -1079,5 +1079,50 @@ func TestTheScreenKeepsTimeAndCanBeToldNotTo(t *testing.T) {
 	}
 	if off := m.wordsRiding(4); off[0] != loud[0] {
 		t.Errorf("with the key off the marks stand at %d, want the %d they stood at before", off[0], loud[0])
+	}
+}
+
+// In the band beside the cover, a meter stands on the floor and a wave hangs
+// from the middle.
+//
+// Drawn at a fixed four rows in a band of thirteen, the bars floated in the
+// middle with their feet on nothing — a row of bars stands on a floor, and a
+// floor that lines up with nothing reads as a mistake. The trace is drawn at the
+// height it is given now, so the bars reach the foot of the band, which is the
+// foot of the picture beside them.
+//
+// And the wave is unmoved by that, which is the other half of it: it is drawn
+// about the middle of whatever it is given, and the middle of that band is the
+// row the playhead is on.
+func TestTheTraceFillsTheBandItIsGiven(t *testing.T) {
+	m := scopeModel(200, 44)
+	m.tab = tabQueue
+	m.scope.bands = make([]float32, 28)
+	for i := range m.scope.bands {
+		m.scope.bands[i] = 1
+	}
+
+	l := m.layout()
+	band := m.listBandRows(l)
+	if band < 8 {
+		t.Skip("the band is too short at this size to say anything")
+	}
+
+	m.scope.modes[tabQueue] = scopeBars
+	rows := m.place(m.traceBlock(), queueScopeWidth(l), band)
+	if len(rows) != band {
+		t.Fatalf("the trace came out %d rows in a band of %d", len(rows), band)
+	}
+	if strings.TrimSpace(plain(rows[band-1])) == "" {
+		t.Error("the bars do not reach the foot of the band")
+	}
+	if strings.TrimSpace(plain(rows[0])) == "" {
+		t.Error("the bars at full tilt do not reach the top of the band")
+	}
+
+	// Under the artwork on the player it is still a strip, and deliberately so:
+	// a glance rather than the loudest thing on that screen.
+	if strip := m.place(m.traceBlock(), m.scopeWidth(l), scopeRows); len(strip) != scopeRows {
+		t.Errorf("the strip under the artwork is %d rows, want %d", len(strip), scopeRows)
 	}
 }

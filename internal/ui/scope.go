@@ -260,16 +260,32 @@ func (m Model) scopeWidth(l layout) int {
 }
 
 // scopeRender draws whichever visualiser is on, across w cells.
-func (m Model) scopeRender(w int) []string {
+// scopeRender draws the trace, rows deep.
+//
+// The height is given rather than fixed, because the two places it is drawn are
+// not the same size. Under the artwork it is a strip four rows deep — a glance,
+// and deliberately not the loudest thing on that screen. In the band beside the
+// cover on the queue it has the whole height of the picture, and drawn at four
+// there it floated in the middle of thirteen with its feet on nothing: a row of
+// bars stands on a floor, and a floor that lines up with nothing reads as a
+// mistake.
+//
+// The waveform is unmoved by this. It is drawn about the middle of whatever it
+// is given, so it stays on the band's middle — which is the row the playhead is
+// on, and the reason the two line up.
+func (m Model) scopeRender(w, rows int) []string {
+	if rows <= 0 {
+		rows = scopeRows
+	}
 	switch {
 	case m.scopeMode().wave():
-		return m.scopeLines(w)
+		return m.scopeLinesFrom(w, rows, m.scopeTrigger(w*dotsPerCellX))
 	case m.scopeMode().mirror():
-		return m.stageArt(w, scopeRows)
+		return m.stageArt(w, rows)
 	case m.scopeMode().ladder():
-		return m.ladderLines(w, scopeRows)
+		return m.ladderLines(w, rows)
 	default:
-		return m.barsLines(w, scopeRows)
+		return m.barsLines(w, rows)
 	}
 }
 
@@ -300,18 +316,6 @@ func (m Model) scopeVisible() bool {
 // and the key steps over off — so there is no case here for a screen that shows
 // something and asks for nothing.
 func (m Model) frameMode() scopeMode { return m.scopeMode() }
-
-// scopeLines renders the trace across w cells.
-//
-// The waveform is drawn as a line rather than a scatter of points: consecutive
-// samples are joined vertically, so a steep slope stays continuous instead of
-// breaking into dots. Without that a loud passage looks like static.
-//
-// Each cell is coloured by how loud that moment is, not by where it sits, so
-// the trace flares on a hit and recedes between them.
-func (m Model) scopeLines(w int) []string {
-	return m.scopeLinesFrom(w, scopeRows, m.scopeTrigger(w*dotsPerCellX))
-}
 
 // scopeLinesFrom draws the frame beginning at a given sample. Where that sample
 // is decided is scopeTrigger's business; this only draws.

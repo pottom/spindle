@@ -48,7 +48,7 @@ func (m Model) artBlock(centred bool) block {
 // and it is the same block in both.
 func (m Model) traceBlock() block {
 	return block{"trace", func(w, h int) []string {
-		return stack(m.scopeRender(w), w, h)
+		return stack(m.scopeRender(w, h), w, h)
 	}}
 }
 
