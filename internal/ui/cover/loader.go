@@ -23,7 +23,12 @@ import (
 
 const (
 	// decodedCacheSize is the number of decoded images held in memory.
-	decodedCacheSize = 10
+	//
+	// Enough for a wall of them. The library draws one cover per tile and a wide
+	// terminal holds thirty: at ten, scrolling a row threw away pictures that
+	// were about to be asked for again, and every one of them was decoded from
+	// the disk cache a second time.
+	decodedCacheSize = 64
 
 	// maxCoverBytes caps a download; album art is well under this.
 	maxCoverBytes = 4 << 20

@@ -473,6 +473,11 @@ func (m Model) handleTick() (Model, tea.Cmd) {
 	if cmd := m.toneFlow(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
+	// What is on screen goes out of date the moment somebody edits it from a
+	// phone, and nothing says so. See refresh.go.
+	if cmd := m.refreshOnScreen(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 	// And the device itself, which can go away under everything else: a daemon
 	// whose playback loop wedged ends rather than sitting there deaf, and
 	// nothing else is left running to start another. See revive.go.

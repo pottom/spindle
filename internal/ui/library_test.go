@@ -265,3 +265,43 @@ func TestTheWallIsWalkedInTwoDirections(t *testing.T) {
 		t.Errorf("the wall starts at tile %d, which is %d into a row", from, from%g.cols)
 	}
 }
+
+// A list asked for again keeps the cursor on the thing it was on, wherever that
+// has moved to. A refresh that sent the reader back to the top would make a
+// library unreadable for longer than the refresh takes.
+func TestARefreshKeepsTheCursorWhereItWas(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.tab = tabLibrary
+	m.width, m.height = 150, 40
+	m.resize()
+
+	lists := []player.Playlist{
+		{ID: "p0", Name: "Deep House"}, {ID: "p1", Name: "Chill"}, {ID: "p2", Name: "Runners"},
+	}
+	m.library.adopt(msg.LibraryFetched{Kind: int(libraryPlaylists), Playlists: lists}, player.Playlist{ID: likedID})
+	m.library.cursors[libraryPlaylists].moveTo(2, m.library.count()) // "Chill", after the liked row
+
+	was := m.library.idAt(libraryPlaylists, m.library.cursors[libraryPlaylists].cursor)
+	if was == "" {
+		t.Fatal("the cursor is on nothing to begin with")
+	}
+
+	// The same page again, with something new at the front: the cursor follows
+	// what it was on rather than staying at its index.
+	m.library.adopt(msg.LibraryFetched{
+		Kind:      int(libraryPlaylists),
+		Playlists: append([]player.Playlist{{ID: "pNew", Name: "Made on the phone"}}, lists...),
+	}, player.Playlist{ID: likedID})
+
+	if now := m.library.idAt(libraryPlaylists, m.library.cursors[libraryPlaylists].cursor); now != was {
+		t.Errorf("after the refresh the cursor is on %q, want %q", now, was)
+	}
+
+	// And something that has gone leaves it at the top rather than pointing at
+	// whatever slid into its place.
+	m.library.adopt(msg.LibraryFetched{Kind: int(libraryPlaylists), Playlists: lists[:1]},
+		player.Playlist{ID: likedID})
+	if got := m.library.cursors[libraryPlaylists].cursor; got != 0 {
+		t.Errorf("the cursor is at %d after what it was on went, want the top", got)
+	}
+}

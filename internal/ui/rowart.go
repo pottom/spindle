@@ -24,14 +24,21 @@ import (
 // and keeps its table.
 
 const (
-	// openRowRows is how many screen rows one track takes with its sleeve on it.
-	// Two: the smallest a square picture can be and still be a picture, and
-	// exactly the two lines a track has to say — what it is, and who made it.
-	openRowRows = 2
+	// openRowRows is how many screen rows one track takes with its sleeve on it,
+	// and rowArtRows how many of those the sleeve fills. The row that is left is
+	// air: drawn edge to edge, one sleeve runs into the next and a column of
+	// covers reads as one long picture.
+	//
+	// Two rows was the least a square picture can be drawn in and it looked it —
+	// forty pixels across is a colour rather than a cover. Three is half as much
+	// again in each direction and twice the picture, and the two lines a track has
+	// to say stand beside it.
+	openRowRows = 4
+	rowArtRows  = 3
 
 	// rowArtCols is how wide that sleeve is. Twice the rows, because a cell is
 	// about twice as tall as it is wide and a sleeve is square.
-	rowArtCols = 4
+	rowArtCols = 2 * rowArtRows
 
 	// rowArtGap is the air between the picture and the words.
 	rowArtGap = 2
@@ -61,7 +68,7 @@ func (m Model) openTrackRows(t player.Track, w int, selected bool, number int) [
 	lead := make([]string, openRowRows)
 	for i := range lead {
 		cell := ""
-		if i < len(art) {
+		if i < min(len(art), rowArtRows) {
 			cell = art[i]
 		}
 		lead[i] = fit(cell, rowArtCols) + strings.Repeat(" ", rowArtGap)
@@ -95,7 +102,22 @@ func (m Model) openTrackRows(t player.Track, w int, selected bool, number int) [
 			m.lit(m.styles.RowSecondary, strings.Join(t.Artists, ", ")),
 	})
 
-	return []string{lead[0] + title, lead[1] + under}
+	// The words sit against the middle of the picture rather than at the top of
+	// it: two lines against three rows of sleeve, and hung from the top they
+	// would read as a caption that had come loose.
+	out := make([]string, openRowRows)
+	at := (rowArtRows - 2 + 1) / 2
+	for i := range out {
+		switch i {
+		case at:
+			out[i] = lead[i] + title
+		case at + 1:
+			out[i] = lead[i] + under
+		default:
+			out[i] = lead[i]
+		}
+	}
+	return out
 }
 
 // numberOf is a track's place in the record, or nothing at all for the one that
@@ -131,11 +153,11 @@ func (m *Model) syncRowCovers() tea.Cmd {
 			continue
 		}
 		seen[t.ID] = true
-		if t.CoverURL == "" || m.tiles[t.ID].matches(t.CoverURL, rowArtCols, openRowRows) {
+		if t.CoverURL == "" || m.tiles[t.ID].matches(t.CoverURL, rowArtCols, rowArtRows) {
 			continue
 		}
-		m.tiles[t.ID] = coverState{url: t.CoverURL, width: rowArtCols, height: openRowRows}
-		cmds = append(cmds, coverCmd(m.covers, t.CoverURL, rowArtCols, openRowRows, slotFor(i)))
+		m.tiles[t.ID] = coverState{url: t.CoverURL, width: rowArtCols, height: rowArtRows}
+		cmds = append(cmds, coverCmd(m.covers, t.CoverURL, rowArtCols, rowArtRows, slotFor(i)))
 	}
 	for id := range m.tiles {
 		if !seen[id] {

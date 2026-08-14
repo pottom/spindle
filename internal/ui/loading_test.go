@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -98,5 +99,51 @@ func TestAskingForAPageStartsTheSpinner(t *testing.T) {
 	}
 	if !tm.(Model).listLoading() {
 		t.Error("the new list is not marked as reading")
+	}
+}
+
+// What is on screen is asked for again while it is on screen, because nothing in
+// the Web API says a playlist was edited from a phone.
+func TestWhatIsOnScreenIsAskedForAgain(t *testing.T) {
+	m := likedModel(t)
+	m.width, m.height = 150, 40
+	m.tab = tabLibrary
+	m.resize()
+
+	// Fresh: nothing to do.
+	m.library.pages[m.library.kind].at = time.Now()
+	if cmd := m.refreshOnScreen(); cmd != nil {
+		t.Error("a list read a moment ago was asked for again")
+	}
+
+	// Old: asked for.
+	m.library.pages[m.library.kind].at = time.Now().Add(-staleAfter - time.Second)
+	if cmd := m.refreshOnScreen(); cmd == nil {
+		t.Error("a list older than the stale mark was not asked for again")
+	}
+	if !m.library.pages[m.library.kind].loading {
+		t.Error("the refresh did not mark the page as being fetched")
+	}
+
+	// And a fetch already in flight is not asked for twice.
+	m.library.pages[m.library.kind].at = time.Now().Add(-staleAfter - time.Second)
+	if cmd := m.refreshOnScreen(); cmd != nil {
+		t.Error("a page already being fetched was asked for again")
+	}
+
+	// The queue is the daemon's rather than Spotify's, and is asked far more
+	// often for that reason.
+	m.tab = tabQueue
+	m.queueAt = time.Now()
+	if cmd := m.refreshOnScreen(); cmd != nil {
+		t.Error("the queue was asked for again a moment after it arrived")
+	}
+	m.queueAt = time.Now().Add(-queueStaleAfter - time.Second)
+	if cmd := m.refreshOnScreen(); cmd == nil {
+		t.Error("the queue was not asked for again")
+	}
+	if queueStaleAfter >= staleAfter {
+		t.Errorf("the queue is asked every %s and a list every %s, want the queue oftener",
+			queueStaleAfter, staleAfter)
 	}
 }

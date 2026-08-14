@@ -2,6 +2,7 @@ package ui
 
 import (
 	"charm.land/bubbles/v2/textinput"
+	"time"
 
 	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui/msg"
@@ -154,6 +155,16 @@ type paging struct {
 	// loading stops a run of cursor keys from asking for the same page a dozen
 	// times before the first answer lands.
 	loading bool
+
+	// at is when the first page last arrived, which is how old what is on screen
+	// is. A list somebody edits on their phone is out of date here and nothing
+	// says so: this is what a refresh is measured against.
+	at time.Time
+}
+
+// stale reports whether what is held is old enough to be asked for again.
+func (p paging) stale(after time.Duration) bool {
+	return !p.loading && time.Since(p.at) >= after
 }
 
 // wants reports whether the cursor has come near enough to the end of what is
@@ -165,6 +176,7 @@ func (p paging) wants(cursor, loaded int) bool {
 // took records a page that has arrived.
 func (p *paging) took(more bool, next int) {
 	p.more, p.next, p.loading = more, next, false
+	p.at = time.Now()
 }
 
 // adopt takes a page of one of the lists. The first page replaces what was
@@ -176,6 +188,7 @@ func (p *paging) took(more bool, next int) {
 func (p *libraryPane) adopt(m msg.LibraryFetched, liked player.Playlist) {
 	kind := libraryKind(m.Kind)
 	first := m.Offset == 0
+	was := p.idAt(kind, p.cursors[kind].cursor)
 
 	switch kind {
 	case libraryAlbums:
@@ -203,9 +216,53 @@ func (p *libraryPane) adopt(m msg.LibraryFetched, liked player.Playlist) {
 	}
 
 	if first {
+		// A first page arrives on the way in and again on every refresh, and a
+		// refresh that sent the reader back to the top of the wall would make it
+		// unreadable for longer than the refresh takes. So the cursor goes back
+		// on the thing it was on, wherever that has moved to.
 		p.cursors[kind].reset()
+		p.keepOn(kind, was)
 	}
 	p.pages[kind].took(m.More, m.Next)
+}
+
+// idAt is what the thing at a place in one of the library's lists is called, so
+// a cursor can be put back on it after the list has been fetched afresh.
+func (p libraryPane) idAt(kind libraryKind, i int) string {
+	switch kind {
+	case libraryAlbums:
+		if a := atAlbum(p.albums, i); a != nil {
+			return a.ID
+		}
+	case libraryArtists:
+		if a := atArtist(p.artists, i); a != nil {
+			return a.ID
+		}
+	case libraryRecent:
+		if t := at(p.recent, i); t != nil {
+			return t.ID
+		}
+	default:
+		if pl := atPlaylist(p.playlists, i); pl != nil {
+			return pl.ID
+		}
+	}
+	return ""
+}
+
+// keepOn puts a cursor back on the thing it was on. Something that has gone from
+// the list leaves it at the top, which is where a list that changed under
+// somebody has to start again.
+func (p *libraryPane) keepOn(kind libraryKind, id string) {
+	if id == "" {
+		return
+	}
+	for i := range p.countOf(kind) {
+		if p.idAt(kind, i) == id {
+			p.cursors[kind].moveTo(i, p.countOf(kind))
+			return
+		}
+	}
 }
 
 // selected is the playlist under the cursor at the top level, which is the one

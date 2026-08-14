@@ -176,14 +176,60 @@ func (m *Model) closeOpen() { m.stack = nil }
 func (o *openPage) adopt(m msg.OpenedFetched) {
 	switch {
 	case m.Offset == 0:
+		// Where the cursor is, before the list under it is replaced. A first
+		// page arrives when a record is opened and again every time it is
+		// refreshed, and a refresh that sent the reader back to the top would
+		// make a list impossible to read for longer than the refresh takes.
+		was := o.at()
+
 		o.tracks, o.albums = m.Tracks, m.Albums
 		o.cursor.reset()
+		o.keepOn(was)
 	case o.holdsAlbums():
 		o.albums = append(o.albums, m.Albums...)
 	default:
 		o.tracks = append(o.tracks, m.Tracks...)
 	}
 	o.pages.took(m.More, m.Next)
+}
+
+// at is what the cursor is resting on, by id, so it can be found again in a list
+// that has been fetched afresh.
+func (o openPage) at() string {
+	if o.holdsAlbums() {
+		if a := atAlbum(o.albums, o.cursor.cursor); a != nil {
+			return a.ID
+		}
+		return ""
+	}
+	if t := at(o.tracks, o.cursor.cursor); t != nil {
+		return t.ID
+	}
+	return ""
+}
+
+// keepOn puts the cursor back on the thing it was on, wherever that has moved
+// to. A thing that is no longer in the list leaves the cursor at the top, which
+// is where a list that has changed under somebody has to start again.
+func (o *openPage) keepOn(id string) {
+	if id == "" {
+		return
+	}
+	if o.holdsAlbums() {
+		for i := range o.albums {
+			if o.albums[i].ID == id {
+				o.cursor.moveTo(i, o.count())
+				return
+			}
+		}
+		return
+	}
+	for i := range o.tracks {
+		if o.tracks[i].ID == id {
+			o.cursor.moveTo(i, o.count())
+			return
+		}
+	}
 }
 
 // readAhead sends for the next page once the cursor has come near enough to the

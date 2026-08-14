@@ -38,20 +38,24 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 	}
 	switch {
 	case t == tabLibrary:
-		// Fetched every time rather than once: a playlist made or renamed
-		// elsewhere would otherwise never appear until spindle was restarted,
-		// and one page of a library is a cheap answer.
-		m.library.paging().loading = true
-		cmds = append(cmds,
-			fetchLibraryCmd(m.player, m.library.kind, 0),
-			fetchOpenCmd(m.player, openPlaylist, likedID, 0),
-			m.syncGridCovers(),
-			m.spinner.Tick,
-		)
+		// Asked for again on the way in, unless what is held is new enough to
+		// still be true: a playlist made or renamed elsewhere would otherwise
+		// never appear until spindle was restarted, and walking in and out of
+		// the tab would otherwise ask every time. See refresh.go.
+		cmds = append(cmds, m.syncGridCovers(), m.spinner.Tick)
+		if m.library.paging().stale(staleAfter) {
+			m.library.paging().loading = true
+			cmds = append(cmds,
+				fetchLibraryCmd(m.player, m.library.kind, 0),
+				fetchOpenCmd(m.player, openPlaylist, likedID, 0),
+			)
+		}
 	case t == tabQueue:
 		// The queue is kept for the sake of instant skipping, which only needs
 		// the first entry to be right. Looking at the whole list is a different
-		// promise, so it is fetched again.
+		// promise, so it is fetched again — and goes on being, while the tab is
+		// up. See refresh.go.
+		m.queueAt = time.Now()
 		cmds = append(cmds, fetchQueueCmd(m.player))
 	}
 	return tea.Batch(cmds...)

@@ -83,6 +83,10 @@ type Model struct {
 
 	cover coverState
 
+	// queueAt is when the queue was last asked for. It comes from our own daemon
+	// rather than from Spotify, so it is asked again often — see refresh.go.
+	queueAt time.Time
+
 	// tiles are the library's wall: one picture per thing on it, keyed by the
 	// thing rather than by where it sits, so scrolling a row does not re-fetch
 	// what only moved. What has scrolled away is dropped — see syncGridCovers.
