@@ -82,13 +82,10 @@ func (m Model) drawFinder(lines []string, l layout, top int) []string {
 	put(boxTop+1, edge.Render(pointerV)+finderLine(typed, count, box-2)+edge.Render(pointerV))
 	put(boxTop+2, edge.Render(pointerElbow+rule+pointerBR))
 
-	// The ground last, over the whole of it: a card lying on the screen rather
-	// than a frame drawn on it. It goes on after the letters because a style
-	// wrapped round text that carries styles of its own does not survive them —
-	// see raise, which puts the ground back after every reset inside the span.
-	for row := boxTop; row < boxTop+finderRows; row++ {
-		out[row] = raise(out[row], left, left+box, m.styles.Raised, l.interior)
-	}
+	// No ground inside it. The rows it stands in are the list's own, held empty
+	// for it, so there is nothing under the box to cover — and a panel painted a
+	// shade off the screen, on a screen with a photograph at the top of it, reads
+	// as a second window rather than as part of this one.
 	return out
 }
 

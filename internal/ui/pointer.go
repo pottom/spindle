@@ -108,27 +108,12 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 		out[row] = overwrite(out[row], at, style.Render(s), l.interior)
 	}
 
-	// The block's own ground, a step off the screen's, so that what is inside
-	// the frame reads as standing apart rather than as the same screen with a
-	// line drawn round it. In the hue of the cover it stands beside, like
-	// everything else inside the frame: the frame says another record, the
-	// colour says which, and the ground says it without a word.
-	//
-	// From the picture's right edge only. The cover is put on the screen by the
-	// terminal rather than written into the row, and cutting a row apart at a
-	// column the placement runs through would take the picture with it.
-	// A column short of the frame, because there is one on the other side: the
-	// frame stands at the edge of the margin and the picture begins a column
-	// inside it, so a ground that runs flush into the frame on the right and
-	// leaves a gutter on the left is a box with one wall painted.
-	if from := leftMargin + l.artWidth; from < right-1 {
-		for row := head + 1; row < foot; row++ {
-			if row < 0 || row >= len(out) {
-				continue
-			}
-			out[row] = raise(out[row], from, right-1, m.coverStyles.Raised, l.interior)
-		}
-	}
+	// The frame and nothing else. It carried a ground for a while — a step off
+	// the screen's, in the hue of the cover it stood beside — and beside a
+	// photograph a shaded panel reads as another window laid over this one. What
+	// says the band belongs to another record is the frame and the line down to
+	// the row, which is what somebody would draw on a printout, and a wash of
+	// colour behind it was the same thing said twice and less well.
 
 	put(head, pointerAt, pointerTL+rule+pointerTR)
 	put(foot, pointerAt, pointerTee+rule+pointerBR)
