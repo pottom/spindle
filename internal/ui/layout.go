@@ -8,10 +8,16 @@ const (
 	minWidth  = 64
 	minHeight = 20
 
-	// A table earns its width; prose does not. The lists take whatever the
-	// terminal gives — a title cut short at column 60 on a 200-column screen is
-	// the one thing nobody would choose.
-	maxTableWidth = 200
+	// Nothing caps the frame's width any more. It was two hundred columns, and
+	// on a terminal wider than that — which is what a small font on a large
+	// screen is — a fifth of the screen went to margins. Somebody who shrinks
+	// the type is buying room, and handing a third of it back is answering the
+	// opposite of what was asked.
+	//
+	// What is capped is the prose inside it, which is where the argument
+	// belongs: maxInfoCols holds the column of words beside the picture, and the
+	// list's own columns hold themselves. A table earns its width; a caption
+	// does not.
 
 	// The player used to be capped narrower than this, which left a third of a
 	// large terminal blank. The reason written down for it — that a wide line of
@@ -118,7 +124,7 @@ func computeLayout(w, h, helpHeight int, hasBanner bool, mode layoutMode, cell c
 	// other way round: it is as wide as its two parts need, and centred in what
 	// is left, because a caption stretched across a very wide terminal is a
 	// worse use of the room than the blank either side of it.
-	interior := min(w, maxTableWidth)
+	interior := w
 
 	// Above the body: the tab labels, their rule and a blank line. Below it: a
 	// blank line and the help bar, plus one more for a banner.

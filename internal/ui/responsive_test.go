@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"charm.land/lipgloss/v2"
 	"fmt"
 	"strings"
 	"testing"
@@ -64,7 +65,7 @@ func TestThePlayerFillsTheWidthItIsGiven(t *testing.T) {
 		}
 		// The frame reaches the edge of what the terminal offers, the same as
 		// every list does. A player centred in a blank band was the bug.
-		if want := min(s[0], maxTableWidth); l.interior != want {
+		if want := s[0]; l.interior != want {
 			t.Errorf("%dx%d: the player is %d wide, want %d — it is leaving a blank band down the sides",
 				s[0], s[1], l.interior, want)
 		}
@@ -83,12 +84,12 @@ func TestThePlayerFillsTheWidthItIsGiven(t *testing.T) {
 	}
 }
 
-// The lists take the width they are given, up to the point where a table stops
-// being readable, and they take all of it.
+// The lists take the width they are given, all of it. Nothing caps it: somebody
+// who shrinks the type is buying room, and a margin hands it back.
 func TestTheListsTakeTheWidth(t *testing.T) {
 	for _, s := range probeSizes {
 		l := computeLayout(s[0], s[1], 2, false, modeList, defaultTestCell)
-		want := min(s[0], maxTableWidth)
+		want := s[0]
 		if l.interior != want {
 			t.Errorf("%dx%d: the list is %d wide, want %d", s[0], s[1], l.interior, want)
 		}
@@ -295,6 +296,39 @@ func TestTheCoverStopsGrowing(t *testing.T) {
 		if px := l.artWidth * defaultTestCell.Width; px > maxArtPx {
 			t.Errorf("%dx%d: the cover is %d pixels across, past the %d it may be",
 				s[0], s[1], px, maxArtPx)
+		}
+	}
+}
+
+// No tab leaves a band down the sides, however wide the terminal is.
+//
+// The frame was capped at two hundred columns, so a small font on a large screen
+// — which is somebody buying room — got a fifth of it back as margin. What is
+// capped is the prose inside the frame, which is where the argument about line
+// length belongs.
+func TestNoTabLeavesABandDownTheSides(t *testing.T) {
+	for _, w := range []int{140, 200, 260, 340} {
+		for _, tab := range []tabID{tabPlayer, tabQueue, tabLibrary, tabSearch, tabSettings, tabHelp} {
+			m := queueModel(0, "one", "two", "three", "four")
+			m.ps = &player.State{TrackID: "now", Title: "sounding", Playing: true}
+			m.tab = tab
+			m.width, m.height = w, 40
+			m.resize()
+
+			if l := m.layout(); l.interior != w {
+				t.Errorf("%d cells, %v: the frame is %d wide, want the whole terminal", w, tab, l.interior)
+			}
+
+			// And something is drawn out at the right-hand edge, rather than the
+			// frame merely claiming the width and leaving it blank.
+			var reach int
+			for _, row := range strings.Split(m.render(), "\n") {
+				reach = max(reach, lipgloss.Width(strings.TrimRight(ansiOff(row), " ")))
+			}
+			if want := w - rightMargin; reach < want {
+				t.Errorf("%d cells, %v: nothing is drawn past column %d, want the screen used to %d",
+					w, tab, reach, want)
+			}
 		}
 	}
 }
