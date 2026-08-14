@@ -31,16 +31,17 @@ const (
 	// stand in: inside the left margin, clear of the list's own cursor mark.
 	pointerAt = 1
 
-	// The pen. Light box drawing, because it is an annotation over a picture
-	// rather than a part of it — a heavy rule reads as a panel border, and the
-	// band is not a panel.
-	pointerTL    = "┌"
-	pointerTR    = "┐"
-	pointerBR    = "┘"
+	// The pen. Light box drawing with rounded corners, because it is an
+	// annotation over a picture rather than a part of it: a square corner reads
+	// as a panel's border, and the band is not a panel — it is a thing somebody
+	// has drawn a ring around.
+	pointerTL    = "╭"
+	pointerTR    = "╮"
+	pointerBR    = "╯"
 	pointerTee   = "├"
 	pointerH     = "─"
 	pointerV     = "│"
-	pointerElbow = "└"
+	pointerElbow = "╰"
 )
 
 // pointAtCursor draws the frame and the line, over rows already laid out.
@@ -78,7 +79,11 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 		return lines
 	}
 
-	right := leftMargin + l.artWidth + columnGap + queueDetailWidth(l)
+	// A column clear of the panel rather than hard against it: the clock and the
+	// length are set to the panel's right edge, and drawn at that column the
+	// frame took the air out from under them. The gap between the panel and the
+	// picture is three columns wide, so this stands in it.
+	right := leftMargin + l.artWidth + columnGap + queueDetailWidth(l) + 1
 	if !m.scopeVisible() || !m.queuePane.room.showsTrace() {
 		right = leftMargin + l.artWidth + columnGap + l.infoWidth
 	}

@@ -1678,3 +1678,56 @@ func TestThePanelWearsTheCoversOwnColour(t *testing.T) {
 		t.Error("with no cover colour the panel did not fall back to the screen's")
 	}
 }
+
+// A track that is not the one playing says how long it is, in the row the
+// playhead would have stood in.
+//
+// The rows are kept either way — the panel must not shift as the cursor passes
+// the playing track — and kept empty they were four rows of nothing in the
+// middle of the block. A duration means something beside the track it belongs
+// to, which is where this puts it.
+func TestANonPlayingTrackSaysHowLongItIs(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.ps = &player.State{TrackID: "a", Duration: 2 * time.Minute, Playing: true}
+	m.width, m.height = 200, 48
+	m.resize()
+	m.queue[1] = player.Track{ID: "b", Title: "Gabriela", Artists: []string{"Alosa"},
+		Album: "Gabriela", Duration: 3*time.Minute + 10*time.Second}
+
+	// On the track that is playing: a playhead and both clocks.
+	m.queuePane.cursor.cursor = queueRowOf(0)
+	playing := plain(strings.Join(m.trackDetail(60, 20), "\n"))
+	if !strings.Contains(playing, knob) {
+		t.Error("the track that is playing has no playhead")
+	}
+
+	// On any other: no playhead, and its own length where the total time was.
+	m.queuePane.cursor.cursor = queueRowOf(1)
+	other := m.trackDetail(60, 20)
+	got := plain(strings.Join(other, "\n"))
+	if strings.Contains(got, knob) {
+		t.Error("a track that is not playing was given a playhead")
+	}
+	if !strings.Contains(got, "3:10") {
+		t.Errorf("detail = %q, want the track's own length in it", got)
+	}
+
+	// In the same row, and the panel is the same height: nothing moves as the
+	// cursor passes the playing track.
+	if a, b := len(other), len(m.trackDetail(60, 20)); a != b {
+		t.Errorf("the panel is %d rows and %d rows", a, b)
+	}
+	m.queuePane.cursor.cursor = queueRowOf(0)
+	if a, b := len(other), len(m.trackDetail(60, 20)); a != b {
+		t.Errorf("the panel is %d rows off the playing track and %d rows on it", a, b)
+	}
+
+	// Right where the clock is: the last thing on the row either way.
+	for _, rows := range [][]string{other} {
+		for _, row := range rows {
+			if s := plain(row); strings.Contains(s, "3:10") && strings.TrimRight(s, " ") != s {
+				t.Errorf("the length is not set to the right edge: %q", s)
+			}
+		}
+	}
+}

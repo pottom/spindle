@@ -357,14 +357,23 @@ func (m Model) trackDetail(w, rows int) []string {
 		return lines
 	}
 
+	// The playhead for the one track it can belong to, and for every other the
+	// row it would have stood in says how long that track is — in the same place
+	// the total time sits, which is where a duration means something. The rows
+	// are kept either way: without that the panel would shift every time the
+	// cursor passed the track playing, and a bar is not worth making the facts
+	// beside it move.
 	bar, times := "", ""
-	if m.ps != nil && m.ps.TrackID == t.ID {
+	switch {
+	case m.ps != nil && m.ps.TrackID == t.ID:
 		bar = m.progressLine(w)
 		times = spread(
 			s.Time.Render(formatDuration(m.elapsed())),
 			s.Time.Render(formatDuration(m.ps.Duration)),
 			w,
 		)
+	case t.Duration > 0:
+		times = spread("", s.Time.Render(formatDuration(t.Duration)), w)
 	}
 
 	under := []string{times}
