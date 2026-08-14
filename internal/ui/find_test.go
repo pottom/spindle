@@ -237,7 +237,7 @@ func TestTheFieldStandsOverTheList(t *testing.T) {
 		}
 		return -1
 	}
-	for _, of := range []string{"Queue", "title", "Titanium"} {
+	for _, of := range []string{"tracks", "title", "Titanium"} {
 		before, after := find(was, of), find(now, of)
 		if before < 0 || after < 0 {
 			t.Errorf("%q is on row %d without the field and %d with it", of, before, after)

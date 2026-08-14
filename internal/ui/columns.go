@@ -18,11 +18,14 @@ package ui
 
 // columnHead is a list's names, dressed and laid out like one of its rows.
 //
-// Quiet and in lower case, like the tabs: it is furniture rather than content,
-// and a row of capitals across the top of a list is the loudest thing on a
-// screen whose whole point is the words under it.
+// In the accent and in lower case. Lower case because a row of capitals across
+// the top of a list is the loudest thing on a screen whose whole point is the
+// words under it; the accent because the names are not one more row of the list
+// and read as one when they are set in the same greys — the colour is what the
+// line under them is doing, said again in a way that survives a narrow terminal
+// dropping the line's columns out from under it.
 func (m Model) columnHead(w int, lead, primary, secondary, album, tempo, trailing string) string {
-	s := m.styles.Empty
+	s := m.styles.Columns
 	dress := func(text string) string {
 		if text == "" {
 			return ""
@@ -38,7 +41,7 @@ func (m Model) columnHead(w int, lead, primary, secondary, album, tempo, trailin
 func (m Model) trackColumns(w int, numbered bool) string {
 	lead := ""
 	if numbered {
-		lead = m.leadIn(m.styles.Empty.Render("#"))
+		lead = m.leadIn(m.styles.Columns.Render("#"))
 	}
 	// Whatever a row of this list holds open in front of the title — the queue's
 	// hearts, the marks for what is playing — held open here too, so the names

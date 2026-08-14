@@ -48,6 +48,9 @@ type Styles struct {
 	// Raised is the background of a block that stands apart from the screen.
 	Raised lipgloss.Style
 
+	// Columns names the cells of a list's rows, over the top of it.
+	Columns lipgloss.Style
+
 	// Found is what a search match is drawn in: the accent laid behind the
 	// letters that matched, the way grep colours what it found.
 	Found lipgloss.Style
@@ -245,6 +248,7 @@ func New(isDark bool, accent color.Color) Styles {
 		Elapsed:   fg(accent),
 		Remaining: fg(t.Border),
 		Rule:      fg(t.Border),
+		Columns:   fg(accent),
 		Found:     found(isDark, accent),
 		Raised:    lipgloss.NewStyle().Background(t.Raised),
 		Knob:      fg(accent),

@@ -247,9 +247,6 @@ func TestQueuePaneRenders(t *testing.T) {
 	m.resize()
 
 	out := plain(m.render())
-	if !strings.Contains(out, "Queue") {
-		t.Error("render() has no queue heading")
-	}
 	// One list, numbered in the order it will be heard: no row carries a badge
 	// for how it got there.
 	if !strings.Contains(out, " 1  a") || !strings.Contains(out, " 2  b") {
@@ -1643,8 +1640,10 @@ func TestTheHeadingStandsClearOfTheBand(t *testing.T) {
 	if got := strings.TrimSpace(plain(block[band])); got != "" {
 		t.Errorf("the row over the heading carries %q, want it clear", got)
 	}
-	if !strings.Contains(plain(block[band+1]), "Queue") {
-		t.Errorf("the heading is not a row under the band: %q", plain(block[band+1]))
+	// The heading row carries the count and nothing else: the tab is called
+	// queue, so naming the list again says nothing.
+	if got := plain(block[band+1]); strings.Contains(got, "Queue") || !strings.Contains(got, "tracks") {
+		t.Errorf("the row under the band = %q, want the count without a heading", got)
 	}
 	if got := plain(block[band+2]); !strings.Contains(got, "title") {
 		t.Errorf("the columns are not named under the heading: %q", got)

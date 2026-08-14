@@ -298,7 +298,10 @@ func (m Model) queueBlock(l layout, rows int) []string {
 
 	return m.listBlock(l, rows, listScreen{
 		detail:   m.trackDetail,
-		heading:  func(int) string { return m.styles.Title.Render("Queue") },
+		// No heading. The tab it is under is called queue, in the row across the
+		// top of the screen, and a list titled after the tab it is the only thing
+		// on is a label for something nobody was in any doubt about.
+		heading:  func(int) string { return "" },
 		subtitle: func() string { return m.styles.Album.Render(queueSubtitle(m.queue)) },
 		columns:  func(w int) string { return m.trackColumns(w, true) },
 		count:    len(rowsOf),

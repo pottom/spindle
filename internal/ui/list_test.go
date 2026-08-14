@@ -311,3 +311,19 @@ func TestTheColumnsAreNamed(t *testing.T) {
 		t.Error("an empty list still names its columns")
 	}
 }
+
+// The names of the columns wear the accent, so they read as the head of the
+// table rather than as its first row.
+func TestTheColumnsWearTheAccent(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.width, m.height = 150, 32
+	m.resize()
+	m.queue[1] = player.Track{ID: "t1", Title: "Mockingbird", Artists: []string{"ReMan"},
+		Album: "Nightfall", Duration: 3 * time.Minute}
+	m.queuePane.room = queueRoomList
+
+	accent := m.styles.Columns.Render("title")
+	if !strings.Contains(fmt.Sprint(m.View()), accent) {
+		t.Errorf("the columns are not named in the accent: want %q", accent)
+	}
+}
