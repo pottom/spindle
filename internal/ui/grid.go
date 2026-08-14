@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/pottom/spindle/internal/ui/cover"
+	"github.com/pottom/spindle/internal/ui/style"
 )
 
 // The library as a wall of covers.
@@ -192,33 +193,63 @@ func (m Model) drawTileRow(row []gridTile, g gridShape, width int) []string {
 	return out
 }
 
-// frameTile draws the ring round the tile under the cursor, over rows already
-// laid out: the row above its picture, the row under its words, and a column
-// either side.
+// frameTile marks the tile under the cursor, over rows already laid out: four
+// corners standing in the air around it.
 //
-// Rounded corners and the accent, the same pen the band on a list is bracketed
-// with. What it says is where the cursor is, which on a wall of pictures is a
-// question about one of them rather than about a row of words — so it goes round
-// the picture rather than beside the name.
+// Corners rather than a closed ring, and each arm walked out to the screen's own
+// ground — the same pen and the same reasoning as the bracket beside a band. A
+// rule all the way round a picture is a picture in a box, and a wall of them is
+// then one boxed thing among thirty unboxed ones, which is a lot of line to say
+// "here". Four corners say it and let the picture be.
 func (m Model) frameTile(rows []string, at, top int, g gridShape, width int) {
 	col := at % g.cols
-	left := gridGutter + col*(g.tileW+tileGap) - 1
-	right := left + g.tileW + 1
-	head := top + (at/g.cols)*(g.tileH+tileRowGap) - 1
-	foot := head + g.tileH + 1
+	left := gridGutter + col*(g.tileW+tileGap) - frameCols
+	right := left + g.tileW + frameCols
+	head := top + (at/g.cols)*(g.tileH+tileRowGap) - frameRows
+	foot := head + g.tileH + frameRows
 	if head < 0 || foot >= len(rows) || left < 0 || right >= width {
 		return
 	}
 
-	pen := m.styles.Cursor
-	rule := strings.Repeat(pointerH, g.tileW)
-	rows[head] = overwrite(rows[head], left, pen.Render(pointerTL+rule+pointerTR), width)
-	rows[foot] = overwrite(rows[foot], left, pen.Render(pointerElbow+rule+pointerBR), width)
-	for row := head + 1; row < foot; row++ {
-		rows[row] = overwrite(rows[row], left, pen.Render(pointerV), width)
-		rows[row] = overwrite(rows[row], right, pen.Render(pointerV), width)
+	// As long as the tile can carry without the two corners of a side meeting in
+	// the middle, which would be the ring again by another route.
+	arm := min(frameArm, (g.tileW-1)/2)
+	tall := min(frameTall, (g.tileH-1)/2)
+	across := style.Fade(m.styles.Accent, m.screenGround(), arm+1)
+	down := style.Fade(m.styles.Accent, m.screenGround(), tall+1)
+
+	put := func(row, col int, s string) {
+		if row >= 0 && row < len(rows) {
+			rows[row] = overwrite(rows[row], col, s, width)
+		}
+	}
+	for _, corner := range []struct {
+		row, col   int
+		glyph      string
+		side, step int
+	}{
+		{head, left, pointerTL, 1, 1},
+		{head, right, pointerTR, -1, 1},
+		{foot, left, pointerElbow, 1, -1},
+		{foot, right, pointerBR, -1, -1},
+	} {
+		put(corner.row, corner.col, across[0].Render(corner.glyph))
+		for i := 1; i <= arm; i++ {
+			put(corner.row, corner.col+i*corner.side, across[i].Render(pointerH))
+		}
+		for i := 1; i <= tall; i++ {
+			put(corner.row+i*corner.step, corner.col, down[i].Render(pointerV))
+		}
 	}
 }
+
+const (
+	// frameArm is how far a corner reaches along the top or foot of a tile, and
+	// frameTall how far down its side. Enough to read as a corner rather than as
+	// a stray tick, and nowhere near enough to meet the corner opposite.
+	frameArm  = 4
+	frameTall = 2
+)
 
 // tileName is the name under a picture, lit where the cursor is on it.
 //

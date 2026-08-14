@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image/color"
 	"strings"
 	"testing"
 
@@ -455,5 +456,46 @@ func TestTheFrameFitsInTheAirBetweenTiles(t *testing.T) {
 	from, to := m.library.cursors[libraryPlaylists].gridWindow(len(m.library.playlists), g)
 	if want := (to - from) * g.tileW * g.coverRows; first != want {
 		t.Errorf("the wall shows %d cells of picture, want %d — the frame ate some", first, want)
+	}
+}
+
+// The tile under the cursor is marked with four corners rather than a ring, and
+// each arm walks out to the screen's own ground.
+func TestTheTilesCornersFadeOut(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.tab = tabLibrary
+	m.width, m.height = 150, 40
+	m.resize()
+	m.ground = color.RGBA{R: 10, G: 10, B: 14, A: 255}
+	m.restyle()
+	for i := range 8 {
+		m.library.playlists = append(m.library.playlists, player.Playlist{
+			ID: fmt.Sprintf("p%d", i), Name: fmt.Sprintf("List %d", i), Owner: "pottom",
+		})
+	}
+
+	screen := fmt.Sprint(m.View())
+	plainScreen := plain(screen)
+
+	// Corners, and no side drawn the whole way: the two corners of a side never
+	// meet.
+	for _, corner := range []string{pointerTL, pointerTR, pointerElbow, pointerBR} {
+		if !strings.Contains(plainScreen, corner) {
+			t.Errorf("the tile under the cursor has no %s corner", corner)
+		}
+	}
+	g := m.libraryShape(m.layout(), m.layout().bodyHeight)
+	if strings.Contains(plainScreen, strings.Repeat(pointerH, g.tileW)) {
+		t.Error("a side of the frame is drawn the whole way across the tile")
+	}
+
+	// The corner is the accent and the far end of its arm is the ground.
+	r, _, _, _ := m.styles.Accent.RGBA()
+	accent := fmt.Sprintf("\x1b[38;2;%d;", r>>8)
+	if !strings.Contains(screen, accent+"") {
+		t.Errorf("the corner is not drawn in the accent")
+	}
+	if !strings.Contains(screen, "\x1b[38;2;10;10;14m"+pointerH) {
+		t.Error("the arm does not end in the screen's own ground")
 	}
 }
