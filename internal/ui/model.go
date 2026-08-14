@@ -209,6 +209,10 @@ type Model struct {
 	width, height int
 	isDark        bool
 
+	// ground is the terminal's own background colour, as it reported it. Nil
+	// until it has answered, and only the raised block asks for it.
+	ground color.Color
+
 	styles style.Styles
 
 	// coverStyles is the same set in the colour of the cover on screen rather
@@ -337,7 +341,7 @@ func (m *Model) restyle() {
 	if rgb, ok := m.toneAccent(); ok {
 		accent = cover.Readable(rgb, m.isDark)
 	}
-	m.styles = style.New(m.isDark, accent)
+	m.styles = style.New(m.isDark, accent).On(m.ground)
 
 	// And a second set in the colour of the cover on screen, for the panel that
 	// describes it. Everything else is the sounding record's — see tone.go — but
@@ -346,7 +350,7 @@ func (m *Model) restyle() {
 	// colour as well costs one palette a cover rather than a comparison a frame.
 	m.coverStyles = m.styles
 	if m.cover.hasAccent {
-		m.coverStyles = style.New(m.isDark, cover.Readable(m.cover.accent, m.isDark))
+		m.coverStyles = style.New(m.isDark, cover.Readable(m.cover.accent, m.isDark)).On(m.ground)
 	}
 
 	m.help.Styles = help.DefaultStyles(m.isDark)

@@ -36,9 +36,17 @@ func NewTheme(isDark bool) Theme {
 		Faint:       pick(lipgloss.Color("#8C959F"), lipgloss.Color("#484F58")),
 		Border:      pick(lipgloss.Color("#D0D7DE"), lipgloss.Color("#30363D")),
 
-		// Raised is a background a step off the terminal's own, for the one
-		// block that has to read as standing apart from the screen around it.
-		Raised: pick(lipgloss.Color("#F0F3F6"), lipgloss.Color("#161B22")),
+		// Raised is a background a step off the terminal's own, for the one block
+		// that has to read as standing apart from the screen around it.
+		//
+		// A small step on purpose. The screen's own ground sits at a lightness
+		// of 0.07 and this at 0.09: enough that the block has an edge without a
+		// frame, and not so much that it reads as a panel dropped on the screen.
+		// It was 0.11 and looked it, and it was the record's own hue for a while
+		// — which was handsome on some covers and wrong on others, because an
+		// accent is an average of a photograph and half of them are not colours
+		// anybody would choose to sit behind text.
+		Raised: pick(lipgloss.Color("#EDF1F5"), lipgloss.Color("#12161C")),
 		BorderFocus: pick(lipgloss.Color("#128A3E"), lipgloss.Color("#1DB954")),
 		Error:       pick(lipgloss.Color("#CF222E"), lipgloss.Color("#F85149")),
 		Warning:     pick(lipgloss.Color("#9A6700"), lipgloss.Color("#D29922")),

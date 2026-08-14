@@ -42,41 +42,50 @@ func TestThePicturesKeepTheirColour(t *testing.T) {
 	}
 }
 
-// The marked block's ground is the record's hue at the screen's own weight.
+// The marked block's ground is a small step off the screen's own, in the
+// screen's own colour.
 //
-// A multiplier was the wrong instrument: covers come back at every lightness
-// there is, and the same factor makes one album a dark slab and the next a lit
-// one. What a ground has to be is the same distance off the screen's whatever
-// record it belongs to.
-func TestTheRaisedGroundKeepsItsWeight(t *testing.T) {
-	light := func(c color.Color) float64 {
-		_, _, l := toHSL(c)
-		return l
-	}
+// The terminal says what colour it is when it is asked, and it used to be asked
+// only whether it was dark. That is enough for text and wrong for a ground: a
+// light theme is not white — Solarized's is cream — and a raised block painted
+// in a cool grey on it is a card from another program.
+func TestTheRaisedGroundFollowsTheTerminal(t *testing.T) {
+	for _, ground := range []string{"#000000", "#0D1117", "#1E1E2E", "#FFFFFF", "#FDF6E3", "#F5F5F5"} {
+		on := lipgloss.Color(ground)
+		h, sat, l := toHSL(on)
 
-	for _, accent := range []string{"#1DB954", "#E8734A", "#4A9BE8", "#D8C24A", "#8B5CF6"} {
-		for _, dark := range []bool{true, false} {
-			s := New(dark, lipgloss.Color(accent))
-			bg, ok := s.Raised.GetBackground().(color.Color)
-			if !ok {
-				t.Fatalf("%s: the raised style has no ground", accent)
-			}
-			if got, want := light(bg), raisedLight(dark); got < want-0.01 || got > want+0.01 {
-				t.Errorf("%s dark=%v: the ground is at lightness %.2f, want %.2f", accent, dark, got, want)
-			}
+		s := New(l < 0.5, nil).On(on)
+		bg, ok := s.Raised.GetBackground().(color.Color)
+		if !ok {
+			t.Fatalf("%s: the raised style has no ground", ground)
+		}
+		gotH, gotSat, gotL := toHSL(bg)
 
-			// And it is the record's hue, not a grey.
-			wantHue, _, _ := toHSL(lipgloss.Color(accent))
-			gotHue, sat, _ := toHSL(bg)
-			if sat < 0.2 {
-				t.Errorf("%s: the ground came out at saturation %.2f, which is a grey", accent, sat)
+		// A step away, and the right way.
+		if l < 0.5 && gotL <= l {
+			t.Errorf("%s: the ground came out at %.2f, no lighter than the screen's %.2f", ground, gotL, l)
+		}
+		if l >= 0.5 && gotL >= l {
+			t.Errorf("%s: the ground came out at %.2f, no darker than the screen's %.2f", ground, gotL, l)
+		}
+		if d := gotL - l; d < -groundStep-0.01 || d > groundStep+0.01 {
+			t.Errorf("%s: the ground is %.3f away, want a step of %.2f", ground, d, groundStep)
+		}
+
+		// And in the screen's own colour: a cream terminal gets a cream card.
+		if sat > 0.05 {
+			if dh := gotH - h; dh < -5 || dh > 5 {
+				t.Errorf("%s: the ground is hue %.0f, want the screen's %.0f", ground, gotH, h)
 			}
-			// Within a few degrees: a ground this dark has only a handful of
-			// steps of each channel to be built out of, so the hue lands where
-			// eight bits will let it.
-			if d := gotHue - wantHue; d < -5 || d > 5 {
-				t.Errorf("%s: the ground is hue %.0f, want the record's %.0f", accent, gotHue, wantHue)
+			if gotSat < sat*0.8 {
+				t.Errorf("%s: the ground lost its colour: %.2f against the screen's %.2f", ground, gotSat, sat)
 			}
 		}
+	}
+
+	// With no answer from the terminal it keeps the theme's own, rather than
+	// coming up with nothing.
+	if s := New(true, nil); s.Raised.GetBackground() == nil {
+		t.Error("with no ground reported the block has no ground at all")
 	}
 }

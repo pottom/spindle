@@ -50,6 +50,11 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 
 	case tea.BackgroundColorMsg:
 		m.isDark = message.IsDark()
+
+		// And the colour itself, not only whether it is dark: the one block with
+		// a ground of its own takes its hue from the screen it sits on. See
+		// Styles.On.
+		m.ground = message.Color
 		m.restyle()
 
 		// And the artwork, for the renderer that has to composite it itself. A

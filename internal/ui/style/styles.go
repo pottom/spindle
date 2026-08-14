@@ -128,19 +128,36 @@ type Styles struct {
 
 // New builds the styles for the given terminal background. A nil accent falls
 // back to the theme's own, for the moments before any artwork has loaded.
-const (
-	// raisedSat is how much of the accent's colour the ground keeps. Enough to
-	// name the record and not enough to be a panel painted in it.
-	raisedSat = 0.40
-)
+// groundStep is how far the raised block's ground sits off the screen's own, in
+// lightness.
+//
+// Small on purpose: enough that the block has an edge without a frame, not so
+// much that it reads as a panel dropped on the screen. Measured against the
+// grounds a terminal actually comes with — pure black, GitHub's #0D1117,
+// Catppuccin, Solarized Light — where it lands a step away and in the same hue
+// on every one of them.
+const groundStep = 0.03
 
-// raisedLight is how light that ground is: the same distance off the screen's
-// own, either way up.
-func raisedLight(isDark bool) float64 {
-	if isDark {
-		return 0.11
+// On is the same styles with the block's ground taken from the terminal's own
+// colour rather than assumed.
+//
+// The terminal says what it is when it is asked, and until this it was asked
+// only whether it was dark. That is enough for the text and wrong for a ground:
+// a light theme is not white — Solarized's is cream — and a raised block painted
+// in a cool grey on it is a card from another program. Taking the hue from the
+// screen it sits on makes it that screen's card.
+func (s Styles) On(ground color.Color) Styles {
+	if ground == nil {
+		return s
 	}
-	return 0.94
+	h, sat, l := toHSL(ground)
+	if l < 0.5 {
+		l = min(l+groundStep, 1)
+	} else {
+		l = max(l-groundStep, 0)
+	}
+	s.Raised = lipgloss.NewStyle().Background(fromHSL(h, sat, l))
+	return s
 }
 
 func New(isDark bool, accent color.Color) Styles {
@@ -194,12 +211,7 @@ func New(isDark bool, accent color.Color) Styles {
 		Elapsed:   fg(accent),
 		Remaining: fg(t.Border),
 		Rule:      fg(t.Border),
-
-		// The record's own hue at the ground's own weight. Measured: the flat
-		// grey this replaces sits at a lightness of 0.11, so every album's
-		// ground is put at exactly that and only the hue changes — a multiplier
-		// would have made one cover a dark slab and the next a lit one.
-		Raised: lipgloss.NewStyle().Background(tinted(accent, raisedSat, raisedLight(isDark))),
+		Raised:    lipgloss.NewStyle().Background(t.Raised),
 		Knob:      fg(accent),
 
 		// The transport is the artwork's colour, like everything else on the
@@ -260,19 +272,6 @@ func Sequences(palette [][]lipgloss.Style) [][]Seq {
 // shift rotates a colour's hue by the given degrees and scales its saturation
 // and lightness, which keeps a derived colour recognisably related to the one
 // it came from — blending toward white or grey does not.
-// tinted keeps a colour's hue and puts its saturation and lightness where it is
-// told, rather than scaling them.
-//
-// A multiplier is the wrong instrument for a ground: covers come back at every
-// lightness there is, and the same factor turns one album's colour into a dark
-// slab and another's into a lit one. What a background has to be is the same
-// distance off the screen's own ground whatever record it belongs to, which is
-// an absolute.
-func tinted(c color.Color, sat, light float64) color.Color {
-	h, _, _ := toHSL(c)
-	return fromHSL(h, min(max(sat, 0), 1), min(max(light, 0), 1))
-}
-
 func shift(c color.Color, degrees, sat, light float64) color.Color {
 	h, s, l := toHSL(c)
 	h = math.Mod(h+degrees+360, 360)
