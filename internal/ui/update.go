@@ -157,6 +157,10 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 			m.tideTook(message.Art)
 			return m, nil
 		}
+		if message.Slot == toneSlot {
+			m.toneTook(message.Art)
+			return m, nil
+		}
 		if message.Slot == nowSlot {
 			if m.nowCover.matches(message.URL, message.Width, message.Height) {
 				m.nowCover.art = message.Art.Cells
@@ -173,6 +177,11 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 	case msg.CoverFailed:
 		if message.Slot == tideSlot {
 			// No colour to hand over: the record changes the way it always did.
+			return m, nil
+		}
+		if message.Slot == toneSlot {
+			// A record whose cover will not load keeps the colour of the one
+			// before it, which is better than the program going grey mid-song.
 			return m, nil
 		}
 		if message.Slot == nowSlot {
@@ -456,6 +465,11 @@ func (m Model) handleTick() (Model, tea.Cmd) {
 	// that has since changed size is shown with a corner cut off. This costs
 	// nothing when the size is unchanged.
 	if cmd := m.syncCover(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	// And the colour the whole program is drawn in, which belongs to whatever is
+	// sounding rather than to whatever the cursor is on. See tone.go.
+	if cmd := m.toneFlow(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
 	// And the device itself, which can go away under everything else: a daemon

@@ -425,8 +425,10 @@ func (m Model) debugFigure() []debugField {
 	if next := m.tideComing(); next != "" {
 		b.put("next", "%s", debugShort(next, 8))
 	}
-	if m.cover.hasAccent {
-		r, g, bl, _ := m.cover.accent.RGBA()
+	// The colour the program is drawn in, which is the sounding record's rather
+	// than the cover on screen. See tone.go.
+	if rgb, ok := m.toneAccent(); ok {
+		r, g, bl, _ := rgb.RGBA()
 		b.put("accent", "#%02x%02x%02x", r>>8, g>>8, bl>>8)
 	}
 	return b.out

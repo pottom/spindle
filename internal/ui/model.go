@@ -244,6 +244,10 @@ type Model struct {
 	// of it. See tide.go.
 	tide tideState
 
+	// tone is the colour of the record that is sounding, which is what the
+	// whole program is drawn in. See tone.go.
+	tone toneState
+
 	// lyrics is the words of the track playing, and whether they are on screen.
 	lyrics lyricsState
 
@@ -324,8 +328,8 @@ func (m Model) coverTarget() string {
 // restyle rebuilds every style from the current background and album accent.
 func (m *Model) restyle() {
 	var accent color.Color
-	if m.cover.hasAccent {
-		accent = cover.Readable(m.cover.accent, m.isDark)
+	if rgb, ok := m.toneAccent(); ok {
+		accent = cover.Readable(rgb, m.isDark)
 	}
 	m.styles = style.New(m.isDark, accent)
 	m.help.Styles = help.DefaultStyles(m.isDark)

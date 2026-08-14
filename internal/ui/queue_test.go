@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"image/color"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/player"
+	"github.com/pottom/spindle/internal/ui/cover"
 	"github.com/pottom/spindle/internal/ui/msg"
 )
 
@@ -1403,5 +1405,67 @@ func TestThePlayheadLinesUpWithThePicture(t *testing.T) {
 			t.Errorf("%dx%d: the playhead is on row %d of %d, want the band's middle at %d",
 				size[0], size[1], at, band, want)
 		}
+	}
+}
+
+// The colour belongs to the record that is sounding, wherever the cursor is.
+//
+// It used to come off whichever cover was in the main slot, and on the browsing
+// tabs that slot follows the cursor — so walking down a queue repainted the
+// tabs, the playhead and the meter in the colours of records nobody was
+// listening to.
+func TestTheAccentIsTheSoundingRecordsEverywhere(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.tab = tabQueue
+	m.ps = &player.State{TrackID: "a", Playing: true}
+
+	sounding := color.RGBA{R: 200, G: 40, B: 40, A: 255}
+	cursor := color.RGBA{R: 40, G: 40, B: 200, A: 255}
+
+	m.toneTook(cover.Art{Accent: sounding, HasAccent: true})
+	was := m.styles.Cursor.GetForeground()
+
+	// The cursor moves onto a record of quite another colour, and the picture
+	// under it changes — the program does not.
+	m.cover.accent, m.cover.hasAccent = cursor, true
+	m.restyle()
+	if got := m.styles.Cursor.GetForeground(); got != was {
+		t.Errorf("the cursor's cover repainted the program: %v, want %v", got, was)
+	}
+
+	// And when the record changes, everything follows it.
+	m.tone.asked = "b"
+	m.toneTook(cover.Art{Accent: cursor, HasAccent: true})
+	if got := m.styles.Cursor.GetForeground(); got == was {
+		t.Error("the record changed and the colour did not")
+	}
+
+	// With nothing sounding yet, the cover on screen is what there is: a
+	// program with no accent at all reads as broken rather than as quiet.
+	fresh := queueModel(0, "a")
+	fresh.cover.accent, fresh.cover.hasAccent = cursor, true
+	fresh.restyle()
+	if got, ok := fresh.toneAccent(); !ok || got != cursor {
+		t.Errorf("with no record sounding the accent is %v (ok=%v), want the cover's", got, ok)
+	}
+}
+
+// The sounding record's cover is asked for once, not on every frame.
+func TestTheSoundingColourIsAskedForOncePerRecord(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.ps = &player.State{TrackID: "a", CoverURL: "http://example/a.jpg", Playing: true}
+
+	if cmd := m.toneFlow(); cmd == nil {
+		t.Fatal("the sounding record's colour was never sent for")
+	}
+	for range 5 {
+		if cmd := m.toneFlow(); cmd != nil {
+			t.Error("the same record's colour was sent for twice")
+		}
+	}
+
+	m.ps.TrackID, m.ps.CoverURL = "b", "http://example/b.jpg"
+	if cmd := m.toneFlow(); cmd == nil {
+		t.Error("the record changed and its colour was not sent for")
 	}
 }
