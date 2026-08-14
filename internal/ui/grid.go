@@ -370,7 +370,11 @@ const (
 // tile is anyway.
 func (m Model) tileName(t gridTile) string {
 	if t.selected {
-		return m.styles.RowSelected.Render(t.name)
+		// The accent, like the frame round it: one thing is being pointed at and
+		// both marks on it say so in the same voice. In the text colour it was a
+		// second kind of highlight, and the eye had to work out whether the two
+		// meant the same thing.
+		return m.styles.Cursor.Bold(true).Render(t.name)
 	}
 	return m.styles.RowPrimary.Render(t.name)
 }

@@ -758,3 +758,28 @@ func TestTheFramesCornersMeetItsUprights(t *testing.T) {
 			before, after)
 	}
 }
+
+// The name of the tile under the cursor is written in the accent, like the frame
+// round it: one thing is being pointed at, and both marks say so in one voice.
+func TestTheSelectedTilesNameWearsTheAccent(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.tab = tabLibrary
+	m.width, m.height = 150, 40
+	m.resize()
+	m.library.playlists = []player.Playlist{
+		{ID: "p0", Name: "Deep House", Owner: "you"},
+		{ID: "p1", Name: "Chill", Owner: "you"},
+	}
+
+	screen := fmt.Sprint(m.View())
+	want := m.styles.Cursor.Bold(true).Render("Deep House")
+	if !strings.Contains(screen, want) {
+		t.Errorf("the selected name is not in the accent: want %q", want)
+	}
+	if other := m.styles.RowSelected.Render("Deep House"); strings.Contains(screen, other) {
+		t.Error("the selected name is still in the text colour")
+	}
+	if rest := m.styles.RowPrimary.Render("Chill"); !strings.Contains(screen, rest) {
+		t.Error("the names that are not selected changed as well")
+	}
+}
