@@ -35,6 +35,16 @@ const (
 	// smudge and a name is two words of three.
 	tileWant  = 22
 	tileLeast = 12
+
+	// gridGutter is the column the cursor's mark stands in, to the left of the
+	// wall. Every tile has this much air to its left — the first from the
+	// gutter, the rest from the gap between them — so the mark can be drawn
+	// beside a name instead of in front of it.
+	//
+	// In front of it was where it was, and it pushed the words two columns off
+	// the left edge of the picture over them. A caption that does not start where
+	// its picture starts reads as belonging to neither.
+	gridGutter = 2
 )
 
 // gridShape is how a wall of tiles divides a screen.
@@ -135,26 +145,37 @@ func (m Model) drawGrid(tiles []gridTile, g gridShape, width, height int) []stri
 func (m Model) drawTileRow(row []gridTile, g gridShape, width int) []string {
 	out := make([]string, 0, g.tileH)
 	gap := strings.Repeat(" ", tileGap)
+	lead := strings.Repeat(" ", gridGutter)
 
 	for line := range g.coverRows {
 		var cells []string
 		for _, tile := range row {
 			cells = append(cells, fit(artLine(tile.art, line), g.tileW))
 		}
-		out = append(out, fit(strings.Join(cells, gap), width))
+		out = append(out, fit(lead+strings.Join(cells, gap), width))
 	}
 
-	// Both lines carry the column the cursor's mark stands in, so the name and
-	// what it is start together whether the cursor is on the tile or not.
+	// The words start where the picture starts, both lines of them.
 	for _, words := range []func(gridTile) string{
 		func(t gridTile) string { return m.tileName(t) },
-		func(t gridTile) string { return tileIndent + m.styles.Empty.Render(t.sub) },
+		func(t gridTile) string { return m.styles.Empty.Render(t.sub) },
 	} {
 		var cells []string
 		for _, tile := range row {
 			cells = append(cells, fit(words(tile), g.tileW))
 		}
-		out = append(out, fit(strings.Join(cells, gap), width))
+		out = append(out, fit(lead+strings.Join(cells, gap), width))
+	}
+
+	// And the mark stands beside the name it belongs to, in the air to the left
+	// of that tile — the gutter for the first of a row, the gap between them for
+	// the rest.
+	for i, tile := range row {
+		if !tile.selected {
+			continue
+		}
+		at := len(out) - 2
+		out[at] = overwrite(out[at], i*(g.tileW+tileGap), m.styles.Cursor.Render(gridCursor), width)
 	}
 	return out
 }
@@ -167,18 +188,13 @@ func (m Model) drawTileRow(row []gridTile, g gridShape, width int) []string {
 // tile is anyway.
 func (m Model) tileName(t gridTile) string {
 	if t.selected {
-		return m.styles.RowSelected.Render(gridCursor + t.name)
+		return m.styles.RowSelected.Render(t.name)
 	}
-	return tileIndent + m.styles.RowPrimary.Render(t.name)
+	return m.styles.RowPrimary.Render(t.name)
 }
 
-// gridCursor is the mark in front of the name of the tile under the cursor, and
-// tileIndent is the room it takes. The column is held open on every tile, so
-// lighting one moves nothing.
-const (
-	gridCursor = "▸ "
-	tileIndent = "  "
-)
+// gridCursor is the mark beside the name of the tile under the cursor.
+const gridCursor = "▸"
 
 // artLine is one row of a rendered cover, or blank where the picture has not
 // arrived or has run out of rows.

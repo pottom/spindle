@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/pottom/spindle/internal/player"
 
@@ -347,4 +348,62 @@ func TestTheWallAsksAgainWhenTheWindowChanges(t *testing.T) {
 			break
 		}
 	}
+}
+
+// The words under a tile start where its picture starts. The cursor's mark
+// stands beside them in the air to the left, not in front of them.
+func TestTheWallsNamesLineUpWithItsPictures(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.tab = tabLibrary
+	m.width, m.height = 150, 40
+	m.resize()
+	for i := range 8 {
+		m.library.playlists = append(m.library.playlists, player.Playlist{
+			ID: fmt.Sprintf("p%d", i), Name: fmt.Sprintf("List %d", i), Owner: "pottom",
+		})
+	}
+	// A picture, so there is an edge to line up with.
+	g := m.libraryShape(m.layout(), m.layout().bodyHeight)
+	m.tiles = map[string]coverState{"p0": {
+		url: "u", width: g.tileW, height: g.coverRows,
+		art: strings.Repeat(strings.Repeat("#", g.tileW)+"\n", g.coverRows),
+	}}
+
+	// In cells rather than in bytes: the cursor's mark is three bytes and one
+	// column, which is exactly the difference this is looking for.
+	column := func(row, of string) int {
+		at := strings.Index(row, of)
+		if at < 0 {
+			return -1
+		}
+		return lipgloss.Width(row[:at])
+	}
+
+	rows := strings.Split(plain(fmt.Sprint(m.View())), "\n")
+	art, name := -1, -1
+	for _, row := range rows {
+		if art < 0 && strings.Contains(row, "###") {
+			art = column(row, "#")
+		}
+		if art >= 0 && name < 0 && strings.Contains(row, "List 0") {
+			name = column(row, "List 0")
+		}
+	}
+	if art < 0 || name < 0 {
+		t.Fatalf("the picture is at %d and the name at %d", art, name)
+	}
+	if art != name {
+		t.Errorf("the picture starts at column %d and its name at %d", art, name)
+	}
+
+	// And the mark is to the left of both, in the gutter.
+	for _, row := range rows {
+		if at := column(row, gridCursor); at >= 0 {
+			if at >= name {
+				t.Errorf("the mark is at column %d, want it left of the name at %d", at, name)
+			}
+			return
+		}
+	}
+	t.Error("the cursor's mark is nowhere on the wall")
 }
