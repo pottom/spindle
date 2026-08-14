@@ -105,6 +105,11 @@ func (m Model) renderPlayer() string {
 		lines = m.drawPeek(lines, len(lines)-len(body)-1, l)
 	}
 
+	// And for the same reason: where the band at the top belongs to a different
+	// record from the one the list begins with, the frame and the line that say
+	// so stand in the blank rows either side of it. See pointer.go.
+	lines = m.pointAtCursor(lines, l, len(lines)-len(body))
+
 	// A blank row before the bottom block, so the help never reads as one more
 	// entry in whatever list ends above it.
 	lines = append(lines, m.pad("", l))

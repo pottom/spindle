@@ -1513,3 +1513,73 @@ func TestTheSoundingTempoReachesTheRowAndThePanel(t *testing.T) {
 		t.Errorf("the row says %.0f bpm, want the live 112 over the remembered 90", now.Tempo)
 	}
 }
+
+// When the band at the top is about a different record from the one the list
+// begins with, a frame round it and a line down to the row it belongs to.
+//
+// Nothing said so before: the picture changed as the cursor moved and the only
+// way to know why was to have watched it change.
+func TestTheBandIsMarkedWhenItIsNotTheSoundingTrack(t *testing.T) {
+	m := queueModel(0, "one", "two", "three", "four", "five")
+	m.ps = &player.State{TrackID: "now", Title: "sounding", Playing: true}
+	m.width, m.height = 120, 34
+	m.resize()
+
+	// On the row that is sounding, the band is about the track the list begins
+	// with, and a frame round it would be pointing at what it stands on.
+	m.queuePane.cursor.cursor = 0
+	if got := plain(fmt.Sprint(m.View())); strings.Contains(got, pointerTL) {
+		t.Error("the band was marked while the cursor was on the sounding track")
+	}
+
+	// And off it, the frame and the line.
+	m.queuePane.cursor.cursor = 3
+	rows := strings.Split(plain(fmt.Sprint(m.View())), "\n")
+
+	var head, elbow int = -1, -1
+	for i, row := range rows {
+		if strings.Contains(row, pointerTL) {
+			head = i
+		}
+		if strings.Contains(row, pointerElbow) {
+			elbow = i
+		}
+	}
+	if head < 0 || elbow < 0 {
+		t.Fatalf("the band was not marked: frame at %d, line ends at %d", head, elbow)
+	}
+	if elbow <= head {
+		t.Errorf("the line ends at row %d, above the frame at %d", elbow, head)
+	}
+
+	// It ends on the row under the cursor, which is the whole point of it. The
+	// sounding track is the first row, so the third queue entry is the fourth.
+	if !strings.Contains(rows[elbow], "three") {
+		t.Errorf("the line points at %q, want the row under the cursor", strings.TrimSpace(rows[elbow]))
+	}
+
+	// It costs no rows: the same screen with and without it.
+	m.queuePane.cursor.cursor = 0
+	plainRows := len(strings.Split(plain(fmt.Sprint(m.View())), "\n"))
+	m.queuePane.cursor.cursor = 3
+	if marked := len(strings.Split(plain(fmt.Sprint(m.View())), "\n")); marked != plainRows {
+		t.Errorf("the screen is %d rows marked and %d unmarked", marked, plainRows)
+	}
+}
+
+// With the player folded away there is nothing up there describing anything, so
+// there is nothing to point at.
+func TestNothingIsMarkedWhenTheBandIsFoldedAway(t *testing.T) {
+	m := queueModel(0, "one", "two", "three")
+	m.ps = &player.State{TrackID: "now", Title: "sounding", Playing: true}
+	m.width, m.height = 120, 34
+	m.resize()
+	m.queuePane.cursor.cursor = 2
+
+	for _, room := range []queueRoom{queueRoomTrace, queueRoomList} {
+		m.queuePane.room = room
+		if got := plain(fmt.Sprint(m.View())); strings.Contains(got, pointerTL) {
+			t.Errorf("%v marked a band that is not there", room)
+		}
+	}
+}
