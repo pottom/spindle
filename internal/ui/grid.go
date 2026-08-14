@@ -272,10 +272,15 @@ func (m Model) frameTile(rows []string, at, top int, g gridShape, width int) {
 
 const (
 	// frameArm is how far a corner reaches along the top or foot of a tile, and
-	// frameTall how far down its side. Enough to read as a corner rather than as
-	// a stray tick, and nowhere near enough to meet the corner opposite.
-	frameArm  = 4
-	frameTall = 2
+	// frameTall how far down its side.
+	//
+	// Long enough for the fade to be a fade. At four cells and two rows the arms
+	// were the right length for a corner and the wrong length for what is drawn
+	// in them: four steps from the accent to the ground is a corner that stops
+	// rather than one that goes out. Twice that gives the walk somewhere to
+	// happen, and the halves are still nowhere near meeting.
+	frameArm  = 8
+	frameTall = 4
 )
 
 // tileName is the name under a picture, lit where the cursor is on it.
