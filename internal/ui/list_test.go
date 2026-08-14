@@ -401,8 +401,8 @@ func TestTheRowCarriesTheRatingAndTheHeart(t *testing.T) {
 	}
 }
 
-// The line under the names is drawn in the accent at its middle and fades out to
-// the screen at both ends.
+// The line under the names is a seam: the ground, brightening to the accent and
+// back, over and over along the width.
 func TestTheLineUnderTheNamesFades(t *testing.T) {
 	m := queueModel(0, "a", "b")
 	m.width, m.height = 190, 40
@@ -428,30 +428,41 @@ func TestTheLineUnderTheNamesFades(t *testing.T) {
 		t.Fatal("the line under the names is not drawn a cell at a time")
 	}
 
-	r, g, b, _ := m.styles.Accent.RGBA()
-	accent := fmt.Sprintf("%d;%d;%d", r>>8, g>>8, b>>8)
-	if got := cells[len(cells)/2]; got != accent {
-		t.Errorf("the middle of the line is %s, want the accent %s", got, accent)
-	}
-	for _, end := range []int{0, len(cells) - 1} {
-		if got, want := cells[end], "10;10;14"; got != want {
-			t.Errorf("cell %d of the line is %s, want the screen's ground %s", end, got, want)
+	// How near each cell is to the accent, against how near the ground is: 1 at
+	// the top of a stitch and 0 in the ground between two.
+	r, _, _, _ := m.styles.Accent.RGBA()
+	lit := make([]float64, len(cells))
+	for i, cell := range cells {
+		var cr, cg, cb int
+		if _, err := fmt.Sscanf(cell, "%d;%d;%d", &cr, &cg, &cb); err != nil {
+			t.Fatalf("cell %d of the line is %q", i, cell)
 		}
+		_, _ = cg, cb
+		lit[i] = float64(cr-10) / float64(int(r>>8)-10)
 	}
 
-	// The fade is the ends of it rather than the whole of it: a quarter along is
-	// the line at full strength, and inside the span it is neither one nor the
-	// other.
-	for _, at := range []int{len(cells) / 4, 3 * len(cells) / 4} {
-		if cells[at] != accent {
-			t.Errorf("cell %d of the line is %s, want the accent %s", at, cells[at], accent)
+	// It begins in the ground, because a whole number of stitches fits the width.
+	if lit[0] > 0.05 {
+		t.Errorf("the line begins at %.2f of the accent, want the ground", lit[0])
+	}
+
+	// And rises to it and falls away again, over and over.
+	var peaks []int
+	for i := 1; i < len(lit)-1; i++ {
+		if lit[i] >= lit[i-1] && lit[i] > lit[i+1] && lit[i] > 0.9 {
+			peaks = append(peaks, i)
 		}
 	}
-	if cells[1] == accent || cells[1] == "10;10;14" {
-		t.Errorf("the second cell is %s, want a step between the accent and the ground", cells[1])
+	if len(peaks) < 4 {
+		t.Fatalf("the line reaches the accent %d times over %d cells, want a seam", len(peaks), len(cells))
 	}
-	if cells[columnFade] != accent {
-		t.Errorf("cell %d is %s, want the line at full strength past the fade", columnFade, cells[columnFade])
+	for i := 1; i < len(peaks); i++ {
+		if gap := peaks[i] - peaks[i-1]; gap < columnStitch-3 || gap > columnStitch+3 {
+			t.Errorf("stitches %d and %d are %d cells apart, want about %d", i-1, i, gap, columnStitch)
+		}
+	}
+	if mid := (peaks[0] + peaks[1]) / 2; lit[mid] > 0.2 {
+		t.Errorf("between two stitches the line is at %.2f of the accent, want it to fall away", lit[mid])
 	}
 }
 
