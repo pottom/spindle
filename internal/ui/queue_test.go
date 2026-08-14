@@ -288,40 +288,41 @@ func TestDetailFollowsTheCursor(t *testing.T) {
 }
 
 // Everything Spotify supplied is worth showing; everything it left blank is
-// worth leaving out, rather than printing a label with nothing after it.
+// worth leaving out, rather than showing a fact with nothing in it.
 func TestFactsSkipWhatSpotifyDidNotSay(t *testing.T) {
 	full := player.Track{
 		Album: "Hot Space", Released: "1982-05-21",
 		TrackNumber: 3, TotalTracks: 11, DiscNumber: 2, Duration: 4 * time.Minute,
 	}
 	got := factLines(trackFacts(full))
-	for _, want := range []string{"Album", "Released", "Length"} {
+	for _, want := range []string{"Hot Space", "1982"} {
 		if !strings.Contains(got, want) {
-			t.Errorf("trackFacts() = %q, want a %s row", got, want)
+			t.Errorf("trackFacts() = %q, want %q in it", got, want)
 		}
 	}
 
-	// Where the track stands on its album is not among them. It was, and its
-	// row was worth more to the playhead beside it: nobody reading a queue is
-	// asking which side of the record this came from.
-	if strings.Contains(got, "Track") || strings.Contains(got, "3 of 11") {
-		t.Errorf("trackFacts() = %q, want nothing about the track's place on its album", got)
+	// Two are not among them any more. Where a track stands on its album is
+	// what nobody reading a queue is asking, and how long it is is already
+	// under the playhead, where it is read against the elapsed time.
+	for _, gone := range []string{"3 of 11", "4:00"} {
+		if strings.Contains(got, gone) {
+			t.Errorf("trackFacts() = %q, want nothing saying %q", got, gone)
+		}
 	}
-	if !strings.Contains(got, "1982") || strings.Contains(got, "1982-05-21") {
+	if strings.Contains(got, "1982-05-21") {
 		t.Errorf("trackFacts() = %q, want just the year", got)
 	}
 
 	bare := player.Track{Album: "Unknown", Duration: time.Minute}
-	if got := factLines(trackFacts(bare)); strings.Contains(got, "Released") || strings.Contains(got, "Track ") {
+	if got := factLines(trackFacts(bare)); strings.Contains(got, "1:00") || len(strings.Split(strings.TrimSpace(got), "\n")) > 2 {
 		t.Errorf("trackFacts() = %q, want no empty rows", got)
 	}
-
 }
 
 func factLines(facts []trackFact) string {
 	var b strings.Builder
 	for _, f := range facts {
-		b.WriteString(f.label + " " + f.value + "\n")
+		b.WriteString(f.value + "\n")
 	}
 	return b.String()
 }
@@ -474,9 +475,10 @@ func TestPopularityShownEvenAtZero(t *testing.T) {
 	}
 	// Under the name, not over it: a title is what the eye should land on
 	// first, and the rating belongs to the track rather than to the panel.
+	// A row of air, the name, the artist, and then the rating under them.
 	rows := strings.Split(got, "\n")
-	if len(rows) < 3 || !strings.Contains(rows[2], starEmpty) {
-		t.Errorf("the panel begins %q, want the stars under the name and the artist", rows[:min(len(rows), 3)])
+	if len(rows) < 4 || !strings.Contains(rows[3], starEmpty) {
+		t.Errorf("the panel begins %q, want the stars under the name and the artist", rows[:min(len(rows), 4)])
 	}
 
 	m.queue[1].Popularity = &fifty
@@ -573,7 +575,7 @@ func TestTempoShownOnlyWhenMeasured(t *testing.T) {
 	if strings.Contains(got, "bpm") {
 		t.Errorf("trackFacts() = %q, want no number for a track never played", got)
 	}
-	if !strings.Contains(got, "Tempo "+unknownValue) {
+	if !strings.Contains(got, unknownValue) {
 		t.Errorf("trackFacts() = %q, want the tempo row held open", got)
 	}
 	if a, b := len(trackFacts(measured)), len(trackFacts(never)); a != b {
@@ -750,6 +752,10 @@ func TestQueueDetailStaysAboveTheArtworksFoot(t *testing.T) {
 	m.width, m.height = 200, 45
 	m.resize()
 
+	// On a track with something to say about it, or there is nothing beside the
+	// picture to overrun its foot.
+	m.queuePane.cursor.cursor = queueRowOf(0)
+
 	l := m.layout()
 	if l.artRows >= l.artHeight {
 		t.Skipf("the picture fills its box at this cell size (%d rows), so there is no foot to overrun", l.artRows)
@@ -757,9 +763,10 @@ func TestQueueDetailStaysAboveTheArtworksFoot(t *testing.T) {
 	short := l.artRows
 
 	block := m.queueBlock(l, l.bodyHeight)
+	// The track's own name, which is the one thing the panel always carries.
 	var above bool
 	for i := range short {
-		above = above || strings.Contains(plain(block[i]), "Length")
+		above = above || strings.Contains(plain(block[i]), m.queue[0].Title)
 	}
 	if !above {
 		t.Fatal("the panel is empty above the foot, so there is nothing to have overflowed")
@@ -1011,7 +1018,7 @@ func TestSearchUsesTheSameShapeAsTheQueue(t *testing.T) {
 
 	// The panel beside the cover describes what the cursor rests on.
 	head := plain(strings.Join(block[:l.artRows], "\n"))
-	if !strings.Contains(head, res[0].Title) || !strings.Contains(head, "Album") {
+	if !strings.Contains(head, res[0].Title) || !strings.Contains(head, res[0].Album) {
 		t.Errorf("the panel = %q, want the result under the cursor described", head)
 	}
 

@@ -319,7 +319,10 @@ func (m Model) trackDetail(w, rows int) []string {
 	// label on a picture. It sits with the name because it is the one fact about
 	// a track that is an opinion rather than a measurement — and under it,
 	// because a title is what the eye should land on first.
+	// A row of air over the name, so the panel does not begin hard against the
+	// top of the picture beside it.
 	lines := []string{
+		"",
 		title,
 		s.Artist.Render(strings.Join(t.Artists, ", ")),
 	}
@@ -337,7 +340,7 @@ func (m Model) trackDetail(w, rows int) []string {
 	facts := trackFacts(*t)
 	if rows < len(facts)+6 {
 		for _, f := range facts {
-			lines = append(lines, m.fact(f.label, f.value, w))
+			lines = append(lines, fit(f.value, w))
 		}
 		return lines
 	}
@@ -358,8 +361,11 @@ func (m Model) trackDetail(w, rows int) []string {
 		// panel than no playhead at all.
 		under = append(under, "")
 	}
+	// The values alone. A column of names beside three short facts is a table
+	// with one row in every column: the album is an album, the year is a year,
+	// and the tempo says bpm itself.
 	for _, f := range facts {
-		under = append(under, m.fact(f.label, f.value, w))
+		under = append(under, fit(f.value, w))
 	}
 
 	// The playhead is the middle row of the panel, and the panel is centred in
@@ -493,19 +499,23 @@ func (m Model) fact(label, value string, w int) string {
 	return fit(m.styles.FactLabel.Render(padRight(label, factLabelCols))+value, w)
 }
 
-// trackFact is one thing known about a track: what it is called, and what it
-// says. Both screens draw the same facts — the queue names them, the player
-// does not — so they are gathered once and rendered twice.
+// trackFact is one thing known about a track: which fact it is, and what it
+// says. Both screens draw the same facts from here, so they are gathered once
+// and rendered twice.
+//
+// Neither of them names the facts any more. A column of labels beside three
+// short values is a table with one row in every column, and every one of them
+// says what it is without being told: an album is an album, a year is a year,
+// and a tempo carries its unit.
 type trackFact struct {
 	key   string
-	label string
 	value string
 }
 
 // trackFacts is what is worth saying about a track, in the order it is worth
 // saying it. Anything Spotify left blank is left out rather than shown empty.
 func trackFacts(t player.Track) []trackFact {
-	facts := []trackFact{{"album", "Album", t.Album}}
+	facts := []trackFact{{"album", t.Album}}
 
 	if year := releaseYear(t.Released); year != "" {
 		// A single or a compilation is worth knowing and costs no room of its
@@ -513,10 +523,8 @@ func trackFacts(t player.Track) []trackFact {
 		if t.AlbumType != "" && t.AlbumType != "album" {
 			year += " · " + t.AlbumType
 		}
-		facts = append(facts, trackFact{"released", "Released", year})
+		facts = append(facts, trackFact{"released", year})
 	}
-	facts = append(facts, trackFact{"length", "Length", formatDuration(t.Duration)})
-
 	// The row is always here, even with nothing to put in it. A tempo takes a
 	// dozen seconds to measure, so it arrives mid-track — and a row appearing
 	// then would push everything under it down while it is being read.
@@ -524,7 +532,7 @@ func trackFacts(t player.Track) []trackFact {
 	if t.Tempo > 0 {
 		tempo = fmt.Sprintf("%.0f bpm", t.Tempo)
 	}
-	facts = append(facts, trackFact{"tempo", "Tempo", tempo})
+	facts = append(facts, trackFact{"tempo", tempo})
 	return facts
 }
 
@@ -1212,9 +1220,8 @@ func (m Model) trackCaption(t player.Track, w int) []string {
 	var rest []string
 	for _, f := range trackFacts(t) {
 		switch f.key {
-		case "album", "length":
-			// The album has a line of its own; the length is already under the
-			// progress bar, where it is read against the elapsed time.
+		case "album":
+			// The album has a line of its own.
 			continue
 		}
 		rest = append(rest, f.value)
