@@ -54,16 +54,20 @@ func (m Model) likedRow() player.Playlist {
 	return likedPlaylist(m.library.liked, m.library.likedAll)
 }
 
-// readSaved asks for the first page of the saved tracks, for the sake of the
-// glance's hearts, and only where there is something to ask for and nothing
-// read yet.
+// readSaved asks for the first page of the saved tracks, once, for the sake of
+// the hearts every track list draws.
 //
 // The library reads the same page when it opens, for the row at the top of it.
-// This is the other way in: somebody who opens the glance and never opens the
-// library would otherwise be shown a column that is blank because nothing was
-// ever read, which is indistinguishable from a queue of nothing saved.
+// This is the other way in: somebody who never opens the library would otherwise
+// be shown a column that is blank because nothing was ever read, which is
+// indistinguishable from a list of nothing saved.
+//
+// It was asked for only where the glance was open, which is where the hearts
+// were. They are a column of the table now, on the queue and in a playlist and
+// wherever else tracks are listed, so the page is read whether the glance is or
+// not.
 func (m Model) readSaved() tea.Cmd {
-	if !m.peek.on || m.library.likedIDs != nil {
+	if m.library.likedIDs != nil {
 		return nil
 	}
 	return fetchOpenCmd(m.player, openPlaylist, likedID, 0)

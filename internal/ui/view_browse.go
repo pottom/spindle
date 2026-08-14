@@ -523,11 +523,26 @@ func (m Model) leadIn(place string) string {
 // After the title rather than in a column of its own: a column keeps the marks
 // in line with each other, but it indents every title to make room for
 // something most rows do not have.
-func (m Model) withMark(t player.Track, title string) string {
-	if hot(t) {
+//
+// Only where the row is too narrow for the rating itself. The flag was how a
+// rating reached every row while the number was on the detail panel alone; on a
+// row wide enough to carry the stars it is the same thing said twice, and the
+// stars say it better — three of five and four of five are both a flag.
+func (m Model) withMark(t player.Track, title string, w int) string {
+	if hot(t) && !m.showsStars(w) {
 		title += " " + hotMark
 	}
 	return title
+}
+
+// showsStars reports whether a row of the given width has earned the column the
+// rating is drawn in.
+func (m Model) showsStars(w int) bool {
+	gutter := rowGutter
+	if m.rowsAreFlush {
+		gutter = 0
+	}
+	return rowWidths(w-gutter).stars > 0
 }
 
 // queuedColumn is the narrow band between the ordinal and the title, carrying
@@ -657,12 +672,14 @@ func (m Model) queueRow(t player.Track, w int, selected bool, number int) string
 	if selected {
 		primary = m.styles.RowSelected
 	}
-	return m.rowWithTempo(w, selected,
-		m.leadIn(m.styles.Cursor.Render(nowMark))+m.withMark(t, m.lit(primary, t.Title)),
-		m.lit(m.styles.RowSecondary, strings.Join(t.Artists, ", ")),
-		m.tempoCell(t),
-		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
-	)
+	return m.drawRow(w, selected, rowCells{
+		primary:   m.leadIn(m.styles.Cursor.Render(nowMark)) + m.withMark(t, m.lit(primary, t.Title), w),
+		secondary: m.lit(m.styles.RowSecondary, strings.Join(t.Artists, ", ")),
+		stars:     m.starsCell(t),
+		liked:     m.likedCell(t),
+		tempo:     m.tempoCell(t),
+		trailing:  m.styles.RowTrailing.Render(formatDuration(t.Duration)),
+	})
 }
 
 func queueSubtitle(tracks []player.Track) string {
@@ -1140,7 +1157,7 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 		primary = m.styles.RowPlaying
 	}
 
-	title := m.queuedColumn(t) + m.withMark(t, m.lit(primary, t.Title))
+	title := m.queuedColumn(t) + m.withMark(t, m.lit(primary, t.Title), w)
 	switch {
 	case m.tab == tabQueue && m.ps != nil && m.ps.TrackID == t.ID:
 		// On the queue the playing track is marked rather than numbered: it is
@@ -1150,13 +1167,38 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 		title = m.leadIn(primary.Render(fmt.Sprintf("%d", number))) + title
 	}
 
-	return m.rowWithAlbum(w, selected,
-		title,
-		m.lit(m.styles.RowSecondary, strings.Join(t.Artists, ", ")),
-		m.lit(m.styles.RowTrailing, t.Album),
-		m.tempoCell(t),
-		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
-	)
+	return m.drawRow(w, selected, rowCells{
+		primary:   title,
+		secondary: m.lit(m.styles.RowSecondary, strings.Join(t.Artists, ", ")),
+		album:     m.lit(m.styles.RowTrailing, t.Album),
+		stars:     m.starsCell(t),
+		liked:     m.likedCell(t),
+		tempo:     m.tempoCell(t),
+		trailing:  m.styles.RowTrailing.Render(formatDuration(t.Duration)),
+	})
+}
+
+// starsCell is a track's rating for a list row, and nothing at all for a track
+// Spotify sent no rating for: five empty stars would be a rating of none, which
+// is a different thing from not knowing.
+func (m Model) starsCell(t player.Track) string {
+	if t.Popularity == nil {
+		return ""
+	}
+	return m.stars(*t.Popularity)
+}
+
+// likedCell is the heart on the rows that are saved.
+//
+// Only where the saved tracks are known — see libraryPane.saved, which can only
+// answer for what has been read of them. Nothing is drawn for the rest, because
+// a blank says "not in the part I have read" and a mark on every row nobody
+// checked would say something stronger and wrong.
+func (m Model) likedCell(t player.Track) string {
+	if !m.library.saved(t.ID) {
+		return ""
+	}
+	return m.styles.Queued.Render(likedMark)
 }
 
 // tempoCell is the beat rate for a list row, or nothing for a track that has
@@ -1206,71 +1248,100 @@ const (
 	// albumFrom is the row width at which the album earns those columns. Below
 	// it the row has nothing spare, and taking them would come out of the title.
 	albumFrom = 2*secondaryCols + albumCols + tempoCols + trailingCols
+
+	// starsCols is the rating's column, which is five stars wide because a
+	// rating is five stars, and likedCols the heart's — as wide as the word over
+	// it rather than as the glyph in it, so the name is not the thing it names
+	// cut in half.
+	starsCols = starCount
+	likedCols = 5
+
+	// starsFrom is the width at which the two of them earn their columns. Before
+	// the album, because between them they cost a third of what it does: the
+	// order the columns arrive in is what they are worth against what they take.
+	starsFrom = 2*secondaryCols + tempoCols + trailingCols + starsCols + likedCols + 2
 )
 
-func rowWidths(body int) (main, second, beat, album int) {
-	// Last in, first considered: the album is taken off the top so everything
-	// below divides what is genuinely left, rather than being squeezed after the
-	// fact.
+// rowSpan is how wide each of a row's columns is. A zero is a column this row
+// has not earned and will not draw.
+type rowSpan struct {
+	main   int
+	second int
+	album  int
+	stars  int
+	liked  int
+	beat   int
+}
+
+func rowWidths(body int) rowSpan {
+	var span rowSpan
+
+	// Last in, first considered: the columns on the right are taken off the top
+	// so everything below divides what is genuinely left, rather than being
+	// squeezed after the fact.
+	if body >= starsFrom {
+		span.stars, span.liked = starsCols, likedCols
+		body -= span.stars + span.liked + 2
+	}
 	if body >= albumFrom {
-		album = albumCols
-		body -= album + 1
+		span.album = albumCols
+		body -= span.album + 1
 	}
 
-	second = min(body/3, secondaryCols)
+	span.second = min(body/3, secondaryCols)
 
-	beat = tempoCols
-	main = body - second - beat - trailingCols - 2
-	if main < 16 {
+	span.beat = tempoCols
+	span.main = body - span.second - span.beat - trailingCols - 2
+	if span.main < 16 {
 		// Too narrow for everything: the tempo goes first, then the artist.
-		beat = 0
-		main = body - second - trailingCols - 2
+		span.beat = 0
+		span.main = body - span.second - trailingCols - 2
 	}
-	if main < 16 {
-		return body - trailingCols - 1, 0, 0, 0
+	if span.main < 16 {
+		return rowSpan{main: body - trailingCols - 1}
 	}
 
-	free := body - beat - trailingCols - 2
-	if grown := min(secondaryCols+(body-shareAbove)/2, free/2); grown > second {
-		second, main = grown, free-grown
+	free := body - span.beat - trailingCols - 2
+	if grown := min(secondaryCols+(body-shareAbove)/2, free/2); grown > span.second {
+		span.second, span.main = grown, free-grown
 	}
-	return main, second, beat, album
+	return span
 }
 
 // rowSecondaryAt is the column a track row's artists begin at, counted from the
 // start of the row. The queue hangs its trace from the same line, so the screen
 // reads as two columns rather than four.
 func rowSecondaryAt(w int) int {
-	main, second, _, _ := rowWidths(w - rowGutter)
-	if second == 0 {
+	span := rowWidths(w - rowGutter)
+	if span.second == 0 {
 		return w
 	}
-	return rowGutter + main + 1
+	return rowGutter + span.main + 1
 }
 
-// rowWithTempo is row with a beat rate between the artist and the duration.
-// An empty tempo still holds its column, so the durations stay in line whether
-// a track has been heard before or not.
-func (m Model) rowWithTempo(w int, selected bool, primary, secondary, tempo, trailing string) string {
-	return m.rowCols(w, selected, primary, secondary, tempo, trailing)
+// rowCells is what one row of a list holds, column by column. Every cell is
+// passed whether or not the row is wide enough to draw it: which columns fit is
+// the row's business, not the caller's.
+type rowCells struct {
+	primary   string
+	secondary string
+	album     string
+	stars     string
+	liked     string
+	tempo     string
+	trailing  string
 }
 
-// rowWithAlbum is a track row that also carries its album, for the lists where a
-// track has one to show. The column appears on its own once the row is wide
-// enough; below that this draws exactly what rowWithTempo would.
-func (m Model) rowWithAlbum(w int, selected bool, primary, secondary, album, tempo, trailing string) string {
-	return m.rowColsAlbum(w, selected, primary, secondary, album, tempo, trailing)
-}
-
+// rowCols is a row of three columns, for the lists whose rows are a name, a
+// second name and a number.
 func (m Model) rowCols(w int, selected bool, primary, secondary, tempo, trailing string) string {
-	return m.rowColsAlbum(w, selected, primary, secondary, "", tempo, trailing)
+	return m.drawRow(w, selected, rowCells{
+		primary: primary, secondary: secondary, tempo: tempo, trailing: trailing,
+	})
 }
 
-// rowColsAlbum is rowCols with the album between the artists and the tempo. It
-// is drawn only where the row is wide enough to have earned the column, and the
-// caller passes it whether or not that is so: which columns fit is the row's
-// business, not the caller's.
-func (m Model) rowColsAlbum(w int, selected bool, primary, secondary, album, tempo, trailing string) string {
+// drawRow lays out the cursor's gutter and the columns of one row.
+func (m Model) drawRow(w int, selected bool, c rowCells) string {
 	gutter := "  "
 	if selected {
 		gutter = m.styles.Cursor.Render(rowCursor) + " "
@@ -1284,29 +1355,32 @@ func (m Model) rowColsAlbum(w int, selected bool, primary, secondary, album, tem
 
 	body := w - lipgloss.Width(gutter)
 	if body < minInfoCols-6 {
-		return gutter + fit(primary, max(body, 0))
+		return gutter + fit(c.primary, max(body, 0))
 	}
 
-	main, second, beat, albumWidth := rowWidths(body)
+	span := rowWidths(body)
 	if m.rowsMainAt > 0 && m.rowsMainAt < body-trailingCols {
 		// Widened or narrowed to line the second column up with something
 		// elsewhere on the screen. What the first column gives up or takes goes
 		// to the second, so the columns to the right of it stay where they are.
-		second = max(second+main-m.rowsMainAt, 0)
-		main = m.rowsMainAt
+		span.second = max(span.second+span.main-m.rowsMainAt, 0)
+		span.main = m.rowsMainAt
 	}
 
-	line := gutter + fit(primary, max(main, 0)) + " "
-	if second > 0 {
-		line += fit(secondary, second) + " "
+	line := gutter + fit(c.primary, max(span.main, 0)) + " "
+	if span.second > 0 {
+		line += fit(c.secondary, span.second) + " "
 	}
-	if albumWidth > 0 {
-		line += fit(album, albumWidth) + " "
+	if span.album > 0 {
+		line += fit(c.album, span.album) + " "
 	}
-	if beat > 0 {
-		line += padLeft(tempo, beat)
+	if span.stars > 0 {
+		line += fit(c.stars, span.stars) + " " + fit(c.liked, span.liked) + " "
 	}
-	return line + padLeft(trailing, trailingCols)
+	if span.beat > 0 {
+		line += padLeft(c.tempo, span.beat)
+	}
+	return line + padLeft(c.trailing, trailingCols)
 }
 
 // searchField renders the query line, keeping the prompt in the accent.

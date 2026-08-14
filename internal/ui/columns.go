@@ -24,7 +24,7 @@ package ui
 // and read as one when they are set in the same greys — the colour is what the
 // line under them is doing, said again in a way that survives a narrow terminal
 // dropping the line's columns out from under it.
-func (m Model) columnHead(w int, lead, primary, secondary, album, tempo, trailing string) string {
+func (m Model) columnHead(w int, lead string, names rowCells) string {
 	s := m.styles.Columns
 	dress := func(text string) string {
 		if text == "" {
@@ -32,8 +32,15 @@ func (m Model) columnHead(w int, lead, primary, secondary, album, tempo, trailin
 		}
 		return s.Render(text)
 	}
-	return m.rowColsAlbum(w, false,
-		lead+dress(primary), dress(secondary), dress(album), dress(tempo), dress(trailing))
+	return m.drawRow(w, false, rowCells{
+		primary:   lead + dress(names.primary),
+		secondary: dress(names.secondary),
+		album:     dress(names.album),
+		stars:     dress(names.stars),
+		liked:     dress(names.liked),
+		tempo:     dress(names.tempo),
+		trailing:  dress(names.trailing),
+	})
 }
 
 // trackColumns names a list of tracks. The ordinal keeps its column: it is the
@@ -50,18 +57,26 @@ func (m Model) trackColumns(w int, numbered bool) string {
 
 	// tempo rather than bpm, because the cell under it says bpm already: a
 	// column named after its own unit is the unit written twice.
-	return m.columnHead(w, lead, "title", "artist", "album", "tempo", "time")
+	return m.columnHead(w, lead, rowCells{
+		primary:   "title",
+		secondary: "artist",
+		album:     "album",
+		stars:     "stars",
+		liked:     "liked",
+		tempo:     "tempo",
+		trailing:  "time",
+	})
 }
 
 // albumColumns names a list of records, and artistColumns a list of people.
 func (m Model) albumColumns(w int, lead string) string {
-	return m.columnHead(w, lead, "album", "artist", "", "", "released")
+	return m.columnHead(w, lead, rowCells{primary: "album", secondary: "artist", trailing: "released"})
 }
 
 func (m Model) artistColumns(w int, lead string) string {
-	return m.columnHead(w, lead, "artist", "genres", "", "", "followers")
+	return m.columnHead(w, lead, rowCells{primary: "artist", secondary: "genres", trailing: "followers"})
 }
 
 func (m Model) playlistColumns(w int) string {
-	return m.columnHead(w, blankMark, "playlist", "owner", "", "", "tracks")
+	return m.columnHead(w, blankMark, rowCells{primary: "playlist", secondary: "owner", trailing: "tracks"})
 }

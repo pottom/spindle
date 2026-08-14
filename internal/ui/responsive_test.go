@@ -101,12 +101,12 @@ func TestTheListsTakeTheWidth(t *testing.T) {
 // means here: widening walks one order of layouts, so a resize adds a column
 // rather than rearranging the row.
 func TestColumnsComeInOneOrderAndStay(t *testing.T) {
-	type seen struct{ second, beat, album bool }
+	type seen struct{ second, beat, album, stars bool }
 	var was seen
 
 	for body := 20; body <= 400; body++ {
-		main, second, beat, album := rowWidths(body)
-		now := seen{second > 0, beat > 0, album > 0}
+		span := rowWidths(body)
+		now := seen{span.second > 0, span.beat > 0, span.album > 0, span.stars > 0}
 
 		for _, c := range []struct {
 			name       string
@@ -115,6 +115,7 @@ func TestColumnsComeInOneOrderAndStay(t *testing.T) {
 			{"the artists", was.second, now.second},
 			{"the tempo", was.beat, now.beat},
 			{"the album", was.album, now.album},
+			{"the rating", was.stars, now.stars},
 		} {
 			if c.had && !c.hasIt {
 				t.Errorf("row %d: %s column went away on a wider row", body, c.name)
@@ -128,9 +129,17 @@ func TestColumnsComeInOneOrderAndStay(t *testing.T) {
 		if now.beat && !now.second {
 			t.Errorf("row %d: the tempo is shown but the artists are not", body)
 		}
+		if now.album && !now.stars {
+			t.Errorf("row %d: the album is shown but the rating is not", body)
+		}
+
+		// The heart comes with the rating and goes with it.
+		if (span.stars > 0) != (span.liked > 0) {
+			t.Errorf("row %d: the rating has %d columns and the heart %d", body, span.stars, span.liked)
+		}
 
 		// And the row still adds up to what it was given.
-		used := main + second + beat + album + trailingCols
+		used := span.main + span.second + span.beat + span.album + span.stars + span.liked + trailingCols
 		if used > body {
 			t.Errorf("row %d: the columns come to %d, past the row", body, used)
 		}
@@ -143,12 +152,12 @@ func TestColumnsComeInOneOrderAndStay(t *testing.T) {
 // names are unreadable.
 func TestTheTitleKeepsTheLargestShare(t *testing.T) {
 	for body := 60; body <= 400; body++ {
-		main, second, _, album := rowWidths(body)
-		if main < second {
-			t.Errorf("row %d: the artists have %d columns and the title %d", body, second, main)
+		span := rowWidths(body)
+		if span.main < span.second {
+			t.Errorf("row %d: the artists have %d columns and the title %d", body, span.second, span.main)
 		}
-		if album > 0 && main < album {
-			t.Errorf("row %d: the album has %d columns and the title %d", body, album, main)
+		if span.album > 0 && span.main < span.album {
+			t.Errorf("row %d: the album has %d columns and the title %d", body, span.album, span.main)
 		}
 	}
 }

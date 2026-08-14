@@ -256,7 +256,7 @@ func TestThePickerTakesTheSameKeys(t *testing.T) {
 // names rather than beside them.
 func TestTheColumnsAreNamed(t *testing.T) {
 	m := queueModel(0, "a", "b")
-	m.width, m.height = 150, 32
+	m.width, m.height = 170, 32
 	m.resize()
 	for i := range m.queue {
 		m.queue[i] = player.Track{ID: fmt.Sprintf("t%d", i), Title: "Mockingbird",
@@ -325,5 +325,65 @@ func TestTheColumnsWearTheAccent(t *testing.T) {
 	accent := m.styles.Columns.Render("title")
 	if !strings.Contains(fmt.Sprint(m.View()), accent) {
 		t.Errorf("the columns are not named in the accent: want %q", accent)
+	}
+}
+
+// A track's rating and whether it is saved are columns of the table, on a row
+// wide enough to carry them.
+func TestTheRowCarriesTheRatingAndTheHeart(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.width, m.height = 190, 32
+	m.resize()
+	m.queuePane.room = queueRoomList
+
+	hot, cold := 95, 8
+	m.queue[0] = player.Track{ID: "t0", Title: "Saved", Artists: []string{"A"},
+		Album: "One", Popularity: &hot, Duration: time.Minute}
+	m.queue[1] = player.Track{ID: "t1", Title: "Unsaved", Artists: []string{"B"},
+		Album: "Two", Popularity: &cold, Duration: time.Minute}
+	m.library.adoptLiked([]player.Track{{ID: "t0"}}, true)
+
+	rows := map[string]string{}
+	for _, row := range strings.Split(plain(fmt.Sprint(m.View())), "\n") {
+		for _, title := range []string{"Saved", "Unsaved"} {
+			if strings.Contains(row, title) && rows[title] == "" {
+				rows[title] = row
+			}
+		}
+	}
+
+	// The rating, filled in fifths.
+	if got := rows["Saved"]; !strings.Contains(got, strings.Repeat(starFull, 5)) {
+		t.Errorf("a track rated 95 does not carry five stars: %q", got)
+	}
+	if got := rows["Unsaved"]; !strings.Contains(got, starEmpty) {
+		t.Errorf("a track rated 8 does not carry its empty stars: %q", got)
+	}
+
+	// The heart, on the row that is saved and no other.
+	if got := rows["Saved"]; !strings.Contains(got, likedMark) {
+		t.Errorf("the saved track carries no heart: %q", got)
+	}
+	if got := rows["Unsaved"]; strings.Contains(got, likedMark) {
+		t.Errorf("a track that is not saved carries a heart: %q", got)
+	}
+
+	// And the flag for a popular track is not drawn beside stars that say it.
+	if got := rows["Saved"]; strings.Contains(got, hotMark) {
+		t.Errorf("the rating is on the row twice: %q", got)
+	}
+
+	// Narrow the row past the rating's column and the flag comes back, so the
+	// same fact reaches every width by one route or the other.
+	m.width = 120
+	m.resize()
+	narrow := ""
+	for _, row := range strings.Split(plain(fmt.Sprint(m.View())), "\n") {
+		if strings.Contains(row, "Saved") && !strings.Contains(row, "Unsaved") && narrow == "" {
+			narrow = row
+		}
+	}
+	if !strings.Contains(narrow, hotMark) {
+		t.Errorf("a row too narrow for the stars drops the flag as well: %q", narrow)
 	}
 }

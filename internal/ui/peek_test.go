@@ -175,13 +175,14 @@ func TestTheGlanceMarksTheSavedTracks(t *testing.T) {
 	}
 }
 
-// Nothing has been read of the saved tracks until something asks, and opening
-// the glance is something asking: a blank column because nobody fetched the
-// list reads exactly like a queue with nothing saved in it.
+// Nothing has been read of the saved tracks until something asks: a blank column
+// because nobody fetched the list reads exactly like a queue with nothing saved
+// in it. Every list of tracks draws the hearts now, so it is asked for once and
+// not per screen.
 func TestTheGlanceSendsForTheSavedTracks(t *testing.T) {
 	m := peekModel()
-	if m.readSaved() != nil {
-		t.Error("the saved tracks were sent for with no glance to show them")
+	if m.readSaved() == nil {
+		t.Fatal("the saved tracks were never sent for")
 	}
 
 	m.peek.on = true

@@ -95,8 +95,8 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 
 	case prefsMsg:
 		m.applyPrefs(prefs(message))
-		// The glance can come back on from the file, and it wants the saved
-		// tracks the same way a glance opened by hand does.
+		// The saved tracks are read here because this is the first moment the
+		// program has a player to ask, and every list of tracks wants them.
 		return m, tea.Batch(m.startScope(), m.fetchLyrics(), m.readSaved())
 
 	case msg.Tick:
