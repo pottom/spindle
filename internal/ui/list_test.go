@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"image/color"
 	"regexp"
 	"strings"
 	"testing"
@@ -385,5 +386,44 @@ func TestTheRowCarriesTheRatingAndTheHeart(t *testing.T) {
 	}
 	if !strings.Contains(narrow, hotMark) {
 		t.Errorf("a row too narrow for the stars drops the flag as well: %q", narrow)
+	}
+}
+
+// The line under the names is drawn in the accent and fades out across the
+// width, like the bracket that marks the band above the list.
+func TestTheLineUnderTheNamesFades(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.width, m.height = 190, 40
+	m.resize()
+	m.queue[1] = player.Track{ID: "t1", Title: "Mockingbird", Artists: []string{"ReMan"},
+		Duration: 3 * time.Minute}
+	m.queuePane.room = queueRoomList
+	m.ground = color.RGBA{R: 10, G: 10, B: 14, A: 255}
+	m.restyle()
+
+	rule := regexp.MustCompile(`\x1b\[38;2;(\d+;\d+;\d+)m─`)
+	var cells []string
+	for _, row := range strings.Split(fmt.Sprint(m.View()), "\n") {
+		hits := rule.FindAllStringSubmatch(row, -1)
+		if len(hits) > 20 {
+			for _, hit := range hits {
+				cells = append(cells, hit[1])
+			}
+			break
+		}
+	}
+	if len(cells) == 0 {
+		t.Fatal("the line under the names is not drawn a cell at a time")
+	}
+
+	r, g, b, _ := m.styles.Accent.RGBA()
+	if got, want := cells[0], fmt.Sprintf("%d;%d;%d", r>>8, g>>8, b>>8); got != want {
+		t.Errorf("the line begins at %s, want the accent %s", got, want)
+	}
+	if got, want := cells[len(cells)-1], "10;10;14"; got != want {
+		t.Errorf("the line ends at %s, want the screen's ground %s", got, want)
+	}
+	if cells[len(cells)/2] == cells[0] {
+		t.Error("the line is the same colour halfway along as at its start")
 	}
 }

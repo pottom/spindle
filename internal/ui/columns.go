@@ -1,5 +1,11 @@
 package ui
 
+import (
+	"image/color"
+
+	"github.com/pottom/spindle/internal/ui/style"
+)
+
 // The row that names a list's columns.
 //
 // Every list on screen is four or five columns of words with nothing to say what
@@ -15,6 +21,34 @@ package ui
 // width, so a column that comes and goes with the terminal's takes its name with
 // it. Nothing here decides which columns fit — that is the row's business, and a
 // header that decided it separately would be a second opinion to keep in step.
+
+// columnRule is the line under those names.
+//
+// The accent at the left, walked out to the screen's own ground at the right —
+// the same pen as the bracket that marks the band above the list, and the same
+// reason: at one weight it is a rule the width of the terminal, which is the
+// loudest thing on a screen made of words. Fading it leaves the end the names
+// begin at and lets the rest go.
+//
+// The sounding record's accent rather than the cover's, like the names over it.
+// The one thing on these screens that wears the cover's is the band the cursor is
+// resting on, which is explicitly about another record.
+func (m Model) columnRule(w int) string {
+	var out string
+	for _, step := range style.Fade(m.styles.Accent, m.screenGround(), w) {
+		out += step.Render(pointerH)
+	}
+	return out
+}
+
+// screenGround is the terminal's own background colour, or the nearest thing to
+// it worth fading into before the terminal has said what it is.
+func (m Model) screenGround() color.Color {
+	if m.ground != nil {
+		return m.ground
+	}
+	return m.styles.Theme.Raised
+}
 
 // columnHead is a list's names, dressed and laid out like one of its rows.
 //

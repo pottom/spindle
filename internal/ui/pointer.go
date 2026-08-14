@@ -120,12 +120,8 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 	// the whole way they were two rules the width of the sleeve, which is most of
 	// what the closed frame was taken down for; fading them leaves the corner —
 	// where the bracket takes hold — and lets the rest go.
-	ground := m.ground
-	if ground == nil {
-		ground = m.styles.Theme.Raised
-	}
 	var rule string
-	for _, step := range style.Fade(m.coverStyles.Accent, ground, arm) {
+	for _, step := range style.Fade(m.coverStyles.Accent, m.screenGround(), arm) {
 		rule += step.Render(pointerH)
 	}
 

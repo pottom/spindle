@@ -209,7 +209,7 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	if len(out) < rows {
 		rule := strings.Repeat(" ", w)
 		if named {
-			rule = fit(m.styles.Rule.Render(strings.Repeat(pointerH, queueRowWidth(l))), w)
+			rule = fit(m.columnRule(queueRowWidth(l)), w)
 		}
 		out = append(out, rule)
 	}

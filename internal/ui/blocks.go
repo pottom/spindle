@@ -104,7 +104,7 @@ func (m Model) upNextBlock() block {
 			tempo:     "tempo",
 			trailing:  "time",
 		})}
-		out = append(out, fit(m.styles.Rule.Render(strings.Repeat(pointerH, w)), w))
+		out = append(out, fit(m.columnRule(w), w))
 
 		for i := range h - len(out) {
 			row := strings.Repeat(" ", w)
