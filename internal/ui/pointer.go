@@ -16,29 +16,46 @@ import (
 // records, and nothing on the screen said so: the picture changed and the only
 // way to know why was to have watched it change.
 //
-// So it is drawn: a frame round the band and a line from it down to the row it
-// belongs to. Both are what somebody would draw on a printout with a pen, which
-// is how the request for it arrived.
+// So it is drawn: a bracket down the left of the band, and a line from it to the
+// row it belongs to. Both are what somebody would draw on a printout with a pen,
+// which is how the request for it arrived.
 //
-// It costs no rows. The frame stands in the blank row above the band and the one
-// below it, and in the left margin every row already has — the same three cells
-// the list's own cursor mark sits inside. Anything that took a row would move
-// the whole screen every time the cursor left the first line, which is a worse
-// answer to "what is this" than not answering.
+// A bracket rather than a frame. The frame ran all the way round — two rules the
+// width of the panel and a second upright at its right edge — which is four lines
+// to say what the one line down the left already says, on a screen whose subject
+// is a photograph. What the right-hand upright said as well was where the panel
+// ends; that is worth less than the quiet, and the panel's own edges say it.
+//
+// It costs no rows. The arms stand in the blank row above the band and the one
+// below it, and the upright in the left margin every row already has — the same
+// three cells the list's own cursor mark sits inside. Anything that took a row
+// would move the whole screen every time the cursor left the first line, which is
+// a worse answer to "what is this" than not answering.
 
 const (
 	// pointerAt is the column the frame's left edge and the line down from it
 	// stand in: inside the left margin, clear of the list's own cursor mark.
 	pointerAt = 1
 
+	// pointerArm is how far the marks at the top and the foot of the band reach
+	// in from the margin. Long enough to read as a bracket taking hold of the
+	// band rather than as a stray tick; short enough that it is a hand on the
+	// edge and not a rule across the screen.
+	//
+	// Fixed rather than a share of the width: a share moves the end of it about
+	// as a terminal is resized, and there is nothing at that end for it to
+	// arrive at.
+	pointerArm = 10
+
 	// The pen. Light box drawing with rounded corners, because it is an
 	// annotation over a picture rather than a part of it: a square corner reads
 	// as a panel's border, and the band is not a panel — it is a thing somebody
-	// has drawn a ring around.
+	// has drawn a bracket beside. The two right-hand corners belong to the field
+	// a list is searched in, which is a box and closes — see finder.go.
 	pointerTL    = "╭"
+	pointerTee   = "├"
 	pointerTR    = "╮"
 	pointerBR    = "╯"
-	pointerTee   = "├"
 	pointerH     = "─"
 	pointerV     = "│"
 	pointerElbow = "╰"
@@ -73,32 +90,26 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 	from, _ := cursor.window(len(m.queueRows()), m.visibleListRows())
 	at := top + band + m.listChrome() + (cursor.cursor - from)
 
-	// The frame stands in the blank rows either side of the band.
+	// The arms stand in the blank rows either side of the band.
 	head, foot := top-1, top+band
 	if head < 0 || at >= len(lines) || at <= foot {
 		return lines
 	}
 
-	// A column clear of the panel rather than hard against it: the clock and the
-	// length are set to the panel's right edge, and drawn at that column the
-	// frame took the air out from under them. The gap between the panel and the
-	// picture is three columns wide, so this stands in it.
-	right := leftMargin + l.artWidth + columnGap + queueDetailWidth(l) + 1
-	if !m.scopeVisible() || !m.queuePane.room.showsTrace() {
-		right = leftMargin + l.artWidth + columnGap + l.infoWidth
-	}
-	if right >= l.interior-1 {
-		right = l.interior - 2
-	}
-	if right <= pointerAt+2 {
+	// Never past the picture: the arm reaches in from the margin, and the cover
+	// begins a column or two along. It is put on the screen by the terminal
+	// rather than written into the row, so anything drawn over those columns is
+	// drawn over the sleeve.
+	arm := min(pointerArm, leftMargin+l.artWidth-pointerAt-1)
+	if arm < 1 {
 		return lines
 	}
 
 	// Quiet on purpose. It is an annotation over a picture: what it has to do is
 	// answer "which track is this" when the question comes up, not compete with
-	// the picture it is drawn around.
+	// the picture it is drawn beside.
 	style := m.styles.Rule
-	rule := strings.Repeat(pointerH, right-pointerAt-1)
+	rule := strings.Repeat(pointerH, arm)
 
 	out := append([]string(nil), lines...)
 	put := func(row int, at int, s string) {
@@ -108,18 +119,16 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 		out[row] = overwrite(out[row], at, style.Render(s), l.interior)
 	}
 
-	// The frame and nothing else. It carried a ground for a while — a step off
-	// the screen's, in the hue of the cover it stood beside — and beside a
-	// photograph a shaded panel reads as another window laid over this one. What
-	// says the band belongs to another record is the frame and the line down to
-	// the row, which is what somebody would draw on a printout, and a wash of
-	// colour behind it was the same thing said twice and less well.
+	// The bracket, and nothing else. It was a closed frame with a ground inside
+	// it for a while — a step off the screen's, in the hue of the cover — and
+	// beside a photograph a shaded panel reads as another window laid over this
+	// one, while a rule round all four sides is four lines saying what the one
+	// down the left already says.
 
-	put(head, pointerAt, pointerTL+rule+pointerTR)
-	put(foot, pointerAt, pointerTee+rule+pointerBR)
+	put(head, pointerAt, pointerTL+rule)
+	put(foot, pointerAt, pointerTee+rule)
 	for row := head + 1; row < foot; row++ {
 		put(row, pointerAt, pointerV)
-		put(row, right, pointerV)
 	}
 
 	// And down the margin to the row it belongs to, where it turns and points.

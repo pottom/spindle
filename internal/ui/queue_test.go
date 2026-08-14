@@ -1518,7 +1518,7 @@ func TestTheSoundingTempoReachesTheRowAndThePanel(t *testing.T) {
 }
 
 // When the band at the top is about a different record from the one the list
-// begins with, a frame round it and a line down to the row it belongs to.
+// begins with, a bracket down its left and a line to the row it belongs to.
 //
 // Nothing said so before: the picture changed as the cursor moved and the only
 // way to know why was to have watched it change.
@@ -1529,13 +1529,13 @@ func TestTheBandIsMarkedWhenItIsNotTheSoundingTrack(t *testing.T) {
 	m.resize()
 
 	// On the row that is sounding, the band is about the track the list begins
-	// with, and a frame round it would be pointing at what it stands on.
+	// with, and marking it would be pointing at what it stands on.
 	m.queuePane.cursor.cursor = 0
 	if got := plain(fmt.Sprint(m.View())); strings.Contains(got, pointerTL) {
 		t.Error("the band was marked while the cursor was on the sounding track")
 	}
 
-	// And off it, the frame and the line.
+	// And off it, the bracket and the line.
 	m.queuePane.cursor.cursor = 3
 	rows := strings.Split(plain(fmt.Sprint(m.View())), "\n")
 
@@ -1549,7 +1549,35 @@ func TestTheBandIsMarkedWhenItIsNotTheSoundingTrack(t *testing.T) {
 		}
 	}
 	if head < 0 || elbow < 0 {
-		t.Fatalf("the band was not marked: frame at %d, line ends at %d", head, elbow)
+		t.Fatalf("the band was not marked: bracket at %d, line ends at %d", head, elbow)
+	}
+
+	// A bracket rather than a frame: an arm at the head and the foot, an upright
+	// between them, and nothing closing it on the right.
+	if got := strings.TrimSpace(rows[head]); got != pointerTL+strings.Repeat(pointerH, pointerArm) {
+		t.Errorf("the head of the bracket is %q, want a corner and %d of rule", got, pointerArm)
+	}
+	for i := head; i <= elbow; i++ {
+		if strings.ContainsAny(rows[i], pointerTR+pointerBR) {
+			t.Errorf("row %d closes the bracket on the right: %q", i, rows[i])
+		}
+	}
+	foot := -1
+	for i := head + 1; i < elbow; i++ {
+		if strings.HasPrefix(strings.TrimSpace(rows[i]), pointerTee) {
+			foot = i
+		}
+	}
+	if foot < 0 {
+		t.Fatal("the bracket has no arm at its foot")
+	}
+	if got := strings.TrimSpace(rows[foot]); got != pointerTee+strings.Repeat(pointerH, pointerArm) {
+		t.Errorf("the foot of the bracket is %q, want the tee and %d of rule", got, pointerArm)
+	}
+	for i := head + 1; i < foot; i++ {
+		if !strings.HasPrefix(strings.TrimSpace(rows[i]), pointerV) {
+			t.Errorf("row %d of the band has no upright: %q", i, rows[i])
+		}
 	}
 	if elbow <= head {
 		t.Errorf("the line ends at row %d, above the frame at %d", elbow, head)
