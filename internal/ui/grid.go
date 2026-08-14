@@ -77,7 +77,8 @@ type gridShape struct {
 	rows int // rows of tiles down
 
 	tileW     int // cells one tile takes across
-	coverRows int // rows its picture fills
+	coverRows int // rows the box its picture is asked for holds
+	artRows   int // rows the picture really fills, which can be one fewer
 	tileH     int // rows the whole tile takes, picture and words
 	gap       int // cells between two tiles across
 }
@@ -109,12 +110,19 @@ func gridFor(width, height int, cell cover.CellSize) gridShape {
 	// area uses, so a tile's cover is as square as any other cover on screen.
 	coverRows := max(tileW*cell.Width/cell.Height, 1)
 
-	// And the tile is then as wide as that picture really comes out, rather than
-	// as wide as it was offered. A square cover fills whole cells only, and on a
-	// cell that is not exactly twice as tall as it is wide the last column or two
-	// of the tile is never drawn into — which put all the slack on one side of
-	// the picture and left the corner marks lopsided.
+	// The tile is then as wide as the picture really comes out. A cover is square
+	// and fills whole cells only, so a box is nearly always a column wider than
+	// what it holds — and here the tile is the picture: the frame stands against
+	// its edges and the words start at its left, so a column of slack puts every
+	// mark out of true.
 	tileW = min(max(coverRows*cell.Height/cell.Width, 1), tileW)
+
+	// The rows are the other way about. The box is asked for at its full height
+	// and the picture comes back a row short of it, which is what artworkRows
+	// says and what the artwork area beside a list has always done: the box is
+	// where a picture may go, and this is where it ends. The tile is laid out
+	// against where it ends.
+	artRows := artworkRows(tileW, coverRows, cell)
 
 	// What that gives back goes between the tiles, so the wall still reaches both
 	// margins and the gap is never tighter than the frame needs.
@@ -123,11 +131,11 @@ func gridFor(width, height int, cell cover.CellSize) gridShape {
 		gap = max((width-cols*tileW)/(cols-1), tileGap)
 	}
 
-	tileH := coverRows + tileTextRows
+	tileH := artRows + tileTextRows
 	rows := max((height+tileRowGap)/(tileH+tileRowGap), 0)
 	return gridShape{
 		cols: cols, rows: rows,
-		tileW: tileW, coverRows: coverRows, tileH: tileH, gap: gap,
+		tileW: tileW, coverRows: coverRows, artRows: artRows, tileH: tileH, gap: gap,
 	}
 }
 
@@ -211,7 +219,7 @@ func (m Model) drawTileRow(row []gridTile, g gridShape, width, at int) []string 
 	// squared off when they arrived and the words are cut to the tile. So the row
 	// is written out and padded at the end, and nothing walks a picture through
 	// an escape-sequence parser to ask how wide it is. See coverState.took.
-	tall := min(frameTall, (g.coverRows-1)/2)
+	tall := min(frameTall, (g.artRows-1)/2)
 	fade := style.Fade(m.styles.Accent, m.screenGround(), tall+1)
 
 	join := func(cells []string, line int) string {
@@ -219,8 +227,8 @@ func (m Model) drawTileRow(row []gridTile, g gridShape, width, at int) []string 
 		// and nothing at all where it is past the corners' reach or below the
 		// picture altogether.
 		edge := ""
-		if at >= 0 && line < g.coverRows {
-			if step := min(line+1, g.coverRows-line); step <= tall {
+		if at >= 0 && line < g.artRows {
+			if step := min(line+1, g.artRows-line); step <= tall {
 				edge = fade[step].Render(pointerV)
 			}
 		}
@@ -250,7 +258,7 @@ func (m Model) drawTileRow(row []gridTile, g gridShape, width, at int) []string 
 	}
 
 	cells := make([]string, len(row))
-	for line := range g.coverRows {
+	for line := range g.artRows {
 		for i, tile := range row {
 			cells[i] = artLine(tile.art, line, g.tileW)
 		}
@@ -267,7 +275,7 @@ func (m Model) drawTileRow(row []gridTile, g gridShape, width, at int) []string 
 		for j, tile := range row {
 			cells[j] = fit(words(tile), g.tileW)
 		}
-		out = append(out, join(cells, g.coverRows))
+		out = append(out, join(cells, g.artRows))
 	}
 	return out
 }

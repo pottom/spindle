@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	"image/color"
 	"strings"
 	"testing"
@@ -449,7 +450,7 @@ func TestTheFrameFitsInTheAirBetweenTiles(t *testing.T) {
 
 	// And that is all of them: every visible tile's cover, entire.
 	from, to := m.library.cursors[libraryPlaylists].gridWindow(len(m.library.playlists), g)
-	if want := (to - from) * g.tileW * g.coverRows; first != want {
+	if want := (to - from) * g.tileW * g.artRows; first != want {
 		t.Errorf("the wall shows %d cells of picture, want %d — the frame ate some", first, want)
 	}
 }
@@ -608,9 +609,47 @@ func TestATileWithNoCoverGetsTheDrawnOne(t *testing.T) {
 func tileArt(g gridShape) coverState {
 	tile := coverState{url: "u", width: g.tileW, height: g.coverRows}
 	var art strings.Builder
-	for range g.coverRows {
+	for range g.artRows {
 		art.WriteString(strings.Repeat("#", g.tileW) + "\n")
 	}
 	tile.took(strings.TrimSuffix(art.String(), "\n"))
 	return tile
+}
+
+// The tile is laid out against the picture the renderer really draws, not
+// against the box it was asked for. A cover is square and fills whole cells
+// only, so a box is nearly always a column wider or a row taller than what it
+// holds — and here the tile is the picture.
+func TestTheTileMatchesWhatIsDrawn(t *testing.T) {
+	square := image.NewRGBA(image.Rect(0, 0, 640, 640))
+	for y := range 640 {
+		for x := range 640 {
+			square.SetRGBA(x, y, color.RGBA{R: 200, G: 100, B: 50, A: 255})
+		}
+	}
+
+	for _, cell := range []cover.CellSize{
+		{Width: 10, Height: 20}, {Width: 9, Height: 19}, {Width: 8, Height: 17},
+		{Width: 16, Height: 32}, {Width: 16, Height: 34}, {Width: 7, Height: 15},
+		{Width: 12, Height: 26}, {Width: 11, Height: 24},
+	} {
+		g := gridFor(140, 37, cell)
+		if !g.ok() {
+			t.Fatalf("%+v: no wall at all", cell)
+		}
+
+		art, err := cover.NewHalfblock(cell).Render(square, g.tileW, g.coverRows, 1, 0)
+		if err != nil {
+			t.Fatalf("%+v: %v", cell, err)
+		}
+
+		lines := strings.Split(art, "\n")
+		if got := lipgloss.Width(lines[0]); got != g.tileW {
+			t.Errorf("%+v: the picture is %d cells wide and the tile %d", cell, got, g.tileW)
+		}
+		if got := len(lines); got != g.artRows {
+			t.Errorf("%+v: the picture is %d rows tall and the tile keeps %d for it",
+				cell, got, g.artRows)
+		}
+	}
 }
