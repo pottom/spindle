@@ -586,3 +586,27 @@ func TestATileIsAsWideAsItsPicture(t *testing.T) {
 		}
 	}
 }
+
+// A thing with no artwork of its own is given the drawn stand-in, so the wall
+// has no holes in it.
+func TestATileWithNoCoverGetsTheDrawnOne(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.tab = tabLibrary
+	m.width, m.height = 150, 40
+	m.resize()
+	m.library.playlists = []player.Playlist{
+		{ID: "p0", Name: "Made here", Owner: "you"},
+		{ID: "p1", Name: "From Spotify", Owner: "them", CoverURL: "http://example.invalid/a.jpg"},
+	}
+
+	tiles := m.libraryTiles()
+	if len(tiles) != 2 {
+		t.Fatalf("the wall holds %d tiles", len(tiles))
+	}
+	if tiles[0].url != cover.NoneURL {
+		t.Errorf("a playlist with no cover asks for %q, want the drawn one", tiles[0].url)
+	}
+	if tiles[1].url == cover.NoneURL {
+		t.Error("a playlist with a cover was given the drawn one")
+	}
+}

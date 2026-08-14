@@ -80,6 +80,15 @@ func (m Model) libraryTiles() []libraryTile {
 			out = append(out, libraryTile{id: p.ID, url: p.CoverURL, name: p.Name, sub: sub})
 		}
 	}
+
+	// A thing with no artwork gets the drawn stand-in rather than a hole. A gap
+	// in a wall of covers reads as a picture that failed to load; a drawing says
+	// there was never one to load. See cover.NoneURL.
+	for i := range out {
+		if out[i].url == "" {
+			out[i].url = cover.NoneURL
+		}
+	}
 	return out
 }
 
