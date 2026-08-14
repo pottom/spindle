@@ -46,7 +46,11 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = message.Width, message.Height
 		m.resize()
-		return m, m.syncCover()
+		// The wall's tiles are a different size in a window of a different size,
+		// and a cover rendered for the old one is the wrong picture: some of them
+		// simply never arrive, because what was asked for is not what is wanted
+		// now. Every other screen holds one picture and syncCover sees to it.
+		return m, tea.Batch(m.syncCover(), m.syncGridCovers())
 
 	case tea.BackgroundColorMsg:
 		m.isDark = message.IsDark()

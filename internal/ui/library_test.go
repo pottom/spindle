@@ -11,6 +11,7 @@ import (
 
 	"github.com/pottom/spindle/internal/player"
 
+	"github.com/pottom/spindle/internal/ui/cover"
 	"github.com/pottom/spindle/internal/ui/msg"
 )
 
@@ -303,5 +304,47 @@ func TestARefreshKeepsTheCursorWhereItWas(t *testing.T) {
 		player.Playlist{ID: likedID})
 	if got := m.library.cursors[libraryPlaylists].cursor; got != 0 {
 		t.Errorf("the cursor is at %d after what it was on went, want the top", got)
+	}
+}
+
+// A window of a different size divides the wall into tiles of a different size,
+// and a cover rendered for the old one is the wrong picture. The resize has to
+// send for them again, or some never arrive at all.
+func TestTheWallAsksAgainWhenTheWindowChanges(t *testing.T) {
+	m := New(player.NewMock(), cover.NewLoader(cover.NewHalfblock(defaultTestCell), nil), defaultTestCell)
+	m.tab = tabLibrary
+	m.width, m.height = 150, 40
+	m.resize()
+	for i := range 12 {
+		m.library.playlists = append(m.library.playlists, player.Playlist{
+			ID: fmt.Sprintf("p%d", i), Name: fmt.Sprintf("List %d", i),
+			CoverURL: fmt.Sprintf("http://example.invalid/%d.jpg", i),
+		})
+	}
+
+	if cmd := m.syncGridCovers(); cmd == nil {
+		t.Fatal("the wall sent for no covers at all")
+	}
+	was := m.libraryShape(m.layout(), m.layout().bodyHeight)
+
+	// Wider: bigger tiles, and every cover held is for the old size.
+	var tm tea.Model = m
+	tm, cmd := tm.Update(tea.WindowSizeMsg{Width: 220, Height: 50})
+	m = tm.(Model)
+	if now := m.libraryShape(m.layout(), m.layout().bodyHeight); now.tileW == was.tileW {
+		t.Skipf("the tiles are %d cells wide at both sizes", now.tileW)
+	}
+	if cmd == nil {
+		t.Fatal("the resize sent for nothing")
+	}
+
+	// What is held now is asked for at the new size.
+	g := m.libraryShape(m.layout(), m.layout().bodyHeight)
+	for id, tile := range m.tiles {
+		if tile.width != g.tileW || tile.height != g.coverRows {
+			t.Errorf("%s is held at %dx%d, want the new %dx%d",
+				id, tile.width, tile.height, g.tileW, g.coverRows)
+			break
+		}
 	}
 }
