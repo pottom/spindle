@@ -110,7 +110,9 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 
 	// The block's own ground, a step off the screen's, so that what is inside
 	// the frame reads as standing apart rather than as the same screen with a
-	// line drawn round it.
+	// line drawn round it. In the hue of the cover it stands beside, like
+	// everything else inside the frame: the frame says another record, the
+	// colour says which, and the ground says it without a word.
 	//
 	// From the picture's right edge only. The cover is put on the screen by the
 	// terminal rather than written into the row, and cutting a row apart at a
@@ -120,7 +122,7 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 			if row < 0 || row >= len(out) {
 				continue
 			}
-			out[row] = raise(out[row], from, right, m.styles.Raised, l.interior)
+			out[row] = raise(out[row], from, right, m.coverStyles.Raised, l.interior)
 		}
 	}
 

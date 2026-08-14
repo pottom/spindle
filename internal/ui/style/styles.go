@@ -128,6 +128,21 @@ type Styles struct {
 
 // New builds the styles for the given terminal background. A nil accent falls
 // back to the theme's own, for the moments before any artwork has loaded.
+const (
+	// raisedSat is how much of the accent's colour the ground keeps. Enough to
+	// name the record and not enough to be a panel painted in it.
+	raisedSat = 0.40
+)
+
+// raisedLight is how light that ground is: the same distance off the screen's
+// own, either way up.
+func raisedLight(isDark bool) float64 {
+	if isDark {
+		return 0.11
+	}
+	return 0.94
+}
+
 func New(isDark bool, accent color.Color) Styles {
 	t := NewTheme(isDark)
 	if accent == nil {
@@ -179,7 +194,12 @@ func New(isDark bool, accent color.Color) Styles {
 		Elapsed:   fg(accent),
 		Remaining: fg(t.Border),
 		Rule:      fg(t.Border),
-		Raised:    lipgloss.NewStyle().Background(t.Raised),
+
+		// The record's own hue at the ground's own weight. Measured: the flat
+		// grey this replaces sits at a lightness of 0.11, so every album's
+		// ground is put at exactly that and only the hue changes — a multiplier
+		// would have made one cover a dark slab and the next a lit one.
+		Raised: lipgloss.NewStyle().Background(tinted(accent, raisedSat, raisedLight(isDark))),
 		Knob:      fg(accent),
 
 		// The transport is the artwork's colour, like everything else on the
@@ -240,6 +260,19 @@ func Sequences(palette [][]lipgloss.Style) [][]Seq {
 // shift rotates a colour's hue by the given degrees and scales its saturation
 // and lightness, which keeps a derived colour recognisably related to the one
 // it came from — blending toward white or grey does not.
+// tinted keeps a colour's hue and puts its saturation and lightness where it is
+// told, rather than scaling them.
+//
+// A multiplier is the wrong instrument for a ground: covers come back at every
+// lightness there is, and the same factor turns one album's colour into a dark
+// slab and another's into a lit one. What a background has to be is the same
+// distance off the screen's own ground whatever record it belongs to, which is
+// an absolute.
+func tinted(c color.Color, sat, light float64) color.Color {
+	h, _, _ := toHSL(c)
+	return fromHSL(h, min(max(sat, 0), 1), min(max(light, 0), 1))
+}
+
 func shift(c color.Color, degrees, sat, light float64) color.Color {
 	h, s, l := toHSL(c)
 	h = math.Mod(h+degrees+360, 360)

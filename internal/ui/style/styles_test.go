@@ -1,6 +1,7 @@
 package style
 
 import (
+	"charm.land/lipgloss/v2"
 	"image/color"
 	"testing"
 )
@@ -37,6 +38,45 @@ func TestThePicturesKeepTheirColour(t *testing.T) {
 		}
 		if sat <= was && was < 0.6 {
 			t.Errorf("%s came back no stronger than it went in (%.2f → %.2f)", accent.name, was, sat)
+		}
+	}
+}
+
+// The marked block's ground is the record's hue at the screen's own weight.
+//
+// A multiplier was the wrong instrument: covers come back at every lightness
+// there is, and the same factor makes one album a dark slab and the next a lit
+// one. What a ground has to be is the same distance off the screen's whatever
+// record it belongs to.
+func TestTheRaisedGroundKeepsItsWeight(t *testing.T) {
+	light := func(c color.Color) float64 {
+		_, _, l := toHSL(c)
+		return l
+	}
+
+	for _, accent := range []string{"#1DB954", "#E8734A", "#4A9BE8", "#D8C24A", "#8B5CF6"} {
+		for _, dark := range []bool{true, false} {
+			s := New(dark, lipgloss.Color(accent))
+			bg, ok := s.Raised.GetBackground().(color.Color)
+			if !ok {
+				t.Fatalf("%s: the raised style has no ground", accent)
+			}
+			if got, want := light(bg), raisedLight(dark); got < want-0.01 || got > want+0.01 {
+				t.Errorf("%s dark=%v: the ground is at lightness %.2f, want %.2f", accent, dark, got, want)
+			}
+
+			// And it is the record's hue, not a grey.
+			wantHue, _, _ := toHSL(lipgloss.Color(accent))
+			gotHue, sat, _ := toHSL(bg)
+			if sat < 0.2 {
+				t.Errorf("%s: the ground came out at saturation %.2f, which is a grey", accent, sat)
+			}
+			// Within a few degrees: a ground this dark has only a handful of
+			// steps of each channel to be built out of, so the hue lands where
+			// eight bits will let it.
+			if d := gotHue - wantHue; d < -5 || d > 5 {
+				t.Errorf("%s: the ground is hue %.0f, want the record's %.0f", accent, gotHue, wantHue)
+			}
 		}
 	}
 }
