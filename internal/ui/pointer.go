@@ -58,6 +58,17 @@ const (
 	pointerElbow = "╰"
 )
 
+// pointable reports whether this screen has a band that follows the cursor and a
+// list under it for the line to reach.
+//
+// The queue, the library, and whatever has been opened from either. Not the
+// search, whose band follows the cursor too but whose heading is the field being
+// typed into — a bracket drawn round the results while somebody is still writing
+// the question is an answer arriving early. Not the player, which has no list.
+func (m Model) pointable() bool {
+	return m.tab == tabQueue || m.tab == tabLibrary
+}
+
 // pointAtCursor draws the frame and the line, over rows already laid out.
 //
 // Over rather than into: the band is assembled by whatever screen is up, and a
@@ -66,25 +77,29 @@ const (
 // this arithmetic — the same the list itself pages by.
 func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 	band := m.listBandRows(l)
-	if m.tab != tabQueue || m.devices.open || m.open() != nil || band <= 0 {
+	if m.devices.open || band <= 0 || !m.pointable() {
 		return lines
 	}
-	if !m.queuePane.room.showsNow() {
+	if m.tab == tabQueue && m.open() == nil && !m.queuePane.room.showsNow() {
 		// Nothing up there describes anything, so there is nothing to point at.
 		return lines
 	}
 
-	// Only when the two are different records. On the row that is sounding the
-	// band is about the track the list begins with, and a frame round it would
-	// be pointing at what it is standing on.
-	if _, playing := m.nowPlayingRow(); playing && m.queuePane.cursor.cursor == 0 {
+	// Only when the band and the row the list begins with are different records.
+	// On the queue's sounding row the band is about the track the list starts
+	// with, and a bracket round it would be pointing at what it is standing on.
+	if _, playing := m.nowPlayingRow(); playing && m.tab == tabQueue &&
+		m.open() == nil && m.queuePane.cursor.cursor == 0 {
 		return lines
 	}
 
 	// Where the row under the cursor ended up: the band, the list's own chrome,
 	// and how far down its window the cursor has got.
-	cursor := m.queuePane.cursor
-	from, _ := cursor.window(len(m.queueRows()), m.visibleListRows())
+	cursor, count := (&m).listCursor()
+	if cursor == nil {
+		return lines
+	}
+	from, _ := cursor.window(count, m.visibleListRows())
 	at := top + band + m.listChrome(band) + (cursor.cursor - from)
 
 	// The arms stand in the blank rows either side of the band.

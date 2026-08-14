@@ -3,10 +3,13 @@ package ui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/pottom/spindle/internal/player"
 
 	"github.com/pottom/spindle/internal/ui/msg"
 )
@@ -167,5 +170,61 @@ func TestAFailedPageDoesNotEndTheList(t *testing.T) {
 	}
 	if got.readAhead() == nil {
 		t.Error("the list will not ask again after a failure")
+	}
+}
+
+// The library's band is marked the same way the queue's is: a bracket down its
+// left and a line to the row it describes.
+//
+// Always, rather than only sometimes. On the queue the band is the cursor's
+// track while the list begins with the sounding one, so the mark answers a
+// question that only comes up off that row; here the band follows the cursor and
+// nothing else, so what it belongs to is worth saying wherever the cursor is.
+func TestTheLibraryBandIsMarkedToo(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.width, m.height = 150, 40
+	m.tab = tabLibrary
+	m.resize()
+	for i, n := range []string{"Deep House", "Chill", "Runners", "Party"} {
+		m.library.playlists = append(m.library.playlists,
+			player.Playlist{ID: fmt.Sprintf("p%d", i), Name: n, Owner: "pottom", Tracks: 30})
+	}
+
+	for _, at := range []int{0, 2, 3} {
+		m.library.cursors[m.library.kind].cursor = at
+
+		rows := strings.Split(plain(fmt.Sprint(m.View())), "\n")
+		head, elbow := -1, -1
+		for i, row := range rows {
+			if strings.Contains(row, pointerTL) {
+				head = i
+			}
+			if strings.Contains(row, pointerElbow) {
+				elbow = i
+			}
+		}
+		if head < 0 || elbow < 0 {
+			t.Fatalf("cursor %d: the band was not marked: bracket at %d, line ends at %d", at, head, elbow)
+		}
+
+		// It ends on the row the band is about.
+		want := []string{"Deep House", "Runners", "Party"}[map[int]int{0: 0, 2: 1, 3: 2}[at]]
+		if !strings.Contains(rows[elbow], want) {
+			t.Errorf("cursor %d: the line points at %q, want %q", at, strings.TrimSpace(rows[elbow]), want)
+		}
+	}
+}
+
+// And the search's is not: its heading is the field being typed into, and a
+// bracket round the results while the question is still being written is an
+// answer arriving early.
+func TestTheSearchBandIsNotMarked(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.width, m.height = 150, 40
+	m.tab = tabSearch
+	m.resize()
+
+	if got := plain(fmt.Sprint(m.View())); strings.Contains(got, pointerTL) {
+		t.Error("the search's band was marked")
 	}
 }
