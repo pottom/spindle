@@ -314,20 +314,19 @@ func (m Model) trackDetail(w, rows int) []string {
 		title += "  " + s.FactLabel.Render(explicitMark)
 	}
 
-	// The rating stands over the name rather than in the facts, and stands
+	// The rating goes under the name rather than in the facts, and stands
 	// alone: a row of stars says what it is, and "Popularity" beside them is a
-	// label on a picture. Above rather than below, because it is the one fact
-	// about the track that is an opinion — it belongs with the name, not among
-	// the measurements.
-	var lines []string
+	// label on a picture. It sits with the name because it is the one fact about
+	// a track that is an opinion rather than a measurement — and under it,
+	// because a title is what the eye should land on first.
+	lines := []string{
+		title,
+		s.Artist.Render(strings.Join(t.Artists, ", ")),
+	}
 	if t.Popularity != nil {
 		lines = append(lines, m.stars(*t.Popularity))
 	}
-	lines = append(lines,
-		title,
-		s.Artist.Render(strings.Join(t.Artists, ", ")),
-		"",
-	)
+	lines = append(lines, "")
 
 	// The playhead and the clock either side of it, for the one track they can
 	// belong to. Their rows are kept whether this is that track or not: without

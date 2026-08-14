@@ -470,8 +470,11 @@ func TestPopularityShownEvenAtZero(t *testing.T) {
 	if strings.Contains(got, "Popularity") {
 		t.Errorf("trackDetail() = %q, want the stars to stand without a label", got)
 	}
-	if rows := strings.Split(got, "\n"); !strings.Contains(rows[0], starEmpty) {
-		t.Errorf("the panel begins %q, want the stars over the name", rows[0])
+	// Under the name, not over it: a title is what the eye should land on
+	// first, and the rating belongs to the track rather than to the panel.
+	rows := strings.Split(got, "\n")
+	if len(rows) < 3 || !strings.Contains(rows[2], starEmpty) {
+		t.Errorf("the panel begins %q, want the stars under the name and the artist", rows[:min(len(rows), 3)])
 	}
 
 	m.queue[1].Popularity = &fifty
