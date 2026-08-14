@@ -46,9 +46,10 @@ func (m Model) columnRule(w int) string {
 // because the seam is fitted to the width: the run holds a whole number of them
 // so the line begins and ends in the ground rather than being cut off mid-stitch.
 //
-// Fourteen puts a dozen or so along a wide terminal — close enough together to
-// read as one line, far enough apart that each is a stitch rather than a dot.
-const columnStitch = 14
+// Seven puts two dozen or so along a wide terminal. At fourteen each stitch was
+// a mark in its own right and the eye counted them; this close together they read
+// as one line with a texture.
+const columnStitch = 7
 
 // screenGround is the terminal's own background colour, or the nearest thing to
 // it worth fading into before the terminal has said what it is.
