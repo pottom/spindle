@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -116,5 +117,74 @@ func TestSlashOnTheSearchTabStillTypes(t *testing.T) {
 	got := tm.(Model)
 	if !got.search.typing || got.find.typing {
 		t.Errorf("search typing = %v, find typing = %v, want the query", got.search.typing, got.find.typing)
+	}
+}
+
+// What the query matched is marked in the list, in every row that matched and
+// in every column that is searched.
+func TestTheQueryIsLitInTheList(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.width, m.height = 200, 40
+	m.resize()
+	m.queue[1] = player.Track{ID: "b", Title: "Titanium", Artists: []string{"Titov"},
+		Album: "Titanium", Duration: 3 * time.Minute}
+	m.startFind()
+	m.find.query = "tit"
+	m.refind()
+
+	row := m.trackRow(m.queue[1], 190, false, 2)
+	if got := plain(row); !strings.Contains(got, "Titanium") {
+		t.Fatalf("the row lost its words: %q", got)
+	}
+
+	// Three of them: the title, the artist, the album.
+	open := m.styles.Found.Render("")
+	if at := strings.Index(open, "m"); at >= 0 {
+		open = open[:at+1]
+	}
+	if n := strings.Count(row, open); n != 3 {
+		t.Errorf("%d of the row's cells are lit, want 3: %q", n, row)
+	}
+
+	// And the letters lit are the ones that matched, in their own case.
+	for _, want := range []string{"Tit", "Tit", "Tit"} {
+		at := strings.Index(row, open+want)
+		if at < 0 {
+			t.Errorf("the mark does not sit on %q: %q", want, row)
+			break
+		}
+		row = row[at+len(open):]
+	}
+}
+
+func TestASpanIsFoundWhateverTheCase(t *testing.T) {
+	for _, c := range []struct {
+		hay, needle string
+		want        [][2]int
+	}{
+		{"Titanium", "tit", [][2]int{{0, 3}}},
+		{"Titanium", "IUM", [][2]int{{5, 8}}},
+		{"aaaa", "aa", [][2]int{{0, 2}, {2, 4}}},
+		{"Titanium", "zz", nil},
+		{"Titanium", "", nil},
+		{"Árvíztűrő", "ÍZTŰ", [][2]int{{4, 10}}},
+		{"Árvíztűrő", "Ő", [][2]int{{11, 13}}},
+	} {
+		got := litSpans(c.hay, c.needle)
+		if len(got) != len(c.want) {
+			t.Errorf("%q in %q: %v, want %v", c.needle, c.hay, got, c.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != c.want[i] {
+				t.Errorf("%q in %q: %v, want %v", c.needle, c.hay, got, c.want)
+				break
+			}
+		}
+		for _, span := range got {
+			if !strings.EqualFold(c.hay[span[0]:span[1]], c.needle) {
+				t.Errorf("%q in %q marks %q", c.needle, c.hay, c.hay[span[0]:span[1]])
+			}
+		}
 	}
 }

@@ -619,8 +619,8 @@ func (m Model) queueRow(t player.Track, w int, selected bool, number int) string
 		primary = m.styles.RowSelected
 	}
 	return m.rowWithTempo(w, selected,
-		m.leadIn(m.styles.Cursor.Render(nowMark))+m.withMark(t, primary.Render(t.Title)),
-		m.styles.RowSecondary.Render(strings.Join(t.Artists, ", ")),
+		m.leadIn(m.styles.Cursor.Render(nowMark))+m.withMark(t, m.lit(primary, t.Title)),
+		m.lit(m.styles.RowSecondary, strings.Join(t.Artists, ", ")),
 		m.tempoCell(t),
 		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
 	)
@@ -929,8 +929,8 @@ func (m Model) albumRow(lead string, a player.Album, w int, selected bool) strin
 		year = strings.TrimSpace(year + " " + a.AlbumType)
 	}
 	return m.row(w, selected,
-		lead+primary.Render(a.Name),
-		m.styles.RowSecondary.Render(strings.Join(a.Artists, ", ")),
+		lead+m.lit(primary, a.Name),
+		m.lit(m.styles.RowSecondary, strings.Join(a.Artists, ", ")),
 		m.styles.RowTrailing.Render(year),
 	)
 }
@@ -952,8 +952,8 @@ func (m Model) artistRow(lead string, a player.Artist, w int, selected bool) str
 		followers = m.styles.RowTrailing.Render(formatCount(a.Followers))
 	}
 	return m.row(w, selected,
-		lead+primary.Render(a.Name),
-		m.styles.RowSecondary.Render(strings.Join(a.Genres, ", ")),
+		lead+m.lit(primary, a.Name),
+		m.lit(m.styles.RowSecondary, strings.Join(a.Genres, ", ")),
 		followers,
 	)
 }
@@ -1036,7 +1036,7 @@ func (m Model) playlistRow(p player.Playlist, w int, selected bool) string {
 	// so without a heading and without a row of its own. The column is held
 	// open on the rows without one, the way the queue holds its marks, so every
 	// name in the list starts in the same place.
-	name := m.libraryMark(p) + primary.Render(p.Name)
+	name := m.libraryMark(p) + m.lit(primary, p.Name)
 
 	// A count of nothing is not a count. The saved tracks arrive a page at a
 	// time and their number is not known until the last of them has, so the
@@ -1046,7 +1046,7 @@ func (m Model) playlistRow(p player.Playlist, w int, selected bool) string {
 		count = m.styles.RowTrailing.Render(fmt.Sprintf("%d tracks", p.Tracks))
 	}
 
-	return m.row(w, selected, name, m.styles.RowSecondary.Render(p.Owner), count)
+	return m.row(w, selected, name, m.lit(m.styles.RowSecondary, p.Owner), count)
 }
 
 // libraryMark is the column in front of a library row, which says what kind of
@@ -1074,7 +1074,7 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 		primary = m.styles.RowPlaying
 	}
 
-	title := m.queuedColumn(t) + m.withMark(t, primary.Render(t.Title))
+	title := m.queuedColumn(t) + m.withMark(t, m.lit(primary, t.Title))
 	switch {
 	case m.tab == tabQueue && m.ps != nil && m.ps.TrackID == t.ID:
 		// On the queue the playing track is marked rather than numbered: it is
@@ -1086,8 +1086,8 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 
 	return m.rowWithAlbum(w, selected,
 		title,
-		m.styles.RowSecondary.Render(strings.Join(t.Artists, ", ")),
-		m.styles.RowTrailing.Render(t.Album),
+		m.lit(m.styles.RowSecondary, strings.Join(t.Artists, ", ")),
+		m.lit(m.styles.RowTrailing, t.Album),
 		m.tempoCell(t),
 		m.styles.RowTrailing.Render(formatDuration(t.Duration)),
 	)

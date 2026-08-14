@@ -48,6 +48,10 @@ type Styles struct {
 	// Raised is the background of a block that stands apart from the screen.
 	Raised lipgloss.Style
 
+	// Found is what a search match is drawn in: the accent laid behind the
+	// letters that matched, the way grep colours what it found.
+	Found lipgloss.Style
+
 	// Rule is a quiet line drawn over the screen rather than in it: a frame
 	// round a block, a leader from one thing to another. The border grey, which
 	// is what the unplayed half of the progress bar is drawn in — so a rule
@@ -160,6 +164,27 @@ func (s Styles) On(ground color.Color) Styles {
 	return s
 }
 
+// found is how a search match is marked: the accent behind the letters, and an
+// ink taken from the accent's own hue at whichever end of the scale it is not.
+//
+// A background rather than a colour, because the colour is already spoken for.
+// The row under the cursor is drawn in the accent to begin with, and a match
+// coloured accent on it would be a highlight that disappears on exactly the row
+// being looked at — which is the row it is most wanted on.
+//
+// The ink is picked off the accent rather than off the theme because the accent
+// is a photograph's average and arrives at any lightness at all: dark text on a
+// dark cover's accent is a black bar, and the theme's own text would be that on
+// half the records in a library.
+func found(accent color.Color) lipgloss.Style {
+	h, sat, l := toHSL(accent)
+	ink := fromHSL(h, min(sat, 0.25), 0.08)
+	if l < 0.45 {
+		ink = fromHSL(h, min(sat, 0.25), 0.96)
+	}
+	return lipgloss.NewStyle().Background(accent).Foreground(ink)
+}
+
 func New(isDark bool, accent color.Color) Styles {
 	t := NewTheme(isDark)
 	if accent == nil {
@@ -211,6 +236,7 @@ func New(isDark bool, accent color.Color) Styles {
 		Elapsed:   fg(accent),
 		Remaining: fg(t.Border),
 		Rule:      fg(t.Border),
+		Found:     found(accent),
 		Raised:    lipgloss.NewStyle().Background(t.Raised),
 		Knob:      fg(accent),
 

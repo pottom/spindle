@@ -3,9 +3,12 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/pottom/spindle/internal/player"
 )
@@ -223,6 +226,95 @@ func (m Model) rowText(i int) string {
 
 func trackText(t player.Track) string {
 	return t.Title + " " + strings.Join(t.Artists, ", ") + " " + t.Album
+}
+
+// lit renders a piece of a row in its own style, with whatever the query
+// matched inside it marked — the way grep colours what it found.
+//
+// Every match in the list, not only the one the cursor is on. A list of thirty
+// answers "3 of 32" and the count says how many there are and not one word about
+// where: the marks are the answer to where, and they are readable while scrolling
+// past rather than only when landed on.
+//
+// It goes on the same cells the query is matched against — see rowText — because
+// a match nothing lights up reads as a miss.
+func (m Model) lit(s lipgloss.Style, text string) string {
+	if text == "" || m.find.query == "" || !m.findable() {
+		return s.Render(text)
+	}
+	spans := litSpans(text, m.find.query)
+	if len(spans) == 0 {
+		return s.Render(text)
+	}
+
+	var b strings.Builder
+	was := 0
+	for _, span := range spans {
+		if span[0] > was {
+			b.WriteString(s.Render(text[was:span[0]]))
+		}
+		b.WriteString(m.styles.Found.Render(text[span[0]:span[1]]))
+		was = span[1]
+	}
+	if was < len(text) {
+		b.WriteString(s.Render(text[was:]))
+	}
+	return b.String()
+}
+
+// litSpans is where a needle sits inside a string, as byte offsets, ignoring
+// case.
+//
+// Rune by rune rather than by lowering both and taking an index, because
+// lowering a string can change its length — ﬁ folds to two letters, İ to two
+// runes — and an offset into the folded string then points into the middle of a
+// letter in the real one. The comparison is folded; the offsets are the
+// original's.
+func litSpans(hay, needle string) [][2]int {
+	type mark struct {
+		r  rune
+		at int
+	}
+	var h []mark
+	for i, r := range hay {
+		h = append(h, mark{unicode.ToLower(r), i})
+	}
+	var n []rune
+	for _, r := range needle {
+		n = append(n, unicode.ToLower(r))
+	}
+	if len(n) == 0 || len(h) < len(n) {
+		return nil
+	}
+
+	var out [][2]int
+	for i := 0; i+len(n) <= len(h); {
+		hit := true
+		for j, r := range n {
+			if h[i+j].r != r {
+				hit = false
+				break
+			}
+		}
+		if !hit {
+			i++
+			continue
+		}
+
+		// The end is where the next letter begins, or — past the last of them —
+		// the last letter's own length, measured in the original rather than in
+		// what it folded to: ToLower can hand back a rune of a different size.
+		last := i + len(n)
+		end := len(hay)
+		if last < len(h) {
+			end = h[last].at
+		} else if _, size := utf8.DecodeRuneInString(hay[h[last-1].at:]); size > 0 {
+			end = min(h[last-1].at+size, len(hay))
+		}
+		out = append(out, [2]int{h[i].at, end})
+		i += len(n)
+	}
+	return out
 }
 
 // findLine is the query as the screen shows it, or empty when nothing is being
