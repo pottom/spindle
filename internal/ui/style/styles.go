@@ -395,43 +395,27 @@ func Fade(from, to color.Color, n int) []lipgloss.Style {
 	return out
 }
 
-// Seam is a run of stitches: the ground, brightening to a colour and back, over
-// and over along the width.
+// Crest is a colour at full strength along a run, given up to another over the
+// last span cells at either end.
 //
-// A line that repeats reads as one line rather than as a bar with two ends, and
-// it says the same thing everywhere along the row — which is what a rule under a
-// table has to do, because no column under it matters more than another.
+// For a line that divides rather than one that begins somewhere. A fade from one
+// end to the other has a bright end and a dead one, which says the left of the
+// row matters more than the right; this says only that there is a line, and lets
+// it go where it meets the edges of the screen.
 //
-// The stitches are fitted to the width rather than laid down at a fixed length:
-// the run holds a whole number of them, so the line begins and ends in the ground
-// instead of being cut off mid-stitch at whichever edge the arithmetic reached.
-func Seam(ground, accent color.Color, n, stitch int) []lipgloss.Style {
+// The span is what makes it a line with soft ends rather than a swell. Walking
+// the whole way out from the middle, the strength is a thing that changes
+// everywhere and the eye follows it along the row instead of reading across it.
+func Crest(from, to color.Color, n, span int) []lipgloss.Style {
 	out := make([]lipgloss.Style, max(n, 0))
-	if n <= 0 {
-		return out
-	}
-
-	stitches := max(int(math.Round(float64(n)/float64(max(stitch, 1)))), 1)
-	for k := range stitches {
-		// Whole cells rather than a wave sampled at them, so every stitch has a
-		// cell at its brightest instead of being caught on the way up. The run
-		// divides into stitches that differ by at most one cell.
-		from, to := k*n/stitches, (k+1)*n/stitches
-		mid := (to - from - 1) / 2
-		for i := from; i < to; i++ {
-			at := float64(abs(i-from-mid)) / float64(max(mid, 1))
-			out[i] = lipgloss.NewStyle().Foreground(blend(accent, ground, min(at, 1)))
-		}
+	span = max(span, 1)
+	for i := range out {
+		// How far this cell is from whichever end is nearer.
+		edge := min(i, n-1-i)
+		at := 1 - min(float64(edge)/float64(span), 1)
+		out[i] = lipgloss.NewStyle().Foreground(blend(from, to, at))
 	}
 	return out
-}
-
-// abs is the distance of an integer from zero.
-func abs(n int) int {
-	if n < 0 {
-		return -n
-	}
-	return n
 }
 
 func blend(a, b color.Color, t float64) color.Color {

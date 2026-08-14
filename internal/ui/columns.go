@@ -22,33 +22,42 @@ import (
 // it. Nothing here decides which columns fit — that is the row's business, and a
 // header that decided it separately would be a second opinion to keep in step.
 
-// columnRule is the line under those names: a seam, stitched in the accent.
+// columnRule is the line under those names.
 //
-// It began as one weight the whole way, which on a wide terminal is the loudest
-// thing on a screen made of words. Then it was the accent in the middle fading
-// out to the screen's ground at both ends — quieter, and still a bar with two
-// ends and a middle, which says the middle of the row matters most. A seam says
-// the same thing everywhere along the row, which is what a rule under a table has
-// to do: no column under it matters more than another.
+// The accent in the middle of it, walked out to the screen's own ground at both
+// ends — the same pen as the bracket that marks the band above the list, and the
+// same reason: at one weight it is a rule the width of the terminal, which is the
+// loudest thing on a screen made of words.
+//
+// Out to both ends rather than out to one. A line that fades left to right has a
+// bright end and a dead one, which says the left of the row matters more than the
+// right, and nothing about a table is truer on one side than the other. The
+// bracket beside the picture does fade one way, because it starts at a corner and
+// takes hold there; this starts nowhere and only divides.
 //
 // The sounding record's accent rather than the cover's, like the names over it.
 // The one thing on these screens that wears the cover's is the band the cursor is
 // resting on, which is explicitly about another record.
 func (m Model) columnRule(w int) string {
 	var out string
-	for _, step := range style.Seam(m.screenGround(), m.styles.Accent, w, columnStitch) {
+	for _, step := range style.Crest(m.styles.Accent, m.screenGround(), w, min(columnFade, w/4)) {
 		out += step.Render(pointerH)
 	}
 	return out
 }
 
-// columnStitch is about how long one stitch of that seam is, in cells. About,
-// because the seam is fitted to the width: the run holds a whole number of them
-// so the line begins and ends in the ground rather than being cut off mid-stitch.
+// columnFade is how many cells at each end the line is given to go out in.
 //
-// Fourteen puts a dozen or so along a wide terminal — close enough together to
-// read as one line, far enough apart that each is a stitch rather than a dot.
-const columnStitch = 14
+// It was the whole half of the line, walked from the middle, and a line whose
+// strength changes at every cell is one the eye follows along the row instead of
+// reading across. Four cells was the fewest that reads as going out rather than
+// stopping, and looked it — the ends were soft over about a word's width and the
+// line still ended somewhere. Eight is far enough to be a fade and short enough
+// that everything between them is simply the line.
+//
+// Cut to a quarter of the width where that is less, so a narrow row keeps a
+// middle to have.
+const columnFade = 8
 
 // screenGround is the terminal's own background colour, or the nearest thing to
 // it worth fading into before the terminal has said what it is.
