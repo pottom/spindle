@@ -499,3 +499,58 @@ func TestTheTilesCornersFadeOut(t *testing.T) {
 		t.Error("the arm does not end in the screen's own ground")
 	}
 }
+
+// The air between a tile and its corners measures the same on all four sides.
+//
+// A cell is about twice as tall as it is wide, so the same number of them is not
+// the same amount of air: two columns and one row is the pair that matches.
+func TestTheTilesCornersStandOffItEvenly(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.tab = tabLibrary
+	m.width, m.height = 150, 40
+	m.resize()
+	for i := range 8 {
+		m.library.playlists = append(m.library.playlists, player.Playlist{
+			ID: fmt.Sprintf("p%d", i), Name: fmt.Sprintf("List %d", i), Owner: "pottom",
+		})
+	}
+	g := m.libraryShape(m.layout(), m.layout().bodyHeight)
+	m.tiles = map[string]coverState{"p0": {
+		url: "u", width: g.tileW, height: g.coverRows,
+		art: strings.Repeat(strings.Repeat("#", g.tileW)+"\n", g.coverRows),
+	}}
+
+	rows := strings.Split(plain(fmt.Sprint(m.View())), "\n")
+	var left, right, art0, art1 = -1, -1, -1, -1
+	for _, row := range rows {
+		if !strings.Contains(row, "#") || !strings.Contains(row, pointerV) {
+			continue
+		}
+		left = strings.Index(row, pointerV)
+		right = strings.LastIndex(row, pointerV)
+		art0 = strings.Index(row, "#")
+		art1 = strings.LastIndex(row, "#")
+		break
+	}
+	if left < 0 || art0 < 0 {
+		t.Fatal("no row of the framed tile carries both the frame and its picture")
+	}
+
+	// In cells: the uprights are multi-byte, so byte offsets would lie.
+	cells := func(s string, at int) int { return lipgloss.Width(s[:at]) }
+	row := rows[0]
+	for _, r := range rows {
+		if strings.Contains(r, "#") && strings.Contains(r, pointerV) {
+			row = r
+			break
+		}
+	}
+	before := cells(row, art0) - cells(row, left) - 1
+	after := cells(row, right) - cells(row, art1) - 1
+	if before != after {
+		t.Errorf("the picture has %d columns of air on the left and %d on the right", before, after)
+	}
+	if before != frameCols-1 {
+		t.Errorf("the picture has %d columns of air, want %d", before, frameCols-1)
+	}
+}

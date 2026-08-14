@@ -33,8 +33,15 @@ const (
 	tileGap    = 2*frameCols + 1
 	tileRowGap = frameRows
 
-	// frameCols and frameRows are what that ring takes on each side.
-	frameCols = 1
+	// frameCols and frameRows are how far the corners stand off the tile on each
+	// side: two columns and one row.
+	//
+	// Not the same number, because a cell is not square. A terminal cell is about
+	// twice as tall as it is wide, so a column of air is half the air a row is —
+	// drawn one of each, the corners sat visibly closer to the sides of a picture
+	// than to its top and foot. Two and one is the pair that measures the same in
+	// pixels.
+	frameCols = 2
 	frameRows = 1
 
 	// tileTextRows is what a tile spends on words: the name, and a line saying
@@ -203,10 +210,12 @@ func (m Model) drawTileRow(row []gridTile, g gridShape, width int) []string {
 // "here". Four corners say it and let the picture be.
 func (m Model) frameTile(rows []string, at, top int, g gridShape, width int) {
 	col := at % g.cols
+	// The far side is measured from the tile's own far edge rather than from the
+	// near line, or the air is only even when a corner stands one cell out.
 	left := gridGutter + col*(g.tileW+tileGap) - frameCols
-	right := left + g.tileW + frameCols
+	right := left + g.tileW - 1 + 2*frameCols
 	head := top + (at/g.cols)*(g.tileH+tileRowGap) - frameRows
-	foot := head + g.tileH + frameRows
+	foot := head + g.tileH - 1 + 2*frameRows
 	if head < 0 || foot >= len(rows) || left < 0 || right >= width {
 		return
 	}
