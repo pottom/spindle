@@ -110,6 +110,11 @@ func (m Model) renderPlayer() string {
 	// so stand in the blank rows either side of it. See pointer.go.
 	lines = m.pointAtCursor(lines, l, len(lines)-len(body))
 
+	// And the field a list is searched in, over the head of the list itself.
+	// Last, because it is the thing being typed into: nothing on the screen may
+	// be drawn over the letters going in. See finder.go.
+	lines = m.drawFinder(lines, l, len(lines)-len(body))
+
 	// A blank row before the bottom block, so the help never reads as one more
 	// entry in whatever list ends above it.
 	lines = append(lines, m.pad("", l))

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -186,5 +187,105 @@ func TestASpanIsFoundWhateverTheCase(t *testing.T) {
 				t.Errorf("%q in %q marks %q", c.needle, c.hay, c.hay[span[0]:span[1]])
 			}
 		}
+	}
+}
+
+// searchingQueue is a queue of named tracks with a query open over it.
+func searchingQueue(t *testing.T, query string) Model {
+	t.Helper()
+	m := queueModel(0, "a", "b", "c", "d", "e", "f", "g", "h")
+	m.width, m.height = 140, 34
+	m.resize()
+	names := []string{"Titanium", "Mockingbird", "Messy", "Titans", "Cold", "Flowers", "Hero", "Style"}
+	for i := range m.queue {
+		m.queue[i] = player.Track{ID: fmt.Sprintf("t%d", i), Title: names[i],
+			Artists: []string{"Titov"}, Album: "Nightfall", Duration: 3 * time.Minute}
+	}
+	m.queuePane.room = queueRoomList
+	m.startFind()
+	m.find.query = query
+	m.refind()
+	return m
+}
+
+// The field is a box over the list, and it says what the query did.
+func TestTheFieldFloatsOverTheList(t *testing.T) {
+	m := searchingQueue(t, "tit")
+	screen := plain(fmt.Sprint(m.View()))
+	if !strings.Contains(screen, pointerTL) {
+		t.Fatal("the field is not on the screen")
+	}
+	// Every row here has Titov on it, so the query is in all of them.
+	for _, want := range []string{"/", "tit", finderCaret, fmt.Sprintf("1 of %d", len(m.find.matches))} {
+		if !strings.Contains(screen, want) {
+			t.Errorf("the field does not show %q", want)
+		}
+	}
+
+	// It costs the list nothing: the same rows are on screen with it up.
+	m.find = find{}
+	was := strings.Count(plain(fmt.Sprint(m.View())), "Nightfall")
+	m = searchingQueue(t, "tit")
+	if now := strings.Count(plain(fmt.Sprint(m.View())), "Nightfall"); now != was {
+		t.Errorf("the list holds %d rows with the field up and %d without", now, was)
+	}
+}
+
+// It never covers the row it found.
+func TestTheFieldKeepsOffWhatItFound(t *testing.T) {
+	m := searchingQueue(t, "tit")
+
+	rows := strings.Split(plain(fmt.Sprint(m.View())), "\n")
+	found, box := -1, -1
+	for i, row := range rows {
+		if strings.Contains(row, "▸") && found < 0 {
+			found = i
+		}
+		if strings.Contains(row, pointerTL) {
+			box = i
+		}
+	}
+	if found < 0 || box < 0 {
+		t.Fatalf("the cursor is on row %d and the field on %d", found, box)
+	}
+	if found >= box && found < box+finderRows {
+		t.Errorf("the field covers the row it found: cursor %d, field %d", found, box)
+	}
+}
+
+// A query with nothing to show for it says so.
+func TestTheFieldSaysWhenNothingMatched(t *testing.T) {
+	m := searchingQueue(t, "zzz")
+	if got := plain(fmt.Sprint(m.View())); !strings.Contains(got, "no match") {
+		t.Error("a query that matched nothing does not say so")
+	}
+}
+
+// Esc takes it off — the field, the marks and all — whether it is being typed
+// into or has been let go of.
+func TestEscapeTakesTheSearchOff(t *testing.T) {
+	for _, typing := range []bool{true, false} {
+		m := searchingQueue(t, "tit")
+		m.find.typing = typing
+
+		cmd, handled := m.findKey(tea.KeyPressMsg{Code: tea.KeyEscape})
+		if !handled || cmd != nil {
+			t.Errorf("typing=%v: esc was not taken", typing)
+		}
+		if m.find.query != "" || m.finding() {
+			t.Errorf("typing=%v: the search is still up after esc", typing)
+		}
+		if got := plain(fmt.Sprint(m.View())); strings.Contains(got, pointerTL) {
+			t.Errorf("typing=%v: the field is still drawn after esc", typing)
+		}
+	}
+}
+
+// And so does leaving the list it was made in.
+func TestTheSearchBelongsToItsList(t *testing.T) {
+	m := searchingQueue(t, "tit")
+	m.switchTab(tabLibrary)
+	if m.find.query != "" {
+		t.Error("the query outlived the list it was made in")
 	}
 }

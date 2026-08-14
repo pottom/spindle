@@ -26,6 +26,10 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 	// list the reader is no longer looking at.
 	m.closeOpen()
 
+	// And so did the search: it is a way through one list rather than a standing
+	// filter, and its count is about rows this screen no longer has.
+	m.find = find{}
+
 	cmds := []tea.Cmd{m.syncCover()}
 	// Coming back to the player is the common way the trace becomes visible
 	// again; waiting for the next second would be a visible gap.

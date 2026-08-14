@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -49,6 +48,13 @@ func (m Model) findable() bool {
 // because every printable key is part of what is being looked for.
 func (m *Model) findKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	if !m.find.typing {
+		// A query let go of is still on the screen — its marks are in the rows
+		// and the field still says how many it found — so the key that takes it
+		// off is the one that means never mind, before it means anything else.
+		if m.find.query != "" && key.Matches(k, m.keys.Back) {
+			m.find = find{}
+			return nil, true
+		}
 		return nil, false
 	}
 
@@ -315,24 +321,4 @@ func litSpans(hay, needle string) [][2]int {
 		i += len(n)
 	}
 	return out
-}
-
-// findLine is the query as the screen shows it, or empty when nothing is being
-// looked for. It says how many rows matched, because a query that matches
-// nothing and a query that matches everything look the same on a list you
-// cannot see the end of.
-func (m Model) findLine() string {
-	if !m.find.typing && m.find.query == "" {
-		return ""
-	}
-
-	line := "/" + m.find.query
-	switch {
-	case m.find.query == "":
-	case len(m.find.matches) == 0:
-		line += m.styles.Empty.Render("   no match")
-	default:
-		line += m.styles.Album.Render(fmt.Sprintf("   %d of %d", m.find.at+1, len(m.find.matches)))
-	}
-	return line
 }

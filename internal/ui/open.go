@@ -149,6 +149,9 @@ func (m *Model) push(page openPage) tea.Cmd {
 	}
 	page.pages = paging{loading: true}
 
+	// A search belongs to the list it was made in, and this is another list.
+	m.find = find{}
+
 	m.stack = append(m.stack, page)
 	return tea.Batch(fetchOpenCmd(m.player, page.kind, page.id, 0), m.syncCover(), m.spinner.Tick)
 }
@@ -159,6 +162,7 @@ func (m *Model) pop() bool {
 		return false
 	}
 	m.stack = m.stack[:len(m.stack)-1]
+	m.find = find{}
 	return true
 }
 
