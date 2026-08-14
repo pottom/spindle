@@ -1833,3 +1833,40 @@ func TestThePanelSitsAboveTheMiddle(t *testing.T) {
 		t.Errorf("the panel with the playhead is lifted %d rows, want none", got)
 	}
 }
+
+// The bracket wears the accent of the record it is about — the cover standing
+// inside it, not the one sounding — like everything else in the band.
+func TestTheBracketWearsTheCoversColour(t *testing.T) {
+	m := queueModel(0, "one", "two", "three")
+	m.ps = &player.State{TrackID: "now", Title: "sounding", Playing: true}
+	m.width, m.height = 120, 34
+	m.resize()
+
+	sounding := color.RGBA{R: 220, G: 40, B: 40, A: 255}
+	onScreen := color.RGBA{R: 40, G: 60, B: 220, A: 255}
+	m.tone.accent, m.tone.has = sounding, true
+	m.cover.accent, m.cover.hasAccent = onScreen, true
+	m.restyle()
+
+	m.queuePane.cursor.cursor = 2
+	screen := fmt.Sprint(m.View())
+
+	// The corner and the arm are rendered as one span, so what is looked for is
+	// the sequence that opens it with the corner behind it.
+	opens := func(s lipgloss.Style) string {
+		out := s.Render("")
+		if at := strings.Index(out, "m"); at >= 0 {
+			out = out[:at+1]
+		}
+		return out + pointerTL
+	}
+	if want := opens(m.coverStyles.Cursor); !strings.Contains(screen, want) {
+		t.Errorf("the bracket is not in the cover's own accent: want %q", want)
+	}
+	if wrong := opens(m.styles.Cursor); strings.Contains(screen, wrong) {
+		t.Error("the bracket is in the sounding record's accent")
+	}
+	if grey := opens(m.styles.Rule); strings.Contains(screen, grey) {
+		t.Error("the bracket is still the border grey")
+	}
+}

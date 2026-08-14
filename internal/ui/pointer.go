@@ -105,10 +105,15 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 		return lines
 	}
 
-	// Quiet on purpose. It is an annotation over a picture: what it has to do is
-	// answer "which track is this" when the question comes up, not compete with
-	// the picture it is drawn beside.
-	style := m.styles.Rule
+	// In the accent of the record it is about, which is the cover standing inside
+	// it rather than the one sounding — the same colour the name, the artists and
+	// the stars beside it are set in. Everything else on the screen wears the
+	// sounding record's; this bracket and what it holds are the one part of it
+	// that is explicitly about another, and they say so together.
+	//
+	// It was the border grey, which reads as furniture — a panel's edge rather
+	// than something drawn on the screen to answer a question.
+	style := m.coverStyles.Cursor
 	rule := strings.Repeat(pointerH, arm)
 
 	out := append([]string(nil), lines...)
