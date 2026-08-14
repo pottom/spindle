@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"image/color"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -1553,9 +1554,12 @@ func TestTheBandIsMarkedWhenItIsNotTheSoundingTrack(t *testing.T) {
 	}
 
 	// A bracket rather than a frame: an arm at the head and the foot, an upright
-	// between them, and nothing closing it on the right.
-	if got := strings.TrimSpace(rows[head]); got != pointerTL+strings.Repeat(pointerH, pointerArm) {
-		t.Errorf("the head of the bracket is %q, want a corner and %d of rule", got, pointerArm)
+	// between them, and nothing closing it on the right. The arms run to the far
+	// edge of the picture they hold.
+	l := m.layout()
+	want := pointerTL + strings.Repeat(pointerH, leftMargin+l.artWidth-pointerAt-1)
+	if got := strings.TrimSpace(rows[head]); got != want {
+		t.Errorf("the head of the bracket is %q, want %q", got, want)
 	}
 	for i := head; i <= elbow; i++ {
 		if strings.ContainsAny(rows[i], pointerTR+pointerBR) {
@@ -1571,8 +1575,8 @@ func TestTheBandIsMarkedWhenItIsNotTheSoundingTrack(t *testing.T) {
 	if foot < 0 {
 		t.Fatal("the bracket has no arm at its foot")
 	}
-	if got := strings.TrimSpace(rows[foot]); got != pointerTee+strings.Repeat(pointerH, pointerArm) {
-		t.Errorf("the foot of the bracket is %q, want the tee and %d of rule", got, pointerArm)
+	if got := strings.TrimSpace(rows[foot]); got != pointerTee+strings.Repeat(pointerH, leftMargin+l.artWidth-pointerAt-1) {
+		t.Errorf("the foot of the bracket is %q, want the tee and the picture's width of rule", got)
 	}
 	for i := head + 1; i < foot; i++ {
 		if !strings.HasPrefix(strings.TrimSpace(rows[i]), pointerV) {
@@ -1868,5 +1872,52 @@ func TestTheBracketWearsTheCoversColour(t *testing.T) {
 	}
 	if grey := opens(m.styles.Rule); strings.Contains(screen, grey) {
 		t.Error("the bracket is still the border grey")
+	}
+}
+
+// The arms darken along their length, from the record's colour at the corner out
+// into the screen at the picture's far edge.
+func TestTheBracketsArmsFadeOut(t *testing.T) {
+	m := queueModel(0, "one", "two", "three")
+	m.ps = &player.State{TrackID: "now", Title: "sounding", Playing: true}
+	m.width, m.height = 150, 40
+	m.resize()
+	m.cover.accent, m.cover.hasAccent = color.RGBA{R: 40, G: 60, B: 220, A: 255}, true
+	m.ground = color.RGBA{R: 10, G: 10, B: 14, A: 255}
+	m.restyle()
+	m.queuePane.cursor.cursor = 2
+
+	var arm []string
+	rule := regexp.MustCompile(`\x1b\[38;2;(\d+;\d+;\d+)m─`)
+	for _, row := range strings.Split(fmt.Sprint(m.View()), "\n") {
+		if !strings.Contains(plain(row), pointerTL) {
+			continue
+		}
+		for _, hit := range rule.FindAllStringSubmatch(row, -1) {
+			arm = append(arm, hit[1])
+		}
+		break
+	}
+	if len(arm) < 4 {
+		t.Fatalf("the arm is %d cells of rule, want the picture's width", len(arm))
+	}
+
+	// Every cell its own colour: the same one twice running would be a step
+	// rather than a fade.
+	for i := 1; i < len(arm); i++ {
+		if arm[i] == arm[i-1] {
+			t.Errorf("cells %d and %d of the arm are both %s", i-1, i, arm[i])
+			break
+		}
+	}
+
+	// It begins in the record's colour — as the screen took it, which is the
+	// cover's accent lifted to something legible — and ends in the ground.
+	r, g, b, _ := m.coverStyles.Accent.RGBA()
+	if got, want := arm[0], fmt.Sprintf("%d;%d;%d", r>>8, g>>8, b>>8); got != want {
+		t.Errorf("the arm begins at %s, want the accent %s", got, want)
+	}
+	if got, want := arm[len(arm)-1], "10;10;14"; got != want {
+		t.Errorf("the arm ends at %s, want the ground %s", got, want)
 	}
 }

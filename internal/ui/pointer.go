@@ -5,6 +5,8 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/pottom/spindle/internal/ui/style"
 )
 
 // Saying whose track the band at the top belongs to.
@@ -38,13 +40,8 @@ const (
 	pointerAt = 1
 
 	// pointerArm is how far the marks at the top and the foot of the band reach
-	// in from the margin. Long enough to read as a bracket taking hold of the
-	// band rather than as a stray tick; short enough that it is a hand on the
-	// edge and not a rule across the screen.
-	//
-	// Fixed rather than a share of the width: a share moves the end of it about
-	// as a terminal is resized, and there is nothing at that end for it to
-	// arrive at.
+	// in when there is no picture to measure against. With one they run to its
+	// edge, which is the thing at that end for them to arrive at.
 	pointerArm = 10
 
 	// The pen. Light box drawing with rounded corners, because it is an
@@ -96,11 +93,15 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 		return lines
 	}
 
-	// Never past the picture: the arm reaches in from the margin, and the cover
-	// begins a column or two along. It is put on the screen by the terminal
-	// rather than written into the row, so anything drawn over those columns is
-	// drawn over the sleeve.
-	arm := min(pointerArm, leftMargin+l.artWidth-pointerAt-1)
+	// As far as the picture's own edge. The arms stand in the blank rows above
+	// and below it, so they may run its whole width — and the width of the thing
+	// they are holding is the one length either of them can be that means
+	// something. With the picture folded away there is nothing to measure, and
+	// they fall back to a hand's width.
+	arm := max(leftMargin+l.artWidth-pointerAt-1, pointerArm)
+	if arm >= l.interior-pointerAt-1 {
+		arm = l.interior - pointerAt - 2
+	}
 	if arm < 1 {
 		return lines
 	}
@@ -113,15 +114,27 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 	//
 	// It was the border grey, which reads as furniture — a panel's edge rather
 	// than something drawn on the screen to answer a question.
-	style := m.coverStyles.Cursor
-	rule := strings.Repeat(pointerH, arm)
+	pen := m.coverStyles.Cursor
+
+	// And the arms darken along their length, out into the screen. At one weight
+	// the whole way they were two rules the width of the sleeve, which is most of
+	// what the closed frame was taken down for; fading them leaves the corner —
+	// where the bracket takes hold — and lets the rest go.
+	ground := m.ground
+	if ground == nil {
+		ground = m.styles.Theme.Raised
+	}
+	var rule string
+	for _, step := range style.Fade(m.coverStyles.Accent, ground, arm) {
+		rule += step.Render(pointerH)
+	}
 
 	out := append([]string(nil), lines...)
 	put := func(row int, at int, s string) {
 		if row < 0 || row >= len(out) {
 			return
 		}
-		out[row] = overwrite(out[row], at, style.Render(s), l.interior)
+		out[row] = overwrite(out[row], at, s, l.interior)
 	}
 
 	// The bracket, and nothing else. It was a closed frame with a ground inside
@@ -130,19 +143,19 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 	// one, while a rule round all four sides is four lines saying what the one
 	// down the left already says.
 
-	put(head, pointerAt, pointerTL+rule)
-	put(foot, pointerAt, pointerTee+rule)
+	put(head, pointerAt, pen.Render(pointerTL)+rule)
+	put(foot, pointerAt, pen.Render(pointerTee)+rule)
 	for row := head + 1; row < foot; row++ {
-		put(row, pointerAt, pointerV)
+		put(row, pointerAt, pen.Render(pointerV))
 	}
 
 	// And down the margin to the row it belongs to, where it turns and points.
 	for row := foot + 1; row < at; row++ {
-		put(row, pointerAt, pointerV)
+		put(row, pointerAt, pen.Render(pointerV))
 	}
 	// The row's own cursor mark is the head of it: drawing a second arrowhead
 	// beside it put two of them on the one row, both saying the same thing.
-	put(at, pointerAt, pointerElbow+pointerH)
+	put(at, pointerAt, pen.Render(pointerElbow+pointerH))
 	return out
 }
 

@@ -376,6 +376,25 @@ func fromHSL(h, s, l float64) color.Color {
 }
 
 // blend mixes two colours, t running from a to b.
+// Fade is a colour walked out to another in n steps: a mark that begins in the
+// record's own colour and ends in the screen it is drawn on.
+//
+// Ends in it rather than near it. A stripe that stops at a grey has an end, and
+// an end is a thing the eye arrives at and asks about; one that runs out into the
+// background has none, which is what a mark drawn beside a picture wants — it
+// says where the picture begins and then gets out of the way.
+func Fade(from, to color.Color, n int) []lipgloss.Style {
+	out := make([]lipgloss.Style, max(n, 0))
+	for i := range out {
+		at := 0.0
+		if n > 1 {
+			at = float64(i) / float64(n-1)
+		}
+		out[i] = lipgloss.NewStyle().Foreground(blend(from, to, at))
+	}
+	return out
+}
+
 func blend(a, b color.Color, t float64) color.Color {
 	t = min(max(t, 0), 1)
 	ar, ag, ab, _ := a.RGBA()
