@@ -58,6 +58,10 @@ type keyMap struct {
 	Loose  key.Binding
 	Lyrics key.Binding
 
+	// Close folds the band above the queue away a block at a time, so the list
+	// has the rows. See queueRoom.
+	Close key.Binding
+
 	Peek key.Binding
 	Mute key.Binding
 
@@ -256,6 +260,10 @@ func newKeyMap() keyMap {
 			key.WithHelp(keyLyrics, "lyrics"),
 		),
 
+		Close: key.NewBinding(
+			key.WithKeys(keyClose),
+			key.WithHelp(keyClose, "fold the top away"),
+		),
 		Peek: key.NewBinding(
 			key.WithKeys(keyPeek),
 			key.WithHelp(keyPeek, "up next"),

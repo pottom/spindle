@@ -66,7 +66,11 @@ const (
 
 	keyLyrics = "l"
 
-	keyPeek = "u"
+	// keyClose folds the band above the queue away, a block at a time, so the
+	// list has the rows. Not z, which is where y sits on a Hungarian keyboard
+	// and is awkward on both.
+	keyClose = "c"
+	keyPeek  = "u"
 
 	keyFind     = "/"
 	keyFindNext = ";"

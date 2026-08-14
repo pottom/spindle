@@ -693,6 +693,17 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.lyrics.on = !m.lyrics.on
 		return m, tea.Batch(m.fetchLyrics(), m.savePrefs())
 
+	case key.Matches(k, m.keys.Close):
+		// The band above the queue, folded away a block at a time. Only there:
+		// the same band stands over the library and the search, and what it
+		// holds on those is the thing the cursor is resting on — which is the
+		// point of those screens rather than a header on them.
+		if m.tab != tabQueue || m.devices.open || m.open() != nil {
+			return m, nil
+		}
+		m.queuePane.room = m.queuePane.room.next()
+		return m, m.savePrefs()
+
 	case key.Matches(k, m.keys.Peek):
 		if !m.peekAvailable() {
 			return m, nil

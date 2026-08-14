@@ -121,6 +121,7 @@ func helpGroups() []helpGroup {
 	}, {
 		title: "In the queue",
 		keys: [][2]string{
+			{keyClose, "fold the top away: the picture, the player, both"},
 			{pair(keyMoveDn, keyMoveUp), "move a track down or up"},
 			{keyDrop, "take it out"},
 			{keyEnter, "bring it forward and play it"},

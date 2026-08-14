@@ -93,8 +93,19 @@ const (
 func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	w := queueBlockWidth(l)
 
-	top := min(l.artHeight, rows)
-	art := m.place(m.artBlock(false), l.artWidth, top)
+	// Which of the two blocks above the list are open. Everywhere but the queue
+	// that is both of them; there the key walks the four ways of arranging
+	// them, and the last of them is no band at all. See queueRoom.
+	room := queueRoomBoth
+	if m.tab == tabQueue && m.open() == nil && !m.devices.open {
+		room = m.queuePane.room
+	}
+
+	top := min(m.listBandRows(l), rows)
+	var art []string
+	if room.showsNow() {
+		art = m.place(m.artBlock(false), l.artWidth, top)
+	}
 
 	// The picture decides how far the panel beside it may reach: the box the
 	// layout gives the artwork is a row or two taller than the cover drawn in
@@ -112,25 +123,43 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	detailWidth := l.infoWidth
 	var right []string
 	switch {
-	case m.scopeVisible():
+	case m.scopeVisible() && room.showsTrace():
 		detailWidth = queueDetailWidth(l)
 		right = m.place(m.traceBlock(), queueScopeWidth(l), top)
 	case m.showsNowPanel():
 		detailWidth = queueDetailWidth(l)
 		right = m.place(m.nowBlock(l, foot), nowPanelWidth(l), top)
 	}
-	detail := stack(opts.detail(detailWidth, foot), detailWidth, foot)
-	for len(detail) < top {
-		detail = append(detail, strings.Repeat(" ", detailWidth))
+
+	// With the player folded away the picture has the band to itself, which is
+	// what a picture wants: the strip beside a cover is a glance, and the same
+	// picture across the whole width is something to watch.
+	if right != nil && !room.showsNow() {
+		right = m.place(m.traceBlock(), w, top)
 	}
-	detail = m.outline(detail, detailWidth, "detail")
+
+	var detail []string
+	if room.showsNow() {
+		detail = stack(opts.detail(detailWidth, foot), detailWidth, foot)
+		for len(detail) < top {
+			detail = append(detail, strings.Repeat(" ", detailWidth))
+		}
+		detail = m.outline(detail, detailWidth, "detail")
+	}
 
 	out := make([]string, 0, rows)
 	gap := strings.Repeat(" ", columnGap)
-	for i := range art {
-		row := art[i] + gap + detail[i]
+	band := max(len(art), len(right))
+	for i := range band {
+		var row string
+		if art != nil {
+			row = art[i] + gap + detail[i]
+		}
 		if right != nil {
-			row += gap + right[i]
+			if row != "" {
+				row += gap
+			}
+			row += right[i]
 		}
 		out = append(out, row)
 	}
@@ -156,7 +185,7 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	// What is left is the list. It is asked for rather than counted off what has
 	// been drawn, because the page keys have to move by the same number and
 	// cannot see this function.
-	body := listBodyRows(rows, l.artHeight)
+	body := listBodyRows(rows, m.listBandRows(l))
 
 	// The menu takes the list's rows rather than floating over them. What the
 	// verbs apply to is described in the panel above either way, so the list is

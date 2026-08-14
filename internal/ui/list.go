@@ -85,7 +85,21 @@ func (m Model) visibleListRows() int {
 	}
 
 	l := m.layout()
-	return listBodyRows(max(l.bodyHeight, 1), l.artHeight)
+	return listBodyRows(max(l.bodyHeight, 1), m.listBandRows(l))
+}
+
+// listBandRows is how tall the band above a list is: the artwork's height, and
+// nothing at all where both of the blocks in it have been folded away.
+//
+// Read by the view to draw it and by the keys to page by it. Neither may work it
+// out for itself — the view is a pure function and may not write down what it
+// drew, so the two derive the same number from the same place or they disagree
+// about how far a page is. See visibleListRows.
+func (m Model) listBandRows(l layout) int {
+	if m.tab == tabQueue && m.open() == nil && !m.devices.open && m.queuePane.room == queueRoomList {
+		return 0
+	}
+	return l.artHeight
 }
 
 // listLoading reports whether the list on screen is waiting for a page. It is

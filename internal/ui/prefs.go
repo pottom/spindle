@@ -23,6 +23,11 @@ type prefs struct {
 	Lyrics bool        `json:"lyrics"`
 	Peek   bool        `json:"peek"`
 
+	// Room is how much of the queue tab the list has: which of the two blocks
+	// above it are folded away. Kept because it is a way of working rather than
+	// a passing look — somebody who reads their queue with the picture off wants
+	// it off tomorrow as well. See queueRoom.
+	Room int `json:"room,omitempty"`
 }
 
 // prefsMsg carries the file's contents back into the model.
@@ -65,6 +70,7 @@ func (m Model) savePrefs() tea.Cmd {
 		Scope:  append([]scopeMode(nil), m.scope.modes[:]...),
 		Lyrics: m.lyrics.on,
 		Peek:   m.peek.on,
+		Room:   int(m.queuePane.room),
 	}
 	return func() tea.Msg {
 		path, err := prefsPath()

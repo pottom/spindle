@@ -1201,3 +1201,69 @@ func TestSearchSkipsEmptyKinds(t *testing.T) {
 		t.Errorf("turned to %q, want the next kind that matched anything", m.search.kind)
 	}
 }
+
+// The band above the queue folds away a block at a time, and every row it gives
+// up goes to the list.
+//
+// The list is the point of that tab, and on an ordinary terminal the band over
+// it costs a third of the rows it could be read in. Four arrangements rather
+// than a switch: two blocks make four, and a key that turned one of them off
+// would need a second key for the other.
+func TestTheQueueFoldsTheBandAway(t *testing.T) {
+	m := scopeModel(120, 44)
+	m.tab = tabQueue
+	ids := make([]string, 40)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("t%02d", i)
+	}
+	m.queue = queueOf(0, ids...)
+
+	var tm tea.Model = m
+	rooms := []struct {
+		room                queueRoom
+		showsNow, showsTrace bool
+	}{
+		{queueRoomBoth, true, true},
+		{queueRoomNow, true, false},
+		{queueRoomTrace, false, true},
+		{queueRoomList, false, false},
+	}
+
+	was := -1
+	for _, want := range rooms {
+		got := tm.(Model)
+		if got.queuePane.room != want.room {
+			t.Fatalf("the queue is arranged as %v, want %v", got.queuePane.room, want.room)
+		}
+		if got.queuePane.room.showsNow() != want.showsNow || got.queuePane.room.showsTrace() != want.showsTrace {
+			t.Errorf("%v shows the player %v and the picture %v", want.room,
+				got.queuePane.room.showsNow(), got.queuePane.room.showsTrace())
+		}
+
+		// Every fold gives the list rows, and the last of them gives it the
+		// band's whole height.
+		rows := got.visibleListRows()
+		if want.room == queueRoomList && rows <= was {
+			t.Errorf("with nothing above it the list has %d rows, no more than the %d it had", rows, was)
+		}
+		if want.room != queueRoomList && rows != was && was >= 0 {
+			// The middle two keep the band, so they keep the rows: what changes
+			// there is what stands in it, not how tall it is.
+			t.Errorf("%v changed the list from %d rows to %d, want the band the same height", want.room, was, rows)
+		}
+		if want.room != queueRoomList {
+			was = rows
+		}
+
+		// And the screen draws without complaint in every one of them.
+		if screen := fmt.Sprint(got.View()); screen == "" {
+			t.Errorf("%v drew nothing", want.room)
+		}
+		tm, _ = tm.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	}
+
+	// And round: four presses come back to where it started.
+	if got := tm.(Model).queuePane.room; got != queueRoomBoth {
+		t.Errorf("four presses left the queue at %v, want it back where it began", got)
+	}
+}

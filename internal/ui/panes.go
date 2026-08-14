@@ -235,6 +235,49 @@ func (p libraryPane) cover() string {
 // one more thing to keep in step.
 type queuePane struct {
 	cursor listState
+
+	// room is which of the two blocks above the list are open. See queueRoom.
+	room queueRoom
+}
+
+// queueRoom is how much of the screen the queue is given.
+//
+// The tab is a list with a band across the top of it: what is playing on the
+// left, the picture of it on the right. Both are worth having and neither is
+// worth having always — a queue is read by looking down it, and on an ordinary
+// terminal the band costs a third of the rows it could be read in.
+//
+// So the key walks all four ways of arranging that, rather than switching one
+// thing off. Two blocks make four states and a key that only toggled one of them
+// would need a second key for the other, which is two keys for one question.
+type queueRoom int
+
+const (
+	queueRoomBoth  queueRoom = iota // what is playing, and the picture of it
+	queueRoomNow                    // what is playing, and the list
+	queueRoomTrace                  // the picture, and the list
+	queueRoomList                   // the list, and the whole screen for it
+	queueRooms
+)
+
+// next walks to the arrangement after this one, and round.
+func (r queueRoom) next() queueRoom { return (r + 1) % queueRooms }
+
+// showsNow and showsTrace are which of the two blocks this arrangement has.
+func (r queueRoom) showsNow() bool   { return r == queueRoomBoth || r == queueRoomNow }
+func (r queueRoom) showsTrace() bool { return r == queueRoomBoth || r == queueRoomTrace }
+
+func (r queueRoom) String() string {
+	switch r {
+	case queueRoomNow:
+		return "the player"
+	case queueRoomTrace:
+		return "the picture"
+	case queueRoomList:
+		return "the list alone"
+	default:
+		return "the player and the picture"
+	}
 }
 
 // searchPane is the search tab: a query and what it matched.
