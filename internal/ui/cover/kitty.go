@@ -77,7 +77,12 @@ type Kitty struct {
 // pictures this way. What that looked like was a logo that never appeared and a
 // colour that never crossed, on exactly the terminals good enough to show both.
 // A slot is an integer here; running out of them costs nothing but saying so.
-const slots = 64
+const slots = Slots
+
+// Slots is that number, for the callers that hand out pictures. A wall of covers
+// has to know how many it may keep apart before it starts giving two of them the
+// same number, which is a picture drawn in the wrong place.
+const Slots = 64
 
 func NewKitty(out io.Writer, cell CellSize) *Kitty {
 	// Zero is not an id the protocol accepts, and a pid can be anything. The

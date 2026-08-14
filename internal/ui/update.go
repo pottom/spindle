@@ -218,7 +218,7 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		// reader has already walked away from.
 		if page := m.openMut(); page != nil && page.id == message.ID {
 			page.adopt(message)
-			return m, m.syncCover()
+			return m, tea.Batch(m.syncCover(), m.syncRowCovers())
 		}
 		return m, nil
 

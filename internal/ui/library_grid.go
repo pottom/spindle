@@ -6,6 +6,8 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/pottom/spindle/internal/ui/cover"
 )
 
 // What the library's wall is made of, and where its pictures come from.
@@ -14,10 +16,22 @@ import (
 // screen into tiles and draws what it is handed. This is the half that knows
 // what a playlist is.
 
-// gridSlotFrom is the first renderer slot the wall may use. Below it are the
-// pictures a screen holds one of — the cursor's, what is playing, the next
-// record's colour, the program's own.
-const gridSlotFrom = 4
+// gridSlotFrom is the first renderer slot the wall may use, and gridSlots how
+// many it has. Below it are the pictures a screen holds one of — the cursor's,
+// what is playing, the next record's colour, the program's own.
+const (
+	gridSlotFrom = 4
+	gridSlots    = cover.Slots - gridSlotFrom
+)
+
+// slotFor is the renderer slot a thing on the wall draws in.
+//
+// Taken from where the thing is in the library rather than from where it is on
+// screen. A slot is one picture to the terminal, and a picture re-sent under the
+// same slot is uploaded again: keyed by screen position, scrolling one row would
+// re-send every cover on the wall. Keyed by the thing itself, a cover that only
+// moved stays where it is and nothing goes over the wire.
+func slotFor(at int) int { return gridSlotFrom + at%gridSlots }
 
 // libraryTile is one thing on the wall, before its picture has been found.
 type libraryTile struct {
@@ -189,7 +203,7 @@ func (m *Model) syncGridCovers() tea.Cmd {
 			continue
 		}
 		m.tiles[item.id] = coverState{url: item.url, width: g.tileW, height: g.coverRows}
-		cmds = append(cmds, coverCmd(m.covers, item.url, g.tileW, g.coverRows, gridSlotFrom+(i-from)))
+		cmds = append(cmds, coverCmd(m.covers, item.url, g.tileW, g.coverRows, slotFor(i)))
 	}
 	for id := range m.tiles {
 		if !seen[id] {
