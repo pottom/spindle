@@ -144,7 +144,7 @@ func TestPeekRowsAreFlushWithTheHeading(t *testing.T) {
 // table names a column for this, and a mark and a column both would be the same
 // fact twice in one row.
 func TestTheGlanceMarksTheSavedTracks(t *testing.T) {
-	m := lyricsModel(190, 44)
+	m := lyricsModel(190, 56)
 	for i, n := range []string{"first", "second", "third", "fourth", "fifth", "sixth"} {
 		m.queue = append(m.queue, player.Track{ID: fmt.Sprint(i), Title: n,
 			Artists: []string{"someone"}, Duration: time.Duration(180+i*9) * time.Second})
@@ -312,5 +312,47 @@ func TestTheGlanceStandsUnderTheBlank(t *testing.T) {
 	}
 	if got := rows[at-2]; !strings.Contains(got, "━") {
 		t.Errorf("row %d is %q, want the rule under the tabs two over the glance", at-2, got)
+	}
+}
+
+// Two blank rows between the glance and the picture. At one the last track sat
+// on the roof of the sleeve and the two read as one block.
+func TestTheGlanceKeepsOffThePicture(t *testing.T) {
+	for _, h := range []int{48, 40, 34} {
+		m := lyricsModel(190, h)
+		for i, n := range []string{"first", "second", "third", "fourth"} {
+			m.queue = append(m.queue, player.Track{ID: fmt.Sprint(i), Title: n,
+				Artists: []string{"someone"}, Duration: time.Minute})
+		}
+		m.peek.on = true
+		if !m.peekVisible() {
+			continue
+		}
+
+		rows := strings.Split(plain(m.render()), "\n")
+		at := -1
+		for i, row := range rows {
+			if strings.Contains(row, "Up next") {
+				at = i
+				break
+			}
+		}
+		if at < 0 {
+			t.Fatalf("%d rows: the glance is not on the screen", h)
+		}
+
+		l := m.layout()
+		top := at + m.artTop(l, l.bodyHeight)
+		if top > len(rows) {
+			t.Fatalf("%d rows: the picture starts past the screen", h)
+		}
+		for i := top - peekGap; i < top; i++ {
+			if got := strings.TrimSpace(rows[i]); got != "" {
+				t.Errorf("%d rows: row %d over the picture carries %q, want it blank", h, i, got)
+			}
+		}
+		if got := strings.TrimSpace(rows[top-peekGap-1]); got == "" {
+			t.Errorf("%d rows: the glance leaves more than %d blank rows over the picture", h, peekGap)
+		}
 	}
 }

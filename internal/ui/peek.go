@@ -13,7 +13,12 @@ const (
 
 	// peekChrome is what the block spends on itself: the names of its columns,
 	// the line under them, and the blank between the list and the artwork.
-	peekChrome = 3
+	peekChrome = 2 + peekGap
+
+	// peekGap is that blank. Two rows: at one the last track sat on the roof of
+	// the sleeve and the two blocks read as one, and the picture is the subject
+	// of this screen — the glance is what is coming after it.
+	peekGap = 2
 )
 
 // peekState is the glance at what is coming next, shown above the artwork.
@@ -56,7 +61,7 @@ func (m Model) drawPeek(lines []string, at int, l layout) []string {
 	if room < peekLeast+peekChrome {
 		return lines
 	}
-	tall := min(room-1, peekRows+peekChrome-1)
+	tall := min(room-peekGap, peekRows+peekChrome-peekGap)
 	// A column in from the frame's own margin. Flush with the artwork and the
 	// device name, the glance reads as part of the chrome rather than as
 	// something laid on top of the screen.
