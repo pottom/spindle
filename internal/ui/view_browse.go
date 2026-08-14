@@ -552,15 +552,12 @@ func (m Model) showsStars(w int) bool {
 // at a glance the way a column can.
 func (m Model) queuedColumn(t player.Track) string {
 	if m.rowsAreTheQueue {
-		// Everything here is in the queue by definition, so a column of dots
-		// saying so is a column that says nothing. It is kept and spent on the
-		// one thing this list cannot say otherwise: whether what is coming is
-		// something you have saved. Held open on the rows without a heart, so
-		// no title moves as the list turns over.
-		if m.library.saved(t.ID) {
-			return m.styles.Cursor.Render(likedMark) + " "
-		}
-		return blankMark
+		// Nothing in front of the title. Everything here is in the queue by
+		// definition, so a column of dots saying so is a column that says
+		// nothing — and the heart it was spent on instead is a column of the
+		// table now, where it is named and where every other list carries it.
+		// A mark and a column both would be the same fact twice in one row.
+		return ""
 	}
 	if m.tab == tabQueue {
 		// Same again, and nothing to put in its place: the queue screen is a

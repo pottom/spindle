@@ -135,13 +135,20 @@ func TestPeekRowsAreFlushWithTheHeading(t *testing.T) {
 	}
 }
 
-// The column in front of the titles carries a heart for the tracks that are
-// saved, and nothing for the rest.
+// The glance carries a heart for the tracks that are saved, and nothing for the
+// rest — in the table's own column, once.
 //
-// It used to carry a dot on every row, saying each was in the queue — which is
-// the one thing every row of a list of what is queued can be relied on to be.
+// The column in front of the titles carried it before, and before that a dot on
+// every row saying each was in the queue, which is the one thing every row of a
+// list of what is queued can be relied on to be. It carries nothing now: the
+// table names a column for this, and a mark and a column both would be the same
+// fact twice in one row.
 func TestTheGlanceMarksTheSavedTracks(t *testing.T) {
-	m := peekModel()
+	m := lyricsModel(190, 44)
+	for i, n := range []string{"first", "second", "third", "fourth", "fifth", "sixth"} {
+		m.queue = append(m.queue, player.Track{ID: fmt.Sprint(i), Title: n,
+			Artists: []string{"someone"}, Duration: time.Duration(180+i*9) * time.Second})
+	}
 	m.peek.on = true
 	m.library.adoptLiked([]player.Track{{ID: "1", Title: "second"}}, false)
 
@@ -166,12 +173,16 @@ func TestTheGlanceMarksTheSavedTracks(t *testing.T) {
 		}
 	}
 
-	// And the column is held open on the rows without one, so a track being
-	// saved elsewhere does not shunt the list sideways. In cells: the heart is
-	// three bytes and a variation selector, and one column.
+	// The titles start at the same column whether a row is saved or not: the
+	// heart is out in the table now and nothing in front of them moves.
 	at := func(row, title string) int { return lipgloss.Width(row[:strings.Index(row, title)]) }
 	if a, b := at(rows["first"], "first"), at(rows["second"], "second"); a != b {
-		t.Errorf("the titles start at columns %d and %d, want the column held open", a, b)
+		t.Errorf("the titles start at columns %d and %d, want them in line", a, b)
+	}
+
+	// And the heart is out there rather than in front of the title.
+	if before := rows["second"][:strings.Index(rows["second"], "second")]; strings.Contains(before, likedMark) {
+		t.Errorf("the heart is still in front of the title: %q", before)
 	}
 }
 
@@ -229,5 +240,50 @@ func TestTheGlanceLinesUpWithTheColumnBesideThePicture(t *testing.T) {
 	if want := leftMargin + l.artWidth + columnGap; at != want {
 		t.Errorf("the glance's artists start at column %d, want %d — the column beside the picture",
 			at, want)
+	}
+}
+
+// The glance is set like every other list of tracks: its columns are named, and
+// a line stands under the names.
+func TestTheGlanceIsATable(t *testing.T) {
+	m := lyricsModel(190, 44)
+	pop := 80
+	for i, n := range []string{"first", "second", "third", "fourth"} {
+		m.queue = append(m.queue, player.Track{ID: fmt.Sprint(i), Title: n, Album: "Nightfall",
+			Artists: []string{"someone"}, Popularity: &pop, Duration: time.Minute})
+	}
+	m.peek.on = true
+
+	rows := strings.Split(plain(m.render()), "\n")
+	head, rule, first := -1, -1, -1
+	for i, row := range rows {
+		if head < 0 && strings.Contains(row, "Up next") {
+			head = i
+		}
+		if head >= 0 && rule < 0 && strings.HasPrefix(strings.TrimSpace(row), pointerH) {
+			rule = i
+		}
+		if head >= 0 && first < 0 && strings.Contains(row, "first") {
+			first = i
+		}
+	}
+	if head < 0 {
+		t.Fatal("the glance is not on the screen")
+	}
+
+	// Its name stands where a title would, and the other columns are named
+	// beside it — so the label costs no row of a block four rows tall.
+	for _, name := range []string{"artist", "album", "stars", "liked", "time"} {
+		if !strings.Contains(rows[head], name) {
+			t.Errorf("the glance does not name its %s column: %q", name, rows[head])
+		}
+	}
+	if rule != head+1 || first != head+2 {
+		t.Errorf("the names are on row %d, the line on %d and the first track on %d", head, rule, first)
+	}
+
+	// And the columns hold what they are named after.
+	if got := rows[first]; !strings.Contains(got, "Nightfall") || !strings.Contains(got, starFull) {
+		t.Errorf("the glance's rows carry no album and no rating: %q", got)
 	}
 }

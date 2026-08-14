@@ -3,12 +3,17 @@ package ui
 import "strings"
 
 const (
-	// peekRows is how many tracks the glance shows. Four is enough to know what
-	// is coming without becoming a second queue screen.
+	// peekRows is how many tracks the glance shows at most. Four is enough to
+	// know what is coming without becoming a second queue screen.
 	peekRows = 4
 
-	// peekChrome is the heading and the blank row under the list.
-	peekChrome = 2
+	// peekLeast is how few it will still bother with. Two rows of what is coming
+	// is a glance; one is a caption on the queue.
+	peekLeast = 2
+
+	// peekChrome is what the block spends on itself: the names of its columns,
+	// the line under them, and the blank between the list and the artwork.
+	peekChrome = 3
 )
 
 // peekState is the glance at what is coming next, shown above the artwork.
@@ -27,7 +32,7 @@ func (m Model) peekAvailable() bool {
 		return false
 	}
 	l := m.layout()
-	return m.artTop(l, l.bodyHeight) >= peekRows+peekChrome
+	return m.artTop(l, l.bodyHeight) >= peekLeast+peekChrome
 }
 
 // peekVisible reports whether the glance is on screen right now.
@@ -40,9 +45,14 @@ func (m Model) peekVisible() bool { return m.peek.on && m.peekAvailable() }
 // header and everything else — which is where every other screen's first line
 // sits, and where this one looked a row low.
 func (m Model) drawPeek(lines []string, at int, l layout) []string {
-	if len(lines)-at < peekRows+peekChrome {
+	// As many tracks as the blank above the artwork can hold, up to four. It was
+	// four or nothing, which on the terminals where the room is five or six rows
+	// meant nothing — and the glance is worth having at three.
+	room := len(lines) - at
+	if room < peekLeast+peekChrome {
 		return lines
 	}
+	tall := min(room-1, peekRows+peekChrome-1)
 	// A column in from the frame's own margin. Flush with the artwork and the
 	// device name, the glance reads as part of the chrome rather than as
 	// something laid on top of the screen.
@@ -62,7 +72,7 @@ func (m Model) drawPeek(lines []string, at int, l layout) []string {
 	// the arithmetic: this list is flush, having no cursor to stand anywhere.
 	glance.rowsMainAt = max(l.artWidth+columnGap-inset-1, 0)
 
-	for i, row := range glance.place(glance.upNextBlock(), w, peekRows+1) {
+	for i, row := range glance.place(glance.upNextBlock(), w, tall) {
 		lines[at+i] = m.pad(indent+row, l)
 	}
 	return lines

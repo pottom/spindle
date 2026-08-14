@@ -67,33 +67,63 @@ func (m Model) wordsBlock() block {
 	}}
 }
 
-// upNextBlock is the glance at what follows: a heading and the first few of the
-// queue. It is on the player today; it is one line to put it anywhere else.
+// upNextBlock is the glance at what follows: the first few of the queue, set
+// like the tables on the list screens. It is on the player today; it is one line
+// to put it anywhere else.
+//
+// The same table, because it is the same thing: a list of tracks in columns. It
+// had columns of its own before and no names on them, which is the state every
+// other list was in until they were named — and this is the list somebody reads
+// out of the corner of an eye, where a column nobody can name is worth least.
+//
+// Its name stands where the title's would be, in the column the titles are in.
+// The heading row was a row of its own with one word on it and nothing else, and
+// a glance is four rows tall: a whole row for a label, above a list that can only
+// afford four, is the label costing a quarter of what it labels.
 func (m Model) upNextBlock() block {
 	return block{"up next", func(w, h int) []string {
-		out := []string{spread(
-			m.styles.Title.Render("Up next"),
-			m.styles.Album.Render(peekSubtitle(len(m.queue))),
-			w,
-		)}
-
 		// The rows are drawn flush: there is no cursor on this list, so the
 		// column one would stand in is dead space.
-		flush := m
-		flush.rowsAreFlush = true
-		// And every row of it is in the queue already, which is what turns the
-		// column of queued dots into the column that says which of them are
-		// saved. See queuedColumn.
-		flush.rowsAreTheQueue = true
-		for i := range h - 1 {
+		glance := m
+		glance.rowsAreFlush = true
+		// And every row of it is in the queue already, which is what takes the
+		// column of queued dots off the front of the titles. See queuedColumn.
+		glance.rowsAreTheQueue = true
+
+		name := m.styles.Title.Render("Up next")
+		if len(m.queue) == 0 {
+			return append([]string{spread(name, m.styles.Empty.Render(peekSubtitle(0)), w)},
+				blankRows(w, h-1)...)
+		}
+
+		out := []string{glance.columnHead(w, name, rowCells{
+			secondary: "artist",
+			album:     "album",
+			stars:     "stars",
+			liked:     "liked",
+			tempo:     "tempo",
+			trailing:  "time",
+		})}
+		out = append(out, fit(m.styles.Rule.Render(strings.Repeat(pointerH, w)), w))
+
+		for i := range h - len(out) {
 			row := strings.Repeat(" ", w)
 			if i < len(m.queue) {
-				row = flush.trackRow(m.queue[i], w, false, i+1)
+				row = glance.trackRow(m.queue[i], w, false, i+1)
 			}
 			out = append(out, row)
 		}
 		return out
 	}}
+}
+
+// blankRows is n rows of nothing, for a block with nothing to put in them.
+func blankRows(w, n int) []string {
+	out := make([]string, max(n, 0))
+	for i := range out {
+		out[i] = strings.Repeat(" ", w)
+	}
+	return out
 }
 
 // nowBlock is the small cover and caption of what is playing, for the screens
