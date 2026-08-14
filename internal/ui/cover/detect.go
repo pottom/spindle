@@ -3,21 +3,28 @@ package cover
 import (
 	"bytes"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/x/term"
 )
 
-// graphicsQuery asks the terminal three things in one breath: whether it speaks
-// the kitty graphics protocol, what it calls itself, and — last, because every
-// terminal answers it — its device attributes, which is how the reading knows
-// the terminal has finished talking. A reply with only the last is a definitive
-// "no" to the first. DESIGN.md 5.3.
+// graphicsQuery asks the terminal four things in one breath: whether it speaks
+// the kitty graphics protocol, how big one of its cells is in pixels, what it
+// calls itself, and — last, because every terminal answers it — its device
+// attributes, which is how the reading knows the terminal has finished talking.
+// A reply with only the last is a definitive "no" to the first. DESIGN.md 5.3.
 //
 // The name is asked for because speaking the protocol is not one question. See
 // Graphics.Placeholders.
-const graphicsQuery = "\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[>q\x1b[c"
+//
+// The cell size is asked for because the other way of learning it — the pixel
+// fields of the kernel's window size — is filled in over ssh by whatever the
+// client said, and a client that guesses badly hands us a cell no font could
+// have. The terminal itself knows. It costs nothing to ask here: the round trip
+// is already being paid for.
+const graphicsQuery = "\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[16t\x1b[>q\x1b[c"
 
 // tidyQuery puts the cursor back and wipes anything the terminal printed
 // because it did not recognise what it was asked.
@@ -54,6 +61,11 @@ type Graphics struct {
 
 	// Name is what the terminal called itself, or empty if it did not say.
 	Name string
+
+	// Cell is the pixel size of one cell as the terminal itself reported it.
+	// Measured is false where it did not answer, or answered something no
+	// terminal could have.
+	Cell CellSize
 }
 
 // Backend is the renderer this terminal should be given.
@@ -125,7 +137,11 @@ func Probe(out, in *os.File) Graphics {
 // readReplyAs is Probe's reading of what came back, apart from the asking, so
 // the reading can be tested without a terminal.
 func readReplyAs(reply []byte) Graphics {
-	g := Graphics{Kitty: bytes.Contains(reply, []byte("\x1b_G")), Name: terminalName(reply)}
+	g := Graphics{
+		Kitty: bytes.Contains(reply, []byte("\x1b_G")),
+		Name:  terminalName(reply),
+		Cell:  cellFromReply(reply),
+	}
 	if g.Kitty {
 		name := strings.ToLower(g.Name)
 		for _, good := range placeholderers {
@@ -141,6 +157,45 @@ func readReplyAs(reply []byte) Graphics {
 // renderer draws.
 func SupportsKitty(out, in *os.File) bool {
 	return Probe(out, in).Backend() == "kitty"
+}
+
+// cellFromReply pulls the cell size out of the terminal's answer to CSI 16 t,
+// which arrives as CSI 6 ; height ; width t — the two the wrong way round from
+// how everything else here is written, which is the reply's fault and not ours.
+//
+// An unanswered query and an impossible answer come back the same way: not
+// measured. Whatever asked can then fall back, and one place decides what
+// "impossible" means. See CellSize.plausible.
+func cellFromReply(reply []byte) CellSize {
+	const head = "\x1b[6;"
+	i := bytes.Index(reply, []byte(head))
+	if i < 0 {
+		return CellSize{}
+	}
+	rest := reply[i+len(head):]
+	end := bytes.IndexByte(rest, 't')
+	if end < 0 {
+		return CellSize{}
+	}
+
+	parts := bytes.Split(rest[:end], []byte(";"))
+	if len(parts) != 2 {
+		return CellSize{}
+	}
+	height, err := strconv.Atoi(string(bytes.TrimSpace(parts[0])))
+	if err != nil {
+		return CellSize{}
+	}
+	width, err := strconv.Atoi(string(bytes.TrimSpace(parts[1])))
+	if err != nil {
+		return CellSize{}
+	}
+
+	cell := CellSize{Width: width, Height: height, Measured: true}
+	if !cell.plausible() {
+		return CellSize{}
+	}
+	return cell
 }
 
 // terminalName pulls the terminal's own name out of its XTVERSION reply, which

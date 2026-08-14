@@ -1,6 +1,9 @@
 package cover
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // Speaking the kitty graphics protocol is not one question, and the terminals
 // that can be drawn on are named rather than the ones that cannot.
@@ -84,5 +87,53 @@ func TestTheQueryPutsTheCursorBackAndWipesWhatWasPrinted(t *testing.T) {
 	// because a reply longer than the terminal is wide leaves a wrapped tail.
 	if tidyAfter != "\x1b[u\x1b[J" {
 		t.Errorf("what was printed is not wiped after asking: %q", tidyAfter)
+	}
+}
+
+// The terminal is asked how big a cell is, and believed only when the answer
+// could be a terminal's.
+func TestTheCellSizeIsReadFromTheReply(t *testing.T) {
+	for _, c := range []struct {
+		name  string
+		reply string
+		want  CellSize
+	}{
+		{"a terminal that answers", "\x1b[6;19;9t\x1b[?62c", CellSize{Width: 9, Height: 19, Measured: true}},
+		{"one that does not", "\x1b[?62c", CellSize{}},
+		{"one that answers nonsense", "\x1b[6;19;5t\x1b[?62c", CellSize{}},
+		{"a cell nobody could read", "\x1b[6;2;1t\x1b[?62c", CellSize{}},
+		{"a reply cut short", "\x1b[6;19;", CellSize{}},
+		{"a reply with a part missing", "\x1b[6;19t\x1b[?62c", CellSize{}},
+	} {
+		if got := readReplyAs([]byte(c.reply)).Cell; got != c.want {
+			t.Errorf("%s: cell = %+v, want %+v", c.name, got, c.want)
+		}
+	}
+}
+
+// And the query asks for it, or nothing above can answer.
+func TestTheQueryAsksForTheCellSize(t *testing.T) {
+	if !strings.Contains(graphicsQuery, "\x1b[16t") {
+		t.Errorf("the query does not ask the terminal its cell size: %q", graphicsQuery)
+	}
+}
+
+// A cell size the kernel reports is refused on the same terms.
+func TestAnImpossibleCellIsRefused(t *testing.T) {
+	for _, c := range []struct {
+		cell CellSize
+		want bool
+	}{
+		{CellSize{Width: 9, Height: 19}, true},
+		{CellSize{Width: 10, Height: 20}, true},
+		{CellSize{Width: 20, Height: 40}, true},
+		{CellSize{Width: 7, Height: 15}, true},
+		{CellSize{Width: 5, Height: 19}, false},  // measured over ssh, Windows client
+		{CellSize{Width: 19, Height: 19}, false}, // square is not a cell
+		{CellSize{Width: 0, Height: 0}, false},
+	} {
+		if got := c.cell.plausible(); got != c.want {
+			t.Errorf("%+v: plausible = %v, want %v", c.cell, got, c.want)
+		}
 	}
 }

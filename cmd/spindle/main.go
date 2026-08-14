@@ -193,8 +193,8 @@ func main() {
 		reportFatal(err)
 	}
 
-	cell := cover.DetectCellSize(os.Stdout)
 	found := cover.Probe(os.Stdout, os.Stdin)
+	cell := cellSize(found)
 	renderer, err := coverRenderer(*backend, cell, found)
 	if err != nil {
 		reportFatal(err)
@@ -286,16 +286,33 @@ func coverRenderer(backend string, cell cover.CellSize, found cover.Graphics) (c
 	}
 }
 
+// cellSize is how big one cell is, from the terminal's own answer where it gave
+// one and from the kernel's window size where it did not.
+//
+// The terminal first, because it knows. The window size is filled in over ssh by
+// whatever the client said, and measured over ssh from a Windows client it said
+// 5 × 19 px — a cell nearly four times taller than it is wide, which no font is,
+// and which would draw every cover the wrong shape.
+func cellSize(g cover.Graphics) cover.CellSize {
+	if g.Cell.Measured {
+		return g.Cell
+	}
+	return cover.DetectCellSize(os.Stdout)
+}
+
 // reportCoverSupport prints what the terminal was found to support, so a fallback
 // to halfblock can be told apart from a kitty backend that is simply not drawing.
 func reportCoverSupport() {
-	cell := cover.DetectCellSize(os.Stdout)
-	source := "measured via TIOCGWINSZ"
-	if !cell.Measured {
-		source = "assumed; the terminal reported no pixel size"
-	}
-
 	g := cover.Probe(os.Stdout, os.Stdin)
+
+	cell := cellSize(g)
+	source := "measured via TIOCGWINSZ"
+	switch {
+	case g.Cell.Measured:
+		source = "the terminal said so"
+	case !cell.Measured:
+		source = "assumed; nothing believable was reported"
+	}
 
 	says := g.Name
 	if says == "" {
