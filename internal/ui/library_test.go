@@ -368,10 +368,7 @@ func TestTheWallsNamesLineUpWithItsPictures(t *testing.T) {
 	}
 	// A picture, so there is an edge to line up with.
 	g := m.libraryShape(m.layout(), m.layout().bodyHeight)
-	m.tiles = map[string]coverState{"p0": {
-		url: "u", width: g.tileW, height: g.coverRows,
-		art: strings.Repeat(strings.Repeat("#", g.tileW)+"\n", g.coverRows),
-	}}
+	m.tiles = map[string]coverState{"p0": tileArt(g)}
 
 	// In cells rather than in bytes: the cursor's mark is three bytes and one
 	// column, which is exactly the difference this is looking for.
@@ -429,9 +426,7 @@ func TestTheFrameFitsInTheAirBetweenTiles(t *testing.T) {
 	g := m.libraryShape(m.layout(), m.layout().bodyHeight)
 	art := map[string]coverState{}
 	for i := range 12 {
-		id := fmt.Sprintf("p%d", i)
-		art[id] = coverState{url: "u", width: g.tileW, height: g.coverRows,
-			art: strings.Repeat(strings.Repeat("#", g.tileW)+"\n", g.coverRows)}
+		art[fmt.Sprintf("p%d", i)] = tileArt(g)
 	}
 	m.tiles = art
 
@@ -515,10 +510,7 @@ func TestTheTilesCornersStandOffItEvenly(t *testing.T) {
 		})
 	}
 	g := m.libraryShape(m.layout(), m.layout().bodyHeight)
-	m.tiles = map[string]coverState{"p0": {
-		url: "u", width: g.tileW, height: g.coverRows,
-		art: strings.Repeat(strings.Repeat("#", g.tileW)+"\n", g.coverRows),
-	}}
+	m.tiles = map[string]coverState{"p0": tileArt(g)}
 
 	rows := strings.Split(plain(fmt.Sprint(m.View())), "\n")
 	var left, right, art0, art1 = -1, -1, -1, -1
@@ -609,4 +601,16 @@ func TestATileWithNoCoverGetsTheDrawnOne(t *testing.T) {
 	if tiles[1].url == cover.NoneURL {
 		t.Error("a playlist with a cover was given the drawn one")
 	}
+}
+
+// tileArt is a picture of the size a tile wants, filed the way an arriving one
+// is: split and squared off once, which is what the wall draws from.
+func tileArt(g gridShape) coverState {
+	tile := coverState{url: "u", width: g.tileW, height: g.coverRows}
+	var art strings.Builder
+	for range g.coverRows {
+		art.WriteString(strings.Repeat("#", g.tileW) + "\n")
+	}
+	tile.took(strings.TrimSuffix(art.String(), "\n"))
+	return tile
 }

@@ -152,122 +152,177 @@ func (l *listState) gridWindow(count int, g gridShape) (from, to int) {
 
 // gridTile is one thing on the wall: its picture, and the two lines under it.
 type gridTile struct {
-	art      string // the cover as cells, or empty while it is on its way
+	// art is the cover, a row of cells to a line, already squared off to the
+	// tile's width. Empty while it is on its way.
+	art      []string
 	name     string
 	sub      string
 	selected bool
 }
 
 // drawGrid lays the tiles out, given the shape they were measured for.
+//
+// A row of tiles has a row of air over it and under it, which is where the arms
+// of the frame round the tile under the cursor stand. So a wall is a gap row, a
+// row of tiles, a gap row, and so on to the foot of it.
 func (m Model) drawGrid(tiles []gridTile, g gridShape, width, height int) []string {
-	// A row of air over the wall, so the frame round a tile in the first row has
-	// somewhere to stand.
-	out := []string{strings.Repeat(" ", width)}
-	blank := strings.Repeat(" ", width)
+	out := make([]string, 0, height)
 
-	for at := 0; at < len(tiles); at += g.cols {
-		row := tiles[at:min(at+g.cols, len(tiles))]
-		if at > 0 {
-			for range tileRowGap {
-				out = append(out, blank)
-			}
-		}
-		out = append(out, m.drawTileRow(row, g, width)...)
+	rows := (len(tiles) + g.cols - 1) / g.cols
+	for r := range rows {
+		row := tiles[r*g.cols : min((r+1)*g.cols, len(tiles))]
+		out = append(out, m.gapRow(g, width, selectedIn(tiles, g, r-1), selectedIn(tiles, g, r)))
+		out = append(out, m.drawTileRow(row, g, width, selectedIn(tiles, g, r))...)
 	}
+	out = append(out, m.gapRow(g, width, selectedIn(tiles, g, rows-1), -1))
+
+	blank := strings.Repeat(" ", width)
 	for len(out) < height {
 		out = append(out, blank)
 	}
-	out = out[:min(len(out), height)]
+	return out[:min(len(out), height)]
+}
 
-	for i, tile := range tiles {
-		if tile.selected {
-			m.frameTile(out, i, 1, g, width)
-			break
+// selectedIn is which tile of a row of the wall the cursor is on, counted from
+// the left of that row, or -1 where it is on none of them.
+func selectedIn(tiles []gridTile, g gridShape, row int) int {
+	if row < 0 {
+		return -1
+	}
+	for i := row * g.cols; i < min((row+1)*g.cols, len(tiles)); i++ {
+		if tiles[i].selected {
+			return i - row*g.cols
 		}
 	}
-	return out
+	return -1
 }
 
 // drawTileRow draws one row of the wall: the pictures side by side, then the
-// names, then the line under them.
-func (m Model) drawTileRow(row []gridTile, g gridShape, width int) []string {
+// names, then the line under them — with the uprights of the frame written in
+// beside the tile the cursor is on.
+func (m Model) drawTileRow(row []gridTile, g gridShape, width, at int) []string {
 	out := make([]string, 0, g.tileH)
-	gap := strings.Repeat(" ", g.gap)
-	lead := strings.Repeat(" ", gridGutter)
 
-	for line := range g.coverRows {
-		var cells []string
-		for _, tile := range row {
-			cells = append(cells, fit(artLine(tile.art, line), g.tileW))
+	// Everything here is already the width it says it is: the pictures were
+	// squared off when they arrived and the words are cut to the tile. So the row
+	// is written out and padded at the end, and nothing walks a picture through
+	// an escape-sequence parser to ask how wide it is. See coverState.took.
+	tall := min(frameTall, (g.tileH-1)/2)
+	fade := style.Fade(m.styles.Accent, m.screenGround(), tall+1)
+
+	join := func(cells []string, line int) string {
+		// How far down the frame this line is, from whichever end is nearer, and
+		// nothing at all where it is past the corners' reach.
+		edge := ""
+		if at >= 0 {
+			if step := min(line+1, g.tileH-line); step <= tall {
+				edge = fade[step].Render(pointerV)
+			}
 		}
-		out = append(out, fit(lead+strings.Join(cells, gap), width))
+
+		var b strings.Builder
+		b.Grow(width)
+		for i, cell := range cells {
+			gap := g.gap
+			if i == 0 {
+				gap = gridGutter
+			}
+			b.WriteString(m.frameGap(gap, edge, at, i))
+			b.WriteString(cell)
+		}
+		if at == len(cells)-1 && edge != "" {
+			b.WriteString(strings.Repeat(" ", frameCols-1) + edge)
+		}
+
+		used := gridGutter + len(cells)*g.tileW + (len(cells)-1)*g.gap
+		if at == len(cells)-1 && edge != "" {
+			used += frameCols
+		}
+		if pad := width - used; pad > 0 {
+			b.WriteString(strings.Repeat(" ", pad))
+		}
+		return b.String()
 	}
 
-	// The words start where the picture starts, both lines of them.
-	for _, words := range []func(gridTile) string{
+	cells := make([]string, len(row))
+	for line := range g.coverRows {
+		for i, tile := range row {
+			cells[i] = artLine(tile.art, line, g.tileW)
+		}
+		out = append(out, join(cells, line))
+	}
+	for i, words := range []func(gridTile) string{
 		func(t gridTile) string { return m.tileName(t) },
 		func(t gridTile) string { return m.styles.Empty.Render(t.sub) },
 	} {
-		var cells []string
-		for _, tile := range row {
-			cells = append(cells, fit(words(tile), g.tileW))
+		for j, tile := range row {
+			cells[j] = fit(words(tile), g.tileW)
 		}
-		out = append(out, fit(lead+strings.Join(cells, gap), width))
+		out = append(out, join(cells, g.coverRows+i))
 	}
-
 	return out
 }
 
-// frameTile marks the tile under the cursor, over rows already laid out: four
-// corners standing in the air around it.
+// frameGap is the air before a tile, with an upright of the frame in it where the
+// tile beside it is the one under the cursor.
+func (m Model) frameGap(gap int, edge string, at, tile int) string {
+	if edge == "" || (tile != at && tile != at+1) {
+		return strings.Repeat(" ", gap)
+	}
+	if tile == at {
+		// Before the framed tile: the upright stands frameCols out from it.
+		return strings.Repeat(" ", gap-frameCols) + edge + strings.Repeat(" ", frameCols-1)
+	}
+	// After it, in the same air.
+	return strings.Repeat(" ", frameCols-1) + edge + strings.Repeat(" ", gap-frameCols)
+}
+
+// gapRow is the air between two rows of tiles, carrying the foot of the frame
+// round a tile in the row above or the head of one in the row below.
 //
-// Corners rather than a closed ring, and each arm walked out to the screen's own
-// ground — the same pen and the same reasoning as the bracket beside a band. A
-// rule all the way round a picture is a picture in a box, and a wall of them is
-// then one boxed thing among thirty unboxed ones, which is a lot of line to say
-// "here". Four corners say it and let the picture be.
-func (m Model) frameTile(rows []string, at, top int, g gridShape, width int) {
-	col := at % g.cols
-	// The far side is measured from the tile's own far edge rather than from the
-	// near line, or the air is only even when a corner stands one cell out.
-	left := gridGutter + col*(g.tileW+g.gap) - frameCols
-	right := left + g.tileW - 1 + 2*frameCols
-	head := top + (at/g.cols)*(g.tileH+tileRowGap) - frameRows
-	foot := head + g.tileH - 1 + 2*frameRows
-	if head < 0 || foot >= len(rows) || left < 0 || right >= width {
-		return
+// The frame is written into these rows rather than over them afterwards. Drawn
+// over, every corner and every cell of every arm was a splice into a finished
+// line — and a line of this wall is a few thousand bytes of placeholder cells,
+// which has to be walked through an escape-sequence parser to find the column
+// asked for. Measured on a wall of sixty covers: two hundred milliseconds a
+// frame, four fifths of it in that splicing.
+func (m Model) gapRow(g gridShape, width, above, below int) string {
+	blank := strings.Repeat(" ", width)
+	if above < 0 && below < 0 {
+		return blank
 	}
 
-	// As long as the tile can carry without the two corners of a side meeting in
-	// the middle, which would be the ring again by another route.
+	at, near, far := above, pointerElbow, pointerBR
+	if below >= 0 {
+		at, near, far = below, pointerTL, pointerTR
+	}
+
 	arm := min(frameArm, (g.tileW-1)/2)
-	tall := min(frameTall, (g.tileH-1)/2)
-	across := style.Fade(m.styles.Accent, m.screenGround(), arm+1)
-	down := style.Fade(m.styles.Accent, m.screenGround(), tall+1)
+	fade := style.Fade(m.styles.Accent, m.screenGround(), arm+1)
 
-	put := func(row, col int, s string) {
-		if row >= 0 && row < len(rows) {
-			rows[row] = overwrite(rows[row], col, s, width)
-		}
+	var b strings.Builder
+	b.Grow(width)
+	left := gridGutter + at*(g.tileW+g.gap) - frameCols
+	b.WriteString(strings.Repeat(" ", left))
+	b.WriteString(fade[0].Render(near))
+	for i := 1; i <= arm; i++ {
+		b.WriteString(fade[i].Render(pointerH))
 	}
-	for _, corner := range []struct {
-		row, col   int
-		glyph      string
-		side, step int
-	}{
-		{head, left, pointerTL, 1, 1},
-		{head, right, pointerTR, -1, 1},
-		{foot, left, pointerElbow, 1, -1},
-		{foot, right, pointerBR, -1, -1},
-	} {
-		put(corner.row, corner.col, across[0].Render(corner.glyph))
-		for i := 1; i <= arm; i++ {
-			put(corner.row, corner.col+i*corner.side, across[i].Render(pointerH))
-		}
-		for i := 1; i <= tall; i++ {
-			put(corner.row+i*corner.step, corner.col, down[i].Render(pointerV))
-		}
+
+	// The middle of a side is open: two corners rather than a ring.
+	inner := g.tileW - 1 + 2*frameCols - 2*(arm+1)
+	if inner > 0 {
+		b.WriteString(strings.Repeat(" ", inner))
 	}
+	for i := arm; i >= 1; i-- {
+		b.WriteString(fade[i].Render(pointerH))
+	}
+	b.WriteString(fade[0].Render(far))
+
+	if pad := width - left - 2*(arm+1) - max(inner, 0); pad > 0 {
+		b.WriteString(strings.Repeat(" ", pad))
+	}
+	return b.String()
 }
 
 const (
@@ -296,15 +351,11 @@ func (m Model) tileName(t gridTile) string {
 	return m.styles.RowPrimary.Render(t.name)
 }
 
-// artLine is one row of a rendered cover, or blank where the picture has not
-// arrived or has run out of rows.
-func artLine(art string, line int) string {
-	if art == "" {
-		return ""
+// artLine is one row of a rendered cover, or a blank of the tile's width where
+// the picture has not arrived or has run out of rows.
+func artLine(art []string, line, w int) string {
+	if line >= len(art) {
+		return strings.Repeat(" ", w)
 	}
-	lines := strings.Split(art, "\n")
-	if line >= len(lines) {
-		return ""
-	}
-	return lines[line]
+	return art[line]
 }

@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"fmt"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -92,4 +94,42 @@ func BenchmarkFrameSpilling352x84(b *testing.B) {
 }
 func BenchmarkFrameWiping352x84(b *testing.B) {
 	benchFrameLeaving(b, 352, 84, wordsWiping)
+}
+
+// What one frame of the library's wall costs, with every tile carrying a
+// picture the size a terminal really draws one.
+func BenchmarkTheWall(b *testing.B) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.tab = tabLibrary
+	m.width, m.height = 200, 50
+	m.resize()
+
+	g := m.libraryShape(m.layout(), m.layout().bodyHeight)
+	m.tiles = map[string]coverState{}
+	for i := range 60 {
+		id := fmt.Sprintf("p%d", i)
+		m.library.playlists = append(m.library.playlists, player.Playlist{
+			ID: id, Name: fmt.Sprintf("List %d", i), Owner: "somebody", Tracks: 30,
+			CoverURL: "http://example.invalid/" + id,
+		})
+		// A picture the size of one the kitty renderer hands back: a cell is a
+		// placeholder character, two diacritics and a colour.
+		var art strings.Builder
+		for range g.coverRows {
+			art.WriteString("\x1b[38;2;1;2;3m")
+			for range g.tileW {
+				art.WriteString("\U0010EEEE̅̅")
+			}
+			art.WriteString("\x1b[m\n")
+		}
+		tile := coverState{url: "http://example.invalid/" + id,
+			width: g.tileW, height: g.coverRows}
+		tile.took(art.String())
+		m.tiles[id] = tile
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = m.libraryPaneView(m.layout(), m.layout().bodyHeight)
+	}
 }

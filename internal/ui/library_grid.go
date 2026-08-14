@@ -132,7 +132,7 @@ func (m Model) libraryPaneGrid(l layout, rows int) []string {
 		tiles := make([]gridTile, 0, to-from)
 		for i := from; i < to; i++ {
 			tiles = append(tiles, gridTile{
-				art:      m.tiles[items[i].id].art,
+				art:      m.tiles[items[i].id].lines,
 				name:     items[i].name,
 				sub:      items[i].sub,
 				selected: i == state.cursor,
@@ -230,7 +230,7 @@ func (m *Model) syncGridCovers() tea.Cmd {
 func (m *Model) gridTook(url string, w, h int, art string) {
 	for id, tile := range m.tiles {
 		if tile.matches(url, w, h) {
-			tile.art = art
+			tile.took(art)
 			m.tiles[id] = tile
 		}
 	}
