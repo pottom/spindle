@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -1265,5 +1266,46 @@ func TestTheQueueFoldsTheBandAway(t *testing.T) {
 	// And round: four presses come back to where it started.
 	if got := tm.(Model).queuePane.room; got != queueRoomBoth {
 		t.Errorf("four presses left the queue at %v, want it back where it began", got)
+	}
+}
+
+// And how it is arranged comes back tomorrow: it is a way of working rather
+// than a passing look.
+func TestTheQueueRemembersHowItWasFolded(t *testing.T) {
+	m := scopeModel(120, 44)
+	m.tab = tabQueue
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	set := tm.(Model)
+	if set.queuePane.room != queueRoomTrace {
+		t.Fatalf("two presses left it at %v", set.queuePane.room)
+	}
+
+	// Written the way the key writes it, read the way the file is read.
+	raw, err := json.Marshal(prefs{
+		Scope: append([]scopeMode(nil), set.scope.modes[:]...),
+		Room:  int(set.queuePane.room),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back prefs
+	if err := json.Unmarshal(raw, &back); err != nil {
+		t.Fatal(err)
+	}
+
+	fresh := scopeModel(120, 44)
+	fresh.applyPrefs(back)
+	if fresh.queuePane.room != queueRoomTrace {
+		t.Errorf("it came back arranged as %v, want %v", fresh.queuePane.room, queueRoomTrace)
+	}
+
+	// And a file from a version that never had it leaves the queue as it was.
+	older := scopeModel(120, 44)
+	older.applyPrefs(prefs{Lyrics: true})
+	if older.queuePane.room != queueRoomBoth {
+		t.Errorf("a file with nothing to say about it left the queue at %v", older.queuePane.room)
 	}
 }

@@ -97,4 +97,9 @@ func (m *Model) applyPrefs(p prefs) {
 	m.lyrics.on = p.Lyrics
 	m.peek.on = p.Peek
 
+	// Anything the file does not cover is left at its default, including a file
+	// written by a version that had never heard of it.
+	if p.Room > 0 && p.Room < int(queueRooms) {
+		m.queuePane.room = queueRoom(p.Room)
+	}
 }
