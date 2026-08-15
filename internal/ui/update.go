@@ -93,6 +93,12 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 	case tea.MouseClickMsg:
 		return m.mouseClick(message)
 
+	case tea.MouseMotionMsg:
+		return m.mouseMotion(message)
+
+	case tea.MouseReleaseMsg:
+		return m.mouseRelease(message)
+
 	case deviceRevived:
 		m.said, m.saidAt = "The device had gone — started a new one", time.Now()
 		return m, tea.Batch(fetchStateCmd(m.player), fetchDevicesCmd(m.player))

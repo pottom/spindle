@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -293,14 +294,22 @@ func TestThePointerFindsThePlayer(t *testing.T) {
 		t.Error("pressing pause left it playing")
 	}
 
-	// The meter: pressed at its far end it is full, and at its near end empty.
+	// The meter: pressed and let go at its far end it is full, and at its near
+	// end empty. A click is a drag with no motion in the middle — see drag.go —
+	// so it is the release that sets it.
 	v := m.volumeSpan(m.layout().infoWidth)
 	_, row := wordAt(t, m, iconNext)
 	left := leftMargin + m.layout().artWidth + columnGap
-	if got, _ = m.mouseClick(clickAt(left+v.at+v.w-1, row)); got.ps.Volume != 100 {
+	press := func(x int) Model {
+		t.Helper()
+		out, _ := m.mouseClick(clickAt(x, row))
+		out, _ = out.mouseRelease(tea.MouseReleaseMsg{X: x, Y: row, Button: tea.MouseLeft})
+		return out
+	}
+	if got = press(left + v.at + v.w - 1); got.ps.Volume != 100 {
 		t.Errorf("pressing the far end of the meter set the volume to %d, want all of it", got.ps.Volume)
 	}
-	if got, _ = m.mouseClick(clickAt(left+v.at, row)); got.ps.Volume != 0 {
+	if got = press(left + v.at); got.ps.Volume != 0 {
 		t.Errorf("pressing the near end of the meter set the volume to %d, want none of it", got.ps.Volume)
 	}
 
@@ -491,6 +500,83 @@ func TestCtrlAndTheWheelMoveTheTrackItStartedOn(t *testing.T) {
 	wx, wy := wordAt(t, wall, before[0].name)
 	if after, _ := wall.mouseWheel(tea.MouseWheelMsg{X: wx, Y: wy, Button: tea.MouseWheelDown, Mod: tea.ModCtrl}); after.library.cursor().cursor != wall.library.cursor().cursor {
 		t.Error("ctrl and the wheel moved something on the library wall")
+	}
+}
+
+// A bar is taken hold of, moved, and let go. What is on screen follows the
+// pointer the whole way; what is sent is sent once, at the end.
+func TestDraggingThePlayheadShowsWhereItWillLand(t *testing.T) {
+	m := playerModel()
+	l := m.layout()
+	at, w, ok := m.barSpan(l, spotSeek)
+	if !ok {
+		t.Fatal("there is no bar to take hold of")
+	}
+
+	_, row := wordAt(t, m, knob)
+	held, cmd := m.mouseClick(clickAt(at+2, row))
+	if !held.drag.on {
+		t.Fatal("pressing the bar took hold of nothing")
+	}
+	if cmd != nil {
+		t.Error("pressing the bar sent something, want it sent on release")
+	}
+
+	// Dragged to the far end, and away from the row it started on: a scrub is
+	// not a test of aim.
+	held, _ = held.mouseMotion(tea.MouseMotionMsg{X: at + w, Y: row + 3, Button: tea.MouseLeft})
+	if held.playhead() != m.ps.Duration {
+		t.Errorf("dragged to the end the bar shows %s, want %s", held.playhead(), m.ps.Duration)
+	}
+	// And the clock beside it says the same thing.
+	if !strings.Contains(ansi.Strip(strings.Join(held.infoBlock(l.infoWidth), "\n")), formatDuration(m.ps.Duration)+" ") {
+		t.Error("the clock does not follow the bar it is written under")
+	}
+
+	// Nothing has been asked of the device yet.
+	if held.elapsed() == m.ps.Duration {
+		t.Error("the drag moved the track itself, want it moved on release")
+	}
+
+	done, cmd := held.mouseRelease(tea.MouseReleaseMsg{X: at + w, Y: row + 3, Button: tea.MouseLeft})
+	if cmd == nil {
+		t.Error("letting go asked for nothing")
+	}
+	if done.drag.on {
+		t.Error("letting go left the bar held")
+	}
+}
+
+// The meter is the same gesture at another width, and the number beside it has
+// to agree with it.
+func TestDraggingTheMeterMovesTheVolume(t *testing.T) {
+	m := playerModel()
+	l := m.layout()
+	at, w, ok := m.barSpan(l, spotVolume)
+	if !ok {
+		t.Fatal("there is no meter to take hold of")
+	}
+
+	_, row := wordAt(t, m, iconNext)
+	held, _ := m.mouseClick(clickAt(at, row))
+	if !held.drag.on || held.drag.kind != spotVolume {
+		t.Fatalf("pressing the meter took hold of %v", held.drag)
+	}
+
+	held, _ = held.mouseMotion(tea.MouseMotionMsg{X: at + w/2, Y: row, Button: tea.MouseLeft})
+	if got := held.heldVolume(); got < 45 || got > 55 {
+		t.Errorf("dragged to the middle the meter shows %d, want about half", got)
+	}
+	if !strings.Contains(ansi.Strip(held.transportLine(l.infoWidth)), fmt.Sprintf("%3d", held.heldVolume())) {
+		t.Error("the reading beside the meter disagrees with the meter")
+	}
+
+	done, cmd := held.mouseRelease(tea.MouseReleaseMsg{X: at + w, Y: row, Button: tea.MouseLeft})
+	if cmd == nil {
+		t.Error("letting go of the meter asked for nothing")
+	}
+	if done.ps.Volume != 100 {
+		t.Errorf("letting go at the far end set the volume to %d, want all of it", done.ps.Volume)
 	}
 }
 

@@ -340,7 +340,9 @@ func (m Model) infoBlock(w int) []string {
 		"",
 		m.progressLine(w),
 		spread(
-			s.Time.Render(formatDuration(m.elapsed())),
+			// The same reading the bar is drawn from, or the clock and the bar
+			// would say two different things about the same drag.
+			s.Time.Render(formatDuration(m.playhead())),
 			s.Time.Render(formatDuration(ps.Duration)),
 			w,
 		),
@@ -366,9 +368,11 @@ func (m Model) progressLine(w int) string {
 		elapsed, remaining = m.styles.Time, m.styles.Time
 	}
 
+	// Where the pointer has dragged it to, while it has hold of it, and where
+	// the track really is otherwise. See drag.go.
 	var fraction float64
 	if m.ps.Duration > 0 {
-		fraction = min(float64(m.elapsed())/float64(m.ps.Duration), 1)
+		fraction = min(float64(m.playhead())/float64(m.ps.Duration), 1)
 	}
 
 	bar := barCells(w)
@@ -392,7 +396,7 @@ func (m Model) volumeLine(w int) string {
 	}
 
 	bar := barCells(w)
-	at := min(max(m.ps.Volume*bar/100, 0), bar)
+	at := min(max(m.heldVolume()*bar/100, 0), bar)
 
 	return filled.Render(strings.Repeat(meterFull, at)) +
 		marker.Render(knob) +
@@ -468,7 +472,10 @@ func (m Model) controlSpans() []span {
 // it says: the row is laid out from the right, so a number that narrows would
 // drag the bar along with it.
 func (m Model) volumeReading() string {
-	return m.styles.Volume.Render(fmt.Sprintf(" %3d", m.ps.Volume))
+	// The held value while the meter is held, for the same reason the clock
+	// beside the playhead shows the dragged position: a number that disagreed
+	// with the bar it is written against is worse than no number.
+	return m.styles.Volume.Render(fmt.Sprintf(" %3d", m.heldVolume()))
 }
 
 // volumeSpan is where the meter itself sits on a transport row of that width:

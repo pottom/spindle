@@ -109,6 +109,10 @@ type Model struct {
 	grip   point
 	gripAt time.Time
 
+	// drag is the bar the pointer has hold of, while it has hold of one. See
+	// drag.go.
+	drag dragState
+
 	// queueAt is when the queue was last asked for. It comes from our own daemon
 	// rather than from Spotify, so it is asked again often — see refresh.go.
 	queueAt time.Time

@@ -168,6 +168,10 @@ func (m Model) mouseClick(e tea.MouseClickMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Whatever was being held is let go of by pressing somewhere else, which
+	// cannot happen with one button but can with two.
+	m.drag = dragState{}
+
 	// A second press on the cell the last one was on, soon enough after it.
 	twice := m.lastClick.seen && m.lastClick.x == e.X && m.lastClick.y == e.Y &&
 		time.Since(m.lastClickAt) < doubleWithin
@@ -208,18 +212,11 @@ func (m Model) mouseClick(e tea.MouseClickMsg) (Model, tea.Cmd) {
 		cursor.moveTo(at.at, count)
 		return m, tea.Batch(m.previewCover(), m.readAhead())
 
-	case spotSeek:
-		// Where along the bar it was pressed, as a share of the track. The bar
-		// is drawn from the same fraction, so the playhead lands under the
-		// pointer. See progressLine.
-		if !m.loaded() {
-			return m, nil
-		}
-		return m, m.seek(atFraction(at.at, barCells(m.layout().infoWidth), m.ps.Duration))
-
-	case spotVolume:
-		// And the same for the meter, which is the same shape at another width.
-		return m, m.setVolume(atShare(at.at, barCells(volumeCells), 100))
+	case spotSeek, spotVolume:
+		// A press on a bar takes hold of it rather than acting on it. What was
+		// chosen is sent when the button comes up — a click is that with no
+		// motion in between. See drag.go.
+		m.takeHold(at.kind, at.at)
 
 	case spotControl:
 		return m.pressControl(control(at.at))
