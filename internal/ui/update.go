@@ -99,6 +99,12 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 	case tea.MouseReleaseMsg:
 		return m.mouseRelease(message)
 
+	case notesTook:
+		// What another database had to say about an artist. It changes a panel
+		// and nothing else — see notes.go.
+		m.tookNotes(message)
+		return m, nil
+
 	case deviceRevived:
 		m.said, m.saidAt = "The device had gone — started a new one", time.Now()
 		return m, tea.Batch(fetchStateCmd(m.player), fetchDevicesCmd(m.player))

@@ -98,7 +98,7 @@ func TestMockArtistAlbumsAreTheirs(t *testing.T) {
 	m, _ := newTestMock()
 
 	albums := walkMock(t, func(offset int) (Page[Album], error) {
-		return m.ArtistAlbums(t.Context(), "ar2", offset)
+		return m.ArtistAlbums(t.Context(), mockArtists[1].ID, offset)
 	})
 	if len(albums) == 0 {
 		t.Fatal("David Bowie has no albums in the mock")
@@ -168,7 +168,7 @@ func TestMockAnswersTheTopTracksCapability(t *testing.T) {
 		t.Fatal("the mock does not implement ArtistTopTracks")
 	}
 
-	tracks, err := top.ArtistTopTracks(t.Context(), "ar1")
+	tracks, err := top.ArtistTopTracks(t.Context(), mockArtists[0].ID)
 	if err != nil {
 		t.Fatal(err)
 	}

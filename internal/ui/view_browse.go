@@ -797,7 +797,9 @@ func (m Model) openPageView(l layout, rows int) []string {
 
 	if page.holdsAlbums() {
 		screen.columns = func(w int) string { return m.albumColumns(w, "") }
-		screen.detail = m.openAlbumDetail
+		// The panel on an artist page is about the artist, where anything is
+		// known about them, and about the record under the cursor otherwise.
+		screen.detail = m.notesPanel
 		screen.empty, screen.waiting = "No records here.", "Reading their records…"
 		screen.row = func(i, w int, selected bool) string {
 			return m.albumRow("", page.albums[i], w, selected)

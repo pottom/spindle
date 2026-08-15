@@ -40,9 +40,15 @@ var mockAlbumList = []Album{
 // The two artists behind the catalogue. Their pictures are their own album
 // covers: artist photographs live at URLs the mock has no honest way to know,
 // and a broken image would say less about the layout than a real cover does.
+//
+// Their ids are the real ones. Everything else here is invented, but an id is
+// what the other databases are asked with — MusicBrainz matches on the Spotify
+// address of an artist, exactly — and a made-up id would leave the whole of
+// that path untravelled under --mock, which is where it is looked at. See
+// internal/notes.
 var mockArtists = []Artist{
-	{ID: "ar1", Name: "Queen", ImageURL: coverOpera, Genres: []string{"glam rock", "classic rock"}, Followers: 45_000_000},
-	{ID: "ar2", Name: "David Bowie", ImageURL: coverBowie, Genres: []string{"art rock", "glam rock"}, Followers: 12_000_000},
+	{ID: "1dfeR4HaWDbWqFHLkxsg1d", Name: "Queen", ImageURL: coverOpera, Genres: []string{"glam rock", "classic rock"}, Followers: 45_000_000},
+	{ID: "0oSGxfWSnnOXhD2fKuz2Gy", Name: "David Bowie", ImageURL: coverBowie, Genres: []string{"art rock", "glam rock"}, Followers: 12_000_000},
 }
 
 // mockLikedIDs is what the saved-songs screen lists — enough of the catalogue,

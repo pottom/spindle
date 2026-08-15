@@ -12,3 +12,9 @@ docs/brief.md
 
 # ...and the logo, which the README shows and the binary carries.
 !internal/logo/*.png
+
+# Keys for the services the metadata comes from. They are secrets, and this
+# directory is where they land when they are pasted out of a browser.
+lastfm.txt
+*.key
+*secret*

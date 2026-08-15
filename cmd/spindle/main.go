@@ -202,7 +202,9 @@ func main() {
 	loader := cover.NewLoader(renderer, &http.Client{Timeout: 15 * time.Second})
 	loader.SetGraphics(found)
 
-	final, err := tea.NewProgram(ui.New(backendPlayer, loader, cell)).Run()
+	final, err := tea.NewProgram(
+		ui.New(backendPlayer, loader, cell).WithNotes(artistNotes()),
+	).Run()
 
 	// Whatever the debug bar wrote down goes with the session that wrote it.
 	ui.ForgetDebug()

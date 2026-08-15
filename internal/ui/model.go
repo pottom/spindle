@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/pottom/spindle/internal/notes"
 	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui/cover"
 	"github.com/pottom/spindle/internal/ui/style"
@@ -124,6 +125,17 @@ type Model struct {
 	// queueAt is when the queue was last asked for. It comes from our own daemon
 	// rather than from Spotify, so it is asked again often — see refresh.go.
 	queueAt time.Time
+
+	// notes is what the other databases say — who an artist is, where they are
+	// from, who was in the band. Nil where nothing is configured, which is not
+	// an error: the screens that would show it simply do not. See notes.go.
+	notes *notes.Cached
+
+	// artists is what has come back, keyed by the Spotify id it was asked
+	// about, and asking is what is in flight. An answer of nothing is an answer
+	// and is kept: most of a real library is artists no database has heard of.
+	artists map[string]notes.Artist
+	asking  map[string]bool
 
 	// tiles are the library's wall: one picture per thing on it, keyed by the
 	// thing rather than by where it sits, so scrolling a row does not re-fetch
@@ -321,6 +333,16 @@ type Model struct {
 
 // New wires a model around a playback backend and an artwork loader. The palette
 // starts dark and is corrected once the terminal reports its background colour.
+// WithNotes hands the model the databases that know what Spotify does not.
+//
+// A setter rather than another argument, because it is genuinely optional: every
+// screen works without it, and a program built with no sources at all is the
+// case the tests run in. See notes.go.
+func (m Model) WithNotes(n *notes.Cached) Model {
+	m.notes = n
+	return m
+}
+
 func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 	m := Model{
 		player: p,
