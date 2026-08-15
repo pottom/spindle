@@ -90,6 +90,30 @@ func TestTheRestIsWorthTheDay(t *testing.T) {
 	t.Logf("a quiet day: %d requests rather than %d", rested, quick)
 }
 
+// A list of devices is asked after while a list of devices is on screen, and
+// not otherwise. Browsing the library with nothing playing asked Spotify what
+// exists every three seconds, for a list nowhere on the screen.
+func TestTheDevicesAreAskedForWhileTheyAreLookedAt(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.noDevice = true
+
+	m.tab = tabPlayer
+	if !m.devicesOnScreen() {
+		t.Error("with nothing playing the player screen is the device list")
+	}
+
+	m.tab = tabLibrary
+	if m.devicesOnScreen() {
+		t.Error("the library was asking after devices it does not show")
+	}
+
+	// Opened over anything, it is on screen wherever you were.
+	m.devices.open = true
+	if !m.devicesOnScreen() {
+		t.Error("the picker was open and nobody was keeping it current")
+	}
+}
+
 // And the queue is not slowed, because the queue is free: it comes from
 // spindle's own daemon over localhost while that is what is playing.
 func TestTheDaemonsQueueIsNotSlowed(t *testing.T) {

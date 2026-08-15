@@ -546,6 +546,18 @@ func (m Model) handleTick() (Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+// devicesOnScreen reports whether a list of devices is being looked at: the
+// picker opened over whatever screen you were on, or the screen that stands in
+// for the player when nothing is playing anywhere.
+//
+// One condition, read by the drawing and by the poll. They were two, and the
+// poll's was the looser one: browsing the library with nothing playing asked
+// Spotify what devices exist every three seconds, for a list that was nowhere on
+// the screen. See body.
+func (m Model) devicesOnScreen() bool {
+	return m.devices.open || (m.tab == tabPlayer && m.noDevice)
+}
+
 // refreshDevices keeps the device list current while a screen of it is up.
 //
 // It used to be fetched only when a state poll came back with nothing playing,
@@ -554,7 +566,7 @@ func (m Model) handleTick() (Model, tea.Cmd) {
 // and the key that asks for a refresh was the only way back — when it worked at
 // all. A list of what is out there has to keep looking.
 func (m *Model) refreshDevices() tea.Cmd {
-	if !m.noDevice && !m.devices.open {
+	if !m.devicesOnScreen() {
 		return nil
 	}
 	// While the picker is up somebody is watching it, waiting for a device to

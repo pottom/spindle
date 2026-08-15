@@ -174,7 +174,7 @@ func (m Model) pad(s string, l layout) string {
 func (m Model) body(l layout) []string {
 	var pane []string
 	switch {
-	case m.tab == tabPlayer && m.noDevice:
+	case m.devicesOnScreen() && !m.devices.open:
 		pane = m.noDevicePanel(l, max(l.bodyHeight-1, 1))
 
 	case m.tab == tabPlayer && m.ps == nil:
