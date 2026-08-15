@@ -79,7 +79,9 @@ const (
 
 	// keyClose folds the band above the queue away, a block at a time, so the
 	// list has the rows. Not z, which is where y sits on a Hungarian keyboard
-	// and is awkward on both.
+	// and is awkward on both — a reason that has since gone: a binding is now
+	// matched by the key a press came from as well as by the letter it sent, so
+	// a letter here is the same key on any layout. See keypress.go.
 	keyClose = "c"
 	keyPeek  = "u"
 
