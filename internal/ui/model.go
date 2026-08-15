@@ -400,6 +400,16 @@ func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 func (m Model) coverTarget() string {
 	// Whatever is open is the screen, so its cursor is what the picture follows.
 	if page := m.open(); page != nil {
+		// Except on an artist's page, where the picture is the artist. The
+		// record under the cursor is named in its own row and dated in the
+		// column beside it; this is a page about a person, and a photograph of
+		// them is the one thing on it that could not be read anywhere else.
+		// Where nobody has a photograph it is the record again. See notes.go.
+		if page.kind == openArtist {
+			if got, ok := m.artistNotes(); ok && got.ImageURL != "" {
+				return got.ImageURL
+			}
+		}
 		return page.cover()
 	}
 

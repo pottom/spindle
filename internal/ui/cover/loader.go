@@ -21,6 +21,18 @@ import (
 	"github.com/pottom/spindle/internal/xdg"
 )
 
+// Agent is what spindle calls itself when it asks another server for a picture.
+//
+// Not decoration: Wikimedia, which is where a photograph of an artist comes
+// from, answers a request with no user agent with a 403 and a link to its robot
+// policy. Spotify's image host does not care, which is why nothing here needed
+// one until artists had faces.
+//
+// No version in it: this package is the one that must not import the rest of the
+// program, and a picture loader that had to know which build it belonged to
+// would be a loader nobody could test on its own.
+const Agent = "spindle ( https://github.com/pottom/spindle )"
+
 const (
 	// decodedCacheSize is the number of decoded images held in memory.
 	//
@@ -170,6 +182,11 @@ func (l *Loader) bytes(ctx context.Context, url, key string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("build cover request: %w", err)
 	}
+	// Spotify's own image host does not care who is asking. Wikimedia, where a
+	// photograph of an artist comes from, refuses a request with no user agent
+	// outright — 403, with a link to their robot policy — so saying who this is
+	// is the difference between a picture and a note glyph.
+	req.Header.Set("User-Agent", Agent)
 	resp, err := l.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch cover: %w", err)

@@ -105,10 +105,11 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		return m.mouseRelease(message)
 
 	case notesTook:
-		// What another database had to say about an artist. It changes a panel
-		// and nothing else — see notes.go.
+		// What another database had to say about an artist: a paragraph, and a
+		// photograph of them where the picture beside it was the sleeve of
+		// whichever record the cursor happened to be on. See notes.go.
 		m.tookNotes(message)
-		return m, nil
+		return m, m.syncCover()
 
 	case deviceRevived:
 		m.said, m.saidAt = "The device had gone — started a new one", time.Now()
