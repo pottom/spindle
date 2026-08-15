@@ -187,6 +187,7 @@ func (m Model) debugSelf() []debugField {
 	if m.lastKey.Code != 0 {
 		b.put("key", "%s", debugKey(m.lastKey))
 	}
+	b.put("kbd", "%s", debugKeyboard(m.keyFlags))
 
 	t := slowNow()
 	b.put("fps", "%.1f", t.fps)
@@ -794,4 +795,20 @@ func debugKey(k tea.KeyPressMsg) string {
 		text = "-"
 	}
 	return fmt.Sprintf("%q/%q %s", text, string(k.Code), base)
+}
+
+// debugKeyboard is what the terminal agreed to report about keys.
+//
+// The flags are the kitty keyboard protocol's own: 1 tells one key from another,
+// 4 is the one that matters here — the key a press came from, beside the letter
+// it sent.
+func debugKeyboard(flags int) string {
+	if flags == 0 {
+		return "none"
+	}
+	out := fmt.Sprintf("%d", flags)
+	if flags&4 != 0 {
+		return out + " base"
+	}
+	return out + " no base"
 }

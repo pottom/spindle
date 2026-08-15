@@ -83,6 +83,10 @@ type Model struct {
 
 	cover coverState
 
+	// keyFlags is what the terminal said it would report about keys, in answer to
+	// being asked. Nought means it said nothing at all.
+	keyFlags int
+
 	// lastKey is the press the debug bar reports, kept for no other reason: what
 	// a terminal says about a key is not knowable from here without looking.
 	lastKey tea.KeyPressMsg

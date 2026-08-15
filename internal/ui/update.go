@@ -51,6 +51,14 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		// now. Every other screen holds one picture and syncCover sees to it.
 		return m, tea.Batch(m.syncCover(), m.syncGridCovers())
 
+	case tea.KeyboardEnhancementsMsg:
+		// What the terminal agreed to report about keys. Asked for so that a
+		// binding written as a letter can be the key that letter sits on — see
+		// keypress.go — and read back here because a terminal is free to accept
+		// some of what it was asked and not the rest.
+		m.keyFlags = message.Flags
+		return m, nil
+
 	case tea.BackgroundColorMsg:
 		m.isDark = message.IsDark()
 
