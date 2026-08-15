@@ -783,3 +783,66 @@ func TestTheSelectedTilesNameWearsTheAccent(t *testing.T) {
 		t.Error("the names that are not selected changed as well")
 	}
 }
+
+// The field a wall is searched in stands under the heading, and the wall steps
+// down for it — the same bargain the tables make. Drawn over the covers it was a
+// box floating in the middle of the pictures.
+func TestTheWallStandsAsideForTheField(t *testing.T) {
+	m := queueModel(0, "a", "b")
+	m.tab = tabLibrary
+	m.width, m.height = 150, 40
+	m.resize()
+	for i := range 24 {
+		m.library.playlists = append(m.library.playlists, player.Playlist{
+			ID: fmt.Sprintf("p%d", i), Name: fmt.Sprintf("List %d", i), Owner: "pottom",
+		})
+	}
+
+	quiet := strings.Split(plain(fmt.Sprint(m.View())), "\n")
+	wasRows := m.libraryShape(m.layout(), m.layout().bodyHeight).rows
+
+	m.startFind()
+	m.find.query = "list"
+	m.refind()
+	busy := strings.Split(plain(fmt.Sprint(m.View())), "\n")
+
+	// The field is on the screen, under the heading.
+	head, box := -1, -1
+	for i, row := range busy {
+		if strings.Contains(row, "Library") {
+			head = i
+		}
+		if head >= 0 && box < 0 && strings.Contains(row, pointerTL) {
+			box = i
+		}
+	}
+	if head < 0 || box < 0 {
+		t.Fatalf("the heading is on row %d and the field on %d", head, box)
+	}
+	if box != head+gridChromeRows {
+		t.Errorf("the field is on row %d, want %d — under the heading and its blank", box, head+gridChromeRows)
+	}
+
+	// And it covers no picture: the first tile's name has moved down by the
+	// height of the box rather than being drawn over.
+	rowOf := func(rows []string, of string) int {
+		for i, row := range rows {
+			if strings.Contains(row, of) {
+				return i
+			}
+		}
+		return -1
+	}
+	before, after := rowOf(quiet, "List 0"), rowOf(busy, "List 0")
+	if before < 0 || after < 0 {
+		t.Fatalf("the first tile is on row %d without the field and %d with it", before, after)
+	}
+	if after != before+finderRows {
+		t.Errorf("the first tile moved from row %d to %d, want %d down", before, after, finderRows)
+	}
+
+	// The wall keeps its shape, a row shorter where the rows were tight.
+	if now := m.libraryShape(m.layout(), m.layout().bodyHeight).rows; now > wasRows {
+		t.Errorf("the wall holds %d rows of tiles with the field up and %d without", now, wasRows)
+	}
+}

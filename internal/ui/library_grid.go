@@ -94,7 +94,7 @@ func (m Model) libraryTiles() []libraryTile {
 // libraryShape is the wall as this terminal divides it.
 func (m Model) libraryShape(l layout, rows int) gridShape {
 	return gridFor(l.interior-leftMargin-rightMargin-gridGutter-gridEdge,
-		rows-gridChromeRows-frameRows, m.cell)
+		rows-gridChromeRows-frameRows-m.finderTakes(), m.cell)
 }
 
 // gridChromeRows is what the wall spends above itself: the heading with the
@@ -116,6 +116,13 @@ func (m Model) libraryPaneGrid(l layout, rows int) []string {
 	out := []string{
 		spread(m.styles.Title.Render("Library"), kinds, w),
 		strings.Repeat(" ", w),
+	}
+
+	// The room the field a wall is searched in stands in, under the heading and
+	// over the pictures. The wall steps down for it the way a table does, rather
+	// than having it drawn over the covers. See finder.go.
+	for range m.finderTakes() {
+		out = append(out, strings.Repeat(" ", w))
 	}
 
 	items := m.libraryTiles()

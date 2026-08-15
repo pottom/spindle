@@ -64,13 +64,7 @@ func (m Model) drawFinder(lines []string, l layout, top int) []string {
 	}
 	left := leftMargin
 
-	// Directly over the heading, in the rows the block stood aside for — under
-	// the band and the blank that goes with it. See listChrome.
-	band := m.listBandRows(l)
-	boxTop := top + band
-	if band > 0 {
-		boxTop += listBandGap
-	}
+	boxTop := top + m.finderAt(l)
 	if boxTop < 0 || boxTop+finderRows > len(lines) {
 		return lines
 	}
@@ -91,6 +85,23 @@ func (m Model) drawFinder(lines []string, l layout, top int) []string {
 	// shade off the screen, on a screen with a photograph at the top of it, reads
 	// as a second window rather than as part of this one.
 	return out
+}
+
+// finderAt is how far into the body the field stands, in the rows whatever is on
+// screen stood aside for.
+//
+// Under whatever names the screen: the heading of a wall of covers, or the band
+// and the blank that goes with it on a list. Above the thing being searched
+// either way, because that is where a field belongs and because everything under
+// it has already made room. See listChrome and libraryShape.
+func (m Model) finderAt(l layout) int {
+	if m.tab == tabLibrary && m.open() == nil {
+		return gridChromeRows
+	}
+	if band := m.listBandRows(l); band > 0 {
+		return band + listBandGap
+	}
+	return 0
 }
 
 // finderTakes is what the field costs the list it is searching: its own height

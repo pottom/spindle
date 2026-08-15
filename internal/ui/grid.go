@@ -277,7 +277,7 @@ func (m Model) drawTileRow(row []gridTile, g gridShape, width, at int) []string 
 
 	for _, words := range []func(gridTile) string{
 		func(t gridTile) string { return m.tileName(t) },
-		func(t gridTile) string { return m.styles.Empty.Render(t.sub) },
+		func(t gridTile) string { return m.lit(m.styles.Empty, t.sub) },
 	} {
 		for j, tile := range row {
 			cells[j] = fit(words(tile), g.tileW)
@@ -374,9 +374,9 @@ func (m Model) tileName(t gridTile) string {
 		// both marks on it say so in the same voice. In the text colour it was a
 		// second kind of highlight, and the eye had to work out whether the two
 		// meant the same thing.
-		return m.styles.Cursor.Bold(true).Render(t.name)
+		return m.lit(m.styles.Cursor.Bold(true), t.name)
 	}
-	return m.styles.RowPrimary.Render(t.name)
+	return m.lit(m.styles.RowPrimary, t.name)
 }
 
 // artLine is one row of a rendered cover, or a blank of the tile's width where
