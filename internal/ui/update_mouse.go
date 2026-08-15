@@ -85,14 +85,18 @@ func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// The menu answers everything while it is up, exactly as it does with the
-	// keys: nothing underneath may be turned by a wheel over a box standing on
-	// top of it.
+	// A box answers everything while it is up, exactly as it does with the keys:
+	// nothing underneath may be turned by a wheel over something standing on top
+	// of it.
 	if _, inside := m.menuVerbAt(m.layout(), e.X, e.Y); inside {
-		m.actions.state.move(delta, len(m.actions.verbs))
+		if m.devices.open {
+			m.devices.cursor.move(delta, len(m.devices.items))
+		} else {
+			m.actions.state.move(delta, len(m.actions.verbs))
+		}
 		return m, nil
 	}
-	if m.actions.open {
+	if _, up := m.openPopup(); up {
 		return m, nil
 	}
 
@@ -207,20 +211,28 @@ func (m Model) mouseClick(e tea.MouseClickMsg) (Model, tea.Cmd) {
 		return m, m.leaveStage()
 	}
 
-	// The menu answers everything while it is up. A press on one of its verbs
+	// A box answers everything while it is up. A press on one of its rows
 	// chooses it, a press anywhere else puts it away — which is what pressing
 	// away from an open menu means, and there is nothing else it could mean.
-	if m.actions.open {
-		verb, inside := m.menuVerbAt(m.layout(), e.X, e.Y)
+	//
+	// One press rather than two, unlike a row of a list: this box was opened on
+	// purpose and holds nothing but choices, so there is nothing here to brush
+	// past by accident.
+	if _, up := m.openPopup(); up {
+		at, inside := m.menuVerbAt(m.layout(), e.X, e.Y)
 		if !inside || e.Button != tea.MouseLeft {
-			m.actions.open = false
+			m.actions.open, m.devices.open = false, false
 			return m, nil
 		}
-		if verb < 0 {
+		if at < 0 {
 			return m, nil
+		}
+		if m.devices.open {
+			m.devices.cursor.moveTo(at, len(m.devices.items))
+			return m, m.transfer()
 		}
 		m.actions.open = false
-		return m, m.actions.verbs[verb].do(&m)
+		return m, m.actions.verbs[at].do(&m)
 	}
 
 	if e.Button == tea.MouseRight {

@@ -174,29 +174,32 @@ func (m Model) pad(s string, l layout) string {
 func (m Model) body(l layout) []string {
 	var pane []string
 	switch {
-	case m.devicesOnScreen() && !m.devices.open:
+	// The screen that stands in for the player when nothing is playing anywhere.
+	// Not while the picker is up over it: that box is the same list, and two of
+	// them is one too many.
+	case m.tab == tabPlayer && m.noDevice && !m.devices.open:
 		pane = m.noDevicePanel(l, max(l.bodyHeight-1, 1))
 
 	case m.tab == tabPlayer && m.ps == nil:
 		// The picture, while there is nothing else to look at. See splash.go.
 		pane = append(m.splashRows(), "", m.styles.Detail.Render("Connecting…"))
 
-	case m.tab == tabSettings && !m.devices.open:
+	case m.tab == tabSettings:
 		pane = m.settingsPanel(l, max(l.bodyHeight, 1))
 
-	case m.tab == tabHelp && !m.devices.open:
+	case m.tab == tabHelp:
 		pane = m.helpPanel(l, max(l.bodyHeight, 1))
 
-	case m.open() != nil && !m.devices.open:
+	case m.open() != nil:
 		pane = m.openPageView(l, max(l.bodyHeight, 1))
 
-	case m.tab == tabQueue && !m.devices.open:
+	case m.tab == tabQueue:
 		pane = m.queueBlock(l, max(l.bodyHeight, 1))
 
-	case m.tab == tabLibrary && !m.devices.open:
+	case m.tab == tabLibrary:
 		pane = m.libraryPaneView(l, max(l.bodyHeight, 1))
 
-	case m.tab == tabSearch && !m.devices.open:
+	case m.tab == tabSearch:
 		pane = m.searchPaneView(l, max(l.bodyHeight, 1))
 
 	default:
@@ -204,8 +207,6 @@ func (m Model) body(l layout) []string {
 
 		var right []string
 		switch {
-		case m.devices.open:
-			right = m.place(m.devicesBlock(), l.infoWidth, rows)
 		case m.lyricsVisible():
 			// The words need room, so the information goes to the top of the
 			// body rather than sitting in the middle of it, and they take

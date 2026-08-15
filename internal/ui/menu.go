@@ -6,6 +6,15 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
+// The boxes that stand over the screen: the menu of verbs, and the list of
+// machines the music can be moved to.
+//
+// One shape for both, because they are one thing — a short list to choose from,
+// about something named at the top of it, standing over whatever you were
+// looking at rather than in place of it. The verbs open at the row or the cover
+// they are about; the devices open under the name of the device in the header,
+// which is the thing they change.
+//
 // The menu of verbs, drawn where the thing it is about is.
 //
 // It used to stand in the list's own rows, on the reasoning that this screen has
@@ -36,9 +45,37 @@ const (
 	menuChrome = 5
 )
 
-// menuBox is where the menu ends up and how big it is.
+// menuBox is where a box ends up and how big it is.
 type menuBox struct {
 	x, y, w, h int
+}
+
+// popup is what one of them holds: where it was opened, what it is about, and
+// the rows to choose from — already styled, because which of them is marked is
+// the caller's business.
+type popup struct {
+	x, y     int
+	title    string
+	subtitle string
+	rows     []string
+}
+
+// openPopup is whichever box is up, and whether one is.
+//
+// The menu of verbs outranks the picker, because the menu is opened over
+// whatever is already there and the picker is not opened over the menu.
+func (m Model) openPopup() (popup, bool) {
+	switch {
+	case m.actions.open && len(m.actions.verbs) > 0:
+		return popup{
+			x: m.actions.x, y: m.actions.y,
+			title: m.actions.title, subtitle: m.actions.subtitle,
+			rows: m.verbLines(0),
+		}, true
+	case m.devices.open:
+		return m.devicesPopup(), true
+	}
+	return popup{}, false
 }
 
 // menuShape measures the box for the verbs it holds and fits it on the screen.
@@ -47,26 +84,26 @@ type menuBox struct {
 // would run off the right edge is pulled back to it, and one that would run off
 // the foot opens upwards instead — which is what every menu on every desktop
 // does, and so the one thing nobody has to be told.
-func (m Model) menuShape(l layout) menuBox {
+func (m Model) menuShape(l layout, p popup) menuBox {
 	want := menuLeast
-	for _, line := range append([]string{m.actions.title, m.actions.subtitle}, m.verbLines(0)...) {
+	for _, line := range append([]string{p.title, p.subtitle}, p.rows...) {
 		want = max(want, lipgloss.Width(line)+2*menuPad+2)
 	}
 
 	left, right := leftMargin, l.interior-rightMargin
 	w := min(want, right-left)
-	h := len(m.actions.verbs) + menuChrome
+	h := len(p.rows) + menuChrome
 
-	x := min(max(m.actions.x, left), right-w)
+	x := min(max(p.x, left), right-w)
 
 	// The body's own rows, which is where a menu about something on the body
 	// belongs: over the tabs it would read as belonging to them.
 	top, foot := tabBarHeight, tabBarHeight+l.bodyHeight
-	y := m.actions.y
+	y := p.y
 	if y+h > foot {
 		// Upwards from the point rather than pinned to the foot, so the corner
 		// stays with the thing it was opened on.
-		y = m.actions.y - h
+		y = p.y - h
 	}
 	y = min(max(y, top), max(foot-h, top))
 	return menuBox{x: x, y: y, w: w, h: h}
@@ -74,10 +111,11 @@ func (m Model) menuShape(l layout) menuBox {
 
 // drawMenu writes it over rows already laid out.
 func (m Model) drawMenu(lines []string, l layout) []string {
-	if !m.actions.open || len(m.actions.verbs) == 0 {
+	p, ok := m.openPopup()
+	if !ok {
 		return lines
 	}
-	box := m.menuShape(l)
+	box := m.menuShape(l, p)
 	if box.w < menuLeast || box.y+box.h > len(lines) {
 		return lines
 	}
@@ -99,11 +137,11 @@ func (m Model) drawMenu(lines []string, l layout) []string {
 	}
 
 	put(pen.Render(pointerTL + rule + pointerTR))
-	line(m.styles.Title.Render(fit(m.actions.title, inner-2*menuPad)))
-	line(m.styles.Artist.Render(fit(m.actions.subtitle, inner-2*menuPad)))
+	line(m.styles.Title.Render(fit(p.title, inner-2*menuPad)))
+	line(m.styles.Artist.Render(fit(p.subtitle, inner-2*menuPad)))
 	put(pen.Render(pointerTee + rule + pointerTeeR))
-	for _, verb := range m.verbLines(inner - 2*menuPad) {
-		line(verb)
+	for _, row := range p.rows {
+		line(fit(row, inner-2*menuPad))
 	}
 	put(pen.Render(pointerElbow + rule + pointerBR))
 	return out
@@ -141,16 +179,17 @@ func (m Model) verbLines(w int) []string {
 //
 // The same rows drawMenu writes, counted rather than remembered.
 func (m Model) menuVerbAt(l layout, x, y int) (int, bool) {
-	if !m.actions.open || len(m.actions.verbs) == 0 {
+	p, ok := m.openPopup()
+	if !ok {
 		return -1, false
 	}
-	box := m.menuShape(l)
+	box := m.menuShape(l, p)
 	if x < box.x || x >= box.x+box.w || y < box.y || y >= box.y+box.h {
 		return -1, false
 	}
-	// menuChrome-1 of the rows the box spends on itself are above the verbs:
+	// menuChrome-1 of the rows the box spends on itself are above the choices:
 	// the edge, the two lines naming what it is about, and the rule under them.
-	if at := y - box.y - (menuChrome - 1); at >= 0 && at < len(m.actions.verbs) {
+	if at := y - box.y - (menuChrome - 1); at >= 0 && at < len(p.rows) {
 		return at, true
 	}
 	return -1, true

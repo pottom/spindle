@@ -376,7 +376,8 @@ func TestTheMenuAnswersWhereItsVerbsAreDrawn(t *testing.T) {
 	// The box stands where the cursor is rather than in the middle of the
 	// screen: on the wall, that is the cover it was raised over.
 	cx, cy := m.cursorPoint(l)
-	if box := m.menuShape(l); box.x != cx || box.y != cy {
+	p, _ := m.openPopup()
+	if box := m.menuShape(l, p); box.x != cx || box.y != cy {
 		t.Errorf("the box is at %d,%d and the cover under the cursor at %d,%d", box.x, box.y, cx, cy)
 	}
 
@@ -713,8 +714,8 @@ func TestNotchesThatComeFastMoveFurther(t *testing.T) {
 	}
 }
 
-// The device picker: the one list in the program you open only to point at, and
-// for a long time the one list the pointer could not reach.
+// The device picker is a box standing over whatever you were looking at, and it
+// answers for itself: one press on a name moves the music there.
 func TestPressingADeviceChoosesIt(t *testing.T) {
 	m := playerModel()
 	m.devices.items = []player.Device{
@@ -724,36 +725,63 @@ func TestPressingADeviceChoosesIt(t *testing.T) {
 	}
 	m.devices.open = true
 
+	l := m.layout()
 	for i, d := range m.devices.items {
 		x, y := wordAt(t, m, d.Name)
-		if at := m.spotAt(x, y); at.kind != spotDevice || at.at != i {
-			t.Fatalf("%q is at column %d of row %d, and the pointer calls it %v/%d",
-				d.Name, x, y, at.kind, at.at)
+		at, inside := m.menuVerbAt(l, x, y)
+		if !inside || at != i {
+			t.Fatalf("%q is at column %d of row %d, and the box calls it %d (inside %v)",
+				d.Name, x, y, at, inside)
 		}
 	}
 
-	// One press points at it; the music does not move until a second one.
+	// What is playing is still on the screen behind it, which is the whole
+	// reason it is a box rather than a panel in place of the player.
+	if !strings.Contains(ansi.Strip(m.render()), m.ps.Title) {
+		t.Error("the picker covered what is playing")
+	}
+
 	x, y := wordAt(t, m, "phone")
 	got, cmd := m.mouseClick(clickAt(x, y))
 	if got.devices.cursor.cursor != 2 {
-		t.Fatalf("one press left the cursor on %d, want the device under it", got.devices.cursor.cursor)
+		t.Fatalf("a press left the cursor on %d, want the device under it", got.devices.cursor.cursor)
 	}
-	if cmd != nil {
-		t.Error("one press asked to move the music")
-	}
-	if twice, cmd := got.mouseClick(clickAt(x, y)); cmd == nil {
-		t.Error("two presses on a device asked for nothing, want the music moved")
-	} else if twice.devices.open {
-		t.Error("choosing a device left the picker up")
+	if cmd == nil {
+		t.Error("choosing a device asked for nothing, want the music moved")
 	}
 
-	// And the same list when it is the whole screen, because nothing is playing
-	// anywhere.
-	none := m
-	none.devices.open, none.noDevice = false, true
-	x, y = wordAt(t, none, "kitchen")
-	if at := none.spotAt(x, y); at.kind != spotDevice || at.at != 0 {
-		t.Errorf("on the no-device screen %q is %v/%d, want the first device", "kitchen", at.kind, at.at)
+	// And a press away from it puts it away.
+	if away, _ := m.mouseClick(clickAt(leftMargin, m.height-2)); away.devices.open {
+		t.Error("pressing away from the picker left it up")
+	}
+}
+
+// The same list when it is the whole screen, because nothing is playing
+// anywhere. That one is a screen rather than a box, and its rows are pointed at
+// like any others.
+func TestPressingADeviceOnTheEmptyScreen(t *testing.T) {
+	m := playerModel()
+	m.ps.Playing = false
+	m.noDevice = true
+	m.devices.items = []player.Device{
+		{ID: "one", Name: "kitchen", Type: "Speaker"},
+		{ID: "two", Name: "laptop", Type: "Computer"},
+	}
+
+	x, y := wordAt(t, m, "kitchen")
+	if at := m.spotAt(x, y); at.kind != spotDevice || at.at != 0 {
+		t.Fatalf("%q is at column %d of row %d, and the pointer calls it %v/%d",
+			"kitchen", x, y, at.kind, at.at)
+	}
+
+	got, cmd := m.mouseClick(clickAt(x, y))
+	if got.devices.cursor.cursor != 0 || cmd != nil {
+		t.Error("one press on the empty screen moved the music, want it to point first")
+	}
+	if twice, cmd := got.mouseClick(clickAt(x, y)); cmd == nil {
+		t.Error("two presses asked for nothing")
+	} else if twice.devices.open {
+		t.Error("choosing a device opened the picker")
 	}
 }
 

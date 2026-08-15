@@ -375,35 +375,29 @@ func (m Model) playerTop(l layout, block int) int {
 // choose one thing and it closes again — and for a long time it was the one list
 // the pointer could not reach.
 //
-// Two screens hold it: the panel opened over the player, and the screen that is
-// nothing but this list because nothing is playing anywhere. Both build their
-// lines and say where in them the devices start, and both centre what they built
-// — so the row is that offset, that start, and how far down the list the pointer
-// is. See noDeviceLines and devicePickerLines.
+// The screen that is nothing but this list, because nothing is playing anywhere.
+// It builds its lines and says where in them the devices start, and centres what
+// it built — so the row is that offset, that start, and how far down the list
+// the pointer is. See noDeviceLines. The picker opened with a key is a box, and
+// boxes answer for themselves.
 func (m Model) deviceSpot(l layout, x, row int) spot {
 	none := spot{spotNothing, -1}
 	if len(m.devices.items) == 0 {
 		return none
 	}
 
-	var lines []string
-	var at, rows, left, width int
+	// The picker opened with a key is a box standing over the screen, and the
+	// box answers for itself — see menuVerbAt. This is the other one: the screen
+	// that stands in for the player when nothing is playing anywhere.
 	if m.devices.open {
-		width = l.infoWidth
-		lines, at = m.devicePickerLines(width)
-		rows = m.playerPaneRows(l)
-		left = leftMargin
-		if l.hasArt() {
-			left += l.artWidth + columnGap
-		}
-		row -= max((l.bodyHeight-rows)/2, 0)
-	} else {
-		// The screen keeps a row back from the body for the status line under
-		// it, which is what the panel is laid out in. See body.
-		lines, at = m.noDeviceLines(l)
-		rows = max(l.bodyHeight-1, 1)
-		left, width = leftMargin, min(l.interior-leftMargin-rightMargin, deviceListCols)
+		return none
 	}
+
+	// It keeps a row back from the body for the status line under it, which is
+	// what the panel is laid out in. See body.
+	lines, at := m.noDeviceLines(l)
+	rows := max(l.bodyHeight-1, 1)
+	left, width := leftMargin, min(l.interior-leftMargin-rightMargin, deviceListCols)
 
 	if x < left || x >= left+width {
 		return none

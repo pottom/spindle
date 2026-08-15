@@ -125,10 +125,3 @@ func blankRows(w, n int) []string {
 	}
 	return out
 }
-
-// devicesBlock is the picker, which stands in for whatever it is opened over.
-func (m Model) devicesBlock() block {
-	return block{"devices", func(w, h int) []string {
-		return m.devicePicker(w, h)
-	}}
-}

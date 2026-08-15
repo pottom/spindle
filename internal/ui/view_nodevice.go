@@ -66,20 +66,31 @@ func (m Model) noDeviceLines(l layout) (lines []string, at int) {
 	return lines, at
 }
 
-// devicePicker is the same list opened over the player, in place of the track
-// information. No border and no dimming: the artwork stays put, the heading and
-// the help bar say plainly where you are.
-func (m Model) devicePicker(w, rows int) []string {
-	lines, _ := m.devicePickerLines(w)
-	return stack(lines, w, rows)
+// devicesPopup is the picker as a box standing over whatever you were looking
+// at, rather than in place of it.
+//
+// It opens under the device's name in the header, because that is the thing it
+// changes: the name says where the music is, and the list of where else it could
+// be belongs under it — the way a menu belongs under the word that opens it.
+//
+// In place of the player it was a panel that took half the screen to say three
+// lines, and it took away the one thing somebody moving the music wants to keep
+// looking at: what is playing.
+func (m Model) devicesPopup() popup {
+	rows := m.deviceRows(deviceListCols, true)
+	if len(m.devices.items) == 0 {
+		// deviceRows says so itself, in one line. Kept, because an empty box
+		// with a heading is worse than a box that explains.
+		rows = []string{m.styles.Empty.Render("No devices reported.")}
+	}
+	return popup{
+		x: leftMargin + devicesUnderName, y: tabBarHeight - 1,
+		title:    "Devices",
+		subtitle: "Move playback somewhere else",
+		rows:     rows,
+	}
 }
 
-// devicePickerLines is the same, and where in it the devices start.
-func (m Model) devicePickerLines(w int) (lines []string, at int) {
-	lines = []string{
-		m.styles.Title.Render("Devices"),
-		m.styles.Album.Render("Move playback somewhere else"),
-		"",
-	}
-	return append(lines, m.deviceRows(w, true)...), len(lines)
-}
+// devicesUnderName is how far in the box hangs from the left margin: under the
+// name in the header rather than under the mark before it.
+const devicesUnderName = 2

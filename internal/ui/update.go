@@ -175,7 +175,12 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 	case msg.NoActiveDevice:
 		// Not an error, and not worth clearing the last known track for: the
 		// player screen explains itself and offers the device list instead.
+		//
+		// And it puts the picker away, because that screen is the picker: a box
+		// of devices standing over a screen of the same devices is the same list
+		// twice, with one of them unreachable.
 		m.noDevice, m.ps, m.err = true, nil, nil
+		m.devices.open = false
 		return m, tea.Batch(fetchDevicesCmd(m.player), m.syncCover())
 
 	case msg.DevicesFetched:
