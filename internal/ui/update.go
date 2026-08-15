@@ -80,6 +80,9 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyPressMsg:
+		// Somebody is here, so the resting cadence goes back to its quickest.
+		m.stir()
+
 		// Before anything else takes it: the bar is for looking at whatever the
 		// screen is doing, including the screens that swallow keys. See debug.go.
 		if m.debugKey(message.String()) {
@@ -88,9 +91,11 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		return m.handleKey(message)
 
 	case tea.MouseWheelMsg:
+		m.stir()
 		return m.mouseWheel(message)
 
 	case tea.MouseClickMsg:
+		m.stir()
 		return m.mouseClick(message)
 
 	case tea.MouseMotionMsg:
@@ -132,6 +137,13 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		return m.handleTick()
 
 	case msg.StateFetched:
+		// An answer that says what the last one said is what a window nobody is
+		// looking at gets, over and over. See rest.
+		if sameAnswer(m.ps, message.State) {
+			m.rest()
+		} else {
+			m.stir()
+		}
 		if m.drivenFromElsewhere(message.State) {
 			m.followUntil = time.Now().Add(followWindow)
 			m.nextPollAt = time.Now().Add(activePoll)
@@ -1130,11 +1142,38 @@ func (m *Model) trackRanOut() tea.Cmd {
 // notePolled records that a poll has just gone out and works out when the next
 // resting one is due.
 func (m *Model) notePolled() {
-	interval := idlePoll
+	interval := max(m.restFor, idlePoll)
 	if time.Now().Before(m.followUntil) {
 		interval = activePoll
 	}
 	m.nextPollAt = time.Now().Add(interval)
+}
+
+// stir puts the resting cadence back to its quickest.
+//
+// Anything somebody does counts: a key, a press of the pointer, an answer that
+// differs from the last one. The rest is what happens to a window nobody is
+// looking at, and that is the only case the slow cadence is for. See restMost.
+func (m *Model) stir() { m.restFor = idlePoll }
+
+// rest slows the cadence, because the last answer said exactly what the one
+// before it said.
+func (m *Model) rest() {
+	m.restFor = min(max(m.restFor, idlePoll)*restEase, restMost)
+}
+
+// sameAnswer reports whether a fresh state says anything new.
+//
+// Not the position, which moves by itself and would make every answer look like
+// news. What counts is what somebody could have done: started or stopped
+// something, changed the record, moved the music to another machine, turned it
+// up, or changed how it is going round.
+func sameAnswer(a, b *player.State) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.TrackID == b.TrackID && a.Playing == b.Playing && a.DeviceID == b.DeviceID &&
+		a.Volume == b.Volume && a.Shuffle == b.Shuffle && a.Repeat == b.Repeat
 }
 
 // drivenFromElsewhere reports that the snapshot differs from what is on screen

@@ -20,11 +20,29 @@ const (
 	// still in flight may report. See DESIGN.md 4.2.
 	optimisticWindow = 2 * time.Second
 
-	// idlePoll is the resting cadence. DESIGN.md 4.1 picked five seconds without
-	// measuring; against a live account both five and two seconds ran with zero
-	// 429s, so three keeps a comfortable margin over the fastest rate proved
-	// safe while cutting the wait before an outside change is noticed.
+	// idlePoll is the resting cadence while anything is happening. DESIGN.md 4.1
+	// picked five seconds without measuring; against a live account both five and
+	// two seconds ran with zero 429s, so three keeps a comfortable margin over
+	// the fastest rate proved safe while cutting the wait before an outside
+	// change is noticed.
 	idlePoll = 3 * time.Second
+
+	// restMost is where the cadence settles once nothing is happening at all,
+	// and restEase how fast it gets there.
+	//
+	// Because three seconds for ever is twenty-eight thousand requests a day,
+	// and an application has a daily quota: spindle left open overnight came
+	// back to "rate limited for 23h4m", which is a lockout rather than a
+	// throttle. Nothing is free about asking what is playing when the answer has
+	// been "nothing" for an hour.
+	//
+	// It costs nothing while the program is being used — any key, any press, and
+	// any answer that differs from the last puts it back to three seconds — and
+	// nothing at all while spindle's own daemon is the one playing, because then
+	// the state comes from the daemon and never from the Web API. What it saves
+	// is the case it was built for: a window left open.
+	restMost = time.Minute
+	restEase = 2
 
 	// activePoll is used for a while after a change nobody here asked for.
 	// Somebody is driving from another device, and the next thing they do
@@ -228,7 +246,12 @@ type Model struct {
 	// nextPollAt is when the resting poll is next due, followUntil is how long
 	// to keep the faster cadence, and endPolledFor stops a track that has run
 	// out from being handled again on every following tick.
-	nextPollAt   time.Time
+	nextPollAt time.Time
+
+	// restFor is how long the resting poll waits now. It doubles while the
+	// answer keeps coming back the same and goes back to idlePoll the moment
+	// anything happens — see stir.
+	restFor      time.Duration
 	followUntil  time.Time
 	endPolledFor string
 
