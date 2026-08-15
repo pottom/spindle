@@ -1,6 +1,7 @@
 package ui
 
 import (
+	tea "charm.land/bubbletea/v2"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -178,6 +179,14 @@ func (m Model) debugSelf() []debugField {
 	// different things and either can be missing: "sleep only" is a machine that
 	// will not suspend while its screen goes dark anyway.
 	b.put("sleep", "%s", map[bool]string{true: awake.What(), false: "as usual"}[awake.Held()])
+
+	// The last key, as the terminal reported it: the letter it sent and the key
+	// it came from. Which key a press came from is only knowable if the terminal
+	// says so, and the only way to find out whether it does is to look. See
+	// keypress.go.
+	if m.lastKey.Code != 0 {
+		b.put("key", "%s", debugKey(m.lastKey))
+	}
 
 	t := slowNow()
 	b.put("fps", "%.1f", t.fps)
@@ -770,4 +779,19 @@ func debugShort(s string, n int) string {
 		return string(r[:n-1]) + "…"
 	}
 	return s
+}
+
+// debugKey is a press as the terminal reported it: what it sent, and the key a
+// standard US keyboard would have had there — or "no base" where the terminal
+// does not say.
+func debugKey(k tea.KeyPressMsg) string {
+	base := "no base"
+	if k.BaseCode != 0 {
+		base = fmt.Sprintf("base %q", string(k.BaseCode))
+	}
+	text := k.Text
+	if text == "" {
+		text = "-"
+	}
+	return fmt.Sprintf("%q/%q %s", text, string(k.Code), base)
 }

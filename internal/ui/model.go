@@ -83,6 +83,10 @@ type Model struct {
 
 	cover coverState
 
+	// lastKey is the press the debug bar reports, kept for no other reason: what
+	// a terminal says about a key is not knowable from here without looking.
+	lastKey tea.KeyPressMsg
+
 	// queueAt is when the queue was last asked for. It comes from our own daemon
 	// rather than from Spotify, so it is asked again often — see refresh.go.
 	queueAt time.Time

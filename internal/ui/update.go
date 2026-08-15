@@ -632,6 +632,8 @@ func (m *Model) fillFromQueue() {
 }
 
 func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
+	m.lastKey = k
+
 	// The big screen outranks even the tabs: it is watched rather than worked
 	// on, so the next key is the way out of it whatever that key was.
 	if cmd, handled := m.stageKey(k); handled {
