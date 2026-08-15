@@ -152,6 +152,10 @@ func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 		m.helpAt = max(m.helpAt+delta, 0)
 		return m, nil
 
+	case spotDevice:
+		m.devices.cursor.move(delta, len(m.devices.items))
+		return m, nil
+
 	case spotSeek:
 		// The same step the keys take. A wheel over the bar is somebody nudging
 		// the playhead, and a notch that jumped a different distance from the
@@ -237,12 +241,28 @@ func (m Model) mouseClick(e tea.MouseClickMsg) (Model, tea.Cmd) {
 	at := m.noteMouse(e.X, e.Y)
 	m.lastClick, m.lastClickAt = m.lastPoint, time.Now()
 
-	if twice && (at.kind == spotList || at.kind == spotTile) && at.at >= 0 {
+	if twice && (at.kind == spotList || at.kind == spotTile || at.kind == spotDevice) && at.at >= 0 {
 		// The cursor is already on it — the first press put it there — so this
 		// is the key that acts on where the cursor is, asked for by hand rather
 		// than pressed. One act, however it was asked for: what enter does on
 		// this screen is what a second click does, whatever screen it is.
 		return m.handleKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+	}
+
+	// A field is one thing rather than a row of things, so it is answered before
+	// the check that there is a part under the pointer at all.
+	switch at.kind {
+	case spotQuery:
+		// Pressing a field is asking for the keyboard, and there is nothing
+		// else it could be asking for.
+		if m.search.typing {
+			return m, nil
+		}
+		return m, m.startTyping()
+
+	case spotFinder:
+		m.find.typing = true
+		return m, nil
 	}
 
 	if at.at < 0 {
@@ -262,6 +282,12 @@ func (m Model) mouseClick(e tea.MouseClickMsg) (Model, tea.Cmd) {
 		m.library.cursor().moveTo(at.at, len(m.libraryTiles()))
 		return m, tea.Batch(m.previewCover(), m.readAhead(), m.syncGridCovers())
 
+	case spotDevice:
+		// Chosen with a second press, like everything else. Moving the music to
+		// another machine is not something to do by brushing past a name.
+		m.devices.cursor.moveTo(at.at, len(m.devices.items))
+		return m, nil
+
 	case spotList:
 		cursor, count := (&m).rowCursor()
 		if cursor == nil {
@@ -275,6 +301,13 @@ func (m Model) mouseClick(e tea.MouseClickMsg) (Model, tea.Cmd) {
 		// chosen is sent when the button comes up — a click is that with no
 		// motion in between. See drag.go.
 		m.takeHold(at.kind, at.at)
+
+	case spotScroll:
+		// And the same for the bar down the side of a list, which moves the
+		// list as it is dragged rather than when it is let go.
+		m.takeHold(at.kind, at.at)
+		m.followScroll(e.Y)
+		return m, tea.Batch(m.previewCover(), m.readAhead())
 
 	case spotControl:
 		return m.pressControl(control(at.at))

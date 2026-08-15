@@ -40,7 +40,7 @@ func stack(lines []string, w, h int) []string { return stackLift(lines, w, h, 0)
 // counts for more than the air over them.
 func stackLift(lines []string, w, h, lift int) []string {
 	out := make([]string, h)
-	top := max((h-len(lines))/2-lift, 0)
+	top := stackTop(len(lines), h, lift)
 	for i := range out {
 		row := i - top
 		if row >= 0 && row < len(lines) {
@@ -51,6 +51,12 @@ func stackLift(lines []string, w, h, lift int) []string {
 	}
 	return out
 }
+
+// stackTop is the row a block of n lines starts on when it is centred in h of
+// them. Named because the pointer has to find its way back to a row that was
+// centred, and working the halving out a second time is how the two come to
+// disagree.
+func stackTop(n, h, lift int) int { return max((h-n)/2-lift, 0) }
 
 // scrollRange sizes and positions a scrollbar thumb: its size is the fraction
 // of the list on screen, its place the fraction already scrolled past.

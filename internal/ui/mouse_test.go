@@ -713,6 +713,139 @@ func TestNotchesThatComeFastMoveFurther(t *testing.T) {
 	}
 }
 
+// The device picker: the one list in the program you open only to point at, and
+// for a long time the one list the pointer could not reach.
+func TestPressingADeviceChoosesIt(t *testing.T) {
+	m := playerModel()
+	m.devices.items = []player.Device{
+		{ID: "one", Name: "kitchen", Type: "Speaker"},
+		{ID: "two", Name: "laptop", Type: "Computer", Active: true},
+		{ID: "three", Name: "phone", Type: "Smartphone"},
+	}
+	m.devices.open = true
+
+	for i, d := range m.devices.items {
+		x, y := wordAt(t, m, d.Name)
+		if at := m.spotAt(x, y); at.kind != spotDevice || at.at != i {
+			t.Fatalf("%q is at column %d of row %d, and the pointer calls it %v/%d",
+				d.Name, x, y, at.kind, at.at)
+		}
+	}
+
+	// One press points at it; the music does not move until a second one.
+	x, y := wordAt(t, m, "phone")
+	got, cmd := m.mouseClick(clickAt(x, y))
+	if got.devices.cursor.cursor != 2 {
+		t.Fatalf("one press left the cursor on %d, want the device under it", got.devices.cursor.cursor)
+	}
+	if cmd != nil {
+		t.Error("one press asked to move the music")
+	}
+	if twice, cmd := got.mouseClick(clickAt(x, y)); cmd == nil {
+		t.Error("two presses on a device asked for nothing, want the music moved")
+	} else if twice.devices.open {
+		t.Error("choosing a device left the picker up")
+	}
+
+	// And the same list when it is the whole screen, because nothing is playing
+	// anywhere.
+	none := m
+	none.devices.open, none.noDevice = false, true
+	x, y = wordAt(t, none, "kitchen")
+	if at := none.spotAt(x, y); at.kind != spotDevice || at.at != 0 {
+		t.Errorf("on the no-device screen %q is %v/%d, want the first device", "kitchen", at.kind, at.at)
+	}
+}
+
+// The bar down the side of a list is grabbed and dragged, and the list follows
+// it as it goes rather than when it is let go.
+func TestDraggingTheScrollbarWalksTheList(t *testing.T) {
+	ids := make([]string, 60)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("t%02d", i)
+	}
+	m := queueModel(0, ids...)
+	m.width, m.height = 100, 40
+	m.resize()
+
+	l := m.layout()
+	band := m.listBandRows(l)
+	head := tabBarHeight + band + m.listChrome(band)
+	body := m.listBodyRows(max(l.bodyHeight, 1), band)
+	bar := leftMargin + queueRowWidth(l) + 1
+
+	if at := m.spotAt(bar, head); at.kind != spotScroll || at.at != 0 {
+		t.Fatalf("the top of the bar is %v/%d, want the scrollbar", at.kind, at.at)
+	}
+
+	// Pressed at the foot of it, the list is at its end.
+	got, _ := m.mouseClick(clickAt(bar, head+body-1))
+	if got.queuePane.cursor.cursor != len(got.queueRows())-1 {
+		t.Errorf("pressing the foot of the bar left the cursor on %d, want the last row",
+			got.queuePane.cursor.cursor)
+	}
+	if !got.drag.on {
+		t.Error("pressing the bar took hold of nothing")
+	}
+
+	// Dragged back to the top, the list comes with it — before the button is
+	// let go.
+	got, _ = got.mouseMotion(tea.MouseMotionMsg{X: bar, Y: head, Button: tea.MouseLeft})
+	if got.queuePane.cursor.cursor != 0 {
+		t.Errorf("dragged to the top the cursor is on %d, want the first row", got.queuePane.cursor.cursor)
+	}
+	got, _ = got.mouseRelease(tea.MouseReleaseMsg{X: bar, Y: head, Button: tea.MouseLeft})
+	if got.drag.on {
+		t.Error("letting go left the bar held")
+	}
+
+	// A list that fits has no bar, and the column it would be in is a row.
+	short := queueModel(0, "alpha", "bravo")
+	short.width, short.height = 100, 40
+	short.resize()
+	if at := short.spotAt(bar, head); at.kind == spotScroll {
+		t.Error("a list that fits on screen drew a scrollbar to point at")
+	}
+}
+
+// Pressing a field is asking for the keyboard, which is the only thing a field
+// can mean.
+func TestPressingAFieldAsksForTheKeyboard(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.tab = tabSearch
+	m.width, m.height = 100, 40
+	m.resize()
+
+	// The catalogue's own field, which on an empty search is the top of the
+	// screen.
+	x, y := leftMargin, tabBarHeight
+	if at := m.spotAt(x, y); at.kind != spotQuery {
+		t.Fatalf("the search field is %v at column %d of row %d", at.kind, x, y)
+	}
+	got, _ := m.mouseClick(clickAt(x, y))
+	if !got.search.typing {
+		t.Error("pressing the search field did not ask for the keyboard")
+	}
+
+	// And the box a list is searched in, which stands over the list.
+	q := queueModel(0, "alpha", "bravo", "charlie")
+	q.width, q.height = 100, 40
+	q.resize()
+	// A query written and let go of: the box is still up, and the marks it left
+	// are still in the list.
+	q.startFind()
+	q.find.query, q.find.typing = "alpha", false
+
+	l := q.layout()
+	if at := q.spotAt(leftMargin+2, tabBarHeight+q.finderAt(l)+1); at.kind != spotFinder {
+		t.Fatalf("the box a list is searched in is %v", at.kind)
+	}
+	back, _ := q.mouseClick(clickAt(leftMargin+2, tabBarHeight+q.finderAt(l)+1))
+	if !back.find.typing {
+		t.Error("pressing the box did not give the keyboard back to it")
+	}
+}
+
 // playerModel is the player tab with something playing on it, at a size where
 // there is room for the picture beside the words.
 func playerModel() Model {

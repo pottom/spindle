@@ -14,12 +14,24 @@ const deviceListCols = 52
 // The list is the same one the picker uses, and it is just as live: this screen
 // is where you choose where to start.
 func (m Model) noDevicePanel(l layout, rows int) []string {
+	lines, _ := m.noDeviceLines(l)
+	return stack(lines, l.interior-leftMargin-rightMargin, rows)
+}
+
+// noDeviceLines is what that screen holds, and where in it the devices start.
+//
+// Two answers from one function because there are two callers: the drawing, and
+// the pointer working out which device it is over. A screen this tall — a
+// picture of unknown height, four lines of explanation, the list, and a page of
+// small print under it — cannot have its rows counted twice and stay in
+// agreement. See deviceSpot.
+func (m Model) noDeviceLines(l layout) (lines []string, at int) {
 	s := m.styles
 	w := l.interior - leftMargin - rightMargin
 
 	// The program's own picture, as large as what is left allows, while the
 	// device is being waited for. See splash.go.
-	lines := m.splashRows()
+	lines = m.splashRows()
 	if len(lines) > 0 {
 		lines = append(lines, "")
 	}
@@ -29,6 +41,7 @@ func (m Model) noDevicePanel(l layout, rows int) []string {
 		s.Detail.Render("Start Spotify on one of your devices, or pick one below."),
 		"",
 	)
+	at = len(lines)
 	lines = append(lines, m.deviceRows(min(w, deviceListCols), true)...)
 	lines = append(lines, "", "")
 
@@ -50,18 +63,23 @@ func (m Model) noDevicePanel(l layout, rows int) []string {
 		)
 	}
 
-	return stack(lines, w, rows)
+	return lines, at
 }
 
 // devicePicker is the same list opened over the player, in place of the track
 // information. No border and no dimming: the artwork stays put, the heading and
 // the help bar say plainly where you are.
 func (m Model) devicePicker(w, rows int) []string {
-	lines := []string{
+	lines, _ := m.devicePickerLines(w)
+	return stack(lines, w, rows)
+}
+
+// devicePickerLines is the same, and where in it the devices start.
+func (m Model) devicePickerLines(w int) (lines []string, at int) {
+	lines = []string{
 		m.styles.Title.Render("Devices"),
 		m.styles.Album.Render("Move playback somewhere else"),
 		"",
 	}
-	lines = append(lines, m.deviceRows(w, true)...)
-	return stack(lines, w, rows)
+	return append(lines, m.deviceRows(w, true)...), len(lines)
 }

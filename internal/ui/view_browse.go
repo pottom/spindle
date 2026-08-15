@@ -878,6 +878,11 @@ func (m Model) playlistDetailOf(p *player.Playlist, w, rows int) []string {
 	return lines
 }
 
+// searchFieldWidth is how wide the field the catalogue is searched from is
+// drawn, wherever on the screen it stands. Named so that a press can be measured
+// against the same number.
+func searchFieldWidth(l layout) int { return max(queueBlockWidth(l)/3, 8) }
+
 func (m Model) searchPaneView(l layout, rows int) []string {
 	empty := "Type to search the catalogue."
 	if strings.TrimSpace(m.search.input.Value()) != "" {
@@ -902,7 +907,7 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 		}
 
 		out := []string{
-			fit(m.searchField(max(w/3, 8)), w),
+			fit(m.searchField(searchFieldWidth(l)), w),
 			strings.Repeat(" ", w),
 			fit(line, w),
 		}
@@ -916,7 +921,7 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 		// The field is the heading: it is what the screen is about, and it has
 		// to be where the eye already goes for a heading rather than in a band
 		// of its own above one.
-		heading:  func(w int) string { return m.searchField(max(w/3, 8)) },
+		heading:  func(int) string { return m.searchField(searchFieldWidth(l)) },
 		subtitle: m.searchKinds,
 		columns:  m.searchColumns,
 		count:    found.count(),

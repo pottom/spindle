@@ -42,6 +42,19 @@ const (
 	// spotHelp is the page of keys, which scrolls under its own head.
 	spotHelp
 
+	// spotDevice is one of the machines playback can be moved to.
+	spotDevice
+
+	// spotScroll is the thin bar down the right of a list. at is how far down
+	// it the pointer is, in rows.
+	spotScroll
+
+	// The two places a question is typed: the field the catalogue is searched
+	// from, and the box a list is searched in. Pressing either is asking for
+	// the keyboard, which is the only thing a field can mean.
+	spotQuery
+	spotFinder
+
 	// The three things on the player worth pointing at. at is the column
 	// reached along the bar for the first two, and which control for the last:
 	// a place on a meter is a place, and rounding it to an index would throw
@@ -159,10 +172,23 @@ func (m Model) spotAt(x, y int) spot {
 		return none
 	}
 
-	// Nothing underneath is reachable while a menu is up, exactly as with the
+	// Nothing underneath is reachable while the menu is up, exactly as with the
 	// keys: what is open answers everything.
-	if m.devices.open || m.actions.open {
+	if m.actions.open {
 		return none
+	}
+
+	// And the list of devices is what is being looked at while it is up, whether
+	// it was opened over a screen or is the screen.
+	if m.devices.open || (m.tab == tabPlayer && m.noDevice) {
+		return m.deviceSpot(l, x, row)
+	}
+
+	// The box a list is searched in stands over whatever is under it, so it is
+	// asked before them. See finder.go.
+	if m.finding() && row >= m.finderAt(l) && row < m.finderAt(l)+finderRows &&
+		x >= leftMargin && x < leftMargin+finderWidth(l) {
+		return spot{spotFinder, -1}
 	}
 
 	switch {
@@ -198,6 +224,21 @@ func (m Model) listSpot(l layout, x, row int) spot {
 	band := m.listBandRows(l)
 	head := band + m.listChrome(band)
 	body := m.listBodyRows(max(l.bodyHeight, 1), band)
+
+	// The field the catalogue is searched from is this screen's heading — three
+	// rows above the first row of results, where the heading, the column names
+	// and the line under them stand — or the top of the screen while nothing has
+	// been found and there is no band to sit under. See searchPaneView.
+	if m.tab == tabSearch && m.open() == nil {
+		field := head - 3
+		if m.search.current().count() == 0 {
+			field = 0
+		}
+		if row == field && x >= leftMargin && x < leftMargin+searchFieldWidth(l) {
+			return spot{spotQuery, -1}
+		}
+	}
+
 	if row < head || row >= head+body {
 		return here
 	}
@@ -208,6 +249,13 @@ func (m Model) listSpot(l layout, x, row int) spot {
 	cursor, count := (&m).rowCursor()
 	if cursor == nil {
 		return here
+	}
+
+	// The bar down the right, where there is one. A column of its own, drawn
+	// after the row and a blank — see listBlock — and there is no bar at all
+	// while the whole list fits.
+	if x == leftMargin+queueRowWidth(l)+1 && count > body {
+		return spot{spotScroll, row - head}
 	}
 	// The window this screen is showing, asked for the way the drawing asks:
 	// this is a copy of the model, so nothing here is decided for the next
@@ -319,6 +367,51 @@ func (m Model) playerTop(l layout, block int) int {
 		return top + m.artTop(l, rows)
 	}
 	return top + max((rows-block)/2, 0)
+}
+
+// deviceSpot is which device is under the pointer.
+//
+// The one list in the program that is only ever pointed at — you open it to
+// choose one thing and it closes again — and for a long time it was the one list
+// the pointer could not reach.
+//
+// Two screens hold it: the panel opened over the player, and the screen that is
+// nothing but this list because nothing is playing anywhere. Both build their
+// lines and say where in them the devices start, and both centre what they built
+// — so the row is that offset, that start, and how far down the list the pointer
+// is. See noDeviceLines and devicePickerLines.
+func (m Model) deviceSpot(l layout, x, row int) spot {
+	none := spot{spotNothing, -1}
+	if len(m.devices.items) == 0 {
+		return none
+	}
+
+	var lines []string
+	var at, rows, left, width int
+	if m.devices.open {
+		width = l.infoWidth
+		lines, at = m.devicePickerLines(width)
+		rows = m.playerPaneRows(l)
+		left = leftMargin
+		if l.hasArt() {
+			left += l.artWidth + columnGap
+		}
+		row -= max((l.bodyHeight-rows)/2, 0)
+	} else {
+		// The screen keeps a row back from the body for the status line under
+		// it, which is what the panel is laid out in. See body.
+		lines, at = m.noDeviceLines(l)
+		rows = max(l.bodyHeight-1, 1)
+		left, width = leftMargin, min(l.interior-leftMargin-rightMargin, deviceListCols)
+	}
+
+	if x < left || x >= left+width {
+		return none
+	}
+	if i := row - stackTop(len(lines), rows, 0) - at; i >= 0 && i < len(m.devices.items) {
+		return spot{spotDevice, i}
+	}
+	return none
 }
 
 // cursorPoint is where on the screen the thing under the cursor is drawn.

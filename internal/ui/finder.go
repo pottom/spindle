@@ -58,7 +58,7 @@ func (m Model) drawFinder(lines []string, l layout, top int) []string {
 	// four letters floating in the middle of the heading reads as something
 	// dropped on the screen. At the list's width it is the head of the list while
 	// the search is open, which is what it is.
-	box := min(queueBlockWidth(l), l.interior-leftMargin-rightMargin)
+	box := finderWidth(l)
 	if box < finderLeast {
 		return lines
 	}
@@ -85,6 +85,12 @@ func (m Model) drawFinder(lines []string, l layout, top int) []string {
 	// shade off the screen, on a screen with a photograph at the top of it, reads
 	// as a second window rather than as part of this one.
 	return out
+}
+
+// finderWidth is how wide the box is drawn, which is also what a press has to
+// land inside to be a press on it.
+func finderWidth(l layout) int {
+	return min(queueBlockWidth(l), l.interior-leftMargin-rightMargin)
 }
 
 // finderAt is how far into the body the field stands, in the rows whatever is on
