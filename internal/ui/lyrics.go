@@ -50,7 +50,6 @@ const (
 	// lyricsDefaultLine is how long the last line of a lyric is assumed to last,
 	// there being nothing after it to measure against.
 	lyricsDefaultLine = 4 * time.Second
-
 )
 
 // lyricsHeadStart is how far in front of its own stamp a line takes the screen.
@@ -92,7 +91,6 @@ type lyricsState struct {
 	forTrack string
 	lines    []player.Lyric
 	synced   bool
-
 
 	// missing records that the track was asked about and has none, which is a
 	// different thing from not having asked yet.

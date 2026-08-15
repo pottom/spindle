@@ -5,7 +5,6 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -51,7 +50,7 @@ func (m *Model) findKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		// A query let go of is still on the screen — its marks are in the rows
 		// and the field still says how many it found — so the key that takes it
 		// off is the one that means never mind, before it means anything else.
-		if m.find.query != "" && key.Matches(k, m.keys.Back) {
+		if m.find.query != "" && m.pressed(k, m.keys.Back) {
 			m.find = find{}
 			return nil, true
 		}
@@ -59,13 +58,13 @@ func (m *Model) findKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	switch {
-	case key.Matches(k, m.keys.Back):
+	case m.pressed(k, m.keys.Back):
 		// Nothing was chosen, so nothing is left behind: the cursor goes back
 		// to where the search started from.
 		m.find = find{}
 		return nil, true
 
-	case key.Matches(k, m.keys.Enter):
+	case m.pressed(k, m.keys.Enter):
 		m.find.typing = false
 		return nil, true
 

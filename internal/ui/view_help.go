@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/build"
@@ -208,21 +207,21 @@ func helpKeyRows(w int) int { return 140 }
 // of the ones that do.
 func (m *Model) helpScroll(k tea.KeyPressMsg, page int) bool {
 	switch {
-	case key.Matches(k, m.keys.Down):
+	case m.pressed(k, m.keys.Down):
 		m.helpAt++
-	case key.Matches(k, m.keys.Up):
+	case m.pressed(k, m.keys.Up):
 		m.helpAt--
-	case key.Matches(k, m.keys.PageDown):
+	case m.pressed(k, m.keys.PageDown):
 		m.helpAt += page
-	case key.Matches(k, m.keys.PageUp):
+	case m.pressed(k, m.keys.PageUp):
 		m.helpAt -= page
-	case key.Matches(k, m.keys.HalfDown):
+	case m.pressed(k, m.keys.HalfDown):
 		m.helpAt += max(page/2, 1)
-	case key.Matches(k, m.keys.HalfUp):
+	case m.pressed(k, m.keys.HalfUp):
 		m.helpAt -= max(page/2, 1)
-	case key.Matches(k, m.keys.First), key.Matches(k, m.keys.FirstVim):
+	case m.pressed(k, m.keys.First), m.pressed(k, m.keys.FirstVim):
 		m.helpAt = 0
-	case key.Matches(k, m.keys.Last), key.Matches(k, m.keys.LastVim):
+	case m.pressed(k, m.keys.Last), m.pressed(k, m.keys.LastVim):
 		m.helpAt = helpKeyRows(0)
 	default:
 		return false

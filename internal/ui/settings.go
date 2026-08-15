@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/auth"
@@ -96,12 +95,12 @@ func (m *Model) settingsKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	switch {
-	case key.Matches(k, m.keys.SeekFwd), key.Matches(k, m.keys.Enter):
+	case m.pressed(k, m.keys.SeekFwd), m.pressed(k, m.keys.Enter):
 		return m.turnSetting(1), true
-	case key.Matches(k, m.keys.SeekBack):
+	case m.pressed(k, m.keys.SeekBack):
 		return m.turnSetting(-1), true
 
-	case key.Matches(k, m.keys.Restart):
+	case m.pressed(k, m.keys.Restart):
 		return m.restartDevice(), true
 	}
 	return nil, false

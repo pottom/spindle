@@ -92,7 +92,6 @@ type Model struct {
 	// what only moved. What has scrolled away is dropped — see syncGridCovers.
 	tiles map[string]coverState
 
-
 	// coverSeq debounces the artwork preview: arrowing down a list should not
 	// fire an upload per row, only once the cursor settles.
 	coverSeq int

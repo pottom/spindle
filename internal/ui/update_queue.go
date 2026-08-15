@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/player"
@@ -17,7 +16,7 @@ func (m *Model) queueKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	switch {
-	case key.Matches(k, m.keys.Enter):
+	case m.pressed(k, m.keys.Enter):
 		// The top row is already playing; restarting it is not what "play"
 		// means to anyone pressing enter on the track they are listening to.
 		at := m.queueIndex()
@@ -26,20 +25,20 @@ func (m *Model) queueKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		return m.playRow(at), true
 
-	case key.Matches(k, m.keys.Actions):
+	case m.pressed(k, m.keys.Actions):
 		m.openActions()
 		return nil, true
 
-	case key.Matches(k, m.keys.Drop):
+	case m.pressed(k, m.keys.Drop):
 		return m.dropQueued(), true
 
-	case key.Matches(k, m.keys.MoveUp):
+	case m.pressed(k, m.keys.MoveUp):
 		return m.moveQueued(-1), true
 
-	case key.Matches(k, m.keys.MoveDn):
+	case m.pressed(k, m.keys.MoveDn):
 		return m.moveQueued(1), true
 
-	case key.Matches(k, m.keys.Back):
+	case m.pressed(k, m.keys.Back):
 		return m.switchTab(tabPlayer), true
 	}
 	return nil, false

@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/player"
@@ -96,7 +95,7 @@ func (m *Model) openKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	switch {
-	case key.Matches(k, m.keys.Enter):
+	case m.pressed(k, m.keys.Enter):
 		// An artist's list is of records, so choosing one opens it rather than
 		// playing it: an artist page is somewhere to go from, not a list to
 		// start.
@@ -113,11 +112,11 @@ func (m *Model) openKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		return m.startPlay(play), true
 
-	case key.Matches(k, m.keys.Actions), key.Matches(k, m.keys.ActionsTyped):
+	case m.pressed(k, m.keys.Actions), m.pressed(k, m.keys.ActionsTyped):
 		m.openActions()
 		return nil, true
 
-	case key.Matches(k, m.keys.PlayOne):
+	case m.pressed(k, m.keys.PlayOne):
 		// Enter plays the list from here, which is what the official client
 		// does and what makes the rest of it follow. This is the other reading:
 		// one track, and whatever was playing before it is let go. Nothing
@@ -133,7 +132,7 @@ func (m *Model) openKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			call:   func(ctx context.Context, p player.Player) error { return p.PlayNow(ctx, id) },
 		}), true
 
-	case key.Matches(k, m.keys.Enqueue), key.Matches(k, m.keys.EnqueueTyped):
+	case m.pressed(k, m.keys.Enqueue), m.pressed(k, m.keys.EnqueueTyped):
 		if a := m.cursorAlbum(); a != nil {
 			return m.enqueueList(openAlbum, a.ID, a.Name), true
 		}
@@ -142,7 +141,7 @@ func (m *Model) openKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		return nil, true
 
-	case key.Matches(k, m.keys.Back):
+	case m.pressed(k, m.keys.Back):
 		m.pop()
 		return m.syncCover(), true
 	}
@@ -160,14 +159,14 @@ func (m *Model) libraryKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	switch {
-	case key.Matches(k, m.keys.SearchKind), key.Matches(k, m.keys.SearchKindBack):
+	case m.pressed(k, m.keys.SearchKind), m.pressed(k, m.keys.SearchKindBack):
 		delta := 1
-		if key.Matches(k, m.keys.SearchKindBack) {
+		if m.pressed(k, m.keys.SearchKindBack) {
 			delta = -1
 		}
 		return tea.Batch(m.turnLibraryKind(delta), m.syncGridCovers()), true
 
-	case key.Matches(k, m.keys.Enter):
+	case m.pressed(k, m.keys.Enter):
 		// A row in the history is a track, and a track plays rather than opens.
 		// The queue is kept: this list is for reaching back for one thing, not
 		// for starting the afternoon again.
@@ -181,11 +180,11 @@ func (m *Model) libraryKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		return m.openLibraryRow(), true
 
-	case key.Matches(k, m.keys.Actions):
+	case m.pressed(k, m.keys.Actions):
 		m.openActions()
 		return nil, true
 
-	case key.Matches(k, m.keys.Enqueue):
+	case m.pressed(k, m.keys.Enqueue):
 		// The whole thing, since the whole thing is what the cursor is on. An
 		// artist is the exception: what "all of it" would mean there is every
 		// record they ever made, which is not a queue anybody asked for.
@@ -244,26 +243,26 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	switch {
-	case key.Matches(k, m.keys.SearchType):
+	case m.pressed(k, m.keys.SearchType):
 		m.startTyping()
 		return nil, true
 
-	case key.Matches(k, m.keys.SearchKind), key.Matches(k, m.keys.SearchKindBack):
+	case m.pressed(k, m.keys.SearchKind), m.pressed(k, m.keys.SearchKindBack):
 		delta := 1
-		if key.Matches(k, m.keys.SearchKindBack) {
+		if m.pressed(k, m.keys.SearchKindBack) {
 			delta = -1
 		}
 		m.turnSearchKind(delta)
 		return tea.Batch(m.previewCover(), m.readAhead()), true
 
-	case key.Matches(k, m.keys.Enter):
+	case m.pressed(k, m.keys.Enter):
 		return m.openSearchHit(), true
 
-	case key.Matches(k, m.keys.Actions), key.Matches(k, m.keys.ActionsTyped):
+	case m.pressed(k, m.keys.Actions), m.pressed(k, m.keys.ActionsTyped):
 		m.openActions()
 		return nil, true
 
-	case key.Matches(k, m.keys.Enqueue), key.Matches(k, m.keys.EnqueueTyped):
+	case m.pressed(k, m.keys.Enqueue), m.pressed(k, m.keys.EnqueueTyped):
 		if pl := m.cursorPlaylist(); pl != nil {
 			return m.enqueueList(openPlaylist, pl.ID, pl.Name), true
 		}
@@ -272,7 +271,7 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		return nil, true
 
-	case key.Matches(k, m.keys.PlayOne):
+	case m.pressed(k, m.keys.PlayOne):
 		if sel := m.search.selected(); sel != nil {
 			id := sel.ID
 			return m.startPlay(playRequest{
@@ -283,7 +282,7 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		return nil, true
 
-	case key.Matches(k, m.keys.Back):
+	case m.pressed(k, m.keys.Back):
 		if m.search.input.Value() == "" {
 			return m.switchTab(tabPlayer), true
 		}
@@ -308,18 +307,18 @@ func (m *Model) searchTypingKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	switch {
-	case key.Matches(k, m.keys.Enter), key.Matches(k, m.keys.Back):
+	case m.pressed(k, m.keys.Enter), m.pressed(k, m.keys.Back):
 		// Enter hands the results to the keyboard; escape does the same, and
 		// then clears the query on a second press. Neither leaves the tab
 		// while there is something to come back to.
 		m.stopTyping()
 		return nil, true
 
-	case key.Matches(k, m.keys.ActionsTyped):
+	case m.pressed(k, m.keys.ActionsTyped):
 		m.openActions()
 		return nil, true
 
-	case key.Matches(k, m.keys.EnqueueTyped):
+	case m.pressed(k, m.keys.EnqueueTyped):
 		if sel := m.search.selected(); sel != nil {
 			return m.enqueue(sel.ID), true
 		}

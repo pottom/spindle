@@ -3,7 +3,6 @@ package ui
 import (
 	"context"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -14,7 +13,7 @@ func (m *Model) deviceKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	// behind it to go back to.
 	active := m.devices.open || (m.tab == tabPlayer && m.noDevice)
 	if !active {
-		if key.Matches(k, m.keys.Devices) && !m.search.typing {
+		if m.pressed(k, m.keys.Devices) && !m.search.typing {
 			m.devices.open = true
 			return tea.Batch(fetchDevicesCmd(m.player), m.syncCover()), true
 		}
@@ -26,13 +25,13 @@ func (m *Model) deviceKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	switch {
-	case key.Matches(k, m.keys.Enter):
+	case m.pressed(k, m.keys.Enter):
 		return m.transfer(), true
 
-	case key.Matches(k, m.keys.Refresh):
+	case m.pressed(k, m.keys.Refresh):
 		return tea.Batch(fetchDevicesCmd(m.player), fetchStateCmd(m.player)), true
 
-	case key.Matches(k, m.keys.Devices), key.Matches(k, m.keys.Back):
+	case m.pressed(k, m.keys.Devices), m.pressed(k, m.keys.Back):
 		if !m.devices.open {
 			return nil, true // nothing to close on the no-device screen
 		}

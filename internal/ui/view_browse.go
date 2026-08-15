@@ -307,7 +307,7 @@ func (m Model) queueBlock(l layout, rows int) []string {
 	_, playing := m.nowPlayingRow()
 
 	return m.listBlock(l, rows, listScreen{
-		detail:   m.trackDetail,
+		detail: m.trackDetail,
 		// No heading. The tab it is under is called queue, in the row across the
 		// top of the screen, and a list titled after the tab it is the only thing
 		// on is a label for something nobody was in any doubt about.

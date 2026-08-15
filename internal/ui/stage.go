@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -234,7 +233,7 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	switch {
-	case key.Matches(k, m.keys.Scope):
+	case m.pressed(k, m.keys.Scope):
 		// The one key that changes the picture rather than putting it away. It
 		// moves this screen's own picture and no other: what the working
 		// screens are set to is not touched, and nothing is written down. There
@@ -247,42 +246,42 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		m.stage.drops = nil
 		return m.startScope(), true
 
-	case key.Matches(k, m.keys.Loose):
+	case m.pressed(k, m.keys.Loose):
 		// The two ways of drawing, side by side on the one record: keeping time
 		// with it, or only answering how loud it is. Nothing else on this
 		// screen can be judged against its alternative, and this one has to be.
 		m.stage.loose = !m.stage.loose
 		return nil, true
 
-	case key.Matches(k, m.keys.Tell):
+	case m.pressed(k, m.keys.Tell):
 		// Says what is playing, there and then. Like the picture key, it does
 		// something up here rather than putting the screen away.
 		m.words.forced = time.Now()
 		return nil, true
 
-	case key.Matches(k, m.keys.Marks):
+	case m.pressed(k, m.keys.Marks):
 		// Walks the sets of marks a press at a time, and round to the deal
 		// again. See marksWalk.
 		m.marksWalk()
 		return nil, true
 
-	case key.Matches(k, m.keys.Face):
+	case m.pressed(k, m.keys.Face):
 		// Puts a face up, and walks its expressions a press at a time.
 		m.faceShow()
 		return nil, true
 
-	case key.Matches(k, m.keys.PlayPause),
-		key.Matches(k, m.keys.VolUp), key.Matches(k, m.keys.VolDown),
-		key.Matches(k, m.keys.Mute),
-		key.Matches(k, m.keys.Next), key.Matches(k, m.keys.Prev),
-		key.Matches(k, m.keys.SeekFwd), key.Matches(k, m.keys.SeekBack),
-		key.Matches(k, m.keys.Shuffle), key.Matches(k, m.keys.Repeat):
+	case m.pressed(k, m.keys.PlayPause),
+		m.pressed(k, m.keys.VolUp), m.pressed(k, m.keys.VolDown),
+		m.pressed(k, m.keys.Mute),
+		m.pressed(k, m.keys.Next), m.pressed(k, m.keys.Prev),
+		m.pressed(k, m.keys.SeekFwd), m.pressed(k, m.keys.SeekBack),
+		m.pressed(k, m.keys.Shuffle), m.pressed(k, m.keys.Repeat):
 		// The transport, which belongs to whatever is playing rather than to
 		// whichever screen is up. Seeking was missing from this list once, so
 		// the two keys nearest to hand did the one thing nobody wanted.
 		return nil, false
 
-	case key.Matches(k, m.keys.Back), key.Matches(k, m.keys.Quit), key.Matches(k, m.keys.Stage):
+	case m.pressed(k, m.keys.Back), m.pressed(k, m.keys.Quit), m.pressed(k, m.keys.Stage):
 		// The way out. esc and q are what "back" means everywhere else, and f is
 		// the key that opened this — a key that puts a screen up is expected to
 		// take it down again, and reaching for it a second time is what a hand

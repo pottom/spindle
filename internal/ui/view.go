@@ -48,6 +48,12 @@ func (m Model) View() tea.View {
 
 	v.AltScreen = true
 	v.WindowTitle = m.windowTitle()
+
+	// Ask the terminal to say which key a press came from as well as which
+	// letter it produced, so a binding written as a letter is the key that
+	// letter sits on wherever somebody is typing. Terminals that cannot say
+	// ignore the request. See keypress.go.
+	v.KeyboardEnhancements = tea.KeyboardEnhancements{ReportAlternateKeys: true}
 	return v
 }
 

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/player"
@@ -229,11 +228,11 @@ func (m *Model) actionsKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	switch {
-	case key.Matches(k, m.keys.Back), key.Matches(k, m.keys.Actions):
+	case m.pressed(k, m.keys.Back), m.pressed(k, m.keys.Actions):
 		m.actions.open = false
 		return nil, true
 
-	case key.Matches(k, m.keys.Enter):
+	case m.pressed(k, m.keys.Enter):
 		chosen := m.actions.state.cursor
 		m.actions.open = false
 		if chosen < 0 || chosen >= len(m.actions.verbs) {

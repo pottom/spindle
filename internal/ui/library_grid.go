@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/ui/cover"
@@ -257,25 +256,25 @@ func (m *Model) libraryGridKey(k tea.KeyPressMsg) bool {
 	state := m.library.cursor()
 	count := len(m.libraryTiles())
 	switch {
-	case key.Matches(k, m.keys.Down):
+	case m.pressed(k, m.keys.Down):
 		state.move(g.cols, count)
-	case key.Matches(k, m.keys.Up):
+	case m.pressed(k, m.keys.Up):
 		state.move(-g.cols, count)
-	case key.Matches(k, m.keys.NextTile):
+	case m.pressed(k, m.keys.NextTile):
 		state.move(1, count)
-	case key.Matches(k, m.keys.PrevTile):
+	case m.pressed(k, m.keys.PrevTile):
 		state.move(-1, count)
-	case key.Matches(k, m.keys.PageDown):
+	case m.pressed(k, m.keys.PageDown):
 		state.move(g.page(), count)
-	case key.Matches(k, m.keys.PageUp):
+	case m.pressed(k, m.keys.PageUp):
 		state.move(-g.page(), count)
-	case key.Matches(k, m.keys.HalfDown):
+	case m.pressed(k, m.keys.HalfDown):
 		state.move(max(g.page()/2, g.cols), count)
-	case key.Matches(k, m.keys.HalfUp):
+	case m.pressed(k, m.keys.HalfUp):
 		state.move(-max(g.page()/2, g.cols), count)
-	case key.Matches(k, m.keys.First), key.Matches(k, m.keys.FirstVim):
+	case m.pressed(k, m.keys.First), m.pressed(k, m.keys.FirstVim):
 		state.move(-count, count)
-	case key.Matches(k, m.keys.Last), key.Matches(k, m.keys.LastVim):
+	case m.pressed(k, m.keys.Last), m.pressed(k, m.keys.LastVim):
 		state.move(count, count)
 	default:
 		return false

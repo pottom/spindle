@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -163,23 +162,23 @@ func (m *Model) listKey(k tea.KeyPressMsg, state *listState, count int, vim bool
 	page := max(m.visibleListRows(), 1)
 
 	switch {
-	case key.Matches(k, m.keys.Down):
+	case m.pressed(k, m.keys.Down):
 		state.move(1, count)
-	case key.Matches(k, m.keys.Up):
+	case m.pressed(k, m.keys.Up):
 		state.move(-1, count)
-	case key.Matches(k, m.keys.PageDown):
+	case m.pressed(k, m.keys.PageDown):
 		state.move(page, count)
-	case key.Matches(k, m.keys.PageUp):
+	case m.pressed(k, m.keys.PageUp):
 		state.move(-page, count)
-	case key.Matches(k, m.keys.HalfDown):
+	case m.pressed(k, m.keys.HalfDown):
 		state.move(max(page/2, 1), count)
-	case key.Matches(k, m.keys.HalfUp):
+	case m.pressed(k, m.keys.HalfUp):
 		state.move(-max(page/2, 1), count)
 	// The ends are asked for as a move the length of the list, which clamps to
 	// them however long it is.
-	case key.Matches(k, m.keys.First), vim && key.Matches(k, m.keys.FirstVim):
+	case m.pressed(k, m.keys.First), vim && m.pressed(k, m.keys.FirstVim):
 		state.move(-count, count)
-	case key.Matches(k, m.keys.Last), vim && key.Matches(k, m.keys.LastVim):
+	case m.pressed(k, m.keys.Last), vim && m.pressed(k, m.keys.LastVim):
 		state.move(count, count)
 	default:
 		return false

@@ -739,8 +739,8 @@ func TestTheFramesCornersMeetItsUprights(t *testing.T) {
 	}
 
 	for _, c := range []struct {
-		name       string
-		got, want  int
+		name      string
+		got, want int
 	}{
 		{"the head's left corner", headL, left},
 		{"the head's right corner", headR, right},

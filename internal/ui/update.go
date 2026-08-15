@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
@@ -642,11 +641,11 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Tab switching outranks everything, including the search field: it is the
 	// one key that has to work wherever you are.
 	switch {
-	case key.Matches(k, m.keys.NextTab):
+	case m.pressed(k, m.keys.NextTab):
 		return m, m.switchTab(m.tab.next(1))
-	case key.Matches(k, m.keys.PrevTab):
+	case m.pressed(k, m.keys.PrevTab):
 		return m, m.switchTab(m.tab.next(-1))
-	case key.Matches(k, m.keys.GoTab) && !m.search.typing && !m.find.typing:
+	case m.pressed(k, m.keys.GoTab) && !m.search.typing && !m.find.typing:
 		// Not on the search tab: there the digits belong to the query, and a
 		// key that types on one screen must not navigate on it.
 		if t, ok := tabAt(k.String()); ok {
@@ -678,16 +677,16 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 	}
 
 	switch {
-	case key.Matches(k, m.keys.QuitAll):
+	case m.pressed(k, m.keys.QuitAll):
 		// Leaving is the common case and gets the easy key; taking the music
 		// with you has to be asked for.
 		m.stopDaemon = true
 		return m, tea.Quit
 
-	case key.Matches(k, m.keys.Quit):
+	case m.pressed(k, m.keys.Quit):
 		return m, tea.Quit
 
-	case key.Matches(k, m.keys.Scope):
+	case m.pressed(k, m.keys.Scope):
 		if !m.scopeAvailable() {
 			return m, nil
 		}
@@ -705,7 +704,7 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		return m, tea.Batch(m.startScope(), m.savePrefs())
 
-	case key.Matches(k, m.keys.Stage):
+	case m.pressed(k, m.keys.Stage):
 		// From any screen. It was the player's key, on the reasoning that the big
 		// picture is the player's screen made big — but it is not: it is what the
 		// program does while nobody is working in it, and where somebody happens
@@ -725,14 +724,14 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.stage.on, m.stage.mode = true, stageOpens
 		return m, tea.Batch(m.startScope(), keepAwake(true))
 
-	case key.Matches(k, m.keys.Lyrics):
+	case m.pressed(k, m.keys.Lyrics):
 		if !m.lyricsAvailable() {
 			return m, nil
 		}
 		m.lyrics.on = !m.lyrics.on
 		return m, tea.Batch(m.fetchLyrics(), m.savePrefs())
 
-	case key.Matches(k, m.keys.Close):
+	case m.pressed(k, m.keys.Close):
 		// The band above the queue, folded away a block at a time. Only there:
 		// the same band stands over the library and the search, and what it
 		// holds on those is the thing the cursor is resting on — which is the
@@ -743,14 +742,14 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.queuePane.room = m.queuePane.room.next()
 		return m, m.savePrefs()
 
-	case key.Matches(k, m.keys.Peek):
+	case m.pressed(k, m.keys.Peek):
 		if !m.peekAvailable() {
 			return m, nil
 		}
 		m.peek.on = !m.peek.on
 		return m, tea.Batch(m.savePrefs(), m.readSaved())
 
-	case key.Matches(k, m.keys.SearchType):
+	case m.pressed(k, m.keys.SearchType):
 		// / looks for something where you are. On a list that means the list —
 		// no request, no waiting, the rows are already here. Where there is no
 		// list to look through it means the other thing: go and ask Spotify.
@@ -760,15 +759,15 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		return m, m.startTyping()
 
-	case key.Matches(k, m.keys.FindNext):
+	case m.pressed(k, m.keys.FindNext):
 		m.findStep(1)
 		return m, tea.Batch(m.previewCover(), m.readAhead())
 
-	case key.Matches(k, m.keys.FindPrev):
+	case m.pressed(k, m.keys.FindPrev):
 		m.findStep(-1)
 		return m, tea.Batch(m.previewCover(), m.readAhead())
 
-	case key.Matches(k, m.keys.Help):
+	case m.pressed(k, m.keys.Help):
 		// A screen rather than a taller bar: unfolding it pushed the list off
 		// the bottom of the tabs with the longest lists, which are exactly the
 		// ones whose keys somebody is looking up.
@@ -785,7 +784,7 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 
 	p := m.player
 	switch {
-	case key.Matches(k, m.keys.PlayPause):
+	case m.pressed(k, m.keys.PlayPause):
 		// Pin the position before the flag flips. Pausing stops the clock from
 		// being carried forward, so the anchor has to already hold everything
 		// that had accumulated, or the playhead drops back to wherever the last
@@ -801,7 +800,7 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 			return p.Pause(ctx)
 		}))
 
-	case key.Matches(k, m.keys.Next):
+	case m.pressed(k, m.keys.Next):
 		cmd := m.skip("skip to next track", p.Next)
 		// The queue already says what is coming, so show it now instead of
 		// half a second from now. The confirming fetch demotes to a check.
@@ -811,25 +810,25 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		return m, cmd
 
-	case key.Matches(k, m.keys.Prev):
+	case m.pressed(k, m.keys.Prev):
 		return m, m.skip("skip to previous track", p.Previous)
 
-	case key.Matches(k, m.keys.SeekFwd):
+	case m.pressed(k, m.keys.SeekFwd):
 		return m, m.seek(m.elapsed() + seekStep)
 
-	case key.Matches(k, m.keys.SeekBack):
+	case m.pressed(k, m.keys.SeekBack):
 		return m, m.seek(m.elapsed() - seekStep)
 
-	case key.Matches(k, m.keys.Mute):
+	case m.pressed(k, m.keys.Mute):
 		return m, m.toggleMute()
 
-	case key.Matches(k, m.keys.VolUp):
+	case m.pressed(k, m.keys.VolUp):
 		return m, m.setVolume(m.ps.Volume + volumeStep)
 
-	case key.Matches(k, m.keys.VolDown):
+	case m.pressed(k, m.keys.VolDown):
 		return m, m.setVolume(m.ps.Volume - volumeStep)
 
-	case key.Matches(k, m.keys.Shuffle):
+	case m.pressed(k, m.keys.Shuffle):
 		m.ps.Shuffle = !m.ps.Shuffle
 		m.hold()
 		on := m.ps.Shuffle
@@ -837,7 +836,7 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 			return p.SetShuffle(ctx, on)
 		})
 
-	case key.Matches(k, m.keys.Repeat):
+	case m.pressed(k, m.keys.Repeat):
 		m.ps.Repeat = nextRepeat(m.ps.Repeat)
 		m.hold()
 		mode := m.ps.Repeat
