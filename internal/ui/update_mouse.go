@@ -59,6 +59,13 @@ func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 	}
 
 	at := m.noteMouse(e.X, e.Y)
+
+	// Held down, the wheel moves the thing rather than the cursor. What that
+	// means is whatever the thing under it is: on an ordered list, its order.
+	if e.Mod&tea.ModCtrl != 0 {
+		return m.mouseReorder(at, delta)
+	}
+
 	switch at.kind {
 	case spotTabs:
 		return m, m.switchTab(m.tab.next(delta))
@@ -118,6 +125,14 @@ func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 // they settle on, near enough, and it is the number to change if a deliberate
 // second click ever fails to open anything.
 const doubleWithin = 400 * time.Millisecond
+
+// gripWithin is how long a cell goes on holding the track a run of ctrl+notches
+// took hold of, once the notches stop.
+//
+// Long, because it is not what ends a hold — moving the pointer is. It is the
+// backstop for the other case: coming back to a cell much later and expecting
+// to take hold of whatever is there now.
+const gripWithin = 2 * time.Second
 
 // mouseClick acts on what was pressed.
 //
@@ -210,6 +225,45 @@ func (m Model) mouseClick(e tea.MouseClickMsg) (Model, tea.Cmd) {
 		return m.pressControl(control(at.at))
 	}
 	return m, nil
+}
+
+// mouseReorder moves the track under the pointer up or down the queue, which is
+// what ctrl and the wheel do together.
+//
+// Two things make this work rather than something to regret. The first is that
+// the queue already gathers a run of moves and sends it as one edit once it has
+// come to rest — see moveQueued and orderDebounce — so a wheel spun ten notches
+// costs one request, not ten.
+//
+// The second is which track it moves. Not the one under the pointer: the row
+// climbs out from under it, so the second notch would take hold of a different
+// track and three notches would leave three tracks scattered. It moves the one
+// the cursor is on, and the cursor goes with it. The pointer decides only where
+// the hold begins.
+//
+// What ends the hold is the pointer moving, not the clock — measured, because
+// the first attempt ended it on the clock and it was wrong within a second. Two
+// notches a second apart with the pointer sitting still is somebody turning a
+// wheel slowly, and the track escaped from under them and swapped back. So the
+// hold lasts as long as the notches keep arriving on the same cell; the timeout
+// beside it is only there so a cell nobody has touched for a while is not still
+// holding something.
+//
+// Only the queue's own tab. Nothing else on screen is a list somebody put in an
+// order.
+func (m Model) mouseReorder(at spot, delta int) (Model, tea.Cmd) {
+	if at.kind != spotList || m.tab != tabQueue || m.open() != nil || m.devices.open {
+		return m, nil
+	}
+
+	held := m.grip.seen && m.grip.x == m.lastPoint.x && m.grip.y == m.lastPoint.y &&
+		time.Since(m.gripAt) < gripWithin
+	m.grip, m.gripAt = m.lastPoint, time.Now()
+
+	if !held && at.at >= 0 {
+		m.queuePane.cursor.moveTo(at.at, len(m.queueRows()))
+	}
+	return m, m.moveQueued(delta)
 }
 
 // mouseActions raises the menu of verbs on the thing under the pointer.

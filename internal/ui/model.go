@@ -103,6 +103,12 @@ type Model struct {
 	lastClick   point
 	lastClickAt time.Time
 
+	// grip is the cell a run of ctrl+notches is moving a track from, and when
+	// the last of them came. While the pointer stays on it, the run goes on
+	// moving the same track — see mouseReorder.
+	grip   point
+	gripAt time.Time
+
 	// queueAt is when the queue was last asked for. It comes from our own daemon
 	// rather than from Spotify, so it is asked again often — see refresh.go.
 	queueAt time.Time

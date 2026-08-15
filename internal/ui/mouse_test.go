@@ -433,6 +433,67 @@ func TestASecondPressOpensWhatTheFirstChose(t *testing.T) {
 	}
 }
 
+// Ctrl and the wheel move the track rather than the cursor. The whole of the
+// gesture is in the second notch: the row it moved has climbed out from under
+// the pointer, and it is still the row that moves.
+func TestCtrlAndTheWheelMoveTheTrackItStartedOn(t *testing.T) {
+	m := queueModel(0, "alpha", "bravo", "charlie", "delta")
+	m.width, m.height = 100, 40
+	m.resize()
+
+	x, y := wordAt(t, m, "alpha")
+	got, _ := m.mouseWheel(tea.MouseWheelMsg{X: x, Y: y, Button: tea.MouseWheelDown, Mod: tea.ModCtrl})
+	if ids(got.queue)[0] != "bravo" || ids(got.queue)[1] != "alpha" {
+		t.Fatalf("one notch left the queue %v, want alpha one place down", ids(got.queue))
+	}
+	if got.queuePane.cursor.cursor != queueRowOf(1) {
+		t.Errorf("the cursor is on %d, want it to have gone with the track", got.queuePane.cursor.cursor)
+	}
+
+	// The pointer has not moved and "bravo" is under it now. The run is still
+	// about alpha.
+	got, _ = got.mouseWheel(tea.MouseWheelMsg{X: x, Y: y, Button: tea.MouseWheelDown, Mod: tea.ModCtrl})
+	if ids(got.queue)[2] != "alpha" {
+		t.Fatalf("two notches left the queue %v, want alpha two places down", ids(got.queue))
+	}
+
+	// Slowly is still one hold: what ends it is the pointer moving, not the
+	// clock. A second between notches is somebody turning a wheel.
+	slow := got
+	slow.gripAt = slow.gripAt.Add(-time.Second)
+	slow, _ = slow.mouseWheel(tea.MouseWheelMsg{X: x, Y: y, Button: tea.MouseWheelDown, Mod: tea.ModCtrl})
+	if ids(slow.queue)[3] != "alpha" {
+		t.Errorf("a slow third notch left the queue %v, want alpha still the one moving", ids(slow.queue))
+	}
+
+	// The queue is bravo, charlie, alpha, delta by now, and the pointer is on
+	// the row bravo has ended up in.
+
+	// A cell nobody has touched for a while is holding nothing: the next notch
+	// takes whatever is under the pointer then, which is bravo.
+	cold := got
+	cold.gripAt = cold.gripAt.Add(-2 * gripWithin)
+	cold, _ = cold.mouseWheel(tea.MouseWheelMsg{X: x, Y: y, Button: tea.MouseWheelDown, Mod: tea.ModCtrl})
+	if ids(cold.queue)[1] != "bravo" {
+		t.Errorf("a cold notch left the queue %v, want bravo — the row under the pointer — to have moved", ids(cold.queue))
+	}
+
+	// And moving the pointer ends it too: a row down is charlie.
+	moved := got
+	moved, _ = moved.mouseWheel(tea.MouseWheelMsg{X: x, Y: y + 1, Button: tea.MouseWheelDown, Mod: tea.ModCtrl})
+	if ids(moved.queue)[2] != "charlie" {
+		t.Errorf("a notch a row down left the queue %v, want charlie to have moved instead", ids(moved.queue))
+	}
+
+	// Nowhere else: the library is not a list anybody put in an order.
+	wall := likedModel(t)
+	before := wall.libraryTiles()
+	wx, wy := wordAt(t, wall, before[0].name)
+	if after, _ := wall.mouseWheel(tea.MouseWheelMsg{X: wx, Y: wy, Button: tea.MouseWheelDown, Mod: tea.ModCtrl}); after.library.cursor().cursor != wall.library.cursor().cursor {
+		t.Error("ctrl and the wheel moved something on the library wall")
+	}
+}
+
 // playerModel is the player tab with something playing on it, at a size where
 // there is room for the picture beside the words.
 func playerModel() Model {
