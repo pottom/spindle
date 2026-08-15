@@ -707,18 +707,24 @@ func (m Model) libraryPaneView(l layout, rows int) []string {
 	return m.libraryPaneGrid(l, rows)
 }
 
-// libraryKinds is the strip beside the heading: the three lists the tab holds,
-// the one on screen lit, each with what has been read of it.
+// libraryKinds is the tab bar of the library's own kinds: the four lists the tab
+// holds, the one on screen lit and underlined.
 //
-// It sits where a subtitle would because it is one — it says what is being
-// looked at — and because a row of its own would cost the list a line to say
-// something three words long.
-func (m Model) libraryKinds() string {
-	var parts []string
-	for _, kind := range []libraryKind{libraryPlaylists, libraryAlbums, libraryArtists, libraryRecent} {
-		style := m.styles.Album
-		if kind == m.library.kind {
-			style = m.styles.Title
+// Drawn the way the tabs across the top of the screen are drawn, because it is
+// the same thing one level down — the underline is the whole of the chrome, and
+// somebody who has learned the top row has learned this one. It stands at the
+// left, where a heading used to say "Library" over a tab already called library.
+//
+// It costs no rows: the labels take the heading's row and the underline the
+// blank under it, which was there to hold the heading clear of the wall.
+func (m Model) libraryKinds() (labels, rule string) {
+	const gap = "   "
+
+	var names, marks strings.Builder
+	for i, kind := range libraryOrder {
+		if i > 0 {
+			names.WriteString(gap)
+			marks.WriteString(gap)
 		}
 
 		label := kind.String()
@@ -730,10 +736,20 @@ func (m Model) libraryKinds() string {
 			}
 			label += " " + count
 		}
-		parts = append(parts, style.Render(label))
+
+		if kind == m.library.kind {
+			names.WriteString(m.styles.TabActive.Render(label))
+			marks.WriteString(m.styles.TabRule.Render(strings.Repeat(meterFull, lipgloss.Width(label))))
+			continue
+		}
+		names.WriteString(m.styles.TabIdle.Render(label))
+		marks.WriteString(strings.Repeat(" ", lipgloss.Width(label)))
 	}
-	return strings.Join(parts, m.styles.Album.Render(" · "))
+	return names.String(), marks.String()
 }
+
+// libraryOrder is the order the kinds are drawn and walked in.
+var libraryOrder = []libraryKind{libraryPlaylists, libraryAlbums, libraryArtists, libraryRecent}
 
 // libraryDetail is the panel beside the cover: whichever kind is on screen, it
 // describes the row under the cursor.

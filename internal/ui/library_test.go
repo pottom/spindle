@@ -80,19 +80,44 @@ func TestOpeningASavedAlbum(t *testing.T) {
 	}
 }
 
-// The strip beside the heading says which list is on screen and how much of it
-// there is, so the other two are visible without spending a row on them.
+// The library's kinds are a tab bar of their own: each named, with how much of
+// it has been read, and the one on screen underlined.
 func TestTheLibraryNamesItsKinds(t *testing.T) {
 	m := likedModel(t)
-	strip := plain(m.libraryKinds())
+	labels, rule := m.libraryKinds()
+	strip := plain(labels)
 
-	for _, want := range []string{"playlists", "albums", "artists"} {
+	for _, want := range []string{"playlists", "albums", "artists", "recent"} {
 		if !strings.Contains(strip, want) {
 			t.Errorf("the strip reads %q, want it to name %q", strip, want)
 		}
 	}
 	if !strings.Contains(strip, "playlists "+itoa(len(m.library.playlists))) {
 		t.Errorf("the strip reads %q, want the number of playlists read so far", strip)
+	}
+
+	// The rule stands under the one on screen and nowhere else, the way the
+	// tabs across the top of the screen are marked.
+	under := plain(rule)
+	if strings.TrimSpace(under) == "" {
+		t.Fatalf("nothing is underlined: %q", under)
+	}
+	if at := strings.Index(under, meterFull); at != strings.Index(strip, "playlists") {
+		t.Errorf("the rule starts at column %d and the kind on screen at %d",
+			at, strings.Index(strip, "playlists"))
+	}
+	if strings.Count(under, meterFull) != lipgloss.Width(plain(m.library.kind.String()))+2 {
+		t.Errorf("the rule is %d cells long, want the label's width",
+			strings.Count(under, meterFull))
+	}
+
+	// And the heading that used to say Library is gone: the tab is called
+	// library already.
+	m.width, m.height = 150, 40
+	m.tab = tabLibrary
+	m.resize()
+	if screen := plain(fmt.Sprint(m.View())); strings.Contains(screen, "Library") {
+		t.Error("the wall still says Library over a tab called library")
 	}
 }
 
@@ -809,7 +834,7 @@ func TestTheWallStandsAsideForTheField(t *testing.T) {
 	// The field is on the screen, under the heading.
 	head, box := -1, -1
 	for i, row := range busy {
-		if strings.Contains(row, "Library") {
+		if head < 0 && strings.Contains(row, "playlists") {
 			head = i
 		}
 		if head >= 0 && box < 0 && strings.Contains(row, pointerTL) {
@@ -844,5 +869,40 @@ func TestTheWallStandsAsideForTheField(t *testing.T) {
 	// The wall keeps its shape, a row shorter where the rows were tight.
 	if now := m.libraryShape(m.layout(), m.layout().bodyHeight).rows; now > wasRows {
 		t.Errorf("the wall holds %d rows of tiles with the field up and %d without", now, wasRows)
+	}
+}
+
+// The two keys next to each other walk the library's kinds, and the search's.
+// Which letters they send does not matter: a binding is matched by the key a
+// press came from as well.
+func TestTheBracketsWalkTheKinds(t *testing.T) {
+	m := likedModel(t)
+	m.width, m.height = 150, 40
+	m.tab = tabLibrary
+	m.resize()
+
+	was := m.library.kind
+	next, _ := m.handleKey(tea.KeyPressMsg{Code: ']', Text: "]"})
+	if next.library.kind == was {
+		t.Errorf("] did not move off %v", was)
+	}
+	back, _ := next.handleKey(tea.KeyPressMsg{Code: '[', Text: "["})
+	if back.library.kind != was {
+		t.Errorf("[ landed on %v, want back on %v", back.library.kind, was)
+	}
+
+	// The same key on a Hungarian keyboard, which sends something else from it.
+	hungarian, _ := m.handleKey(tea.KeyPressMsg{Code: 'ő', Text: "ő", BaseCode: '['})
+	if hungarian.library.kind == was {
+		t.Error("the key where [ sits did not walk the kinds")
+	}
+
+	// And while a query is being typed on the search tab, they are letters.
+	typing := m
+	typing.tab = tabSearch
+	typing.startTyping()
+	after, _ := typing.handleKey(tea.KeyPressMsg{Code: ']', Text: "]"})
+	if after.search.kind != typing.search.kind {
+		t.Error("] changed the kind while the query was being typed")
 	}
 }

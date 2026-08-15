@@ -112,6 +112,7 @@ func helpGroups() []helpGroup {
 			{"^u / ^d", "half a screenful"},
 			{pair(keyFirstVim, keyLastVim), "the top, the end"},
 			{keyFind, "find in this list"},
+			{pair(keyKindPrev, keyKindNext), "the kinds a tab holds: playlists, albums, artists, recent"},
 			{pair(keyFindNext, keyFindPrev), "the next match, the one before"},
 			{keyEnter, "play it, or open it"},
 			{keyPlayOne, "play only this one"},

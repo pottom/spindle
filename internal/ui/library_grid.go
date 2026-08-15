@@ -106,16 +106,17 @@ func (m Model) libraryPaneGrid(l layout, rows int) []string {
 	w := l.interior - leftMargin - rightMargin
 	g := m.libraryShape(l, rows)
 
-	// The kinds are set against the heading, and the spinner beside them: the
-	// tiles already on the wall are not always all of them, and nothing else on
-	// the screen would say so.
-	kinds := m.libraryKinds()
+	// The kinds, drawn as a tab bar of their own at the left, and the spinner out
+	// at the right: the tiles already on the wall are not always all of them, and
+	// nothing else on the screen would say so.
+	labels, rule := m.libraryKinds()
+	spinner := ""
 	if m.listLoading() {
-		kinds += " " + m.spinner.View()
+		spinner = m.spinner.View()
 	}
 	out := []string{
-		spread(m.styles.Title.Render("Library"), kinds, w),
-		strings.Repeat(" ", w),
+		spread(labels, spinner, w),
+		fit(rule, w),
 	}
 
 	// The room the field a wall is searched in stands in, under the heading and

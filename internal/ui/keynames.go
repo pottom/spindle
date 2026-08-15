@@ -91,6 +91,13 @@ const (
 
 	// The search tab reads every printable key as part of the query, so the
 	// verbs that have to work while typing take a control key as well.
+	// The kinds a tab holds — the library's four lists, the search's four sorts
+	// of answer — are walked with the two keys next to each other on any
+	// keyboard. Which letters they send does not matter: a binding is matched by
+	// the key a press came from as well. See keypress.go.
+	keyKindPrev = "["
+	keyKindNext = "]"
+
 	keyKind        = "ctrl+t"
 	keyKindFwd     = "ctrl+right"
 	keyKindBack    = "ctrl+left"

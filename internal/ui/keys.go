@@ -286,10 +286,10 @@ func newKeyMap() keyMap {
 			key.WithHelp(keyFind, "find"),
 		),
 		SearchKind: key.NewBinding(
-			key.WithKeys(keyKindFwd, keyKind),
-			key.WithHelp(keyKind, "kind"),
+			key.WithKeys(keyKindNext, keyKindFwd, keyKind),
+			key.WithHelp(pair(keyKindPrev, keyKindNext), "kind"),
 		),
-		SearchKindBack: key.NewBinding(key.WithKeys(keyKindBack)),
+		SearchKindBack: key.NewBinding(key.WithKeys(keyKindPrev, keyKindBack)),
 		Actions: key.NewBinding(
 			key.WithKeys(keyActions),
 			key.WithHelp(keyActions, "actions"),
