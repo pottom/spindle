@@ -307,22 +307,35 @@ returns *canonical* MBIDs.
 
 ## 3. What is genuinely there, and what is not
 
-### Artist biography: not there. At all.
+### Artist prose: there is some, and this section had it wrong
 
-**Open question, raised 2026-08-15 and not settled.** He has read a short
-description of an artist on MusicBrainz with his own eyes, which this section
-says does not exist. Half-measured before it was set aside: `musicbrainz.org`
-answers a plain `curl` of an artist *page* with a "Verifying your browser"
-interstitial, so **the website and the `/ws/2` API are not the same surface** —
-and the site is known to pull the Wikipedia lead paragraph onto the artist page.
-The likeliest reading is that the prose is real and reachable, and only the
-authorship is different: it is Wikipedia's text, arriving through the Wikidata
-relation described below, not a MusicBrainz field. **That is a guess until
-somebody finishes the measurement** — the annotation field and the Wikidata chain
-against a handful of artists from this library.
+**Settled by measurement, 2026-08-15.** He said he had read a short description
+of an artist on MusicBrainz with his own eyes, against a report that said no such
+field exists. He was right, and the flat claim below is what needed correcting:
+**the `annotation` field does sometimes hold prose about the artist.**
 
-Taking the API at face value: there is no biography, description, summary or
-blurb field anywhere in MusicBrainz. What exists:
+Measured on the artists in this library:
+
+```
+Darude       annotation: "His performance name came from his DJ days of playing
+                          one track, rather a lot. …"          ← prose, about him
+Queen        annotation: "'''Note:''' Please add any 2011 Remaster releases to
+                          either ''Universal Island R…"        ← housekeeping
+Miles Davis  annotation: none
+Two Steps
+  From Hell  annotation: "…is both a [label:…] and and [artist:…]"  ← half prose
+Mike Mana    annotation: none
+```
+
+So it is neither "there is a description" nor "there is none": **the field is
+there, and what is in it varies from a sentence about the artist to a note
+between editors about how to file releases.** It cannot be shown unread. What it
+can be is a fallback — where it exists and does not start with `'''Note:'''` or
+a `[label:…]` link, it is a line worth having.
+
+The rest of this section stands: there is no *biography* field, and the reliable
+prose is Wikipedia's, reached through the Wikidata relation below. What exists in
+MusicBrainz itself:
 
 - **`disambiguation`** — a short editorial tiebreaker, e.g. **[M]** Pink Floyd →
   `"English Rock Band"`. One line, present on most notable artists, genuinely
@@ -852,14 +865,52 @@ Wikipedia misses, but the quality is poor and it needs an API key.
 
 ---
 
+## Measured against this library, 2026-08-15
+
+Everything above is a chart-and-catalogue sample. This is the same set of
+questions asked of six records that actually play here — three of them the sort
+of thing no database has heard of, three of them famous. It changes which of the
+recommendations survive.
+
+**Credits — 0 of 6.** Two Steps From Hell "Emerald Princess", Mike Mana "Never
+The Same" and MIRBRO "G LOVE" are **not in MusicBrainz at all**. Darude
+"Sandstorm", Queen "Bohemian Rhapsody" and Miles Davis "So What" are there, each
+with **zero** artist relations. The 69% above does not transfer, and §5.1 — the
+whole case for MusicBrainz as the report tells it — **does not apply to this
+music**. It reproduces the 2026-08-10 measurement exactly.
+
+**Composers — 3 of 3 of the tracks that exist.** Every one of them carries a
+work relation, and every work carries its writers with an ISWC:
+
+```
+Darude — Sandstorm        → composer Ville Virtanen; arrangers Jaakko Salovaara, Ville Virtanen
+Queen — Bohemian Rhapsody → composer and lyricist Freddie Mercury
+Miles Davis — So What     → composer Miles Davis
+```
+
+So §5.2, the cheapest of the recommendations, is the one that survives contact
+with this library.
+
+**Artist prose — 4 of 6.** Darude (annotation *and* Wikipedia), Queen
+(Wikipedia), Miles Davis (Wikipedia), Two Steps From Hell (Wikipedia: "American
+trailer music company … founded in 2006 by Thomas Bergersen and Nick Phoenix").
+Mike Mana is in MusicBrainz with nothing attached; MIRBRO is not in it at all.
+
+**Artists — 5 of 6 found**, and the sixth is genuinely absent rather than badly
+matched.
+
+**And the limiter is real.** One artist lookup in that run came back 503 at
+1.2 s spacing and needed a retry — §4 is not being pessimistic.
+
 ## The three things worth doing
 
-1. **ISRC → recording → credits and composers, on the now-playing screen.** About
-   two requests per new track, **[M] 1.8 KB**, **[M] 69% / 73%** availability,
-   information Spotify structurally cannot provide, CC0 with no obligations. This
-   is the whole case for MusicBrainz in one feature — **subject to the caveat in
-   §5.1: that availability has not been measured against the music actually
-   played here, and the one measurement that was, found none.**
+1. ~~**ISRC → recording → credits**~~ — **struck out.** Measured twice against
+   this library and it found nothing both times: three records absent from the
+   database, three present with no credits at all. Keep the ISRC lookup, because
+   everything else hangs off it; drop the panel it was for.
+
+   What is left of this one is **the composer line**, which measured 3 of 3 —
+   see above, and §5.2.
 2. **`disambiguation`, area and years on the artist, free; the Wikipedia lead
    paragraph behind it, three cached requests.** The only artist prose that
    exists.
