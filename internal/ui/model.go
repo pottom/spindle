@@ -113,6 +113,14 @@ type Model struct {
 	// drag.go.
 	drag dragState
 
+	// lastNotchAt is when the last turn of the wheel came, and lastNotch how
+	// long before it the one before that did. The gap is the only thing that
+	// tells a deliberate click of a wheel from a trackpad flick — see
+	// wheelStep — and the debug bar carries it so it can be set from a real
+	// hand.
+	lastNotchAt time.Time
+	lastNotch   time.Duration
+
 	// queueAt is when the queue was last asked for. It comes from our own daemon
 	// rather than from Spotify, so it is asked again often — see refresh.go.
 	queueAt time.Time

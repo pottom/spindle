@@ -676,6 +676,43 @@ func TestAPressLeavesTheBigScreen(t *testing.T) {
 	}
 }
 
+// Notches that arrive together move further than notches that arrive one at a
+// time: the gap between them is the only evidence a terminal gives about what
+// turned them.
+func TestNotchesThatComeFastMoveFurther(t *testing.T) {
+	ids := make([]string, 40)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("t%02d", i)
+	}
+	m := queueModel(0, ids...)
+	m.width, m.height = 100, 40
+	m.resize()
+
+	x, y := wordAt(t, m, ids[0])
+
+	// One notch after a long pause is one row.
+	slow, _ := m.mouseWheel(wheelAt(x, y, tea.MouseWheelDown))
+	if slow.queuePane.cursor.cursor != 1 {
+		t.Fatalf("a notch on its own moved %d rows, want one", slow.queuePane.cursor.cursor)
+	}
+
+	// A run of them, arriving as fast as this loop can send them, moves by more
+	// per notch.
+	fast := m
+	for range 5 {
+		fast, _ = fast.mouseWheel(wheelAt(x, y, tea.MouseWheelDown))
+	}
+	if fast.queuePane.cursor.cursor <= 5 {
+		t.Errorf("five notches in a row moved %d rows, want more than one each", fast.queuePane.cursor.cursor)
+	}
+
+	// And the gap is on the debug bar, so the thresholds can be set from a real
+	// hand rather than from the comment beside them.
+	if fast.lastNotch <= 0 || fast.lastNotch > time.Second {
+		t.Errorf("the measured gap is %s, want something a wheel could produce", fast.lastNotch)
+	}
+}
+
 // playerModel is the player tab with something playing on it, at a size where
 // there is room for the picture beside the words.
 func playerModel() Model {

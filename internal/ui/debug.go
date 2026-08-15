@@ -189,9 +189,13 @@ func (m Model) debugSelf() []debugField {
 	}
 	b.put("kbd", "%s", debugKeyboard(m.keyFlags))
 
-	// And the last place the pointer was, with what the hit test called it.
+	// And the last place the pointer was, with what the hit test called it, and
+	// how long before the last notch of the wheel the one before it came.
 	if m.lastPoint.seen {
 		b.put("at", "%s", m.lastPoint)
+	}
+	if m.lastNotch > 0 && m.lastNotch < time.Minute {
+		b.put("notch", "%s", debugMs(m.lastNotch))
 	}
 
 	t := slowNow()

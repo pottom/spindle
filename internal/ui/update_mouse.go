@@ -33,6 +33,44 @@ func (m *Model) noteMouse(x, y int) spot {
 	return at
 }
 
+// How fast a run of notches has to arrive before a list moves by more than one
+// row, and how far it moves then.
+//
+// A terminal reports notches and never says what turned them. A mouse wheel
+// clicks a few times a second and every one of them is deliberate; a trackpad
+// flick sends them as fast as the screen redraws, and each one means far less.
+// The only thing that tells them apart from here is how close together they
+// come, so that is what is measured.
+//
+// These numbers are a starting point and the debug bar carries the gap that was
+// actually measured, so they can be set from a real hand rather than from this
+// comment. Conservative on purpose: a list that runs away is worse to use than
+// one that is a little slow.
+const (
+	wheelBrisk = 80 * time.Millisecond
+	wheelFast  = 30 * time.Millisecond
+
+	wheelBriskRows = 2
+	wheelFastRows  = 4
+)
+
+// wheelStep is how many rows one notch moves, from how long it has been since
+// the last one.
+func (m *Model) wheelStep() int {
+	gap := time.Since(m.lastNotchAt)
+	m.lastNotchAt = time.Now()
+	m.lastNotch = gap
+
+	switch {
+	case gap < wheelFast:
+		return wheelFastRows
+	case gap < wheelBrisk:
+		return wheelBriskRows
+	default:
+		return 1
+	}
+}
+
 // mouseWheel turns whatever the pointer is over.
 func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 	var delta int
@@ -94,7 +132,7 @@ func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 		if !g.ok() {
 			return m, nil
 		}
-		m.library.cursor().move(delta*g.cols, len(m.libraryTiles()))
+		m.library.cursor().move(delta*m.wheelStep()*g.cols, len(m.libraryTiles()))
 		return m, tea.Batch(m.previewCover(), m.readAhead(), m.syncGridCovers())
 
 	case spotList:
@@ -102,12 +140,11 @@ func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 		if cursor == nil {
 			return m, nil
 		}
-		// One row a notch. A mouse wheel is coarser than that and a trackpad
-		// finer, and which of the two is in somebody's hand is not a thing a
-		// terminal says — so the honest answer is the smallest step, and going
-		// faster when the notches come fast is a measurement rather than a
-		// guess. Not made yet.
-		cursor.move(delta, count)
+		// A row a notch, or more when the notches are coming fast: which of a
+		// wheel and a trackpad is in somebody's hand is not a thing a terminal
+		// says, and how close together the notches arrive is the only evidence
+		// there is. See wheelStep.
+		cursor.move(delta*m.wheelStep(), count)
 		return m, tea.Batch(m.previewCover(), m.readAhead())
 
 	case spotHelp:
