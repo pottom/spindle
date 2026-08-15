@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -247,6 +248,115 @@ func TestScrollingTheWallBackDoesNotAskAgain(t *testing.T) {
 	if cmd := m.syncGridCovers(); cmd != nil {
 		t.Error("scrolling the wall away and back asked again for pictures it already had")
 	}
+}
+
+// The block names its last four rows from its foot, because what is above them
+// is as tall as the caption needs. This is the only thing holding those two
+// numbers to the rows they are about.
+func TestTheBlockPutsTheBarAndTheTransportWhereTheyAreNamed(t *testing.T) {
+	m := playerModel()
+
+	lines := m.infoBlock(m.layout().infoWidth)
+	bar := lines[len(lines)-1-playerBarUp]
+	if !strings.Contains(bar, knob) {
+		t.Errorf("the row named the bar holds %q, want the playhead in it", ansi.Strip(bar))
+	}
+	transport := lines[len(lines)-1-playerTransportUp]
+	if !strings.Contains(transport, iconNext) {
+		t.Errorf("the row named the transport holds %q, want the controls in it", ansi.Strip(transport))
+	}
+}
+
+// The playhead, the meter and every glyph beside them answer where they are
+// drawn — the player is the screen where the mouse has the most to reach for
+// and the least in the way of rows to reach it by.
+func TestThePointerFindsThePlayer(t *testing.T) {
+	m := playerModel()
+
+	x, y := wordAt(t, m, iconNext)
+	if at := m.spotAt(x, y); at.kind != spotControl || at.at != int(ctlNext) {
+		t.Fatalf("the skip glyph is at column %d of row %d, and the pointer calls it %v/%d", x, y, at.kind, at.at)
+	}
+	got, cmd := m.mouseClick(clickAt(x, y))
+	if cmd == nil {
+		t.Error("pressing the skip glyph asked the device for nothing")
+	}
+	_ = got
+
+	// The play glyph is the one that changes what it is drawn as, so it is
+	// worth pressing rather than only pointing at.
+	x, y = wordAt(t, m, iconPause)
+	if at := m.spotAt(x, y); at.kind != spotControl || at.at != int(ctlPlay) {
+		t.Fatalf("the pause glyph is %v/%d, want the play control", at.kind, at.at)
+	}
+	if got, _ = m.mouseClick(clickAt(x, y)); got.ps.Playing {
+		t.Error("pressing pause left it playing")
+	}
+
+	// The meter: pressed at its far end it is full, and at its near end empty.
+	v := m.volumeSpan(m.layout().infoWidth)
+	_, row := wordAt(t, m, iconNext)
+	left := leftMargin + m.layout().artWidth + columnGap
+	if got, _ = m.mouseClick(clickAt(left+v.at+v.w-1, row)); got.ps.Volume != 100 {
+		t.Errorf("pressing the far end of the meter set the volume to %d, want all of it", got.ps.Volume)
+	}
+	if got, _ = m.mouseClick(clickAt(left+v.at, row)); got.ps.Volume != 0 {
+		t.Errorf("pressing the near end of the meter set the volume to %d, want none of it", got.ps.Volume)
+	}
+
+	// And the wheel over it steps by what the keys step by.
+	was := m.ps.Volume
+	got, _ = m.mouseWheel(wheelAt(left+v.at+2, row, tea.MouseWheelUp))
+	if got.ps.Volume != was+volumeStep {
+		t.Errorf("a notch up the meter left the volume at %d, want %d", got.ps.Volume, was+volumeStep)
+	}
+}
+
+// The bar the playhead rides on is a place rather than a step: pressed halfway
+// along, the track is halfway through.
+func TestPressingTheBarSeeksToThatPlace(t *testing.T) {
+	m := playerModel()
+
+	x, y := wordAt(t, m, knob)
+	at := m.spotAt(x, y)
+	if at.kind != spotSeek {
+		t.Fatalf("the playhead is at column %d of row %d, and the pointer calls it %v", x, y, at.kind)
+	}
+
+	// Where the playhead is drawn is where it says it is: pressing the cell it
+	// is standing in seeks to where the track already is.
+	bar := barCells(m.layout().infoWidth)
+	want := atFraction(at.at, bar, m.ps.Duration)
+	if got := m.elapsed(); absDuration(got-want) > m.ps.Duration/time.Duration(bar) {
+		t.Errorf("the playhead is drawn at %s and pressing it asks for %s", got, want)
+	}
+
+	// And the far end of the bar is the end of the track.
+	end := m.spotAt(x-at.at+bar, y)
+	if end.kind != spotSeek || atFraction(end.at, bar, m.ps.Duration) != m.ps.Duration {
+		t.Errorf("the end of the bar is %v/%d, want the end of the track", end.kind, end.at)
+	}
+}
+
+func absDuration(d time.Duration) time.Duration {
+	if d < 0 {
+		return -d
+	}
+	return d
+}
+
+// playerModel is the player tab with something playing on it, at a size where
+// there is room for the picture beside the words.
+func playerModel() Model {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.ps = &player.State{
+		TrackID: "now", Title: "playing", Artists: []string{"someone"}, Album: "somewhere",
+		Duration: 5 * time.Minute, Volume: 40, Playing: true,
+	}
+	m.setProgress(2 * time.Minute)
+	m.width, m.height = 120, 40
+	m.resize()
+	return m
 }
 
 // wideLibrary is the library tab with enough playlists on it to scroll.

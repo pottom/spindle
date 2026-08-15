@@ -41,6 +41,14 @@ const (
 
 	// spotHelp is the page of keys, which scrolls under its own head.
 	spotHelp
+
+	// The three things on the player worth pointing at. at is the column
+	// reached along the bar for the first two, and which control for the last:
+	// a place on a meter is a place, and rounding it to an index would throw
+	// away the only thing a click on a bar is saying.
+	spotSeek
+	spotVolume
+	spotControl
 )
 
 // spot is what is under the pointer: what sort of thing, and which one of them.
@@ -158,6 +166,8 @@ func (m Model) spotAt(x, y int) spot {
 	}
 
 	switch {
+	case m.tab == tabPlayer:
+		return m.playerSpot(l, x, row)
 	case m.tab == tabHelp:
 		return spot{spotHelp, -1}
 	case m.tab == tabLibrary && m.open() == nil:
@@ -246,6 +256,66 @@ func (m Model) wallSpot(l layout, x, row int) spot {
 		return spot{spotTile, at}
 	}
 	return here
+}
+
+// playerSpot is what the player screen has at a point: the bar the playhead
+// rides on, the volume meter, or one of the transport glyphs.
+//
+// Those three and nothing else. The picture is a picture, the title is a title,
+// and a screen where every word does something when it is pressed is a screen
+// nobody presses anything on.
+func (m Model) playerSpot(l layout, x, row int) spot {
+	none := spot{spotNothing, -1}
+	if m.ps == nil || m.noDevice {
+		// Nothing loaded, or nowhere to send it. Both draw something else
+		// entirely in this space. See body.
+		return none
+	}
+
+	// The column beside the picture, and where in it the block came to rest.
+	left := leftMargin
+	if l.hasArt() {
+		left += l.artWidth + columnGap
+	}
+	x -= left
+	if x < 0 || x >= l.infoWidth {
+		return none
+	}
+
+	lines := m.infoBlock(l.infoWidth)
+	up := len(lines) - 1 - (row - m.playerTop(l, len(lines)))
+	switch up {
+	case playerBarUp:
+		// Only where there is one. With nothing loaded the block holds a blank
+		// row there rather than a bar at nought against a length of nought.
+		if m.loaded() {
+			return spot{spotSeek, x}
+		}
+	case playerTransportUp:
+		if at := spanAt(m.controlSpans(), x); at >= 0 {
+			return spot{spotControl, at}
+		}
+		if v := m.volumeSpan(l.infoWidth); x >= v.at && x < v.at+v.w {
+			return spot{spotVolume, x - v.at}
+		}
+	}
+	return none
+}
+
+// playerTop is the row of the body the player's block of text begins on, given
+// how tall the block is.
+//
+// Two centrings, one inside the other: the column is placed in the body and the
+// block is placed in the column. With the words up there is only one — the block
+// hangs from the top of the picture and the words take everything under it. See
+// body and infoWithLyrics.
+func (m Model) playerTop(l layout, block int) int {
+	rows := m.playerPaneRows(l)
+	top := max((l.bodyHeight-rows)/2, 0)
+	if m.lyricsVisible() {
+		return top + m.artTop(l, rows)
+	}
+	return top + max((rows-block)/2, 0)
 }
 
 // rowCursor is the cursor of whatever list is on screen.

@@ -798,36 +798,15 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	p := m.player
 	switch {
 	case m.pressed(k, m.keys.PlayPause):
-		// Pin the position before the flag flips. Pausing stops the clock from
-		// being carried forward, so the anchor has to already hold everything
-		// that had accumulated, or the playhead drops back to wherever the last
-		// poll left it.
-		m.setProgress(m.elapsed())
-		m.ps.Playing = !m.ps.Playing
-		m.hold()
-		play := m.ps.Playing
-		return m, tea.Batch(m.spinDevice(), controlCmd("toggle playback", func(ctx context.Context) error {
-			if play {
-				return p.Play(ctx)
-			}
-			return p.Pause(ctx)
-		}))
+		return m, m.togglePlay()
 
 	case m.pressed(k, m.keys.Next):
-		cmd := m.skip("skip to next track", p.Next)
-		// The queue already says what is coming, so show it now instead of
-		// half a second from now. The confirming fetch demotes to a check.
-		if next := m.takeFromQueue(); next != nil {
-			m.showTrack(next)
-			return m, tea.Batch(cmd, m.syncCover())
-		}
-		return m, cmd
+		return m, m.skipNext()
 
 	case m.pressed(k, m.keys.Prev):
-		return m, m.skip("skip to previous track", p.Previous)
+		return m, m.skipPrev()
 
 	case m.pressed(k, m.keys.SeekFwd):
 		return m, m.seek(m.elapsed() + seekStep)
@@ -845,20 +824,10 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, m.setVolume(m.ps.Volume - volumeStep)
 
 	case m.pressed(k, m.keys.Shuffle):
-		m.ps.Shuffle = !m.ps.Shuffle
-		m.hold()
-		on := m.ps.Shuffle
-		return m, controlCmd("set shuffle", func(ctx context.Context) error {
-			return p.SetShuffle(ctx, on)
-		})
+		return m, m.toggleShuffle()
 
 	case m.pressed(k, m.keys.Repeat):
-		m.ps.Repeat = nextRepeat(m.ps.Repeat)
-		m.hold()
-		mode := m.ps.Repeat
-		return m, controlCmd("set repeat", func(ctx context.Context) error {
-			return p.SetRepeat(ctx, mode)
-		})
+		return m, m.turnRepeat()
 	}
 
 	return m, nil

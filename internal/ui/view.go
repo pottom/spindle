@@ -196,14 +196,7 @@ func (m Model) body(l layout) []string {
 		pane = m.searchPaneView(l, max(l.bodyHeight, 1))
 
 	default:
-		// The player centres its text against the cover. The browsing tabs, and
-		// the player once the words are showing, give the right-hand column
-		// every row there is instead.
-		rows := l.artHeight
-		full := m.tab != tabPlayer || !l.hasArt() || m.lyricsVisible()
-		if full {
-			rows = max(l.bodyHeight, l.artHeight)
-		}
+		rows := m.playerPaneRows(l)
 
 		var right []string
 		switch {
@@ -268,6 +261,22 @@ func (m Model) body(l layout) []string {
 	return lines[:l.bodyHeight]
 }
 
+// playerPaneRows is the height the column beside the picture is laid out in.
+//
+// The player centres its text against the cover. The browsing tabs, and the
+// player once the words are showing, give the right-hand column every row there
+// is instead.
+//
+// Read by the body to draw it and by the pointer to find the transport in it —
+// neither may work it out for itself, or a click lands a row off centre on
+// exactly the terminals where the two halvings round differently.
+func (m Model) playerPaneRows(l layout) int {
+	if m.tab != tabPlayer || !l.hasArt() || m.lyricsVisible() {
+		return max(l.bodyHeight, l.artHeight)
+	}
+	return l.artHeight
+}
+
 // artworkCells is the cover: the picture itself, a spinner while it downloads,
 // or a single note glyph when there is none. The area around it is reserved
 // whatever it holds, so nothing moves when a cover finishes loading.
@@ -281,6 +290,21 @@ func (m Model) artworkCells() string {
 		return m.styles.NoCover.Render(noCoverGlyph)
 	}
 }
+
+// The two rows of the block a pointer can act on, counted back from its foot.
+//
+// From the foot because the head of the block is as tall as the caption needs,
+// and the caption is a different height for a track, an episode and a thing
+// with no album. Counted from the end, the last four rows are the same rows
+// whatever is above them.
+//
+// A number written here and a row written in infoBlock are two records of one
+// thing, and the way that is kept true is a test rather than a promise:
+// TestTheBlockPutsTheBarAndTheTransportWhereTheyAreNamed.
+const (
+	playerTransportUp = 0
+	playerBarUp       = 4
+)
 
 // infoBlock is the text beside the artwork, as a compact run of lines. The
 // caller centres it against the cover rather than stretching it, so the two
@@ -322,6 +346,14 @@ func (m Model) infoBlock(w int) []string {
 	)
 }
 
+// barCells is how much of a row of that width the bar itself is: the playhead
+// takes a cell of its own, so the bar is one shorter.
+//
+// Both meters are drawn from it and a press on either is measured back through
+// it, so where the pointer landed is the fraction the bar would have been drawn
+// at. See atShare.
+func barCells(w int) int { return max(w-1, 1) }
+
 // progressLine is a thin rule with the playhead riding on it. Paused, the whole
 // thing goes grey: the state has to be readable without hunting for an icon.
 func (m Model) progressLine(w int) string {
@@ -335,8 +367,7 @@ func (m Model) progressLine(w int) string {
 		fraction = min(float64(m.elapsed())/float64(m.ps.Duration), 1)
 	}
 
-	// The playhead takes a cell of its own, so the bar is one shorter.
-	bar := max(w-1, 1)
+	bar := barCells(w)
 	filled := min(max(int(fraction*float64(bar)+0.5), 0), bar)
 	return elapsed.Render(strings.Repeat(meterFull, filled)) +
 		remaining.Render(knob) +
@@ -356,7 +387,7 @@ func (m Model) volumeLine(w int) string {
 		filled, marker = m.styles.Time, m.styles.Time
 	}
 
-	bar := max(w-1, 1)
+	bar := barCells(w)
 	at := min(max(m.ps.Volume*bar/100, 0), bar)
 
 	return filled.Render(strings.Repeat(meterFull, at)) +
@@ -364,19 +395,36 @@ func (m Model) volumeLine(w int) string {
 		m.styles.Remaining.Render(strings.Repeat(meterEmpty, bar-at))
 }
 
-// transportLine holds the transport icons, the shuffle and repeat state, and the
-// volume, all on one row.
-func (m Model) transportLine(w int) string {
+// control names one of the things on the transport row, in the order they are
+// drawn. A click has to say which one it landed on, and so does the row itself.
+type control int
+
+const (
+	ctlPrev control = iota
+	ctlPlay
+	ctlNext
+	ctlShuffle
+	ctlRepeat
+
+	ctlCount = iota
+)
+
+// controlAir is the space kept after each of them. The last has none: what
+// follows it is the whole width of the row.
+var controlAir = [ctlCount]int{ctlPrev: 3, ctlPlay: 3, ctlNext: 4, ctlShuffle: 2}
+
+// controlGlyphs is what each of them is drawn as, in that order.
+//
+// The two toggles keep a fixed two-cell slot, so turning one on cannot nudge the
+// rest of the row sideways.
+func (m Model) controlGlyphs() [ctlCount]string {
 	s := m.styles
 
 	playPause := iconPause
 	if !m.ps.Playing {
 		playPause = iconPlay
 	}
-	transport := s.Controls.Render(iconPrev + "   " + playPause + "   " + iconNext)
 
-	// Both toggles keep a fixed two-cell slot, so turning one on cannot nudge
-	// the rest of the row sideways.
 	shuffle := s.ToggleOff.Render(iconShuf + " ")
 	if m.ps.Shuffle {
 		shuffle = s.ToggleOn.Render(iconShuf + " ")
@@ -389,11 +437,51 @@ func (m Model) transportLine(w int) string {
 		repeat = s.ToggleOn.Render(iconRep + "1")
 	}
 
-	// The reading holds three columns whatever it says: the row is laid out
-	// from the right, so a number that narrows drags the bar along with it.
-	volume := m.volumeLine(volumeCells) + s.Volume.Render(fmt.Sprintf(" %3d", m.ps.Volume))
+	return [ctlCount]string{
+		ctlPrev:    s.Controls.Render(iconPrev),
+		ctlPlay:    s.Controls.Render(playPause),
+		ctlNext:    s.Controls.Render(iconNext),
+		ctlShuffle: shuffle,
+		ctlRepeat:  repeat,
+	}
+}
 
-	return spread(transport+"    "+shuffle+"  "+repeat, volume, w)
+// controlSpans is where those glyphs end up on the row, for a click to be
+// answered: the same glyphs and the same air, walked instead of written.
+func (m Model) controlSpans() []span {
+	glyphs := m.controlGlyphs()
+	out := make([]span, ctlCount)
+	at := 0
+	for i, glyph := range glyphs {
+		w := lipgloss.Width(glyph)
+		out[i] = span{at: at, w: w}
+		at += w + controlAir[i]
+	}
+	return out
+}
+
+// volumeReading is the number beside the meter. It holds three columns whatever
+// it says: the row is laid out from the right, so a number that narrows would
+// drag the bar along with it.
+func (m Model) volumeReading() string {
+	return m.styles.Volume.Render(fmt.Sprintf(" %3d", m.ps.Volume))
+}
+
+// volumeSpan is where the meter itself sits on a transport row of that width:
+// hard against the right edge, with only the reading after it.
+func (m Model) volumeSpan(w int) span {
+	return span{at: w - volumeCells - lipgloss.Width(m.volumeReading()), w: volumeCells}
+}
+
+// transportLine holds the transport icons, the shuffle and repeat state, and the
+// volume, all on one row.
+func (m Model) transportLine(w int) string {
+	var b strings.Builder
+	for i, glyph := range m.controlGlyphs() {
+		b.WriteString(glyph)
+		b.WriteString(strings.Repeat(" ", controlAir[i]))
+	}
+	return spread(b.String(), m.volumeLine(volumeCells)+m.volumeReading(), w)
 }
 
 // statusLine names the device on the left and leaves the right to whatever the

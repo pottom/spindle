@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"time"
+
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -81,6 +83,19 @@ func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 		// The page scrolls under its own head, exactly as the keys scroll it.
 		m.helpAt = max(m.helpAt+delta, 0)
 		return m, nil
+
+	case spotSeek:
+		// The same step the keys take. A wheel over the bar is somebody nudging
+		// the playhead, and a notch that jumped a different distance from the
+		// key beside it would be a second answer to one question.
+		//
+		// Turned up is further along, as turned up is louder on the meter
+		// beside it: both bars fill to the right, and a wheel that read one of
+		// them backwards would be two rules on one row.
+		return m, m.seek(m.elapsed() - time.Duration(delta)*seekStep)
+
+	case spotVolume:
+		return m, m.setVolume(m.ps.Volume - delta*volumeStep)
 	}
 	return m, nil
 }
@@ -122,6 +137,60 @@ func (m Model) mouseClick(e tea.MouseClickMsg) (Model, tea.Cmd) {
 		}
 		cursor.moveTo(at.at, count)
 		return m, tea.Batch(m.previewCover(), m.readAhead())
+
+	case spotSeek:
+		// Where along the bar it was pressed, as a share of the track. The bar
+		// is drawn from the same fraction, so the playhead lands under the
+		// pointer. See progressLine.
+		if !m.loaded() {
+			return m, nil
+		}
+		return m, m.seek(atFraction(at.at, barCells(m.layout().infoWidth), m.ps.Duration))
+
+	case spotVolume:
+		// And the same for the meter, which is the same shape at another width.
+		return m, m.setVolume(atShare(at.at, barCells(volumeCells), 100))
+
+	case spotControl:
+		return m.pressControl(control(at.at))
 	}
 	return m, nil
+}
+
+// pressControl does what the glyph under the pointer says, which is what the key
+// bound to it does: one act, two ways of asking for it. See transport.go.
+func (m Model) pressControl(c control) (Model, tea.Cmd) {
+	if m.ps == nil || m.noDevice {
+		return m, nil
+	}
+	switch c {
+	case ctlPrev:
+		return m, m.skipPrev()
+	case ctlPlay:
+		return m, m.togglePlay()
+	case ctlNext:
+		return m, m.skipNext()
+	case ctlShuffle:
+		return m, m.toggleShuffle()
+	case ctlRepeat:
+		return m, m.turnRepeat()
+	}
+	return m, nil
+}
+
+// atShare is where along a bar of that many cells a press landed, as a share of
+// a whole — the arithmetic the bars are drawn by, read backwards.
+func atShare(cell, cells, whole int) int {
+	if cells <= 0 {
+		return 0
+	}
+	return min(max(cell*whole/cells, 0), whole)
+}
+
+// atFraction is the same for a length of time.
+func atFraction(cell, cells int, whole time.Duration) time.Duration {
+	if cells <= 0 {
+		return 0
+	}
+	return min(max(time.Duration(cell)*whole/time.Duration(cells), 0), whole)
 }
