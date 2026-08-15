@@ -51,9 +51,23 @@ func (m Model) View() tea.View {
 
 	// Ask the terminal to say which key a press came from as well as which
 	// letter it produced, so a binding written as a letter is the key that
-	// letter sits on wherever somebody is typing. Terminals that cannot say
-	// ignore the request. See keypress.go.
-	v.KeyboardEnhancements = tea.KeyboardEnhancements{ReportAlternateKeys: true}
+	// letter sits on wherever somebody is typing. See keypress.go.
+	//
+	// Three things rather than one, because the first alone changed nothing. A
+	// key that produces text is sent as that text, and the key it came from
+	// travels only with the escape-coded form — so every key has to be asked for
+	// that way, and the text asked for alongside it or a query would be typed in
+	// whatever a US keyboard has there. Measured on a Hungarian layout: the
+	// terminal agreed to report alternate keys and then reported none, because
+	// nothing was ever sent in the form that carries them.
+	//
+	// Terminals that cannot do this ignore the request, and everything is as it
+	// was: the letter that arrived, matched as itself.
+	v.KeyboardEnhancements = tea.KeyboardEnhancements{
+		ReportAlternateKeys:        true,
+		ReportAllKeysAsEscapeCodes: true,
+		ReportAssociatedText:       true,
+	}
 	return v
 }
 

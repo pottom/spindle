@@ -63,7 +63,18 @@ func TestTheTerminalIsAskedForTheBaseKey(t *testing.T) {
 	m := queueModel(0, "a", "b")
 	m.width, m.height = 100, 30
 	m.resize()
-	if !m.View().KeyboardEnhancements.ReportAlternateKeys {
+	ke := m.View().KeyboardEnhancements
+	if !ke.ReportAlternateKeys {
 		t.Error("the terminal is never asked which key a press came from")
+	}
+
+	// And asked in the form that carries the answer. A key that produces text is
+	// sent as that text, and the key it came from travels only with the
+	// escape-coded form — so the first flag on its own reports nothing.
+	if !ke.ReportAllKeysAsEscapeCodes {
+		t.Error("the keys are not asked for in the form that carries a base key")
+	}
+	if !ke.ReportAssociatedText {
+		t.Error("the text of a key is not asked for, so a query would be typed in the wrong letters")
 	}
 }

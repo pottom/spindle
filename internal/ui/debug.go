@@ -807,8 +807,15 @@ func debugKeyboard(flags int) string {
 		return "none"
 	}
 	out := fmt.Sprintf("%d", flags)
-	if flags&4 != 0 {
-		return out + " base"
+	for _, f := range []struct {
+		bit  int
+		name string
+	}{{4, "base"}, {8, "escaped"}, {16, "text"}} {
+		if flags&f.bit == 0 {
+			out += " no " + f.name
+			continue
+		}
+		out += " " + f.name
 	}
-	return out + " no base"
+	return out
 }
