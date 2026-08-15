@@ -28,6 +28,11 @@ type prefs struct {
 	// a passing look — somebody who reads their queue with the picture off wants
 	// it off tomorrow as well. See queueRoom.
 	Room int `json:"room,omitempty"`
+
+	// Cols is how many covers the library puts across. Kept for the same
+	// reason: somebody who wants a wall of large sleeves wants it tomorrow as
+	// well.
+	Cols int `json:"cols,omitempty"`
 }
 
 // prefsMsg carries the file's contents back into the model.
@@ -71,6 +76,7 @@ func (m Model) savePrefs() tea.Cmd {
 		Lyrics: m.lyrics.on,
 		Peek:   m.peek.on,
 		Room:   int(m.queuePane.room),
+		Cols:   m.library.cols,
 	}
 	return func() tea.Msg {
 		path, err := prefsPath()
@@ -101,5 +107,10 @@ func (m *Model) applyPrefs(p prefs) {
 	// written by a version that had never heard of it.
 	if p.Room > 0 && p.Room < int(queueRooms) {
 		m.queuePane.room = queueRoom(p.Room)
+	}
+	if p.Cols > 0 {
+		// Whether that many fit on this terminal is the wall's business, not the
+		// file's: it clamps against how narrow a cover may be drawn.
+		m.library.cols = p.Cols
 	}
 }

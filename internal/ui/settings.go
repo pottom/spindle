@@ -344,6 +344,12 @@ func (m Model) settingsPanel(l layout, rows int) []string {
 	return lines[:rows]
 }
 
+// settingsChrome is what the screen spends above the switches: its name, the
+// line under it, and the blank. Named because the pointer counts down from the
+// top of the body to find which switch it is over, and a fourth line added here
+// would leave every click a row out. See settingsSpot in mouse.go.
+const settingsChrome = 3
+
 // settingsNameCols is the column the names are set in, so the values line up
 // under each other.
 const settingsNameCols = 26

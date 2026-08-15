@@ -580,6 +580,102 @@ func TestDraggingTheMeterMovesTheVolume(t *testing.T) {
 	}
 }
 
+// Ctrl and the wheel over a wall of pictures size them, which is what they do
+// over a grid of icons anywhere.
+func TestCtrlAndTheWheelSizeTheWall(t *testing.T) {
+	m := wideLibrary(t, 60)
+	m.covers = &cover.Loader{}
+	// Wide enough that there is more than one step in either direction: on a
+	// hundred columns the ceiling is a notch away.
+	m.width, m.height = 180, 44
+	m.resize()
+
+	x, y := wordAt(t, m, m.kindLabels()[0])
+	y += gridChromeRows + 1
+
+	was := m.libraryShape(m.layout(), m.layout().bodyHeight).tileW
+	bigger, cmd := m.mouseWheel(tea.MouseWheelMsg{X: x, Y: y, Button: tea.MouseWheelUp, Mod: tea.ModCtrl})
+	if got := bigger.libraryShape(bigger.layout(), bigger.layout().bodyHeight).tileW; got <= was {
+		t.Errorf("a notch up left the covers %d cells wide, want more than %d", got, was)
+	}
+	if cmd == nil {
+		t.Error("the covers were not asked for again at the new size")
+	}
+
+	// Every notch does something until it runs out of room, and what it keeps is
+	// what the wall could actually do — not the ask.
+	seen := map[int]bool{bigger.library.cols: true}
+	for range 40 {
+		before := bigger.library.cols
+		bigger, _ = bigger.mouseWheel(tea.MouseWheelMsg{X: x, Y: y, Button: tea.MouseWheelUp, Mod: tea.ModCtrl})
+		if bigger.library.cols == before {
+			break
+		}
+		seen[bigger.library.cols] = true
+	}
+	if g := bigger.libraryShape(bigger.layout(), bigger.layout().bodyHeight); g.tileW > tileMost {
+		t.Errorf("turned as far as it goes the covers are %d cells wide, want no more than %d", g.tileW, tileMost)
+	}
+	if len(seen) < 2 {
+		t.Errorf("only %d sizes of wall were reachable turning up", len(seen))
+	}
+
+	smaller := m
+	for range 40 {
+		before := smaller.library.cols
+		smaller, _ = smaller.mouseWheel(tea.MouseWheelMsg{X: x, Y: y, Button: tea.MouseWheelDown, Mod: tea.ModCtrl})
+		if smaller.library.cols == before {
+			break
+		}
+	}
+	if g := smaller.libraryShape(smaller.layout(), smaller.layout().bodyHeight); g.tileW < tileLeast {
+		t.Errorf("turned the other way the covers are %d cells wide, want no less than %d", g.tileW, tileLeast)
+	}
+}
+
+// Every switch on the settings screen answers where it is drawn, and ctrl and
+// the wheel turn the one under the pointer.
+func TestCtrlAndTheWheelTurnTheSwitchUnderIt(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.tab = tabSettings
+	m.width, m.height = 100, 40
+	m.resize()
+
+	rows := m.settingRows()
+	for i, row := range rows {
+		x, y := wordAt(t, m, row.name)
+		if at := m.spotAt(x, y); at.kind != spotList || at.at != i {
+			t.Fatalf("%q is at column %d of row %d, and the pointer calls it %v/%d",
+				row.name, x, y, at.kind, at.at)
+		}
+	}
+
+	// The second switch, turned from over itself rather than from the cursor.
+	x, y := wordAt(t, m, rows[1].name)
+	got, _ := m.mouseWheel(tea.MouseWheelMsg{X: x, Y: y, Button: tea.MouseWheelUp, Mod: tea.ModCtrl})
+	if got.settings.cursor.cursor != 1 {
+		t.Errorf("the cursor is on %d, want the switch under the pointer", got.settings.cursor.cursor)
+	}
+	if got.settingRows()[1].value == rows[1].value {
+		t.Errorf("%q still reads %q, want it turned", rows[1].name, rows[1].value)
+	}
+}
+
+// The big screen is watched rather than worked on, so a press of the pointer is
+// the way out of it.
+func TestAPressLeavesTheBigScreen(t *testing.T) {
+	m := playerModel()
+	m.stage.on = true
+
+	if at := m.spotAt(10, 10); at.kind != spotNothing {
+		t.Errorf("the big screen has %v under the pointer, want nothing to point at", at.kind)
+	}
+	got, _ := m.mouseClick(clickAt(10, 10))
+	if got.stage.on {
+		t.Error("a press left the big screen up")
+	}
+}
+
 // playerModel is the player tab with something playing on it, at a size where
 // there is room for the picture beside the words.
 func playerModel() Model {

@@ -26,6 +26,13 @@ type libraryPane struct {
 	cursors [libraryKinds]listState
 	pages   [libraryKinds]paging
 
+	// cols is how many covers the wall puts across, which ctrl and the wheel
+	// change the way they size the icons in a file manager. Nought is "as many
+	// as look right", which is where it starts and where it stays until somebody
+	// says otherwise. Kept between runs: how large somebody wants their shelf is
+	// a way of working, not a passing look. See gridFor and prefs.go.
+	cols int
+
 	// liked is the first page of the saved tracks, read whenever the library
 	// is, so the row at the top of it has a cover before it is opened and opens
 	// without a wait. likedAll says that page was the whole list, which is the

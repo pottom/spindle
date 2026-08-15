@@ -173,9 +173,12 @@ func (m Model) spotAt(x, y int) spot {
 	case m.tab == tabLibrary && m.open() == nil:
 		return m.wallSpot(l, x, row)
 	case m.tab == tabSettings:
-		// A list with a cursor, laid out its own way. The wheel can turn it;
-		// which row is under the pointer is settings.go's arithmetic rather
-		// than the table's, and nothing asks yet.
+		// A list with a cursor, laid out its own way: a heading, a line saying
+		// what the screen is, a blank, and the switches under them. See
+		// settingsPanel.
+		if at := row - settingsChrome; at >= 0 && at < settingsCount && x >= leftMargin {
+			return spot{spotList, at}
+		}
 		return spot{spotList, -1}
 	case m.open() != nil, m.tab == tabQueue, m.tab == tabSearch:
 		return m.listSpot(l, x, row)

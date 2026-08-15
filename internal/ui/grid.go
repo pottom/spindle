@@ -60,8 +60,14 @@ const (
 	// tileWant is the width a tile is drawn at where the room allows, and
 	// tileLeast the narrowest worth drawing at all. Under that a cover is a
 	// smudge and a name is two words of three.
+	//
+	// tileWant is where the wall starts rather than where it stays: ctrl and the
+	// wheel change how many go across, and the width follows from that. tileMost
+	// is where growing stops — past it a wall is a slideshow, and the tab beside
+	// this one is already the place to look at one record.
 	tileWant  = 22
 	tileLeast = 12
+	tileMost  = 44
 
 	// gridGutter is the air kept to the left of the wall and gridEdge to the
 	// right of it, for the frame that marks the tile under the cursor.
@@ -104,15 +110,31 @@ func (g gridShape) ok() bool { return g.cols > 0 && g.rows > 0 && g.tileW >= til
 // The count of columns comes first, from the width a tile wants: what is left
 // over is spread between them rather than left at the edge, so the wall reaches
 // both margins whatever the terminal is.
-func gridFor(width, height int, cell cover.CellSize) gridShape {
+// want is how many tiles across were asked for, and nought is "as many as look
+// right" — the width a cover was tuned at, shared out. What somebody changes
+// with ctrl and the wheel is that count rather than the width: the width is
+// whatever is left over once the columns are decided, so a step in it does
+// nothing at all until it happens to cross a column boundary. See resizeWall.
+func gridFor(width, height, want int, cell cover.CellSize) gridShape {
 	if width <= 0 || height <= 0 {
 		return gridShape{}
 	}
 
-	cols := max((width+tileGap)/(tileWant+tileGap), 1)
+	cols := want
+	if cols < 1 {
+		cols = max((width+tileGap)/(tileWant+tileGap), 1)
+	}
 	tileW := (width - tileGap*(cols-1)) / cols
+
+	// Never narrower than a cover can be read at, and never wider than a wall
+	// can hold: asked for one tile on a wide screen, what comes back is the
+	// fewest that keeps it under the ceiling.
 	for cols > 1 && tileW < tileLeast {
 		cols--
+		tileW = (width - tileGap*(cols-1)) / cols
+	}
+	for tileW > tileMost {
+		cols++
 		tileW = (width - tileGap*(cols-1)) / cols
 	}
 

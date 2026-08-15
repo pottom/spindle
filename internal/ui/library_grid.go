@@ -113,7 +113,7 @@ func (m Model) libraryTiles() []libraryTile {
 // libraryShape is the wall as this terminal divides it.
 func (m Model) libraryShape(l layout, rows int) gridShape {
 	return gridFor(l.interior-leftMargin-rightMargin-gridGutter-gridEdge,
-		rows-gridChromeRows-frameRows-m.finderTakes(), m.cell)
+		rows-gridChromeRows-frameRows-m.finderTakes(), m.library.cols, m.cell)
 }
 
 // gridChromeRows is what the wall spends above itself: the heading with the

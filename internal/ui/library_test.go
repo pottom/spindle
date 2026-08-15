@@ -583,7 +583,7 @@ func TestATileIsAsWideAsItsPicture(t *testing.T) {
 		{Width: 7, Height: 15},
 		{Width: 16, Height: 32},
 	} {
-		g := gridFor(150, 40, cell)
+		g := gridFor(150, 40, 0, cell)
 		if !g.ok() {
 			t.Fatalf("%+v: no wall at all", cell)
 		}
@@ -659,7 +659,7 @@ func TestTheTileMatchesWhatIsDrawn(t *testing.T) {
 		{Width: 16, Height: 32}, {Width: 16, Height: 34}, {Width: 7, Height: 15},
 		{Width: 12, Height: 26}, {Width: 11, Height: 24},
 	} {
-		g := gridFor(140, 37, cell)
+		g := gridFor(140, 37, 0, cell)
 		if !g.ok() {
 			t.Fatalf("%+v: no wall at all", cell)
 		}
@@ -694,7 +694,7 @@ func TestATileIsSquareInPixels(t *testing.T) {
 		{Width: 12, Height: 26}, {Width: 11, Height: 24}, {Width: 5, Height: 19},
 	} {
 		for _, width := range []int{60, 100, 140, 200, 300} {
-			g := gridFor(width, 37, cell)
+			g := gridFor(width, 37, 0, cell)
 			if !g.ok() {
 				continue
 			}

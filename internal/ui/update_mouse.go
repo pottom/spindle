@@ -60,9 +60,22 @@ func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 
 	at := m.noteMouse(e.X, e.Y)
 
-	// Held down, the wheel moves the thing rather than the cursor. What that
-	// means is whatever the thing under it is: on an ordered list, its order.
+	// Held down, the wheel changes the thing rather than walking it. What that
+	// means is whatever the thing under it is: the order of an ordered list, the
+	// size of a wall of pictures. Two meanings for one gesture, and each is the
+	// obvious one where it is.
 	if e.Mod&tea.ModCtrl != 0 {
+		switch {
+		case at.kind == spotTile:
+			// Turned down is more of them across and so smaller, which is what
+			// turning away from yourself means on every other grid of pictures.
+			return m.resizeWall(delta)
+		case m.tab == tabSettings && at.at >= 0:
+			// The switch under the pointer, turned the way the keys turn it.
+			// Turned up is forward, as it is on every other bar and wheel here.
+			m.settings.cursor.moveTo(at.at, settingsCount)
+			return m, m.turnSetting(-delta)
+		}
 		return m.mouseReorder(at, delta)
 	}
 
@@ -145,6 +158,14 @@ const gripWithin = 2 * time.Second
 // The right button raises the menu of verbs on the thing under it, which is what
 // the right button does everywhere else.
 func (m Model) mouseClick(e tea.MouseClickMsg) (Model, tea.Cmd) {
+	// The big screen is watched rather than worked on, and a press of the
+	// pointer is the way out of it — the same thing esc does, from the same
+	// instinct: it is the first thing a hand reaches for to make something go
+	// away. Nothing up there is worth pointing at.
+	if m.stage.on {
+		return m, m.leaveStage()
+	}
+
 	// The menu answers everything while it is up. A press on one of its verbs
 	// chooses it, a press anywhere else puts it away — which is what pressing
 	// away from an open menu means, and there is nothing else it could mean.
@@ -261,6 +282,40 @@ func (m Model) mouseReorder(at spot, delta int) (Model, tea.Cmd) {
 		m.queuePane.cursor.moveTo(at.at, len(m.queueRows()))
 	}
 	return m, m.moveQueued(delta)
+}
+
+// resizeWall makes the covers larger or smaller, which is what ctrl and the
+// wheel do over a grid of pictures anywhere.
+//
+// By the column rather than by the cell. The width of a tile is what is left
+// over once the columns are decided, so asking for two more cells does nothing
+// at all until it happens to cross a boundary — a notch that leaves the screen
+// exactly as it was reads as a gesture that is not supported. One notch, one
+// column, every time.
+//
+// What it keeps is what the wall says it did, not what was asked for: the shape
+// clamps the count against how narrow a cover may be drawn and how wide it may
+// grow, and storing the ask rather than the answer would leave notches piling up
+// against a wall that had stopped moving.
+//
+// Turned up is larger — fewer across — as turned up is louder and further along
+// everywhere else here. The pictures are asked for again at the new size, so
+// this is the one gesture that costs anything.
+func (m Model) resizeWall(delta int) (Model, tea.Cmd) {
+	l := m.layout()
+	was := m.libraryShape(l, l.bodyHeight)
+	if !was.ok() {
+		return m, nil
+	}
+
+	m.library.cols = max(was.cols+delta, 1)
+	now := m.libraryShape(l, l.bodyHeight)
+	if !now.ok() || now.cols == was.cols {
+		m.library.cols = was.cols
+		return m, nil
+	}
+	m.library.cols = now.cols
+	return m, tea.Batch(m.syncGridCovers(), m.savePrefs())
 }
 
 // mouseActions raises the menu of verbs on the thing under the pointer.

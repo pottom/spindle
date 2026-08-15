@@ -210,6 +210,18 @@ func (m *Model) stageEdgeFlow() {
 	m.stage.edgeAt += time.Duration(float64(now-m.stage.edgeAt) * (1 - float64(paceKeep(stageEdgeRun))))
 }
 
+// leaveStage puts the big screen away and lets the machine sleep again.
+//
+// Its own function because there are two ways out of it now: the key that means
+// back, and a press of the pointer — which is what a screen being watched rather
+// than worked on should answer to.
+func (m *Model) leaveStage() tea.Cmd {
+	m.stage.on = false
+	m.stage.drops = nil
+	m.stage.was = nil
+	return keepAwake(false)
+}
+
 // stageKey answers while the big screen is up.
 //
 // Three keys leave: esc and q, the two that mean "back" everywhere else, and f,
@@ -293,10 +305,7 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		if k.Mod&tea.ModCtrl != 0 {
 			return nil, false
 		}
-		m.stage.on = false
-		m.stage.drops = nil
-		m.stage.was = nil
-		return keepAwake(false), true
+		return m.leaveStage(), true
 	}
 
 	// Everything else: nothing. A key this screen has no use for is a key that
