@@ -97,6 +97,12 @@ type Model struct {
 	// this side of the screen. See mouse.go.
 	lastPoint point
 
+	// lastClick is where and when the pointer was last pressed. A terminal
+	// reports presses and never double presses, so the second of two is
+	// something this side has to notice: the same cell, soon enough after.
+	lastClick   point
+	lastClickAt time.Time
+
 	// queueAt is when the queue was last asked for. It comes from our own daemon
 	// rather than from Spotify, so it is asked again often — see refresh.go.
 	queueAt time.Time

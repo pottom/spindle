@@ -345,6 +345,94 @@ func absDuration(d time.Duration) time.Duration {
 	return d
 }
 
+// The menu is a box now, standing on the thing it is about. What it draws and
+// what it answers a press with are the same rows, which is the only thing
+// holding a click on a verb to the verb it runs.
+func TestTheMenuAnswersWhereItsVerbsAreDrawn(t *testing.T) {
+	m := likedModel(t)
+	if !m.openActions() {
+		t.Fatal("the cover under the cursor offered no verbs")
+	}
+
+	l := m.layout()
+	for i, v := range m.actions.verbs {
+		x, y := wordAt(t, m, v.label)
+		at, inside := m.menuVerbAt(l, x, y)
+		if !inside || at != i {
+			t.Fatalf("%q is drawn at column %d of row %d, and the menu calls it %d (inside %v)",
+				v.label, x, y, at, inside)
+		}
+	}
+
+	// The box stands where the cursor is rather than in the middle of the
+	// screen: on the wall, that is the cover it was raised over.
+	cx, cy := m.cursorPoint(l)
+	if box := m.menuShape(l); box.x != cx || box.y != cy {
+		t.Errorf("the box is at %d,%d and the cover under the cursor at %d,%d", box.x, box.y, cx, cy)
+	}
+
+	// And a press on a verb runs it and puts the menu away.
+	x, y := wordAt(t, m, m.actions.verbs[0].label)
+	got, cmd := m.mouseClick(clickAt(x, y))
+	if got.actions.open {
+		t.Error("pressing a verb left the menu up")
+	}
+	if cmd == nil {
+		t.Error("pressing a verb did nothing")
+	}
+
+	// A press anywhere else puts it away and does nothing else.
+	if got, _ = m.mouseClick(clickAt(leftMargin, m.height-2)); got.actions.open {
+		t.Error("pressing away from the menu left it up")
+	}
+}
+
+// The right button raises it on whatever it is over, having moved the cursor
+// there first: a menu about a record nobody pointed at is how a track gets taken
+// out of a queue by accident.
+func TestARightClickRaisesTheMenuOnWhatItIsOver(t *testing.T) {
+	m := queueModel(0, "alpha", "bravo", "charlie", "delta")
+	m.width, m.height = 100, 40
+	m.resize()
+
+	x, y := wordAt(t, m, "charlie")
+	got, _ := m.mouseClick(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseRight})
+	if !got.actions.open {
+		t.Fatal("the right button raised no menu")
+	}
+	if got.actions.title != "charlie" {
+		t.Errorf("the menu is about %q, want the row it was raised over", got.actions.title)
+	}
+	if got.queuePane.cursor.cursor != queueRowOf(2) {
+		t.Errorf("the cursor is on %d, want the row the menu is about", got.queuePane.cursor.cursor)
+	}
+}
+
+// A second press on the same cell is what enter does there. One is not: on a
+// wall of records the pointer passes over a hundred covers on the way to one.
+func TestASecondPressOpensWhatTheFirstChose(t *testing.T) {
+	m := likedModel(t)
+
+	items := m.libraryTiles()
+	x, y := wordAt(t, m, items[0].name)
+
+	got, _ := m.mouseClick(clickAt(x, y))
+	if got.open() != nil {
+		t.Fatal("one press opened a record")
+	}
+	twice, _ := got.mouseClick(clickAt(x, y))
+	if twice.open() == nil {
+		t.Fatal("two presses opened nothing")
+	}
+
+	// And two presses far enough apart are two presses.
+	slow := got
+	slow.lastClickAt = slow.lastClickAt.Add(-time.Second)
+	if again, _ := slow.mouseClick(clickAt(x, y)); again.open() != nil {
+		t.Error("two presses a second apart opened a record, want them read as two")
+	}
+}
+
 // playerModel is the player tab with something playing on it, at a size where
 // there is room for the picture beside the words.
 func playerModel() Model {

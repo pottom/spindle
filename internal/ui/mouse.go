@@ -318,6 +318,39 @@ func (m Model) playerTop(l layout, block int) int {
 	return top + max((rows-block)/2, 0)
 }
 
+// cursorPoint is where on the screen the thing under the cursor is drawn.
+//
+// The other direction from spotAt, out of the same arithmetic: that one is given
+// a point and names what is there, this one is given the cursor and says where
+// it ended up. It is what lets a menu raised by a key stand where a menu raised
+// by a click stands — one box, opened at the thing it is about, however it was
+// asked for.
+//
+// A row's mark is at the left margin and a cover's at its own left edge; the box
+// opens a row below and a column in from either, so what was chosen is still
+// readable above it.
+func (m Model) cursorPoint(l layout) (x, y int) {
+	if m.tab == tabLibrary && m.open() == nil {
+		g := m.libraryShape(l, l.bodyHeight)
+		state := &m.library.cursors[m.library.kind]
+		if from, _ := state.gridWindow(len(m.libraryTiles()), g); g.ok() {
+			at := state.cursor - from
+			col, row := at%max(g.cols, 1), at/max(g.cols, 1)
+			return leftMargin + gridGutter + col*(g.tileW+g.gap) + 1,
+				tabBarHeight + gridChromeRows + m.finderTakes() + row*(g.tileH+tileRowGap) + 1
+		}
+		return leftMargin + 1, tabBarHeight + gridChromeRows + 1
+	}
+
+	band := m.listBandRows(l)
+	head := tabBarHeight + band + m.listChrome(band)
+	if cursor, count := (&m).rowCursor(); cursor != nil {
+		from, _ := cursor.window(count, m.listBodyRows(max(l.bodyHeight, 1), band))
+		return leftMargin + 1, head + cursor.cursor - from + 1
+	}
+	return leftMargin + 1, head
+}
+
 // rowCursor is the cursor of whatever list is on screen.
 //
 // The search keeps one per kind of hit and the settings keep their own, so this

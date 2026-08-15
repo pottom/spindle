@@ -47,6 +47,17 @@ func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// The menu answers everything while it is up, exactly as it does with the
+	// keys: nothing underneath may be turned by a wheel over a box standing on
+	// top of it.
+	if _, inside := m.menuVerbAt(m.layout(), e.X, e.Y); inside {
+		m.actions.state.move(delta, len(m.actions.verbs))
+		return m, nil
+	}
+	if m.actions.open {
+		return m, nil
+	}
+
 	at := m.noteMouse(e.X, e.Y)
 	switch at.kind {
 	case spotTabs:
@@ -100,19 +111,63 @@ func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+// doubleWithin is how soon a second press on the same cell is the same press
+// again rather than a new one.
+//
+// What every desktop calls a double click. Four hundred milliseconds is what
+// they settle on, near enough, and it is the number to change if a deliberate
+// second click ever fails to open anything.
+const doubleWithin = 400 * time.Millisecond
+
 // mouseClick acts on what was pressed.
 //
 // A label is pressed and the screen changes; a row or a cover is pressed and the
-// cursor goes there. Nothing plays and nothing opens: a wall of records is a
-// place where the pointer passes over a hundred covers on the way to one, and a
-// single click that started the music would be a mistake nobody asked to be able
-// to make. What opens a thing is the next round's question.
+// cursor goes there; pressed again it opens or plays. One press does not,
+// because a wall of records is a place where the pointer passes over a hundred
+// covers on the way to one, and a single click that started the music would be a
+// mistake nobody asked to be able to make.
+//
+// The right button raises the menu of verbs on the thing under it, which is what
+// the right button does everywhere else.
 func (m Model) mouseClick(e tea.MouseClickMsg) (Model, tea.Cmd) {
+	// The menu answers everything while it is up. A press on one of its verbs
+	// chooses it, a press anywhere else puts it away — which is what pressing
+	// away from an open menu means, and there is nothing else it could mean.
+	if m.actions.open {
+		verb, inside := m.menuVerbAt(m.layout(), e.X, e.Y)
+		if !inside || e.Button != tea.MouseLeft {
+			m.actions.open = false
+			return m, nil
+		}
+		if verb < 0 {
+			return m, nil
+		}
+		m.actions.open = false
+		return m, m.actions.verbs[verb].do(&m)
+	}
+
+	if e.Button == tea.MouseRight {
+		return m.mouseActions(e)
+	}
 	if e.Button != tea.MouseLeft {
 		return m, nil
 	}
 
+	// A second press on the cell the last one was on, soon enough after it.
+	twice := m.lastClick.seen && m.lastClick.x == e.X && m.lastClick.y == e.Y &&
+		time.Since(m.lastClickAt) < doubleWithin
+
 	at := m.noteMouse(e.X, e.Y)
+	m.lastClick, m.lastClickAt = m.lastPoint, time.Now()
+
+	if twice && (at.kind == spotList || at.kind == spotTile) && at.at >= 0 {
+		// The cursor is already on it — the first press put it there — so this
+		// is the key that acts on where the cursor is, asked for by hand rather
+		// than pressed. One act, however it was asked for: what enter does on
+		// this screen is what a second click does, whatever screen it is.
+		return m.handleKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+	}
+
 	if at.at < 0 {
 		// The region is known and the part of it is not: the air between two
 		// labels, the gap between two covers. Nothing to press.
@@ -155,6 +210,40 @@ func (m Model) mouseClick(e tea.MouseClickMsg) (Model, tea.Cmd) {
 		return m.pressControl(control(at.at))
 	}
 	return m, nil
+}
+
+// mouseActions raises the menu of verbs on the thing under the pointer.
+//
+// The cursor goes there first. The menu is about what the cursor is on — that is
+// how every screen builds it — so a menu raised somewhere the cursor is not
+// would be a menu about the wrong record, and the surest way to have somebody
+// take a track out of a queue they did not mean to.
+func (m Model) mouseActions(e tea.MouseClickMsg) (Model, tea.Cmd) {
+	at := m.noteMouse(e.X, e.Y)
+	if at.at < 0 {
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	switch at.kind {
+	case spotList:
+		cursor, count := (&m).rowCursor()
+		if cursor == nil {
+			return m, nil
+		}
+		cursor.moveTo(at.at, count)
+		cmd = tea.Batch(m.previewCover(), m.readAhead())
+	case spotTile:
+		m.library.cursor().moveTo(at.at, len(m.libraryTiles()))
+		cmd = tea.Batch(m.previewCover(), m.readAhead(), m.syncGridCovers())
+	default:
+		// The tabs, the kinds, the transport: things that do one thing each and
+		// have no second thing to offer.
+		return m, nil
+	}
+
+	m.openActionsAt(e.X, e.Y)
+	return m, cmd
 }
 
 // pressControl does what the glyph under the pointer says, which is what the key

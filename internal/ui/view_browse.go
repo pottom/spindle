@@ -229,17 +229,6 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	// cannot see this function.
 	body := m.listBodyRows(rows, m.listBandRows(l))
 
-	// The menu takes the list's rows rather than floating over them. What the
-	// verbs apply to is described in the panel above either way, so the list is
-	// what can be spared.
-	if m.actions.open {
-		out = append(out, m.actionsBlock(w, body)...)
-		for len(out) < rows {
-			out = append(out, strings.Repeat(" ", w))
-		}
-		return out[:rows]
-	}
-
 	if opts.count == 0 && body > 0 {
 		// A list that has not arrived is not an empty list, and saying so is
 		// the difference between a slow answer and a wrong one. The pages are

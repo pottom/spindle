@@ -24,6 +24,11 @@ type actionsPane struct {
 	verbs []verb
 	state listState
 
+	// x and y are where on the screen it was opened, which is where the box is
+	// drawn: under the row on a list, beside the cover on a wall, and at the
+	// pointer where the pointer opened it. See menu.go.
+	x, y int
+
 	// title and subtitle are what the menu was opened over, as it is named at
 	// the head of the menu. Held rather than looked up again: the list
 	// underneath can be replaced by a poll while the menu is up, and a menu
@@ -191,7 +196,27 @@ func (m Model) actionsForPlaylist(pl player.Playlist) []verb {
 
 // openActions raises the menu over whatever the cursor is on, and reports
 // whether there was anything to raise it over.
+//
+// Where the cursor is, because that is what the menu is about: under the row on
+// a list, beside the cover on a wall. A menu that appeared in the middle of the
+// screen would make you look away from the thing you had just chosen. See
+// cursorPoint.
 func (m *Model) openActions() bool {
+	x, y := m.cursorPoint(m.layout())
+	return m.openActionsAt(x, y)
+}
+
+// openActionsAt is the same, opened at a point the caller names — which is what
+// the pointer does: a menu raised by a click belongs under that click.
+func (m *Model) openActionsAt(x, y int) bool {
+	raised := m.raiseActions()
+	m.actions.x, m.actions.y = x, y
+	return raised
+}
+
+// raiseActions fills the menu from whatever the cursor is on, and says whether
+// that thing had any verbs.
+func (m *Model) raiseActions() bool {
 	if a := m.cursorAlbum(); a != nil {
 		m.actions = actionsPane{open: true, title: a.Name, subtitle: albumLine(*a)}
 		m.actions.verbs = m.actionsForAlbum(*a)
@@ -243,31 +268,6 @@ func (m *Model) actionsKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 
 	m.listKey(k, &m.actions.state, len(m.actions.verbs), true)
 	return nil, true
-}
-
-// actionsBlock draws the menu in place of the list it was opened over, rather
-// than floating over it: this screen has no boxes anywhere, and a panel on top
-// of a list would need one to be legible.
-func (m Model) actionsBlock(w, rows int) []string {
-	lines := []string{
-		fit(m.styles.Title.Render(m.actions.title), w),
-		fit(m.styles.Artist.Render(m.actions.subtitle), w),
-		"",
-	}
-
-	for i, v := range m.actions.verbs {
-		style, gutter := m.styles.RowPrimary, "  "
-		if i == m.actions.state.cursor {
-			style, gutter = m.styles.RowSelected, m.styles.Cursor.Render(rowCursor)+" "
-		}
-
-		shortcut := "  "
-		if v.key != "" {
-			shortcut = m.styles.FactLabel.Render(v.key) + " "
-		}
-		lines = append(lines, fit(gutter+shortcut+style.Render(v.label), w))
-	}
-	return stack(lines, w, rows)
 }
 
 // playlistOwner is what the menu says under a playlist's name: whose it is, and

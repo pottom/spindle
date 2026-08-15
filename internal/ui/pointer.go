@@ -49,8 +49,11 @@ const (
 	// as a panel's border, and the band is not a panel — it is a thing somebody
 	// has drawn a bracket beside. The two right-hand corners belong to the field
 	// a list is searched in, which is a box and closes — see finder.go.
-	pointerTL    = "╭"
-	pointerTee   = "├"
+	pointerTL  = "╭"
+	pointerTee = "├"
+	// And its mirror, which only a closed box has a use for: the line under the
+	// name of what the menu is about meets both uprights. See menu.go.
+	pointerTeeR  = "┤"
 	pointerTR    = "╮"
 	pointerBR    = "╯"
 	pointerH     = "─"

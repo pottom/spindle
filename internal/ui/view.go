@@ -144,6 +144,10 @@ func (m Model) renderPlayer() string {
 	// be drawn over the letters going in. See finder.go.
 	lines = m.drawFinder(lines, l, len(lines)-len(body))
 
+	// Except the menu, which is what is being answered while it is up and so
+	// stands over everything, the field included. See menu.go.
+	lines = m.drawMenu(lines, l)
+
 	// A blank row before the bottom block, so the help never reads as one more
 	// entry in whatever list ends above it.
 	lines = append(lines, m.pad("", l))
