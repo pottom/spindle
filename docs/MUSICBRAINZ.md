@@ -587,6 +587,17 @@ bimodal (**[M]** 15 tracks with zero, 19 with ten or more), do not design a
 fixed-height box. Either it is absent, or it is a scrollable list. There is no
 "two credits" case to design around.
 
+**And the caveat that decides whether to build it at all.** The 69% above is a
+chart-and-catalogue sample. An earlier measurement, on 2026-08-10, took six
+records from *this* library and got nothing: Two Steps from Hell "Emerald
+Princess", Mike Mana "Never The Same" and MIRBRO "G LOVE" were **not in
+MusicBrainz at all**, and Darude "Sandstorm", Queen "Bohemian Rhapsody" and
+Miles Davis "So What" were present with **zero instrument credits**. Both
+measurements are sound and they are about different music. Six records of the
+library that actually plays here outweigh forty-nine of somebody else's:
+**measure this again against a real sample of what gets played before building
+the panel.**
+
 ### ★★★ 2. Composer and lyricist line — build this, it is nearly free
 
 One line, `Written by Gilmour / Waters`. **[M] 73%** availability.
@@ -834,7 +845,9 @@ Wikipedia misses, but the quality is poor and it needs an API key.
 1. **ISRC → recording → credits and composers, on the now-playing screen.** About
    two requests per new track, **[M] 1.8 KB**, **[M] 69% / 73%** availability,
    information Spotify structurally cannot provide, CC0 with no obligations. This
-   is the whole case for MusicBrainz in one feature.
+   is the whole case for MusicBrainz in one feature — **subject to the caveat in
+   §5.1: that availability has not been measured against the music actually
+   played here, and the one measurement that was, found none.**
 2. **`disambiguation`, area and years on the artist, free; the Wikipedia lead
    paragraph behind it, three cached requests.** The only artist prose that
    exists.
