@@ -10,38 +10,54 @@ import (
 // LikedTracks reads the saved songs, most recently saved first.
 func (s *Spotify) LikedTracks(ctx context.Context, offset int) (Page[Track], error) {
 	start := max(offset, 0)
-	page, err := s.client.CurrentUsersTracks(ctx, spotify.Limit(pageLimit), spotify.Offset(start))
+
+	var out Page[Track]
+	err := s.limits.asking("liked tracks", func(limit int) error {
+		page, err := s.client.CurrentUsersTracks(ctx, spotify.Limit(limit), spotify.Offset(start))
+		if err != nil {
+			return err
+		}
+		if page == nil {
+			return nil
+		}
+		items := make([]Track, 0, len(page.Tracks))
+		for i := range page.Tracks {
+			items = append(items, trackFromFull(&page.Tracks[i].FullTrack))
+		}
+		out = Page[Track]{Items: items, More: page.Next != "", Next: start + limit}
+		return nil
+	})
 	if err != nil {
 		return Page[Track]{}, fmt.Errorf("fetch liked tracks: %w", err)
 	}
-	if page == nil {
-		return Page[Track]{}, nil
-	}
-
-	out := make([]Track, 0, len(page.Tracks))
-	for i := range page.Tracks {
-		out = append(out, trackFromFull(&page.Tracks[i].FullTrack))
-	}
-	return Page[Track]{Items: out, More: page.Next != "", Next: start + pageLimit}, nil
+	return out, nil
 }
 
 // AlbumTracks reads one album's own track list, in album order.
 func (s *Spotify) AlbumTracks(ctx context.Context, albumID string, offset int) (Page[Track], error) {
 	start := max(offset, 0)
-	page, err := s.client.GetAlbumTracks(ctx, spotify.ID(albumID),
-		spotify.Limit(pageLimit), spotify.Offset(start))
+
+	var out Page[Track]
+	err := s.limits.asking("album tracks", func(limit int) error {
+		page, err := s.client.GetAlbumTracks(ctx, spotify.ID(albumID),
+			spotify.Limit(limit), spotify.Offset(start))
+		if err != nil {
+			return err
+		}
+		if page == nil {
+			return nil
+		}
+		items := make([]Track, 0, len(page.Tracks))
+		for i := range page.Tracks {
+			items = append(items, trackFromSimple(&page.Tracks[i]))
+		}
+		out = Page[Track]{Items: items, More: page.Next != "", Next: start + limit}
+		return nil
+	})
 	if err != nil {
 		return Page[Track]{}, fmt.Errorf("fetch album tracks: %w", err)
 	}
-	if page == nil {
-		return Page[Track]{}, nil
-	}
-
-	out := make([]Track, 0, len(page.Tracks))
-	for i := range page.Tracks {
-		out = append(out, trackFromSimple(&page.Tracks[i]))
-	}
-	return Page[Track]{Items: out, More: page.Next != "", Next: start + pageLimit}, nil
+	return out, nil
 }
 
 // artistGroups is what counts as an artist's own discography: the records they
@@ -57,20 +73,28 @@ var artistGroups = []spotify.AlbumType{
 // ArtistAlbums reads what an artist has released.
 func (s *Spotify) ArtistAlbums(ctx context.Context, artistID string, offset int) (Page[Album], error) {
 	start := max(offset, 0)
-	page, err := s.client.GetArtistAlbums(ctx, spotify.ID(artistID), artistGroups,
-		spotify.Limit(pageLimit), spotify.Offset(start))
+
+	var out Page[Album]
+	err := s.limits.asking("artist albums", func(limit int) error {
+		page, err := s.client.GetArtistAlbums(ctx, spotify.ID(artistID), artistGroups,
+			spotify.Limit(limit), spotify.Offset(start))
+		if err != nil {
+			return err
+		}
+		if page == nil {
+			return nil
+		}
+		items := make([]Album, 0, len(page.Albums))
+		for i := range page.Albums {
+			items = append(items, albumFromSimple(&page.Albums[i]))
+		}
+		out = Page[Album]{Items: items, More: page.Next != "", Next: start + limit}
+		return nil
+	})
 	if err != nil {
 		return Page[Album]{}, fmt.Errorf("fetch artist albums: %w", err)
 	}
-	if page == nil {
-		return Page[Album]{}, nil
-	}
-
-	out := make([]Album, 0, len(page.Albums))
-	for i := range page.Albums {
-		out = append(out, albumFromSimple(&page.Albums[i]))
-	}
-	return Page[Album]{Items: out, More: page.Next != "", Next: start + pageLimit}, nil
+	return out, nil
 }
 
 // SavedAlbums reads the albums in the user's own library.

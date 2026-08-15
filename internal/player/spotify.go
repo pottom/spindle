@@ -24,12 +24,16 @@ const (
 	// for the same list.
 	pageLimit = 50
 
-	// searchLimit is the same for a search, and it is not fifty.
+	// searchLimit is where a search starts, rather than what it is held to.
 	//
 	// Measured 2026-08-04 against a live account: /v1/search answers a limit of
 	// ten and refuses eleven with 400 "Invalid limit", whatever is being
-	// searched for, while every other list still takes fifty. It is not
-	// documented anywhere; asking for fifty simply makes every search fail.
+	// searched for, while every other list still took fifty. It is not
+	// documented anywhere, and a fortnight later an artist's albums began
+	// refusing fifty as well — so which endpoint allows what is now found out
+	// rather than written down, and this is only the number the search begins
+	// at so that finding out costs nothing on the one endpoint already known
+	// about. See limits.go.
 	searchLimit = 10
 
 	// searchWindow is as far into a search as Spotify will go: offset 900 with
@@ -49,6 +53,12 @@ type Spotify struct {
 	http *http.Client
 	base string
 
+	// limits is what each list has been found to hand back. The documented
+	// fifty is refused on some endpoints for some applications, and which is
+	// which is not knowable from here — so it is measured rather than written
+	// down. See limits.go.
+	limits limits
+
 	// followed remembers which cursor reaches which offset of the followed
 	// artists, the one list the Web API refuses to page by offset. See
 	// FollowedArtists. Browsing runs in tea.Cmd goroutines, hence the lock.
@@ -66,6 +76,10 @@ func NewSpotify(httpClient *http.Client, opts ...spotify.ClientOption) *Spotify 
 		client: spotify.New(&wrapped, opts...),
 		http:   &wrapped,
 		base:   "https://api.spotify.com/v1/",
+		// The one endpoint whose smaller limit has already been measured
+		// starts there, so finding out costs nothing on it. Everything else
+		// starts at the documented fifty and finds its own way down.
+		limits: limits{at: map[string]int{"search": searchLimit}},
 	}
 }
 
@@ -174,7 +188,14 @@ func (s *Spotify) Search(ctx context.Context, query string, kind SearchKind, off
 		return Results{}, nil
 	}
 
-	res, err := s.client.Search(ctx, query, want, spotify.Limit(searchLimit), spotify.Offset(start))
+	var res *spotify.SearchResult
+	asked := s.limits.per("search")
+	err := s.limits.asking("search", func(limit int) error {
+		asked = limit
+		var err error
+		res, err = s.client.Search(ctx, query, want, spotify.Limit(limit), spotify.Offset(start))
+		return err
+	})
 	if err != nil {
 		return Results{}, fmt.Errorf("search: %w", err)
 	}
@@ -184,7 +205,7 @@ func (s *Spotify) Search(ctx context.Context, query string, kind SearchKind, off
 
 	// Spotify's own "next" link keeps pointing past the window it will answer,
 	// so the end of the window is where paging stops, not where it is told to.
-	next := start + searchLimit
+	next := start + asked
 	more := next < searchWindow
 
 	out := Results{}
@@ -269,6 +290,10 @@ func (s *Spotify) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist]
 			} `json:"items"`
 		} `json:"items"`
 	}
+	// The one list asked for by hand, and so the one that cannot find its own
+	// page size: what comes back from a refusal here is a status rather than
+	// Spotify's own message, and it is the message that says whether the size
+	// was the problem. See limits.go. It has never been refused at fifty.
 	url := fmt.Sprintf("%sme/playlists?limit=%d&offset=%d", s.base, pageLimit, start)
 	if err := s.read(ctx, url, &page); err != nil {
 		return Page[Playlist]{}, fmt.Errorf("fetch playlists: %w", err)
@@ -309,8 +334,16 @@ func (s *Spotify) read(ctx context.Context, url string, out any) error {
 
 func (s *Spotify) PlaylistTracksPage(ctx context.Context, playlistID string, offset int) (Page[Track], error) {
 	start := max(offset, 0)
-	page, err := s.client.GetPlaylistItems(ctx, spotify.ID(playlistID),
-		spotify.Limit(pageLimit), spotify.Offset(start))
+
+	var page *spotify.PlaylistItemPage
+	asked := s.limits.per("playlist tracks")
+	err := s.limits.asking("playlist tracks", func(limit int) error {
+		asked = limit
+		var err error
+		page, err = s.client.GetPlaylistItems(ctx, spotify.ID(playlistID),
+			spotify.Limit(limit), spotify.Offset(start))
+		return err
+	})
 	if err != nil {
 		return Page[Track]{}, fmt.Errorf("fetch playlist tracks: %w", err)
 	}
@@ -331,7 +364,7 @@ func (s *Spotify) PlaylistTracksPage(ctx context.Context, playlistID string, off
 	// from the length of this one: the items dropped just above would otherwise
 	// make a full page look like the last one, and they are why the next offset
 	// counts what was asked for instead of what survived.
-	return Page[Track]{Items: out, More: page.Next != "", Next: start + pageLimit}, nil
+	return Page[Track]{Items: out, More: page.Next != "", Next: start + asked}, nil
 }
 
 func (s *Spotify) Play(ctx context.Context) error {
