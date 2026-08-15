@@ -221,7 +221,12 @@ func (m *Model) openLibraryRow() tea.Cmd {
 // it if it has never been read. Kinds nobody has opened cost no requests: the
 // tab loads the one it is showing and no more.
 func (m *Model) turnLibraryKind(delta int) tea.Cmd {
-	next := libraryKind((int(m.library.kind) + delta + libraryKinds) % libraryKinds)
+	return m.setLibraryKind(libraryKind((int(m.library.kind) + delta + libraryKinds) % libraryKinds))
+}
+
+// setLibraryKind is that, given the kind itself rather than a direction: the
+// keys walk the bar and a click goes straight to a label on it.
+func (m *Model) setLibraryKind(next libraryKind) tea.Cmd {
 	m.library.kind = next
 
 	cmds := []tea.Cmd{m.syncCover()}

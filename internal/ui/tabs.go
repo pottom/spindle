@@ -94,16 +94,36 @@ func (m Model) header(w int) []string {
 	}
 }
 
+// tabGap is the air between two labels. Named rather than written twice,
+// because the pointer has to step by the same distance the drawing sets by.
+const tabGap = "   "
+
+// tabSpans is where each label ends up on the row, for a click to be answered.
+//
+// The bar is set flush right, so it begins wherever it must to end at the
+// margin — and the row it is on is the padded one, which starts a margin in.
+// Nothing is written down as the screen is drawn; this reads the same names and
+// the same air the drawing does, and TestAClickLandsOnTheTabItIsOver puts the
+// drawn row through it column by column.
+func tabSpans(l layout) []span {
+	inner := l.interior - leftMargin - rightMargin
+	width := labelsWidth(tabNames[:], len(tabGap))
+	if width > inner {
+		// Cut off at the edge. Where a label ended can no longer be said, and
+		// guessing would land a click on the wrong screen.
+		return nil
+	}
+	return labelSpans(tabNames[:], len(tabGap), leftMargin+inner-width)
+}
+
 // tabs renders the tab labels and the rule that marks the active one. No boxes —
 // the underline is the only chrome on the screen.
 func (m Model) tabs() (labels, rule string) {
-	const gap = "   "
-
 	var names, marks strings.Builder
 	for i, name := range tabNames {
 		if i > 0 {
-			names.WriteString(gap)
-			marks.WriteString(gap)
+			names.WriteString(tabGap)
+			marks.WriteString(tabGap)
 		}
 		if tabID(i) == m.tab {
 			names.WriteString(m.styles.TabActive.Render(name))

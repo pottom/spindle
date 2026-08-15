@@ -718,15 +718,35 @@ func (m Model) libraryPaneView(l layout, rows int) []string {
 // It costs no rows: the labels take the heading's row and the underline the
 // blank under it, which was there to hold the heading clear of the wall.
 func (m Model) libraryKinds() (labels, rule string) {
-	const gap = "   "
-
 	var names, marks strings.Builder
-	for i, kind := range libraryOrder {
+	for i, label := range m.kindLabels() {
 		if i > 0 {
-			names.WriteString(gap)
-			marks.WriteString(gap)
+			names.WriteString(kindGap)
+			marks.WriteString(kindGap)
 		}
 
+		if libraryOrder[i] == m.library.kind {
+			names.WriteString(m.styles.TabActive.Render(label))
+			marks.WriteString(m.styles.TabRule.Render(strings.Repeat(meterFull, lipgloss.Width(label))))
+			continue
+		}
+		names.WriteString(m.styles.TabIdle.Render(label))
+		marks.WriteString(strings.Repeat(" ", lipgloss.Width(label)))
+	}
+	return names.String(), marks.String()
+}
+
+// kindGap is the air between two of those labels, and what a click steps by.
+const kindGap = "   "
+
+// kindLabels is what each of them says: the name of the kind, and how many of
+// it have been read where anything has.
+//
+// The one list of them, so that what is drawn and what a click is measured
+// against cannot be two different lists. See kindSpans.
+func (m Model) kindLabels() []string {
+	out := make([]string, len(libraryOrder))
+	for i, kind := range libraryOrder {
 		label := kind.String()
 		if n := m.library.countOf(kind); n > 0 {
 			count := fmt.Sprintf("%d", n)
@@ -736,16 +756,15 @@ func (m Model) libraryKinds() (labels, rule string) {
 			}
 			label += " " + count
 		}
-
-		if kind == m.library.kind {
-			names.WriteString(m.styles.TabActive.Render(label))
-			marks.WriteString(m.styles.TabRule.Render(strings.Repeat(meterFull, lipgloss.Width(label))))
-			continue
-		}
-		names.WriteString(m.styles.TabIdle.Render(label))
-		marks.WriteString(strings.Repeat(" ", lipgloss.Width(label)))
+		out[i] = label
 	}
-	return names.String(), marks.String()
+	return out
+}
+
+// kindSpans is where those labels sit on the row, for a click to be answered.
+// The bar is set flush left, against the margin every block on the screen keeps.
+func (m Model) kindSpans() []span {
+	return labelSpans(m.kindLabels(), len(kindGap), leftMargin)
 }
 
 // libraryOrder is the order the kinds are drawn and walked in.

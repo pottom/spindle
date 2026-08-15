@@ -23,6 +23,25 @@ const (
 	gridSlots    = cover.Slots - gridSlotFrom
 )
 
+// gridKeep is how far past the screen the wall holds on to pictures it has
+// already fetched and drawn.
+//
+// A wheel scrolls a row and back in a second, and without this every cover that
+// passed the edge would be fetched again, rendered again and sent to the
+// terminal again — which is the difference between a wall that scrolls and a
+// wall that stutters. The keys never made it worth having: walking a row at a
+// time, the row that left was rarely wanted back.
+//
+// A page either side, held to what the renderer can tell apart. A slot is one
+// picture to the terminal and the wall's slots run i mod gridSlots, so two
+// pictures kept at once whose places are a multiple of that apart would be one
+// picture drawn twice. Three pages fit inside the sixty for any wall a terminal
+// can hold; where they would not, nothing is kept and the wall behaves as it did
+// before. See slotFor.
+func gridKeep(g gridShape) int {
+	return max(min(g.page(), (gridSlots-g.page())/2), 0)
+}
+
 // slotFor is the renderer slot a thing on the wall draws in.
 //
 // Taken from where the thing is in the library rather than from where it is on
@@ -206,13 +225,22 @@ func (m *Model) syncGridCovers() tea.Cmd {
 		m.tiles = map[string]coverState{}
 	}
 
-	// What is on screen now, so what is not can go: the wall of a long library
-	// is a picture for every playlist somebody has ever saved otherwise.
-	seen := make(map[string]bool, to-from)
+	// What is on screen now and a little either side of it, so what is neither
+	// can go: the wall of a long library is a picture for every playlist
+	// somebody has ever saved otherwise.
+	keep := max(from-gridKeep(g), 0)
+	until := min(to+gridKeep(g), len(items))
+	seen := make(map[string]bool, until-keep)
+	for i := keep; i < until; i++ {
+		seen[items[i].id] = true
+	}
+
+	// Asked for, though, only what is on screen. A picture nobody has looked at
+	// is a request against somebody's quota; a picture already here costs
+	// nothing to hold on to.
 	var cmds []tea.Cmd
 	for i := from; i < to; i++ {
 		item := items[i]
-		seen[item.id] = true
 		if item.url == "" {
 			continue
 		}

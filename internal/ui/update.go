@@ -87,6 +87,12 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		}
 		return m.handleKey(message)
 
+	case tea.MouseWheelMsg:
+		return m.mouseWheel(message)
+
+	case tea.MouseClickMsg:
+		return m.mouseClick(message)
+
 	case deviceRevived:
 		m.said, m.saidAt = "The device had gone — started a new one", time.Now()
 		return m, tea.Batch(fetchStateCmd(m.player), fetchDevicesCmd(m.player))

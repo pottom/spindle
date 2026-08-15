@@ -189,6 +189,11 @@ func (m Model) debugSelf() []debugField {
 	}
 	b.put("kbd", "%s", debugKeyboard(m.keyFlags))
 
+	// And the last place the pointer was, with what the hit test called it.
+	if m.lastPoint.seen {
+		b.put("at", "%s", m.lastPoint)
+	}
+
 	t := slowNow()
 	b.put("fps", "%.1f", t.fps)
 	b.put("late", "%d/%d", t.missed, t.frames)

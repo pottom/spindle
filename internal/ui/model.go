@@ -91,6 +91,12 @@ type Model struct {
 	// a terminal says about a key is not knowable from here without looking.
 	lastKey tea.KeyPressMsg
 
+	// lastPoint is the same for the pointer: where the last click or notch
+	// landed, and what the hit test made of it. A click that acts on the wrong
+	// thing and a click that was reported at the wrong place look identical from
+	// this side of the screen. See mouse.go.
+	lastPoint point
+
 	// queueAt is when the queue was last asked for. It comes from our own daemon
 	// rather than from Spotify, so it is asked again often — see refresh.go.
 	queueAt time.Time

@@ -49,6 +49,15 @@ func (m Model) View() tea.View {
 	v.AltScreen = true
 	v.WindowTitle = m.windowTitle()
 
+	// Where the pointer is and what it presses, in cells. Not every movement of
+	// it: nothing on this screen follows the pointer about, and a message a
+	// frame for something nobody reads is a cost with no answer to it.
+	//
+	// This is what takes the terminal's own drag-to-select away, which is worth
+	// saying out loud because it is the price of the whole thing. Shift held
+	// down gives it back, on every terminal this is drawn on. See mouse.go.
+	v.MouseMode = tea.MouseModeCellMotion
+
 	// Ask the terminal to say which key a press came from as well as which
 	// letter it produced, so a binding written as a letter is the key that
 	// letter sits on wherever somebody is typing. See keypress.go.
