@@ -309,8 +309,20 @@ returns *canonical* MBIDs.
 
 ### Artist biography: not there. At all.
 
-There is no biography, description, summary or blurb field anywhere in
-MusicBrainz. What exists:
+**Open question, raised 2026-08-15 and not settled.** He has read a short
+description of an artist on MusicBrainz with his own eyes, which this section
+says does not exist. Half-measured before it was set aside: `musicbrainz.org`
+answers a plain `curl` of an artist *page* with a "Verifying your browser"
+interstitial, so **the website and the `/ws/2` API are not the same surface** —
+and the site is known to pull the Wikipedia lead paragraph onto the artist page.
+The likeliest reading is that the prose is real and reachable, and only the
+authorship is different: it is Wikipedia's text, arriving through the Wikidata
+relation described below, not a MusicBrainz field. **That is a guess until
+somebody finishes the measurement** — the annotation field and the Wikidata chain
+against a handful of artists from this library.
+
+Taking the API at face value: there is no biography, description, summary or
+blurb field anywhere in MusicBrainz. What exists:
 
 - **`disambiguation`** — a short editorial tiebreaker, e.g. **[M]** Pink Floyd →
   `"English Rock Band"`. One line, present on most notable artists, genuinely
