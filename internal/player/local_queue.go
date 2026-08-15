@@ -69,6 +69,15 @@ func (l *Local) Queue(ctx context.Context) (Queue, error) {
 	return l.queueTracks(ctx)
 }
 
+// QueueIsLocal reports whether the queue is coming from the daemon rather than
+// from Spotify.
+//
+// It is asked by whoever decides how often to ask for the queue. The daemon
+// answers over localhost and costs nothing worth counting; the Web API is
+// somebody's quota, and a caller that thinks it is talking to the daemon while
+// it is talking to Spotify can spend that quota in a minute.
+func (l *Local) QueueIsLocal() bool { return !l.idle() }
+
 // queueTracks asks the daemon what is playing and what is coming.
 func (l *Local) queueTracks(ctx context.Context) (Queue, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, l.addr+"/player/queue", nil)

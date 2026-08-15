@@ -24,16 +24,36 @@ const (
 	// while you are still looking at the screen it is on.
 	staleAfter = 30 * time.Second
 
-	// queueStaleAfter is the same for the queue, which is the daemon's and not
-	// Spotify's. Two seconds is a localhost round trip and no quota at all.
+	// queueStaleAfter is the same for the queue while it is the daemon's rather
+	// than Spotify's. Two seconds is a localhost round trip and no quota at all.
 	queueStaleAfter = 2 * time.Second
 )
+
+// queueEvery is how often the queue may be asked for.
+//
+// Two seconds while it comes from the daemon, and the same as everything else
+// when it does not. The queue is the daemon's only while the daemon is the
+// device that is playing: paused, stopped, or playing somewhere else, the same
+// call goes to the Web API instead — and asked every two seconds that is thirty
+// requests a minute against somebody's quota, which is a rate limit within the
+// minute. Measured the hard way.
+func (m Model) queueEvery() time.Duration {
+	if local, ok := m.player.(interface{ QueueIsLocal() bool }); ok && local.QueueIsLocal() {
+		return queueStaleAfter
+	}
+	return staleAfter
+}
 
 // refreshOnScreen asks again for whatever the screen is showing, once it is old
 // enough. It is called from the tick, so the age is checked once a second and
 // the request goes out on the first tick past the age.
 func (m *Model) refreshOnScreen() tea.Cmd {
 	if m.player == nil || m.devices.open || !fitsMinimum(m.width, m.height) {
+		return nil
+	}
+	if m.throttled() {
+		// Spotify has asked to be left alone. Asking anyway is how a short
+		// silence becomes a long one — the same reason the state poll stops.
 		return nil
 	}
 
@@ -48,7 +68,7 @@ func (m *Model) refreshOnScreen() tea.Cmd {
 
 	switch m.tab {
 	case tabQueue:
-		if time.Since(m.queueAt) < queueStaleAfter {
+		if time.Since(m.queueAt) < m.queueEvery() {
 			return nil
 		}
 		m.queueAt = time.Now()

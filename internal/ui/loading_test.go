@@ -131,9 +131,10 @@ func TestWhatIsOnScreenIsAskedForAgain(t *testing.T) {
 		t.Error("a page already being fetched was asked for again")
 	}
 
-	// The queue is the daemon's rather than Spotify's, and is asked far more
-	// often for that reason.
+	// The queue is the daemon's rather than Spotify's while the daemon is the
+	// device playing, and is asked far more often for that reason.
 	m.tab = tabQueue
+	m.player = localQueuePlayer{Player: m.player, local: true}
 	m.queueAt = time.Now()
 	if cmd := m.refreshOnScreen(); cmd != nil {
 		t.Error("the queue was asked for again a moment after it arrived")
@@ -147,3 +148,48 @@ func TestWhatIsOnScreenIsAskedForAgain(t *testing.T) {
 			queueStaleAfter, staleAfter)
 	}
 }
+
+// The queue is asked for often only while it is the daemon's. Paused, stopped,
+// or playing on another device, the same call goes to the Web API — and every
+// two seconds is thirty requests a minute against somebody's quota.
+func TestTheQueueIsAskedOftenOnlyWhenItIsFree(t *testing.T) {
+	m := likedModel(t)
+	m.width, m.height = 150, 40
+	m.tab = tabQueue
+	m.resize()
+
+	// The mock says nothing about where its queue comes from, so it is treated
+	// as Spotify's.
+	if got := m.queueEvery(); got != staleAfter {
+		t.Errorf("a player that cannot say asks every %s, want %s", got, staleAfter)
+	}
+
+	m.player = localQueuePlayer{Player: m.player, local: true}
+	if got := m.queueEvery(); got != queueStaleAfter {
+		t.Errorf("the daemon's own queue is asked every %s, want %s", got, queueStaleAfter)
+	}
+	m.player = localQueuePlayer{Player: m.player, local: false}
+	if got := m.queueEvery(); got != staleAfter {
+		t.Errorf("a queue that comes from Spotify is asked every %s, want %s", got, staleAfter)
+	}
+
+	// And nothing is asked for at all while Spotify has asked to be left alone.
+	m.player = localQueuePlayer{Player: m.player, local: true}
+	m.queueAt = time.Now().Add(-time.Minute)
+	m.rateLimitedUntil = time.Now().Add(10 * time.Second)
+	if cmd := m.refreshOnScreen(); cmd != nil {
+		t.Error("a screen was refreshed while Spotify was asking to be left alone")
+	}
+	m.rateLimitedUntil = time.Time{}
+	if cmd := m.refreshOnScreen(); cmd == nil {
+		t.Error("the queue was not asked for once the throttle passed")
+	}
+}
+
+// localQueuePlayer is a player that says where its queue comes from.
+type localQueuePlayer struct {
+	player.Player
+	local bool
+}
+
+func (p localQueuePlayer) QueueIsLocal() bool { return p.local }
