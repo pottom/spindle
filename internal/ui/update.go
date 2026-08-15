@@ -556,7 +556,14 @@ func (m *Model) refreshDevices() tea.Cmd {
 	if !m.noDevice && !m.devices.open {
 		return nil
 	}
-	if time.Since(m.devicesAt) < devicesEvery {
+	// While the picker is up somebody is watching it, waiting for a device to
+	// appear; the rest of the time this is the screen that says nothing is
+	// playing anywhere, and that answer does not change while nobody is there.
+	every := devicesEvery
+	if !m.devices.open {
+		every = m.every(devicesEvery)
+	}
+	if time.Since(m.devicesAt) < every {
 		return nil
 	}
 
@@ -1142,11 +1149,27 @@ func (m *Model) trackRanOut() tea.Cmd {
 // notePolled records that a poll has just gone out and works out when the next
 // resting one is due.
 func (m *Model) notePolled() {
-	interval := max(m.restFor, idlePoll)
+	interval := m.every(idlePoll)
 	if time.Now().Before(m.followUntil) {
 		interval = activePoll
 	}
 	m.nextPollAt = time.Now().Add(interval)
+}
+
+// every is how often something periodic may happen now.
+//
+// Its own cadence while anything is happening, and slower and slower while
+// nothing is — by the same factor for all of them, because they are all
+// answering the same question: is anybody there. One dial rather than three, so
+// that a screen left open goes quiet all at once rather than in the order
+// somebody happened to write the intervals down.
+//
+// The factor is the resting poll against the quick one: one at first, twenty at
+// rest. A device list asked for every three seconds becomes one asked for every
+// minute, and a playlist re-read every thirty seconds becomes one re-read every
+// ten minutes.
+func (m Model) every(base time.Duration) time.Duration {
+	return base * (max(m.restFor, idlePoll) / idlePoll)
 }
 
 // stir puts the resting cadence back to its quickest.

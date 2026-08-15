@@ -39,9 +39,12 @@ const (
 // minute. Measured the hard way.
 func (m Model) queueEvery() time.Duration {
 	if local, ok := m.player.(interface{ QueueIsLocal() bool }); ok && local.QueueIsLocal() {
+		// The daemon's own list, over localhost. There is nothing to save by
+		// asking it less often, and a queue that went stale on screen while
+		// somebody watched it would be a saving nobody asked for.
 		return queueStaleAfter
 	}
-	return staleAfter
+	return m.every(staleAfter)
 }
 
 // refreshOnScreen asks again for whatever the screen is showing, once it is old
@@ -59,7 +62,7 @@ func (m *Model) refreshOnScreen() tea.Cmd {
 
 	// What is open is the screen, whichever tab it was opened from.
 	if page := m.openMut(); page != nil {
-		if !page.pages.stale(staleAfter) {
+		if !page.pages.stale(m.every(staleAfter)) {
 			return nil
 		}
 		page.pages.loading = true
@@ -76,7 +79,7 @@ func (m *Model) refreshOnScreen() tea.Cmd {
 
 	case tabLibrary:
 		paging := m.library.paging()
-		if !paging.stale(staleAfter) {
+		if !paging.stale(m.every(staleAfter)) {
 			return nil
 		}
 		paging.loading = true

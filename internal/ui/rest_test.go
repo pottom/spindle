@@ -70,12 +70,38 @@ func TestAnythingHappeningWakesThePoll(t *testing.T) {
 
 // What the rest actually saves, in the units that matter: requests against a
 // quota, in a day of a window nobody is looking at.
+//
+// All three of them, because it was never one. A window left open with nothing
+// playing asked after the state every three seconds and after the devices every
+// three seconds — twice what anybody counted — and re-read whatever list was on
+// screen twice a minute on top.
 func TestTheRestIsWorthTheDay(t *testing.T) {
 	day := 24 * time.Hour
 
-	was := int(day / idlePoll)
-	now := int(day / restMost)
-	if now*10 > was {
-		t.Errorf("resting saves only %d requests a day (%d against %d)", was-now, now, was)
+	m := New(player.NewMock(), nil, defaultTestCell)
+	quick := day/idlePoll + day/devicesEvery + day/staleAfter
+
+	m.restFor = restMost
+	rested := day/m.every(idlePoll) + day/m.every(devicesEvery) + day/m.every(staleAfter)
+
+	if rested*10 > quick {
+		t.Errorf("resting leaves %d requests a day against %d, want it under a tenth", rested, quick)
+	}
+	t.Logf("a quiet day: %d requests rather than %d", rested, quick)
+}
+
+// And the queue is not slowed, because the queue is free: it comes from
+// spindle's own daemon over localhost while that is what is playing.
+func TestTheDaemonsQueueIsNotSlowed(t *testing.T) {
+	m := New(localQueue{Player: player.NewMock()}, nil, defaultTestCell)
+	m.restFor = restMost
+
+	if got := m.queueEvery(); got != queueStaleAfter {
+		t.Errorf("the daemon's queue is asked for every %s at rest, want %s", got, queueStaleAfter)
 	}
 }
+
+// localQueue is a backend whose queue comes from the daemon.
+type localQueue struct{ player.Player }
+
+func (localQueue) QueueIsLocal() bool { return true }
