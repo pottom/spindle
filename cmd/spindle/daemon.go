@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/pottom/spindle/internal/auth"
 	"github.com/pottom/spindle/internal/daemon"
@@ -77,7 +78,11 @@ func runDaemon(args []string) error {
 	})
 	if errors.Is(err, daemon.ErrAlreadyRunning) {
 		// Nothing to complain about: the device the caller wanted exists.
-		fmt.Fprintln(os.Stderr, "spindle: a daemon is already running")
+		// Stamped by hand: this one is written before there is a logger, and
+		// stderr is the log file for a daemon nobody is watching. An unstamped
+		// line in a stamped file is a line nobody can place. See daemon.stamp.
+		fmt.Fprintf(os.Stderr, "%s info  spindle: a daemon is already running\n",
+			time.Now().Format(daemon.Stamp))
 		return nil
 	}
 	return err
