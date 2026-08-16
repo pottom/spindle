@@ -239,6 +239,14 @@ func (m Model) listSpot(l layout, x, row int) spot {
 		}
 	}
 
+	// The band over the list is a player: the record's name, and under it the
+	// playhead, for the one track the two of them can belong to. It answers the
+	// pointer as the player's own bar does — a press takes hold of it, a drag
+	// scrubs, a notch nudges — because it is the same bar with the same meaning,
+	// and a bar the eye can see and the pointer cannot find is worse than none.
+	if row < band {
+		return m.bandSpot(l, x, row, band)
+	}
 	if row < head || row >= head+body {
 		return here
 	}
@@ -265,6 +273,45 @@ func (m Model) listSpot(l layout, x, row int) spot {
 		return spot{spotList, at}
 	}
 	return here
+}
+
+// bandSpot is what the band over a list has at a point: the playhead, where the
+// cursor is resting on the track that is sounding, and nothing else.
+//
+// Worked out from the numbers the band is drawn from — see listBlock, which
+// stacks the panel beside the picture, and trackDetailAt, which says which of
+// its rows the bar came to rest on.
+func (m Model) bandSpot(l layout, x, row, band int) spot {
+	// Everything else up there belongs to the list under it: a notch over the
+	// band moves the list, which is what a wheel over a screen ought to do
+	// wherever on it the pointer happens to rest.
+	none := spot{spotList, -1}
+	if m.ps == nil || m.noDevice || !m.bandRoom().showsNow() {
+		return none
+	}
+
+	left := leftMargin
+	if l.hasArt() {
+		left += l.artWidth + columnGap
+	}
+	x -= left
+
+	w := m.bandDetailWidth(l)
+	if x < 0 || x >= w {
+		return none
+	}
+
+	// The picture's own height bounds the panel beside it, exactly as it does in
+	// the drawing: a fact hanging below the picture's foot reads as a mistake.
+	foot := min(l.artRows, band)
+	lines, bar := m.trackDetailAt(w, foot)
+	if bar < 0 {
+		return none
+	}
+	if row != stackTop(len(lines), foot, m.detailLift())+bar {
+		return none
+	}
+	return spot{spotSeek, x}
 }
 
 // wallSpot is what the library's wall has at a point: the bar of kinds over it,

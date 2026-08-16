@@ -51,7 +51,9 @@ func (m Model) barSpan(l layout, kind spotKind) (at, w int, ok bool) {
 
 	switch kind {
 	case spotSeek:
-		return left, barCells(l.infoWidth), m.loaded()
+		// The player's own column, or the band's over a list — the same bar in
+		// a column of a different width. See bandDetailWidth.
+		return left, barCells(m.bandDetailWidth(l)), m.loaded()
 	case spotVolume:
 		v := m.volumeSpan(l.infoWidth)
 		return left + v.at, barCells(v.w), true

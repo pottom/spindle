@@ -97,10 +97,7 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	// Which of the two blocks above the list are open. Everywhere but the queue
 	// that is both of them; there the key walks the four ways of arranging
 	// them, and the last of them is no band at all. See queueRoom.
-	room := queueRoomBoth
-	if m.tab == tabQueue && m.open() == nil && !m.devices.open {
-		room = m.queuePane.room
-	}
+	room := m.bandRoom()
 
 	top := min(m.listBandRows(l), rows)
 	var art []string
@@ -121,11 +118,10 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 	// what is playing there instead — otherwise half of that band is a blank
 	// rectangle on the widest screens, which is where a player should look its
 	// best.
-	detailWidth := l.infoWidth
+	detailWidth := m.bandDetailWidth(l)
 	var right []string
 	switch {
 	case m.scopeVisible() && room.showsTrace():
-		detailWidth = queueDetailWidth(l)
 		right = m.place(m.traceBlock(), queueScopeWidth(l), top)
 	}
 
@@ -341,10 +337,40 @@ func (m Model) scrollColumn(rows, total, offset int) []string {
 // the cover. It follows the player screen: the name first and large, the facts
 // beneath it in a quiet column, so the two screens read as the same program.
 // rows is how tall the panel is; the playhead is only drawn where it fits.
+// bandRoom is what the band over a list is showing. The queue is the one screen
+// that can fold half of it away; everywhere else both halves stand.
+func (m Model) bandRoom() queueRoom {
+	if m.tab == tabQueue && m.open() == nil && !m.devices.open {
+		return m.queuePane.room
+	}
+	return queueRoomBoth
+}
+
+// bandDetailWidth is how wide the panel beside the cover is drawn. Narrower on
+// the queue, where the trace stands beside it.
+//
+// One function, read by the drawing and by the pointer: a bar the eye can see
+// and the pointer cannot find is worse than no bar, and two copies of this
+// arithmetic is how that happens.
+func (m Model) bandDetailWidth(l layout) int {
+	if m.scopeVisible() && m.bandRoom().showsTrace() {
+		return queueDetailWidth(l)
+	}
+	return l.infoWidth
+}
+
 func (m Model) trackDetail(w, rows int) []string {
+	lines, _ := m.trackDetailAt(w, rows)
+	return lines
+}
+
+// trackDetailAt is that panel and which of its rows carries the playhead, or
+// -1 where it carries none. The pointer needs the row and the drawing needs the
+// lines, and they are worked out once so they cannot disagree.
+func (m Model) trackDetailAt(w, rows int) ([]string, int) {
 	t := m.cursorTrack()
 	if t == nil {
-		return nil
+		return nil, -1
 	}
 
 	// In the colour of the cover it is standing beside. Everywhere else on the
@@ -391,7 +417,7 @@ func (m Model) trackDetail(w, rows int) []string {
 		for _, f := range facts {
 			lines = append(lines, fit(f.value, w))
 		}
-		return lines
+		return lines, -1
 	}
 
 	// The playhead, and only for the one track it can belong to.
@@ -448,12 +474,13 @@ func (m Model) trackDetail(w, rows int) []string {
 	// is and the band centres it, which is where a block with nothing to line up
 	// against belongs.
 	if bar == "" {
-		return append(lines, under...)
+		return append(lines, under...), -1
 	}
 	for len(lines) < len(under) {
 		lines = append(lines, "")
 	}
-	return append(append(lines, bar), under...)
+	at := len(lines)
+	return append(append(lines, bar), under...), at
 }
 
 // detailLift is how far above the middle of its band the panel beside the cover
