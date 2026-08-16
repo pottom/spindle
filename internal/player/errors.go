@@ -42,8 +42,11 @@ const defaultRetryAfter = 5 * time.Second
 
 // rateLimiter turns a 429 into a typed error before the Spotify client can
 // swallow the Retry-After header, which it discards while decoding the body.
+// It is also where every request to the Web API can be counted, because it is
+// the one place they all pass through. See tally.go.
 type rateLimiter struct {
-	base http.RoundTripper
+	base  http.RoundTripper
+	tally *tally
 }
 
 func (r *rateLimiter) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -53,6 +56,8 @@ func (r *rateLimiter) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	resp, err := base.RoundTrip(req)
+	r.tally.noteResponse(req, resp, err)
+
 	if err != nil || resp.StatusCode != http.StatusTooManyRequests {
 		return resp, err
 	}
