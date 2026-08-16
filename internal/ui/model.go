@@ -160,8 +160,10 @@ type Model struct {
 	songs      map[string]notes.TrackNote
 	askingSong map[string]bool
 
-	// story says the box with that in it is up. See notes.go.
-	story bool
+	// story says the box with that in it is up, and storyAt how far down it has
+	// been scrolled. A paragraph is longer than a terminal. See notes.go.
+	story   bool
+	storyAt int
 
 	// tiles are the library's wall: one picture per thing on it, keyed by the
 	// thing rather than by where it sits, so scrolling a row does not re-fetch

@@ -728,11 +728,16 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 	}
 
-	// The box with a song's story in it is read rather than worked in, so the
-	// next key — whatever it is — puts it away and is not otherwise spent. The
-	// same bargain the big screen makes.
+	// The box with a song's story in it is read rather than worked in: the keys
+	// that mean "further down" move it, and the next key that means anything
+	// else — whatever it is — puts it away and is not otherwise spent. The same
+	// bargain the big screen makes, with the same exception the help page has.
 	if m.story {
-		m.story = false
+		l := m.layout()
+		if m.scrolled(k, &m.storyAt, m.storyRows(l), m.storyLast(l)) {
+			return m, nil
+		}
+		m.story, m.storyAt = false, 0
 		return m, nil
 	}
 
@@ -813,7 +818,7 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		if !m.storyAvailable() {
 			return m, nil
 		}
-		m.story = true
+		m.story, m.storyAt = true, 0
 		return m, nil
 
 	case m.pressed(k, m.keys.Lyrics):

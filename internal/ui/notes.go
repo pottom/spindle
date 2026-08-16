@@ -269,30 +269,18 @@ const storyWidth = 60
 // next thing you do puts it away. The same shape as the menu of verbs and the
 // list of devices — a short thing about something named at the top of it.
 func (m Model) storyPopup() popup {
-	got, _ := m.songNote()
-
-	var rows []string
-	for _, line := range wrapWords(got.Note, storyWidth) {
-		rows = append(rows, m.styles.Detail.Render(line))
-	}
-
-	// What it is worth to the rest of the world, under the words. Not instead of
-	// them: a number about a song nobody wrote anything about is a box holding
-	// one line, which is not worth opening.
-	if got.Listeners > 0 {
-		rows = append(rows, "", m.styles.Album.Render(fmt.Sprintf(
-			"%s listeners · %s plays", formatCount(got.Listeners), formatCount(got.Plays))))
-	}
-	if len(got.Tags) > 0 {
-		rows = append(rows, m.styles.Empty.Render(strings.Join(got.Tags[:min(len(got.Tags), 5)], " · ")))
-	}
-	if got.NoteFrom != "" {
-		rows = append(rows, "", m.styles.Empty.Render("from "+got.NoteFrom))
-	}
+	rows := m.storyLines()
 
 	title, sub := "", ""
 	if m.ps != nil {
 		title, sub = m.ps.Title, strings.Join(m.ps.Artists, ", ")
+	}
+
+	// From wherever it has been scrolled to. The box draws what it has room for
+	// and marks the row it stopped on, so what this does is move where it
+	// starts. See storyRows.
+	if at := min(max(m.storyAt, 0), max(len(rows)-1, 0)); at > 0 && at < len(rows) {
+		rows = rows[at:]
 	}
 	return popup{
 		x: leftMargin + 2, y: tabBarHeight + 1,
@@ -306,4 +294,51 @@ func (m Model) storyPopup() popup {
 func (m Model) storyAvailable() bool {
 	got, ok := m.songNote()
 	return ok && got.Note != ""
+}
+
+// storyLines is everything the box holds, in order: the words, and what the
+// record is worth to the rest of the world under them.
+//
+// One list, because the box draws from it and the scroll is bounded by it. Two
+// counts of the same rows is how a box comes to say there is more when there is
+// not — which is what it did, because the end was worked out from the paragraph
+// alone while the box also held three lines after it.
+func (m Model) storyLines() []string {
+	got, ok := m.songNote()
+	if !ok {
+		return nil
+	}
+
+	var rows []string
+	for _, line := range wrapWords(got.Note, storyWidth) {
+		rows = append(rows, m.styles.Detail.Render(line))
+	}
+
+	// Not instead of the words: a number about a song nobody wrote anything
+	// about is a box holding one line, which is not worth opening.
+	if got.Listeners > 0 {
+		rows = append(rows, "", m.styles.Album.Render(fmt.Sprintf(
+			"%s listeners · %s plays", formatCount(got.Listeners), formatCount(got.Plays))))
+	}
+	if len(got.Tags) > 0 {
+		rows = append(rows, m.styles.Empty.Render(strings.Join(got.Tags[:min(len(got.Tags), 5)], " · ")))
+	}
+	if got.NoteFrom != "" {
+		rows = append(rows, "", m.styles.Empty.Render("from "+got.NoteFrom))
+	}
+	return rows
+}
+
+// storyRows is how many rows of it are on screen at once, and storyLast the
+// furthest it can be scrolled to.
+//
+// The last is where its last line stands on the last row of the box rather than
+// where the text runs out: scrolling past the end into empty rows is what a
+// scroll that counts lines rather than screens does, and it always feels broken.
+func (m Model) storyRows(l layout) int {
+	return max(l.bodyHeight-menuChrome, 1)
+}
+
+func (m Model) storyLast(l layout) int {
+	return max(len(m.storyLines())-m.storyRows(l), 0)
 }

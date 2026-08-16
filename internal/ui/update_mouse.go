@@ -90,7 +90,9 @@ func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 	// of it.
 	if _, inside := m.menuVerbAt(m.layout(), e.X, e.Y); inside {
 		if m.story {
-			// There is nothing in it to walk through.
+			// Nothing in it to walk through, but plenty to read past.
+			l := m.layout()
+			m.storyAt = min(max(m.storyAt+delta*m.wheelStep(), 0), m.storyLast(l))
 			return m, nil
 		}
 		if m.devices.open {

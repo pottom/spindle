@@ -207,27 +207,38 @@ func helpKeyRows(w int) int { return 140 }
 // helpScroll moves the keys under the head, and reports whether the key was one
 // of the ones that do.
 func (m *Model) helpScroll(k tea.KeyPressMsg, page int) bool {
+	return m.scrolled(k, &m.helpAt, page, helpKeyRows(0))
+}
+
+// scrolled moves a row offset by the keys everything that scrolls is moved by,
+// and says whether the key was one of them.
+//
+// One set of keys for the page of keys and for the box holding a record's
+// story, because there is one answer to "how do I get further down this": the
+// arrows, the pages, and the two that go to the ends. A second thing that
+// scrolled differently would be a second thing to learn for no reason.
+func (m Model) scrolled(k tea.KeyPressMsg, at *int, page, last int) bool {
 	switch {
 	case m.pressed(k, m.keys.Down):
-		m.helpAt++
+		*at++
 	case m.pressed(k, m.keys.Up):
-		m.helpAt--
+		*at--
 	case m.pressed(k, m.keys.PageDown):
-		m.helpAt += page
+		*at += page
 	case m.pressed(k, m.keys.PageUp):
-		m.helpAt -= page
+		*at -= page
 	case m.pressed(k, m.keys.HalfDown):
-		m.helpAt += max(page/2, 1)
+		*at += max(page/2, 1)
 	case m.pressed(k, m.keys.HalfUp):
-		m.helpAt -= max(page/2, 1)
+		*at -= max(page/2, 1)
 	case m.pressed(k, m.keys.First), m.pressed(k, m.keys.FirstVim):
-		m.helpAt = 0
+		*at = 0
 	case m.pressed(k, m.keys.Last), m.pressed(k, m.keys.LastVim):
-		m.helpAt = helpKeyRows(0)
+		*at = last
 	default:
 		return false
 	}
-	m.helpAt = max(m.helpAt, 0)
+	*at = min(max(*at, 0), max(last, 0))
 	return true
 }
 

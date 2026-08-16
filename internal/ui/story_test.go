@@ -123,3 +123,66 @@ func TestASongIsAskedAfterOnce(t *testing.T) {
 		t.Error("a record nobody has written about was asked after twice")
 	}
 }
+
+// A paragraph is longer than a terminal, so it scrolls — by the same keys as
+// everything else that scrolls, and by the wheel. Anything that is not one of
+// those still puts it away.
+func TestTheStoryScrolls(t *testing.T) {
+	long := strings.Repeat("Every word of this is filler and there are a great many of them. ", 40)
+	m := storyModel(long)
+	m.story = true
+
+	l := m.layout()
+	if m.storyLast(l) <= 0 {
+		t.Fatal("a story of forty sentences fits on one screen")
+	}
+
+	head := ansi.Strip(m.render())
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
+	down := tm.(Model)
+	if down.storyAt == 0 {
+		t.Fatal("a page down did not move it")
+	}
+	if !down.story {
+		t.Fatal("a page down put it away")
+	}
+	if ansi.Strip(down.render()) == head {
+		t.Error("it moved and the screen did not")
+	}
+
+	// It stops at the end rather than scrolling into empty rows.
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
+	end := tm.(Model)
+	if end.storyAt != end.storyLast(l) {
+		t.Errorf("the end of it is at %d, want %d", end.storyAt, end.storyLast(l))
+	}
+	for range 5 {
+		tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
+	}
+	if got := tm.(Model).storyAt; got != end.storyLast(l) {
+		t.Errorf("it scrolled past the end to %d", got)
+	}
+
+	// At the end there is nothing more, and it does not say there is.
+	tail := ansi.Strip(end.render())
+	if strings.Contains(tail, "…") {
+		t.Error("the last screen of it still says there is more")
+	}
+	if !strings.Contains(tail, "listeners") {
+		t.Error("what is under the words never came into view")
+	}
+
+	// The wheel reads on too.
+	turned, _ := end.mouseWheel(wheelAt(leftMargin+4, tabBarHeight+3, tea.MouseWheelUp))
+	if turned.storyAt >= end.storyAt {
+		t.Error("the wheel over the box did not move it back")
+	}
+
+	// And something that is not a movement is still the way out.
+	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
+	if shut := tm.(Model); shut.story || shut.storyAt != 0 {
+		t.Error("a key that means nothing here left it up, or left it scrolled")
+	}
+}
