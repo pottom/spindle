@@ -92,9 +92,21 @@ and then
 The client secret is not needed: authorisation is PKCE. Playback needs a second
 authorisation, which the daemon asks for on its own the first time.
 
+An application registered today is in Spotify's development mode, which has a
+daily quota and refuses a family of endpoints outright: a playlist somebody else
+owns cannot be listed, and a track cannot be liked or even asked about. Which
+registration is asking decides that, not spindle — the measurements, and what
+else could be done about it, are in [docs/SPOTIFY-API.md](docs/SPOTIFY-API.md).
+
 If something on your machine already wants port 3679, `spindle callback <port>`
 moves it — add the new address to the application as well, which may list
-several.
+several. The path matters as much as the port: it belongs to whoever registered
+the client id.
+
+Two logs live in `~/.local/state/spindle`, both stamped with the time:
+`daemon.log` is what the playback device did, and `api.log` is one line per
+request to Spotify — which is how a question about a quota is answered by
+reading rather than by guessing. See [docs/SPOTIFY-API.md](docs/SPOTIFY-API.md).
 
 Settings live in `~/.config/spindle`:
 

@@ -48,6 +48,38 @@ resolving the four risks listed in `DESIGN.md`, not production readiness.
    exactly what takes the room back without anybody noticing until a screenshot
    arrives.
 
+8. **Every Web API request goes through `gate`, and nothing asks on an event
+   without a floor under it.** The gate — `internal/player/errors.go` — counts
+   each request into `api.log`, keeps the catalogue answers that cannot go stale,
+   and types a 429 while `Retry-After` is still attached. A second http client
+   that talks to `api.spotify.com` would be a request nobody can account for.
+
+   The floor is the other half. There is a **daily** quota and reaching it is a
+   lockout, not a throttle, so anything that asks in answer to something else —
+   a device event, a keystroke, an answer of "nothing is playing" — must have a
+   shortest interval of its own. A device coming up said so a dozen times in
+   three seconds and spent nineteen requests on it; typing six letters spent six.
+   Both were found by reading `api.log`, which is what to do rather than counting
+   intervals in the source:
+
+       sort -k3 ~/.local/state/spindle/api.log | uniq -cf 2 | sort -rn | head
+
+   What each registration is allowed to ask, and what an open window costs, is
+   measured in [SPOTIFY-API.md](SPOTIFY-API.md).
+9. **What the pointer can touch is found from the same arithmetic that draws it.**
+   Never from a table filled in while drawing, and never from a second copy of
+   the sums. Where the two would diverge, give them one function to share —
+   `stackTop`, `bandDetailWidth`, `trackDetailAt` all exist for that reason. A
+   bar the eye can see and the pointer cannot find is worse than no bar, and it
+   is invisible to every test that does not click.
+10. **A renderer slot belongs to the thing, not to the place it sits in.** A slot
+    is one picture to the terminal, so two things holding one slot is one picture
+    drawn twice. Slots counted from a position break the moment the list shifts
+    underneath — the row of saved tracks arrives after the playlists and moves
+    every one of them along — and the wall then draws each cover under its
+    neighbour's name. Hand them out per thing and keep them until it leaves the
+    screen. See `freeSlot` in `internal/ui/library_grid.go`.
+
 ## Style
 
 - Small files, one type per file. Split anything over 300 lines.
