@@ -185,9 +185,18 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		// And it puts the picker away, because that screen is the picker: a box
 		// of devices standing over a screen of the same devices is the same list
 		// twice, with one of them unreachable.
+		//
+		// Said again, it is the most identical answer there is, so it rests the
+		// cadence exactly as a repeated state does. Only the answers that
+		// carried a state used to do that — and this is the answer a window gets
+		// all day while nobody is listening, so the one case the resting cadence
+		// was built for was the one case without it.
+		if m.noDevice {
+			m.rest()
+		}
 		m.noDevice, m.ps, m.err = true, nil, nil
 		m.devices.open = false
-		return m, tea.Batch(fetchDevicesCmd(m.player), m.syncCover())
+		return m, tea.Batch(m.askDevices(), m.syncCover())
 
 	case msg.DevicesFetched:
 		m.devices.adopt(message.Devices)
@@ -286,9 +295,12 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		// Re-arm before fetching: the next change may land while this one is
 		// still being read, and a dropped wake-up would stall the screen until
 		// the next unprompted poll.
-		cmds := []tea.Cmd{fetchStateCmd(m.player)}
+		var cmds []tea.Cmd
 		if w, ok := m.player.(player.Watcher); ok {
 			cmds = append(cmds, watchCmd(w))
+		}
+		if cmd := m.readChange(); cmd != nil {
+			cmds = append(cmds, cmd)
 		}
 		return m, tea.Batch(cmds...)
 
@@ -582,8 +594,21 @@ func (m Model) devicesOnScreen() bool {
 // and the key that asks for a refresh was the only way back — when it worked at
 // all. A list of what is out there has to keep looking.
 func (m *Model) refreshDevices() tea.Cmd {
-	if !m.devicesOnScreen() {
+	if !m.devicesOnScreen() && !m.awaitingOwnDevice() {
 		return nil
+	}
+	// A device spindle started itself takes a few seconds to appear on
+	// Spotify's list, and until it does there is nothing to take over. That used
+	// to be found out by the answers of "nothing is playing anywhere" arriving
+	// as fast as they could be asked for, each one pulling a list behind it. Now
+	// it is asked for on a cadence like everything else, and only while there is
+	// a device of our own that has not turned up yet — so a machine with no
+	// daemon at all asks for nothing.
+	if m.awaitingOwnDevice() {
+		if time.Since(m.devicesAt) < devicesEvery {
+			return nil
+		}
+		return m.askDevices()
 	}
 	// While the picker is up somebody is watching it, waiting for a device to
 	// appear; the rest of the time this is the screen that says nothing is
@@ -596,8 +621,33 @@ func (m *Model) refreshDevices() tea.Cmd {
 		return nil
 	}
 
+	return m.askDevices()
+}
+
+// askDevices asks what devices are out there, and no more often than the answer
+// can change. Every path that wants the list goes through here: the poll that
+// keeps a list on screen current, and the answer that says nothing is playing
+// anywhere — which used to ask on its own account, so a run of those asked as
+// fast as they arrived, one list each.
+func (m *Model) askDevices() tea.Cmd {
+	if time.Since(m.devicesAt) < m.every(devicesEvery) {
+		return nil
+	}
+
 	m.devicesAt = time.Now()
 	return fetchDevicesCmd(m.player)
+}
+
+// awaitingOwnDevice reports that the device spindle runs for itself exists and
+// has not appeared on Spotify's list yet. Nothing here has a device of its own
+// when there is no daemon, so this is false on a machine that plays elsewhere.
+func (m Model) awaitingOwnDevice() bool {
+	owner, ok := m.player.(player.Owner)
+	if !ok || !m.noDevice {
+		return false
+	}
+	id := owner.OwnDevice()
+	return id != "" && !m.devices.has(id)
 }
 
 // devicesEvery is how often that happens. Spotify lists a device within a few
@@ -1197,9 +1247,40 @@ func (m *Model) trackRanOut() tea.Cmd {
 	return cmd
 }
 
+// readChange asks what the device is doing, having said that something changed
+// — but no faster than eventGap, however many times it says so.
+//
+// A device coming up says it a dozen times in three seconds: connecting,
+// authenticating, registering, loading. Each of those used to go straight out
+// as a fetch, and while nothing is loaded here a fetch is a Web API request —
+// so nineteen of them left the window in the first three seconds, measured,
+// with the daily quota that pays for them. A device reconnecting all night does
+// the same thing all night.
+//
+// Nothing is dropped: a change inside the gap moves the next resting poll
+// forward to the end of it, so the last word in a storm is still read, once.
+func (m *Model) readChange() tea.Cmd {
+	if since := time.Since(m.polledAt); since < eventGap {
+		if due := m.polledAt.Add(eventGap); due.Before(m.nextPollAt) {
+			m.nextPollAt = due
+		}
+		return nil
+	}
+
+	m.notePolled()
+	return fetchStateCmd(m.player)
+}
+
+// eventGap is the shortest time between two fetches prompted by the device
+// talking about itself. Short enough that a change made on another machine is on
+// screen before anybody looks up, long enough that a storm is one request.
+const eventGap = time.Second
+
 // notePolled records that a poll has just gone out and works out when the next
 // resting one is due.
 func (m *Model) notePolled() {
+	m.polledAt = time.Now()
+
 	interval := m.every(idlePoll)
 	if time.Now().Before(m.followUntil) {
 		interval = activePoll

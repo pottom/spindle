@@ -266,6 +266,11 @@ type Model struct {
 	// out from being handled again on every following tick.
 	nextPollAt time.Time
 
+	// polledAt is when a state fetch last went out, by whatever prompted it.
+	// The device's own events prompt most of them, and a device coming up sends
+	// a storm of them — see readChange.
+	polledAt time.Time
+
 	// restFor is how long the resting poll waits now. It doubles while the
 	// answer keeps coming back the same and goes back to idlePoll the moment
 	// anything happens — see stir.
