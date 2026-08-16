@@ -24,7 +24,7 @@ func TestEveryRequestIsWrittenDown(t *testing.T) {
 	}))
 	defer server.Close()
 
-	limiter := &rateLimiter{tally: tal}
+	limiter := &gate{tally: tal}
 	req, err := http.NewRequest(http.MethodGet, server.URL+"/v1/me/player?market=HU", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +59,7 @@ func TestARefusalIsWrittenDownToo(t *testing.T) {
 	var out strings.Builder
 	tal := heldTally(&out, time.Date(2026, 8, 16, 22, 4, 5, 0, time.Local))
 
-	limiter := &rateLimiter{base: brokenTransport{}, tally: tal}
+	limiter := &gate{base: brokenTransport{}, tally: tal}
 	req, _ := http.NewRequest(http.MethodGet, "https://api.spotify.com/v1/me/tracks", nil)
 	if _, err := limiter.RoundTrip(req); err == nil {
 		t.Fatal("a broken transport answered")

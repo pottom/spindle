@@ -71,7 +71,7 @@ type Spotify struct {
 // intact; the Spotify client would otherwise discard the header.
 func NewSpotify(httpClient *http.Client, opts ...spotify.ClientOption) *Spotify {
 	wrapped := *httpClient
-	wrapped.Transport = &rateLimiter{base: httpClient.Transport, tally: openTally()}
+	wrapped.Transport = &gate{base: httpClient.Transport, tally: openTally(), kept: newKept()}
 	return &Spotify{
 		client: spotify.New(&wrapped, opts...),
 		http:   &wrapped,

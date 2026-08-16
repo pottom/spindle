@@ -40,25 +40,51 @@ func (e *RateLimitedError) Error() string {
 // defaultRetryAfter is used when Spotify rate limits without saying for how long.
 const defaultRetryAfter = 5 * time.Second
 
-// rateLimiter turns a 429 into a typed error before the Spotify client can
-// swallow the Retry-After header, which it discards while decoding the body.
-// It is also where every request to the Web API can be counted, because it is
-// the one place they all pass through. See tally.go.
-type rateLimiter struct {
+// gate is the one place every request to the Web API passes through, and it does
+// the three things that have to be true of all of them:
+//
+//   - a 429 becomes a typed error while the Retry-After header is still on it.
+//     The Spotify client discards that header while decoding the body, and it is
+//     the only part of the answer worth having.
+//   - every request is written down, so a day's quota can be accounted for by
+//     reading rather than by arithmetic over the poll intervals. See tally.go.
+//   - an answer about the catalogue is read back rather than asked for again.
+//     See remember.go.
+//
+// One gate rather than three places that each remember to do their bit: a rule
+// about asking is worth nothing where it lives beside only some of the asking.
+// spotify-player arrives at the same shape from the other end — every request
+// there is a value on one channel with a single handler behind it, which names
+// what each request is for but can be walked around. This cannot be.
+type gate struct {
 	base  http.RoundTripper
 	tally *tally
+	kept  *kept
 }
 
-func (r *rateLimiter) RoundTrip(req *http.Request) (*http.Response, error) {
+func (r *gate) RoundTrip(req *http.Request) (*http.Response, error) {
 	base := r.base
 	if base == nil {
 		base = http.DefaultTransport
+	}
+
+	keeping := worthKeeping(req)
+	if keeping {
+		if held, ok := r.kept.read(req); ok {
+			r.tally.note(req.Method, apiPath(req), "kept")
+			return held.reply(req), nil
+		}
 	}
 
 	resp, err := base.RoundTrip(req)
 	r.tally.noteResponse(req, resp, err)
 
 	if err != nil || resp.StatusCode != http.StatusTooManyRequests {
+		if keeping && err == nil {
+			if body, held := hold(resp); held == nil {
+				r.kept.write(req, resp.StatusCode, resp.Header, body)
+			}
+		}
 		return resp, err
 	}
 

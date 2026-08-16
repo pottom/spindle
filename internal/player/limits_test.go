@@ -36,13 +36,23 @@ func TestAListThatIsRefusedIsAskedForLess(t *testing.T) {
 		t.Errorf("it settled on a limit of %s, want one the endpoint answers", want)
 	}
 
-	// And it remembers: the next call does not start by being refused again.
+	// The same question again is not asked again at all: an artist's albums are
+	// a fact about the catalogue and the answer is read back. See remember.go.
 	was := len(asked)
 	if _, err := s.ArtistAlbums(t.Context(), "ar1", 0); err != nil {
 		t.Fatalf("ArtistAlbums: %v", err)
 	}
+	if len(asked) != was {
+		t.Errorf("the same page went out again, %d times", len(asked)-was)
+	}
+
+	// And what worked is remembered, so the next page does not start by being
+	// refused all over again.
+	if _, err := s.ArtistAlbums(t.Context(), "ar1", 50); err != nil {
+		t.Fatalf("ArtistAlbums: %v", err)
+	}
 	if len(asked)-was != 1 {
-		t.Errorf("the second call took %d requests, want one — what worked is remembered", len(asked)-was)
+		t.Errorf("the next page took %d requests, want one — what worked is remembered", len(asked)-was)
 	}
 }
 
