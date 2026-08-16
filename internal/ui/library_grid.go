@@ -37,19 +37,37 @@ const (
 // pictures kept at once whose places are a multiple of that apart would be one
 // picture drawn twice. Three pages fit inside the sixty for any wall a terminal
 // can hold; where they would not, nothing is kept and the wall behaves as it did
-// before. See slotFor.
+// before. See freeSlot.
 func gridKeep(g gridShape) int {
 	return max(min(g.page(), (gridSlots-g.page())/2), 0)
 }
 
-// slotFor is the renderer slot a thing on the wall draws in.
+// freeSlot is the lowest slot no tile on the wall is holding.
 //
-// Taken from where the thing is in the library rather than from where it is on
-// screen. A slot is one picture to the terminal, and a picture re-sent under the
-// same slot is uploaded again: keyed by screen position, scrolling one row would
-// re-send every cover on the wall. Keyed by the thing itself, a cover that only
-// moved stays where it is and nothing goes over the wire.
-func slotFor(at int) int { return gridSlotFrom + at%gridSlots }
+// A slot is given to a tile when it first asks for a picture and stays with it
+// until it scrolls away, because a picture re-sent under the same slot is
+// uploaded again: keyed by screen position, scrolling one row would re-send
+// every cover on the wall.
+//
+// It used to be counted from where the thing sat in the library, which is the
+// same until the library shifts under it. The row of saved tracks that heads the
+// playlists is built from a request of its own and arrives after them, moving
+// every playlist along one — and a tile that already had its picture kept the
+// slot it was given before the shift while its neighbour was uploading into that
+// same slot. Every cover on the wall then drew the one before it. Measured
+// against a real account: seven of twenty-one tiles showed a neighbour's sleeve.
+//
+// Sixty slots, and gridKeep holds at most three pages, so one is always free.
+// Should that arithmetic ever change, the last is reused rather than a picture
+// going missing.
+func freeSlot(used map[int]bool) int {
+	for slot := gridSlotFrom; slot < gridSlotFrom+gridSlots; slot++ {
+		if !used[slot] {
+			return slot
+		}
+	}
+	return gridSlotFrom + gridSlots - 1
+}
 
 // libraryTile is one thing on the wall, before its picture has been found.
 type libraryTile struct {
@@ -203,9 +221,9 @@ func (m Model) libraryWaiting() string {
 //
 // One request per tile, once: a picture already rendered at the size it is
 // wanted at is left alone, so walking the wall asks for nothing and only
-// scrolling or resizing does. The renderer's slot is the tile's place on screen,
-// which is what lets a terminal drawing real pictures tell them apart — see
-// gridSlotFrom.
+// scrolling or resizing does. Each tile holds a renderer slot of its own while it
+// is on the wall, which is what lets a terminal drawing real pictures tell them
+// apart — see freeSlot.
 func (m *Model) syncGridCovers() tea.Cmd {
 	if m.covers == nil || m.tab != tabLibrary || m.open() != nil || !fitsMinimum(m.width, m.height) {
 		return nil
@@ -235,6 +253,15 @@ func (m *Model) syncGridCovers() tea.Cmd {
 		seen[items[i].id] = true
 	}
 
+	// Which slots the tiles that are staying have hold of, so a tile asking for
+	// its first picture is given one nobody else is drawing in.
+	used := make(map[int]bool, len(m.tiles))
+	for id, tile := range m.tiles {
+		if seen[id] && tile.slot != 0 {
+			used[tile.slot] = true
+		}
+	}
+
 	// Asked for, though, only what is on screen. A picture nobody has looked at
 	// is a request against somebody's quota; a picture already here costs
 	// nothing to hold on to.
@@ -247,8 +274,15 @@ func (m *Model) syncGridCovers() tea.Cmd {
 		if m.tiles[item.id].matches(item.url, g.boxW, g.boxH) {
 			continue
 		}
-		m.tiles[item.id] = coverState{url: item.url, width: g.boxW, height: g.boxH, want: g.tileW}
-		cmds = append(cmds, coverCmd(m.covers, item.url, g.boxW, g.boxH, slotFor(i)))
+		slot := m.tiles[item.id].slot
+		if slot == 0 {
+			slot = freeSlot(used)
+			used[slot] = true
+		}
+		m.tiles[item.id] = coverState{
+			url: item.url, width: g.boxW, height: g.boxH, want: g.tileW, slot: slot,
+		}
+		cmds = append(cmds, coverCmd(m.covers, item.url, g.boxW, g.boxH, slot))
 	}
 	for id := range m.tiles {
 		if !seen[id] {

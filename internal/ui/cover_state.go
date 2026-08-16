@@ -25,6 +25,12 @@ type coverState struct {
 
 	art string
 
+	// slot is the renderer slot this tile's picture was sent to. It belongs to
+	// the tile rather than to where the tile sits, because a slot is one picture
+	// to the terminal: two tiles holding the same slot is one picture drawn
+	// twice, under whichever name was uploaded last. Nought is none yet.
+	slot int
+
 	// lines is that art split into rows and padded to the width it was asked
 	// for, done once when it arrives.
 	//
