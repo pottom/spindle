@@ -56,9 +56,11 @@ func NewCached(chain *Chain) *Cached {
 	return c
 }
 
-// Sources is how many databases are behind this, for a screen that wants to say
-// that a key would add one.
-func (c *Cached) Sources() int { return c.chain.Sources() }
+// Sources, Names and Has pass through: what a screen wants to say about this is
+// which databases are behind it, not how they are cached.
+func (c *Cached) Sources() int         { return c.chain.Sources() }
+func (c *Cached) Names() []string      { return c.chain.Names() }
+func (c *Cached) Has(name string) bool { return c.chain.Has(name) }
 
 // Artist answers from what is held, or asks and keeps what comes back.
 func (c *Cached) Artist(ctx context.Context, k Key) (Artist, error) {

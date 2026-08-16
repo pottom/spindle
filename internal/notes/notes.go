@@ -70,6 +70,16 @@ type Artist struct {
 	// Members is who was in the band, with what they played and when.
 	Members []Member
 
+	// Similar is who else people who listen to this listen to, and Listeners
+	// how many of them there are. Tags is what those people call this music.
+	//
+	// Not from the same place as the rest: this is what a scrobbling service
+	// knows and a catalogue does not, and it is the one thing here that says
+	// something about how a record is heard rather than about how it was made.
+	Similar   []string
+	Tags      []string
+	Listeners int
+
 	// ImageURL is a photograph of the artist rather than of a record.
 	ImageURL string
 }
@@ -84,7 +94,8 @@ type Member struct {
 // Known reports whether anything at all was learned. A panel with nothing in it
 // is not drawn.
 func (a Artist) Known() bool {
-	return a.Note != "" || a.Line != "" || len(a.Members) > 0 || a.Area != "" || a.ImageURL != ""
+	return a.Note != "" || a.Line != "" || len(a.Members) > 0 || a.Area != "" ||
+		a.ImageURL != "" || len(a.Similar) > 0
 }
 
 // Source is one database.
@@ -129,6 +140,15 @@ func merge(into *Artist, from Artist) {
 	if len(into.Members) == 0 {
 		into.Members = from.Members
 	}
+	if len(into.Similar) == 0 {
+		into.Similar = from.Similar
+	}
+	if len(into.Tags) == 0 {
+		into.Tags = from.Tags
+	}
+	if into.Listeners == 0 {
+		into.Listeners = from.Listeners
+	}
 }
 
 // Chain asks its sources in order.
@@ -152,6 +172,26 @@ func NewChain(sources ...Source) *Chain {
 // Sources is how many are in the chain, which is what a program says when it
 // wants to explain that a key would add one.
 func (c *Chain) Sources() int { return len(c.sources) }
+
+// Names is what they are called, in the order they are asked. A screen that says
+// what spindle is asking on somebody's behalf is a screen they can decide about.
+func (c *Chain) Names() []string {
+	out := make([]string, 0, len(c.sources))
+	for _, s := range c.sources {
+		out = append(out, s.Name())
+	}
+	return out
+}
+
+// Has reports whether one of them is in the chain by name.
+func (c *Chain) Has(name string) bool {
+	for _, s := range c.sources {
+		if s.Name() == name {
+			return true
+		}
+	}
+	return false
+}
 
 // Artist walks the chain and hands back what was learned.
 //

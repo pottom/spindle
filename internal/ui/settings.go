@@ -10,6 +10,7 @@ import (
 
 	"github.com/pottom/spindle/internal/auth"
 	"github.com/pottom/spindle/internal/daemon"
+	"github.com/pottom/spindle/internal/notes"
 	"github.com/pottom/spindle/internal/ui/msg"
 
 	"github.com/pottom/spindle/internal/ui/cover"
@@ -82,6 +83,7 @@ const (
 	settingCrossfade
 	settingNotify
 	settingArtwork
+	settingNotes
 
 	settingsCount
 )
@@ -248,7 +250,37 @@ func (m Model) settingRows() []settingRow {
 		value: artwork,
 		says:  why,
 		live:  true,
+	}, {
+		name:  "Artist notes",
+		value: m.notesSays(),
+		says:  notesSays(m.notes),
+		live:  true,
 	}}
+}
+
+// notesSays names the databases spindle is asking about an artist, and
+// notesSays what a key would add where there is none.
+//
+// A row that reports rather than turns, like the artwork above it: what is in
+// the chain is decided by what has been configured, and configuring it is a
+// command rather than a key. It is here because the alternative is a feature
+// nobody knows exists — and because somebody who does not want it should see
+// that spindle is not asking anybody anything on their behalf.
+func (m Model) notesSays() string {
+	if m.notes == nil {
+		return "off"
+	}
+	return strings.Join(m.notes.Names(), " · ")
+}
+
+func notesSays(held *notes.Cached) string {
+	if held == nil {
+		return "Nothing is asked about the artists you play."
+	}
+	if held.Has("Last.fm") {
+		return "Who an artist is, who else listens to them, and how many."
+	}
+	return "Who an artist is. A last.fm key adds the ones no other database has heard of — spindle lastfm"
 }
 
 // artworkSays explains the cover, and where it would be better.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"golang.org/x/oauth2"
 )
@@ -18,6 +19,7 @@ const (
 	callbackPath = "/callback"
 
 	clientIDEnv = "SPINDLE_CLIENT_ID"
+	lastFMEnv   = "SPINDLE_LASTFM_KEY"
 
 	authURL  = "https://accounts.spotify.com/authorize"
 	tokenURL = "https://accounts.spotify.com/api/token"
@@ -39,6 +41,31 @@ func CallbackPort() int {
 		return s.CallbackPort
 	}
 	return defaultCallbackPort
+}
+
+// LastFMKey is the key for last.fm, or empty where there is none.
+//
+// The environment first, as with the client id: a key passed in for one run is a
+// key nobody has to write down. An unreadable settings file is not worth
+// refusing to start over — the source is simply not in the chain.
+func LastFMKey() string {
+	if key := strings.TrimSpace(os.Getenv(lastFMEnv)); key != "" {
+		return key
+	}
+	if s, err := load(); err == nil {
+		return strings.TrimSpace(s.LastFM)
+	}
+	return ""
+}
+
+// SetLastFMKey remembers it, or forgets it when handed nothing.
+func SetLastFMKey(key string) error {
+	s, err := load()
+	if err != nil {
+		return err
+	}
+	s.LastFM = strings.TrimSpace(key)
+	return save(s)
 }
 
 // SetCallbackPort remembers where the browser should be sent back to.

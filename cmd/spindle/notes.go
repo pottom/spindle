@@ -4,22 +4,34 @@ import (
 	"os"
 	"strings"
 
+	"github.com/pottom/spindle/internal/auth"
 	"github.com/pottom/spindle/internal/notes"
 )
 
 // The databases spindle asks about an artist, and the language it asks in.
 //
-// None of them is required and none of them needs a key today: what is here is
-// MusicBrainz, which turns a Spotify id into an identifier the rest of the world
-// uses, and Wikipedia, which is the only place a paragraph about an artist
-// reliably exists. A source that needs configuring and has not been configured
-// is simply not in the chain — see internal/notes.
+// None of them is required, and only the last needs a key. MusicBrainz turns a
+// Spotify id into an identifier the rest of the world uses; Wikipedia is the only
+// place a paragraph about an artist reliably exists in a language other than
+// English; Last.fm is the only one that has heard of everybody, and it is the
+// one that says who else people listening to this listen to.
+//
+// A source that needs configuring and has not been configured is simply not in
+// the chain, and every screen works without any of them. See internal/notes.
 
 // artistNotes builds the chain.
+//
+// In the order they are trusted. MusicBrainz first because it turns a Spotify id
+// into the identifiers the rest are keyed by; Wikipedia next because it is the
+// only one that answers in the reader's own language; Last.fm last, and only
+// where a key has been set, because what it adds is the artists nobody wrote an
+// article about — and who else people listening to this listen to, which is not
+// in any catalogue.
 func artistNotes() *notes.Cached {
 	return notes.NewCached(notes.NewChain(
 		notes.NewMusicBrainz(),
 		notes.NewWikipedia(readingLanguage()),
+		notes.NewLastFM(auth.LastFMKey()),
 	))
 }
 

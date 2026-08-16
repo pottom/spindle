@@ -138,6 +138,21 @@ func (m Model) notesPanel(w, rows int) []string {
 		lines = append(lines, m.styles.Detail.Render(fit(strings.Join(got.Aliases, " · "), w)))
 	}
 
+	// Who else people listening to this listen to, and how many of them there
+	// are. Not from a catalogue: this is the one line here that says something
+	// about how a record is heard rather than about how it was made, and it is
+	// the only one that works for a Hungarian artist. See internal/notes.
+	if len(got.Similar) > 0 || got.Listeners > 0 {
+		// The count first, because it is short and never worth losing, and the
+		// names after it, because they are what gets cut on a narrow panel.
+		var like []string
+		if got.Listeners > 0 {
+			like = append(like, formatCount(got.Listeners)+" listeners")
+		}
+		like = append(like, got.Similar[:min(len(got.Similar), 3)]...)
+		lines = append(lines, m.styles.Detail.Render(fit(strings.Join(like, " · "), w)))
+	}
+
 	// And the paragraph, in whatever room is left. Wrapped rather than cut: a
 	// sentence with its end missing is worse than a sentence fewer.
 	if got.Note != "" && len(lines)+2 < rows {

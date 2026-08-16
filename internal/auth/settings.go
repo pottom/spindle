@@ -31,6 +31,15 @@ type settings struct {
 	// idea of useful, and it is asked for once with a command.
 	Notify string `json:"notify,omitempty"`
 
+	// LastFM is a key for last.fm's API, which spindle uses to say something
+	// about an artist and a song that Spotify does not.
+	//
+	// Optional, and everything works without it: a source with no key is not in
+	// the chain at all. It lives here rather than in the source because it is a
+	// property of this installation, and it is asked for by name so that
+	// somebody who does not want it never has to see it. See internal/notes.
+	LastFM string `json:"lastfm_key,omitempty"`
+
 	// CallbackPort is where the browser is sent back to when logging in.
 	//
 	// A setting rather than a number in the source, because the right value is a

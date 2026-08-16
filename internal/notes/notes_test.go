@@ -79,8 +79,8 @@ func TestASourceThatFailsDoesNotStopTheWalk(t *testing.T) {
 // A source with no key is not registered, and nothing downstream has to keep
 // asking whether it is there.
 func TestASourceThatIsNotThereIsNotAsked(t *testing.T) {
-	var missing Source
-	c := NewChain(missing, saying{name: "there", fill: func(*Key, *Artist) {}})
+	// A key nobody has set, which is the way this actually happens.
+	c := NewChain(NewLastFM(""), saying{name: "there", fill: func(*Key, *Artist) {}})
 	if c.Sources() != 1 {
 		t.Errorf("the chain holds %d sources, want only the one that exists", c.Sources())
 	}
