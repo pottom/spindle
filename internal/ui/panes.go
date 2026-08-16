@@ -148,6 +148,47 @@ func (p libraryPane) atTrack() *player.Track {
 	return at(p.recent, p.cursors[libraryRecent].cursor)
 }
 
+// sameHead reports whether a freshly fetched first page of one kind says exactly
+// what the head of the held list already says.
+//
+// The playlists are read past the row that heads them and is not a playlist: it
+// is built from a request of its own, so the fetched page lines up with the held
+// list one along. See likedRow.
+func (p libraryPane) sameHead(kind libraryKind, m msg.LibraryFetched) bool {
+	switch kind {
+	case libraryAlbums:
+		return sameIDs(len(m.Albums), len(p.albums), func(i int) (string, string) {
+			return m.Albums[i].ID, p.albums[i].ID
+		})
+	case libraryArtists:
+		return sameIDs(len(m.Artists), len(p.artists), func(i int) (string, string) {
+			return m.Artists[i].ID, p.artists[i].ID
+		})
+	case libraryRecent:
+		// The history is not paged: what arrives is all of it, so there is
+		// nothing held past it to keep.
+		return false
+	default:
+		return sameIDs(len(m.Playlists), len(p.playlists)-1, func(i int) (string, string) {
+			return m.Playlists[i].ID, p.playlists[i+1].ID
+		})
+	}
+}
+
+// sameIDs walks two lists of the same things and says whether the shorter one is
+// the front of the longer.
+func sameIDs(fetched, held int, at func(i int) (string, string)) bool {
+	if fetched == 0 || held <= 0 || fetched > held {
+		return false
+	}
+	for i := range fetched {
+		if a, b := at(i); a != b {
+			return false
+		}
+	}
+	return true
+}
+
 // paging is what a list has read so far and what is left. Lists arrive fifty at
 // a time and are read by scrolling, so the next page is fetched as the cursor
 // approaches the end of what is loaded rather than by asking for it.
@@ -162,6 +203,12 @@ type paging struct {
 	// loading stops a run of cursor keys from asking for the same page a dozen
 	// times before the first answer lands.
 	loading bool
+
+	// whole says the last page has arrived: there is no more of this list
+	// anywhere, and what is held is all of it. It is what makes a list worth
+	// writing down, and what makes a first page that repeats itself worth
+	// trusting. See listcache.go.
+	whole bool
 
 	// pages is how many have been taken since the first. It is the cap on
 	// reading a list to its end — see walkMost — and it is reset with the list
@@ -195,6 +242,9 @@ func (p paging) wants(cursor, loaded int) bool {
 func (p *paging) took(more bool, next int) {
 	p.more, p.next, p.loading = more, next, false
 	p.at = time.Now()
+	if !more {
+		p.whole = true
+	}
 }
 
 // adopt takes a page of one of the lists. The first page replaces what was
@@ -207,9 +257,18 @@ func (p *libraryPane) adopt(m msg.LibraryFetched, liked player.Playlist) {
 	kind := libraryKind(m.Kind)
 	first := m.Offset == 0
 	was := p.idAt(kind, p.cursors[kind].cursor)
+
+	// A first page that repeats what this kind already holds, against a kind
+	// read through: nobody has touched it, and everything read past this page
+	// still stands. See openPage.sameHead, which is the same argument.
+	if first && p.pages[kind].whole && p.sameHead(kind, m) {
+		p.pages[kind].took(false, 0)
+		return
+	}
+
 	if first {
 		// A list read afresh is a list to read through again. See walk.go.
-		p.pages[kind].pages = 0
+		p.pages[kind].pages, p.pages[kind].whole = 0, false
 	}
 
 	switch kind {

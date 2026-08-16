@@ -47,6 +47,18 @@ const (
 // holdsAlbums reports whether the page's list is of records rather than tracks.
 func (o openPage) holdsAlbums() bool { return o.kind == openArtist }
 
+// String names the kind, for the file a list of it is written down in.
+func (k openKind) String() string {
+	switch k {
+	case openAlbum:
+		return "album"
+	case openArtist:
+		return "artist"
+	default:
+		return "playlist"
+	}
+}
+
 // count is how many rows the page has.
 func (o openPage) count() int {
 	if o.holdsAlbums() {
@@ -153,8 +165,14 @@ func (m *Model) push(page openPage) tea.Cmd {
 	m.find = find{}
 
 	m.stack = append(m.stack, page)
-	return tea.Batch(fetchOpenCmd(m.player, page.kind, page.id, 0), m.syncCover(),
-		m.syncNotes(), m.spinner.Tick)
+	return tea.Batch(
+		// What was read through last time, from the disk, at once — and the
+		// live first page beside it, which is what decides whether it still
+		// holds. See listcache.go.
+		readOpened(page.kind, page.id),
+		fetchOpenCmd(m.player, page.kind, page.id, 0),
+		m.syncCover(), m.syncNotes(), m.spinner.Tick,
+	)
 }
 
 // pop goes back one page, and reports whether there was one to go back from.
@@ -176,6 +194,18 @@ func (m *Model) closeOpen() { m.stack = nil }
 // throw the reader back to the top of the list.
 func (o *openPage) adopt(m msg.OpenedFetched) {
 	switch {
+	case m.Offset == 0 && o.pages.whole && o.sameHead(m):
+		// A first page that repeats what the head of the held list already says,
+		// against a list that was read through: nobody has touched it, and
+		// everything read past this page still stands.
+		//
+		// This is what makes writing a list down worth anything. Without it the
+		// first live page would replace three thousand tracks with fifty and the
+		// whole walk would happen again — every time, on every refresh. See
+		// listcache.go.
+		o.pages.took(false, 0)
+		return
+
 	case m.Offset == 0:
 		// Where the cursor is, before the list under it is replaced. A first
 		// page arrives when a record is opened and again every time it is
@@ -187,13 +217,48 @@ func (o *openPage) adopt(m msg.OpenedFetched) {
 		o.cursor.reset()
 		o.keepOn(was)
 		// A list read afresh is a list to read through again.
-		o.pages.pages = 0
+		o.pages.pages, o.pages.whole = 0, false
 	case o.holdsAlbums():
 		o.albums = append(o.albums, m.Albums...)
 	default:
 		o.tracks = append(o.tracks, m.Tracks...)
 	}
 	o.pages.took(m.More, m.Next)
+}
+
+// sameHead reports whether a freshly fetched first page says exactly what the
+// head of the list already says.
+//
+// By identity and in order, because that is what a change looks like: a track
+// added, removed or moved shifts the ids about, and the first page is where
+// Spotify puts the front of the list. It is not proof — an edit past the fiftieth
+// track leaves the head alone — and it does not have to be: the cost of being
+// wrong is a stale tail until the next time the list is opened, and the cost of
+// not doing it is reading every list from the beginning for ever.
+//
+// A page longer than what is held is a longer list, and so a different one.
+func (o openPage) sameHead(m msg.OpenedFetched) bool {
+	if o.holdsAlbums() {
+		if len(m.Albums) == 0 || len(m.Albums) > len(o.albums) {
+			return false
+		}
+		for i := range m.Albums {
+			if m.Albums[i].ID != o.albums[i].ID {
+				return false
+			}
+		}
+		return true
+	}
+
+	if len(m.Tracks) == 0 || len(m.Tracks) > len(o.tracks) {
+		return false
+	}
+	for i := range m.Tracks {
+		if m.Tracks[i].ID != o.tracks[i].ID {
+			return false
+		}
+	}
+	return true
 }
 
 // at is what the cursor is resting on, by id, so it can be found again in a list

@@ -45,6 +45,7 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 		if m.library.paging().stale(staleAfter) {
 			m.library.paging().loading = true
 			cmds = append(cmds,
+				readLibrary(m.library.kind),
 				fetchLibraryCmd(m.player, m.library.kind, 0),
 				fetchOpenCmd(m.player, openPlaylist, likedID, 0),
 			)
@@ -232,7 +233,9 @@ func (m *Model) setLibraryKind(next libraryKind) tea.Cmd {
 	cmds := []tea.Cmd{m.syncCover()}
 	if m.library.countOf(next) == 0 && !m.library.pages[next].loading {
 		m.library.pages[next].loading = true
-		cmds = append(cmds, fetchLibraryCmd(m.player, next, 0), m.spinner.Tick)
+		// What was read through last time, from the disk, and the live first
+		// page beside it. See listcache.go.
+		cmds = append(cmds, readLibrary(next), fetchLibraryCmd(m.player, next, 0), m.spinner.Tick)
 	}
 	return tea.Batch(cmds...)
 }
