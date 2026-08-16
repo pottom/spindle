@@ -45,7 +45,7 @@ func TestTheStoryKeyIsOfferedOnlyWhereThereIsOne(t *testing.T) {
 // is: it is read rather than worked in, which is the bargain the big screen
 // makes too.
 func TestTheStoryOpensAndTheNextKeyPutsItAway(t *testing.T) {
-	m := storyModel("It was recorded in 1975 and nobody expected it to work.")
+	m := storyModel("Nobody expected it to work.")
 
 	var tm tea.Model = m
 	tm, _ = tm.Update(tea.KeyPressMsg{Code: 'i', Text: "i"})
@@ -55,7 +55,7 @@ func TestTheStoryOpensAndTheNextKeyPutsItAway(t *testing.T) {
 	}
 
 	screen := ansi.Strip(open.render())
-	if !strings.Contains(screen, "nobody expected it to work") {
+	if !strings.Contains(screen, "Nobody expected it to work.") {
 		t.Error("the box does not hold what was written")
 	}
 	if !strings.Contains(screen, m.ps.Title) {
@@ -73,7 +73,9 @@ func TestTheStoryOpensAndTheNextKeyPutsItAway(t *testing.T) {
 	}
 
 	// And a press of the pointer, likewise.
-	if away, _ := open.mouseClick(clickAt(leftMargin+4, tabBarHeight+3)); away.story {
+	p, _ := open.openPopup()
+	box := open.menuShape(open.layout(), p)
+	if away, _ := open.mouseClick(clickAt(box.x+2, box.y+3)); away.story {
 		t.Error("a press inside it left it up")
 	}
 }
@@ -97,8 +99,8 @@ func TestALongStoryIsCutToTheRoom(t *testing.T) {
 	}
 
 	screen := ansi.Strip(m.render())
-	if !strings.Contains(screen, "…") {
-		t.Error("a story that did not fit did not say so")
+	if !strings.Contains(screen, scrollThumb) {
+		t.Error("a story that did not fit drew no bar to say how much of it there is")
 	}
 	if !strings.Contains(screen, "Every word of this is filler") {
 		t.Error("the box holds none of it")
@@ -165,17 +167,16 @@ func TestTheStoryScrolls(t *testing.T) {
 		t.Errorf("it scrolled past the end to %d", got)
 	}
 
-	// At the end there is nothing more, and it does not say there is.
+	// At the end there is nothing more, and what is under the words is reached.
 	tail := ansi.Strip(end.render())
-	if strings.Contains(tail, "…") {
-		t.Error("the last screen of it still says there is more")
-	}
 	if !strings.Contains(tail, "listeners") {
 		t.Error("what is under the words never came into view")
 	}
 
-	// The wheel reads on too.
-	turned, _ := end.mouseWheel(wheelAt(leftMargin+4, tabBarHeight+3, tea.MouseWheelUp))
+	// The wheel reads on too, over wherever the box actually is.
+	p, _ := end.openPopup()
+	box := end.menuShape(l, p)
+	turned, _ := end.mouseWheel(wheelAt(box.x+2, box.y+3, tea.MouseWheelUp))
 	if turned.storyAt >= end.storyAt {
 		t.Error("the wheel over the box did not move it back")
 	}

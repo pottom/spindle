@@ -254,13 +254,41 @@ func (m Model) notesPanel(w, rows int) []string {
 // waiting for it; the screen is already drawn.
 const notesWait = 30 * time.Second
 
-// storyWidth is how wide the box holding a song's story is drawn, where there is
-// room for it.
+const (
+	// storyWidth is how wide the words in the box are set, where there is room.
+	//
+	// Sixty is where a paragraph reads: much narrower and the eye jumps a line
+	// every few words, much wider and it loses its place coming back. The same
+	// argument as maxInfoCols, and the same number within a few columns.
+	storyWidth = 60
+
+	// storyLeast is the narrowest column of prose worth setting. Under this the
+	// box gives up standing beside the picture and stands over it instead: a
+	// paragraph in twenty columns is a paragraph nobody reads, and the cover is
+	// worth less than the words while the words are being read.
+	storyLeast = 36
+)
+
+// storyAt is where the box stands and how wide its words are set.
 //
-// Sixty is where a paragraph reads: much narrower and the eye jumps a line every
-// few words, much wider and it loses its place coming back. The same argument as
-// maxInfoCols, and the same number within a few columns.
-const storyWidth = 60
+// Beside the picture rather than over it: the cover is the one thing on this
+// screen that is not words, and a box of words on top of it is the wrong way
+// round — what is being read is about the record you are looking at, so the
+// record should still be there.
+//
+// The width follows from the place rather than the other way round. Asked for
+// sixty columns where only forty are free, the box was pulled back to the left
+// until it fitted — which put it exactly where it was not to go, hard against
+// the cover. So the room decides, and the words are set to what is left.
+func (m Model) storyPlace(l layout) (left, width int) {
+	if l.hasArt() {
+		left = leftMargin + l.artWidth + columnGap
+		if room := l.interior - rightMargin - left; room >= storyLeast+4 {
+			return left, min(storyWidth, room-4)
+		}
+	}
+	return leftMargin + 2, min(storyWidth, l.interior-leftMargin-rightMargin-6)
+}
 
 // storyPopup is the box with what is written about the record that is playing.
 //
@@ -269,22 +297,17 @@ const storyWidth = 60
 // next thing you do puts it away. The same shape as the menu of verbs and the
 // list of devices — a short thing about something named at the top of it.
 func (m Model) storyPopup() popup {
-	rows := m.storyLines()
+	l := m.layout()
+	left, width := m.storyPlace(l)
 
 	title, sub := "", ""
 	if m.ps != nil {
 		title, sub = m.ps.Title, strings.Join(m.ps.Artists, ", ")
 	}
-
-	// From wherever it has been scrolled to. The box draws what it has room for
-	// and marks the row it stopped on, so what this does is move where it
-	// starts. See storyRows.
-	if at := min(max(m.storyAt, 0), max(len(rows)-1, 0)); at > 0 && at < len(rows) {
-		rows = rows[at:]
-	}
 	return popup{
-		x: leftMargin + 2, y: tabBarHeight + 1,
-		title: title, subtitle: sub, rows: rows, plain: true, want: storyWidth + 4,
+		x: left, y: tabBarHeight + 1,
+		title: title, subtitle: sub, rows: m.storyLines(width), plain: true,
+		want: width + 4, at: m.storyAt,
 	}
 }
 
@@ -303,14 +326,14 @@ func (m Model) storyAvailable() bool {
 // counts of the same rows is how a box comes to say there is more when there is
 // not — which is what it did, because the end was worked out from the paragraph
 // alone while the box also held three lines after it.
-func (m Model) storyLines() []string {
+func (m Model) storyLines(width int) []string {
 	got, ok := m.songNote()
 	if !ok {
 		return nil
 	}
 
 	var rows []string
-	for _, line := range wrapWords(got.Note, storyWidth) {
+	for _, line := range wrapWords(got.Note, width) {
 		rows = append(rows, m.styles.Detail.Render(line))
 	}
 
@@ -340,5 +363,6 @@ func (m Model) storyRows(l layout) int {
 }
 
 func (m Model) storyLast(l layout) int {
-	return max(len(m.storyLines())-m.storyRows(l), 0)
+	_, width := m.storyPlace(l)
+	return max(len(m.storyLines(width))-m.storyRows(l), 0)
 }

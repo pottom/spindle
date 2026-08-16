@@ -416,8 +416,38 @@ func (l *Local) Devices(ctx context.Context) ([]Device, error) { return l.web.De
 func (l *Local) TransferTo(ctx context.Context, id string, playing bool) error {
 	return l.web.TransferTo(ctx, id, playing)
 }
+
+// AddToQueue puts a track at the end of what is coming.
+//
+// Through the daemon while the daemon is the one playing, because it already
+// knows what is in its queue and it answers over localhost. It used to go to
+// the Web API always, and that made every "play this now" from a search into a
+// Spotify request — which is nothing until the day the account is rate limited,
+// and then it is the reason a track will not play at all: PlayNow queues the
+// track and then plays from the queue, and the first half failed.
+//
+// The daemon has no "add" of its own, only "set", so what is coming is read
+// back and handed over with one more on the end. Two requests over localhost
+// against one over the network, and neither of them can be refused for the day.
 func (l *Local) AddToQueue(ctx context.Context, trackID string) error {
-	return l.web.AddToQueue(ctx, trackID)
+	if l.idle() {
+		return l.web.AddToQueue(ctx, trackID)
+	}
+
+	queue, err := l.queueTracks(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Only what was put there by hand: the rest is the context, and setting the
+	// queue to include it would take it out of the record it belongs to.
+	ids := make([]string, 0, len(queue.Upcoming)+1)
+	for _, t := range queue.Upcoming {
+		if t.Queued {
+			ids = append(ids, t.ID)
+		}
+	}
+	return l.SetQueue(ctx, append(ids, trackID))
 }
 func (l *Local) SearchPage(ctx context.Context, q string, offset int) (Page[Track], error) {
 	return l.web.SearchPage(ctx, q, offset)

@@ -159,7 +159,7 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		m.noteUnplayable(message.State)
 		m.fillFromQueue()
 		m.noDevice = false
-		m.err = nil
+		m.clearErr()
 
 		cmds := []tea.Cmd{m.syncCover(), m.syncSong()}
 		if m.stillWaitingForTrackChange(message.State) {
@@ -331,7 +331,8 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 
 	case msg.ControlDone:
 		// Whatever was standing in the way is evidently no longer standing.
-		m.noPremium, m.err = false, nil
+		m.noPremium = false
+		m.clearErr()
 		return m, nil
 
 	case msg.RateLimited:
@@ -355,7 +356,7 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 			m.noPremium = true
 			return m, nil
 		}
-		m.err = message.Err
+		m.err, m.errAt = message.Err, time.Now()
 		return m, nil
 
 	case msg.LyricsFetched:
@@ -1260,6 +1261,20 @@ func (m Model) drivenFromElsewhere(st *player.State) bool {
 		return false
 	}
 	return st.TrackID != m.ps.TrackID || st.Playing != m.ps.Playing
+}
+
+// clearErr takes the error off the screen, once it has been there long enough to
+// have been read.
+//
+// The polls arrive every few seconds and every one of them used to wipe it,
+// which meant a play that failed explained itself for an instant and then went
+// quiet — leaving somebody pressing enter at a list that would not play and
+// nothing on the screen saying why. See errAt.
+func (m *Model) clearErr() {
+	if m.err != nil && time.Since(m.errAt) < saidWindow {
+		return
+	}
+	m.err = nil
 }
 
 // throttled reports whether Spotify has asked to be left alone.

@@ -219,6 +219,14 @@ type Model struct {
 	// on every frame. See wordsComing.
 	mutedAt time.Time
 
+	// errAt is when the error on screen arrived.
+	//
+	// Because the polls clear it, and the polls are every few seconds: a play
+	// that failed said why and was wiped by the next successful state fetch
+	// before it could be read. An error about something somebody just asked for
+	// stays up long enough to read, and then the next answer may have it.
+	errAt time.Time
+
 	// rateLimitedUntil suspends polling. Spotify asked to be left alone, and
 	// carrying on regardless is how a short throttle becomes a long one.
 	rateLimitedUntil time.Time

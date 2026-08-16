@@ -67,6 +67,12 @@ type popup struct {
 	// want is how wide it would like to be, where its rows are wrapped to a
 	// width rather than being as long as they happen to be.
 	want int
+
+	// at is the first row to draw, for a box holding more than it can show.
+	// The slicing is the drawing's business rather than the caller's: the bar
+	// down the side has to know both where it is and how much there is, and one
+	// of those is lost the moment somebody hands over a list already cut.
+	at int
 }
 
 // openPopup is whichever box is up, and whether one is.
@@ -150,25 +156,32 @@ func (m Model) drawMenu(lines []string, l layout) []string {
 		out[row] = overwrite(out[row], box.x, s, l.interior)
 		row++
 	}
-	// A line of the box: the two uprights with the words held between them, and
-	// the air inside written out rather than left to whatever was under it.
-	line := func(s string) {
-		put(pen.Render(pointerV) + fit(strings.Repeat(" ", menuPad)+s, inner) + pen.Render(pointerV))
+	// A line of the box: the two uprights with the words held between them, the
+	// air inside written out rather than left to whatever was under it, and the
+	// bar down the side where there is more of this than fits.
+	line := func(s, mark string) {
+		body := fit(strings.Repeat(" ", menuPad)+s, inner-lipgloss.Width(mark)) + mark
+		put(pen.Render(pointerV) + body + pen.Render(pointerV))
 	}
 
 	put(pen.Render(pointerTL + rule + pointerTR))
-	line(m.styles.Title.Render(fit(p.title, inner-2*menuPad)))
-	line(m.styles.Artist.Render(fit(p.subtitle, inner-2*menuPad)))
+	line(m.styles.Title.Render(fit(p.title, inner-2*menuPad)), "")
+	line(m.styles.Artist.Render(fit(p.subtitle, inner-2*menuPad)), "")
 	put(pen.Render(pointerTee + rule + pointerTeeR))
 
-	// Only the rows it has room for, and a mark on the last of them where there
-	// were more. See menuShape.
+	// Only the rows it has room for, from wherever it has been read to, and the
+	// bar down the side saying how much of it that is — the same bar a list has,
+	// because it is the same question. See scrollColumn.
 	room := box.h - menuChrome
-	for i, row := range p.rows[:min(len(p.rows), room)] {
-		if i == room-1 && room < len(p.rows) {
-			row = fit(row, inner-2*menuPad-1) + "…"
+	from := min(max(p.at, 0), max(len(p.rows)-1, 0))
+	bar := m.scrollColumn(room, len(p.rows), from)
+
+	for i, row := range p.rows[from:min(len(p.rows), from+room)] {
+		mark := ""
+		if bar != nil {
+			mark = bar[i]
 		}
-		line(fit(row, inner-2*menuPad))
+		line(fit(row, inner-2*menuPad), mark)
 	}
 	put(pen.Render(pointerElbow + rule + pointerBR))
 	return out
