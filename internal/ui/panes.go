@@ -163,6 +163,12 @@ type paging struct {
 	// times before the first answer lands.
 	loading bool
 
+	// pages is how many have been taken since the first. It is the cap on
+	// reading a list to its end — see walkMost — and it is reset with the list
+	// rather than carried over, because a list read afresh is a list to read
+	// again.
+	pages int
+
 	// at is when the first page last arrived, which is how old what is on screen
 	// is. A list somebody edits on their phone is out of date here and nothing
 	// says so: this is what a refresh is measured against.
@@ -176,6 +182,11 @@ func (p paging) stale(after time.Duration) bool {
 
 // wants reports whether the cursor has come near enough to the end of what is
 // loaded to send for the next page.
+//
+// Only the search still asks this. Its window is a thousand results deep and ten
+// at a time, so reading it to the end would be a hundred requests for a question
+// somebody is still typing — and unlike a library, nobody wants all of it. Every
+// other list reads itself through. See walk.go.
 func (p paging) wants(cursor, loaded int) bool {
 	return p.more && !p.loading && cursor >= loaded-pageAhead
 }
@@ -196,6 +207,10 @@ func (p *libraryPane) adopt(m msg.LibraryFetched, liked player.Playlist) {
 	kind := libraryKind(m.Kind)
 	first := m.Offset == 0
 	was := p.idAt(kind, p.cursors[kind].cursor)
+	if first {
+		// A list read afresh is a list to read through again. See walk.go.
+		p.pages[kind].pages = 0
+	}
 
 	switch kind {
 	case libraryAlbums:

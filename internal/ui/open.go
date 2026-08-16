@@ -186,6 +186,8 @@ func (o *openPage) adopt(m msg.OpenedFetched) {
 		o.tracks, o.albums = m.Tracks, m.Albums
 		o.cursor.reset()
 		o.keepOn(was)
+		// A list read afresh is a list to read through again.
+		o.pages.pages = 0
 	case o.holdsAlbums():
 		o.albums = append(o.albums, m.Albums...)
 	default:

@@ -251,7 +251,9 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 
 	case msg.LibraryFetched:
 		m.library.adopt(message, m.likedRow())
-		return m, tea.Batch(m.syncCover(), m.syncGridCovers())
+		// And on to the next page, until there is not one: a library half read
+		// is a library whose search answers about half of it. See walk.go.
+		return m, tea.Batch(m.syncCover(), m.syncGridCovers(), m.readOn())
 
 	case msg.OpenedFetched:
 		// The saved tracks are read whether or not they are open: the library
@@ -265,7 +267,7 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		// reader has already walked away from.
 		if page := m.openMut(); page != nil && page.id == message.ID {
 			page.adopt(message)
-			return m, m.syncCover()
+			return m, tea.Batch(m.syncCover(), m.readOn())
 		}
 		return m, nil
 
