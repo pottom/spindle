@@ -35,6 +35,15 @@ const (
 	// per row.
 	coverSettleDelay = 250 * time.Millisecond
 
+	// searchSettleDelay is how long the query has to rest before it is asked.
+	//
+	// Every keystroke used to be a search: typing "jolene" spent six requests
+	// and read one answer, because the five before it were about words nobody
+	// had finished. Measured from a real terminal — six letters, six lines in
+	// the request log. A quarter of a second is under the pause between one
+	// word and the next, so a query typed straight through is asked once.
+	searchSettleDelay = 250 * time.Millisecond
+
 	// A track change does not appear in State() the moment the command returns.
 	// Measured against a live account it took 466, 530, 564 and 678 ms — so the
 	// 400 ms single shot DESIGN.md guessed at would have confirmed the *old*
@@ -403,6 +412,18 @@ func searchCmd(p player.Player, query string, kind player.SearchKind, seq, offse
 		}
 	}
 }
+
+// searchSettleCmd waits out the debounce before a query is asked. The sequence
+// number is the query it was typed for: a tick that arrives after another letter
+// is a tick about a question nobody is asking any more.
+func searchSettleCmd(seq int) tea.Cmd {
+	return tea.Tick(searchSettleDelay, func(time.Time) tea.Msg {
+		return searchSettled{seq: seq}
+	})
+}
+
+// searchSettled says the typing has stopped for long enough to ask.
+type searchSettled struct{ seq int }
 
 // coverSettleCmd waits out the debounce before an artwork preview is loaded.
 func coverSettleCmd(seq int) tea.Cmd {

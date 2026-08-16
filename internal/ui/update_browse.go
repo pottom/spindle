@@ -333,8 +333,9 @@ func (m *Model) searchTypingKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		return nil, true
 	}
 
-	// Anything else is the query. It drives a fresh search on each keystroke;
-	// the sequence number keeps a slow one from overwriting a newer answer.
+	// Anything else is the query. The sequence number is what keeps a slow
+	// answer from overwriting a newer one, and what decides which typing is
+	// still worth asking about once it has settled.
 	before := m.search.input.Value()
 
 	var cmd tea.Cmd
@@ -348,7 +349,7 @@ func (m *Model) searchTypingKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	m.search.seq++
 	m.search.found = nil
 	m.search.current().pages.loading = true
-	return tea.Batch(cmd, searchCmd(m.player, m.search.input.Value(), "", m.search.seq, 0), m.spinner.Tick), true
+	return tea.Batch(cmd, searchSettleCmd(m.search.seq), m.spinner.Tick), true
 }
 
 // startTyping hands the keyboard to the query, from whichever tab asked.

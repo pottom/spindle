@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -255,6 +256,14 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		}
 		if m.cover.matches(message.URL, message.Width, message.Height) {
 			m.cover.failed = true
+		}
+		return m, nil
+
+	case searchSettled:
+		// The typing has stopped. Anything older than what is in the box now is
+		// about a word somebody was halfway through. See searchSettleCmd.
+		if message.seq == m.search.seq && strings.TrimSpace(m.search.input.Value()) != "" {
+			return m, searchCmd(m.player, m.search.input.Value(), "", m.search.seq, 0)
 		}
 		return m, nil
 
