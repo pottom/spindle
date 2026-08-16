@@ -266,6 +266,10 @@ type Model struct {
 	// out from being handled again on every following tick.
 	nextPollAt time.Time
 
+	// adoptingSince is when the wait for a device of our own began. It bounds
+	// the quick cadence that watches for it — see adoptWindow.
+	adoptingSince time.Time
+
 	// polledAt is when a state fetch last went out, by whatever prompted it.
 	// The device's own events prompt most of them, and a device coming up sends
 	// a storm of them — see readChange.

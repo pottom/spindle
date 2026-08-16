@@ -79,3 +79,28 @@ func TestNothingPlayingRestsTheCadenceToo(t *testing.T) {
 		t.Errorf("music stopping somewhere else left the poll at %s, want it unchanged", got.restFor)
 	}
 }
+
+// A device that never turns up is given up on. spotify-player gives its own five
+// tries a second apart; this is the same half minute, and what it protects
+// against is a daemon Spotify cannot see and a window left open in front of it —
+// which would otherwise ask for the list every three seconds until morning.
+func TestTheWaitForOurOwnDeviceEnds(t *testing.T) {
+	m := New(&ownDaemon{Player: player.NewMock(), id: "never-turns-up"}, nil, defaultTestCell)
+	m.noDevice = true
+	m.adoptingSince = time.Now().Add(-2 * adoptWindow)
+	m.devicesAt = time.Now().Add(-time.Hour)
+
+	if !m.awaitingOwnDevice() {
+		t.Fatal("a daemon whose device is not on the list is not being waited for")
+	}
+	if cmd := m.refreshDevices(); cmd != nil {
+		t.Error("a device that has not appeared in half an hour was still being looked for")
+	}
+
+	// And anybody touching the window starts the half minute again: starting the
+	// daemon by hand and coming back is exactly how that happens.
+	m.stir()
+	if cmd := m.refreshDevices(); cmd == nil {
+		t.Error("somebody coming back to the window did not start it looking again")
+	}
+}

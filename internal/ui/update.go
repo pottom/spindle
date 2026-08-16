@@ -605,11 +605,19 @@ func (m *Model) refreshDevices() tea.Cmd {
 	// a device of our own that has not turned up yet — so a machine with no
 	// daemon at all asks for nothing.
 	if m.awaitingOwnDevice() {
-		if time.Since(m.devicesAt) < devicesEvery {
+		if m.adoptingSince.IsZero() {
+			m.adoptingSince = time.Now()
+		}
+		// And it gives up. A daemon that has not appeared in half a minute is
+		// not appearing — Spotify cannot see it, or it died on its way up — and
+		// asking every three seconds until morning costs more than the answer is
+		// worth. Anything anybody does starts the half minute again. See stir.
+		if time.Since(m.adoptingSince) > adoptWindow || time.Since(m.devicesAt) < devicesEvery {
 			return nil
 		}
 		return m.askDevices()
 	}
+	m.adoptingSince = time.Time{}
 	// While the picker is up somebody is watching it, waiting for a device to
 	// appear; the rest of the time this is the screen that says nothing is
 	// playing anywhere, and that answer does not change while nobody is there.
@@ -649,6 +657,12 @@ func (m Model) awaitingOwnDevice() bool {
 	id := owner.OwnDevice()
 	return id != "" && !m.devices.has(id)
 }
+
+// adoptWindow is how long the list is asked for at the quick cadence while a
+// device of our own has not turned up. spotify-player gives its own device five
+// tries a second apart; this is ten tries three seconds apart, which is the same
+// half minute against a daemon that takes about ten seconds to register.
+const adoptWindow = 30 * time.Second
 
 // devicesEvery is how often that happens. Spotify lists a device within a few
 // seconds of it appearing, so this is about as often as it can say anything new.
@@ -1309,7 +1323,14 @@ func (m Model) every(base time.Duration) time.Duration {
 // Anything somebody does counts: a key, a press of the pointer, an answer that
 // differs from the last one. The rest is what happens to a window nobody is
 // looking at, and that is the only case the slow cadence is for. See restMost.
-func (m *Model) stir() { m.restFor = idlePoll }
+func (m *Model) stir() {
+	m.restFor = idlePoll
+
+	// Somebody is here, so a device that was given up on is worth looking for
+	// again: starting the daemon by hand and coming back to the window is
+	// exactly how that happens.
+	m.adoptingSince = time.Time{}
+}
 
 // rest slows the cadence, because the last answer said exactly what the one
 // before it said.
