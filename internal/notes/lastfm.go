@@ -178,3 +178,67 @@ func plainBio(s string) string {
 	s = strings.ReplaceAll(s, "&#39;", "'")
 	return strings.Join(strings.Fields(s), " ")
 }
+
+// Track is what Last.fm has to say about one song.
+//
+// The one thing in this whole layer that is about a recording rather than about
+// who made it: a paragraph somebody wrote about the song, and how many people
+// have heard it. It is empty for most of a real library and worth having for the
+// rest — the story of a song is read once and remembered.
+//
+// Matched by name, because that is what spindle holds. It is Last.fm's own
+// matching rather than an exact key, so a wrong answer is possible; what makes
+// that tolerable is that the answer is prose about a title, and prose about the
+// wrong song reads wrong immediately.
+func (l *LastFM) Track(ctx context.Context, k *TrackKey, have TrackNote) (TrackNote, error) {
+	var t TrackNote
+	if have.Note != "" {
+		return t, nil
+	}
+	if k.Artist == "" || k.Title == "" {
+		return t, fmt.Errorf("last.fm: nothing to look up")
+	}
+
+	var out struct {
+		Track struct {
+			Listeners string `json:"listeners"`
+			Playcount string `json:"playcount"`
+			TopTags   struct {
+				Tag []struct {
+					Name string `json:"name"`
+				} `json:"tag"`
+			} `json:"toptags"`
+			Wiki struct {
+				Content string `json:"content"`
+			} `json:"wiki"`
+		} `json:"track"`
+		Error int    `json:"error"`
+		Msg   string `json:"message"`
+	}
+
+	q := url.Values{
+		"method":  {"track.getinfo"},
+		"api_key": {l.key},
+		"format":  {"json"},
+		"artist":  {k.Artist},
+		"track":   {k.Title},
+	}
+	if err := fetch(ctx, &l.pace, lfmBase+q.Encode(), &out); err != nil {
+		return t, err
+	}
+	if out.Error != 0 {
+		return t, fmt.Errorf("last.fm: %s", out.Msg)
+	}
+
+	if bio := plainBio(out.Track.Wiki.Content); bio != "" {
+		t.Note, t.NoteFrom = bio, l.Name()
+	}
+	t.Listeners, _ = strconv.Atoi(out.Track.Listeners)
+	t.Plays, _ = strconv.Atoi(out.Track.Playcount)
+	for _, tag := range out.Track.TopTags.Tag {
+		if tag.Name != "" {
+			t.Tags = append(t.Tags, tag.Name)
+		}
+	}
+	return t, nil
+}

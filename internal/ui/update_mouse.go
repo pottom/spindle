@@ -89,6 +89,10 @@ func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 	// nothing underneath may be turned by a wheel over something standing on top
 	// of it.
 	if _, inside := m.menuVerbAt(m.layout(), e.X, e.Y); inside {
+		if m.story {
+			// There is nothing in it to walk through.
+			return m, nil
+		}
 		if m.devices.open {
 			m.devices.cursor.move(delta, len(m.devices.items))
 		} else {
@@ -218,10 +222,12 @@ func (m Model) mouseClick(e tea.MouseClickMsg) (Model, tea.Cmd) {
 	// One press rather than two, unlike a row of a list: this box was opened on
 	// purpose and holds nothing but choices, so there is nothing here to brush
 	// past by accident.
-	if _, up := m.openPopup(); up {
+	if p, up := m.openPopup(); up {
 		at, inside := m.menuVerbAt(m.layout(), e.X, e.Y)
-		if !inside || e.Button != tea.MouseLeft {
-			m.actions.open, m.devices.open = false, false
+		if p.plain || !inside || e.Button != tea.MouseLeft {
+			// Nothing in it to choose, or a press away from it: either way it
+			// goes. A paragraph is read and then put away.
+			m.actions.open, m.devices.open, m.story = false, false, false
 			return m, nil
 		}
 		if at < 0 {

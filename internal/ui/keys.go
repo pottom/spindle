@@ -59,6 +59,7 @@ type keyMap struct {
 	// drawing can be put side by side on the one record.
 	Loose  key.Binding
 	Lyrics key.Binding
+	Story  key.Binding
 
 	// Close folds the band above the queue away a block at a time, so the list
 	// has the rows. See queueRoom.
@@ -266,6 +267,10 @@ func newKeyMap() keyMap {
 		Lyrics: key.NewBinding(
 			key.WithKeys(keyLyrics),
 			key.WithHelp(keyLyrics, "lyrics"),
+		),
+		Story: key.NewBinding(
+			key.WithKeys(keyStory),
+			key.WithHelp(keyStory, "about"),
 		),
 
 		Close: key.NewBinding(
@@ -486,7 +491,7 @@ func fitHints(short []key.Binding, width int) []key.Binding {
 	return short
 }
 
-func (k keyMap) forPlayer(scope, lyrics, peek bool, width int) tabKeys {
+func (k keyMap) forPlayer(scope, lyrics, peek, story bool, width int) tabKeys {
 	short := []key.Binding{
 		terse(k.PlayPause, "play/pause"),
 		tight(k.Next, "track"),
@@ -495,6 +500,9 @@ func (k keyMap) forPlayer(scope, lyrics, peek bool, width int) tabKeys {
 	short = append(short, hint("↑↓", "volume"), terse(k.Shuffle, "shuffle"), terse(k.Repeat, "repeat"))
 	if lyrics {
 		short = append(short, terse(k.Lyrics, "lyrics"))
+	}
+	if story {
+		short = append(short, terse(k.Story, "about"))
 	}
 	if scope {
 		short = append(short, terse(k.Scope, "vis"))
@@ -513,6 +521,9 @@ func (k keyMap) forPlayer(scope, lyrics, peek bool, width int) tabKeys {
 	}
 	if lyrics {
 		second = append(second, k.Lyrics)
+	}
+	if story {
+		second = append(second, k.Story)
 	}
 	if peek {
 		second = append(second, k.Peek)

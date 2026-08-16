@@ -98,6 +98,36 @@ func (a Artist) Known() bool {
 		a.ImageURL != "" || len(a.Similar) > 0
 }
 
+// TrackKey names a song. Artist and Title because that is what spindle holds and
+// what the one source that answers about songs matches on; the MBID where it is
+// known.
+type TrackKey struct {
+	Artist string
+	Title  string
+	MBID   string
+}
+
+// TrackNote is what was learned about a song.
+//
+// Far less than about an artist, and from one place rather than four: what is
+// written down about a particular recording is written down by whoever likes it.
+// Empty for almost everything, and worth having for the rest — the story of a
+// song is the sort of thing somebody reads once and remembers for ever.
+type TrackNote struct {
+	Note     string
+	NoteFrom string
+
+	// Listeners and Plays are how many people have heard this and how often,
+	// which is the only number here that is about a song rather than about a
+	// record's popularity in the abstract.
+	Listeners int
+	Plays     int
+	Tags      []string
+}
+
+// Known reports whether anything at all was learned.
+func (t TrackNote) Known() bool { return t.Note != "" || t.Listeners > 0 }
+
 // Source is one database.
 //
 // It is handed what has been learned so far and gives back only what it knows
@@ -149,6 +179,16 @@ func merge(into *Artist, from Artist) {
 	if into.Listeners == 0 {
 		into.Listeners = from.Listeners
 	}
+}
+
+// TrackSource is a source that also knows something about a song.
+//
+// Separate because most of them do not, and a database made to answer about
+// songs it has nothing to say about is a database that answers "no" slowly. The
+// chain asks the ones that implement this and no others.
+type TrackSource interface {
+	Source
+	Track(ctx context.Context, k *TrackKey, have TrackNote) (TrackNote, error)
 }
 
 // Chain asks its sources in order.
@@ -216,6 +256,31 @@ func (c *Chain) Artist(ctx context.Context, k Key) (Artist, error) {
 		merge(&a, got)
 	}
 	return a, ctx.Err()
+}
+
+// Track walks the sources that know about songs.
+func (c *Chain) Track(ctx context.Context, k TrackKey) (TrackNote, error) {
+	var t TrackNote
+	for _, s := range c.sources {
+		asks, ok := s.(TrackSource)
+		if !ok || ctx.Err() != nil {
+			continue
+		}
+		got, err := asks.Track(ctx, &k, t)
+		if err != nil {
+			continue
+		}
+		if t.Note == "" && got.Note != "" {
+			t.Note, t.NoteFrom = got.Note, got.NoteFrom
+		}
+		if t.Listeners == 0 {
+			t.Listeners, t.Plays = got.Listeners, got.Plays
+		}
+		if len(t.Tags) == 0 {
+			t.Tags = got.Tags
+		}
+	}
+	return t, ctx.Err()
 }
 
 // Fetched is how long an answer is good for.

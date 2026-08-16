@@ -28,8 +28,8 @@ func TestEveryKeyNamedIsAKeyRead(t *testing.T) {
 		"no device":   k.forNoDevice(),
 		"devices":     k.forDevices(),
 		"read-only":   k.forReadOnlyQueue(),
-		"player":      k.forPlayer(true, true, true, 200),
-		"player bare": k.forPlayer(false, false, false, 200),
+		"player":      k.forPlayer(true, true, true, true, 200),
+		"player bare": k.forPlayer(false, false, false, false, 200),
 		"open album":  k.forOpen(true, true),
 		"open list":   k.forOpen(false, false),
 	}

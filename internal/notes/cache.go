@@ -33,8 +33,9 @@ type Cached struct {
 	chain *Chain
 	dir   string
 
-	mu   sync.Mutex
-	held map[string]held
+	mu    sync.Mutex
+	held  map[string]held
+	songs map[string]heldTrack
 }
 
 type held struct {
@@ -42,11 +43,17 @@ type held struct {
 	At     time.Time `json:"at"`
 }
 
+// heldTrack is the same for a song.
+type heldTrack struct {
+	Note TrackNote `json:"note"`
+	At   time.Time `json:"at"`
+}
+
 // NewCached wraps a chain. A cache directory that cannot be made is not an
 // error: the memory half still works, and the program is no worse off than it
 // was before there was a disk cache at all.
 func NewCached(chain *Chain) *Cached {
-	c := &Cached{chain: chain, held: map[string]held{}}
+	c := &Cached{chain: chain, held: map[string]held{}, songs: map[string]heldTrack{}}
 	if base, err := xdg.CacheDir(); err == nil {
 		dir := filepath.Join(base, "notes")
 		if os.MkdirAll(dir, 0o755) == nil {
@@ -78,6 +85,54 @@ func (c *Cached) Artist(ctx context.Context, k Key) (Artist, error) {
 	}
 	c.keep(name, a)
 	return a, nil
+}
+
+// Track answers from what is held, or asks and keeps what comes back.
+//
+// Kept the same way and for the same reason: a song looked up once is a song
+// nobody should spend a request on again, and "nothing is written about this
+// one" is the usual answer and worth keeping too.
+func (c *Cached) Track(ctx context.Context, k TrackKey) (TrackNote, error) {
+	name := trackName(k)
+
+	c.mu.Lock()
+	h, ok := c.songs[name]
+	c.mu.Unlock()
+	if ok && time.Since(h.At) < Fetched {
+		return h.Note, nil
+	}
+
+	if c.dir != "" {
+		if data, err := os.ReadFile(filepath.Join(c.dir, name)); err == nil {
+			if json.Unmarshal(data, &h) == nil && time.Since(h.At) < Fetched {
+				c.mu.Lock()
+				c.songs[name] = h
+				c.mu.Unlock()
+				return h.Note, nil
+			}
+		}
+	}
+
+	got, err := c.chain.Track(ctx, k)
+	if err != nil {
+		return got, err
+	}
+
+	h = heldTrack{Note: got, At: time.Now()}
+	c.mu.Lock()
+	c.songs[name] = h
+	c.mu.Unlock()
+	if c.dir != "" {
+		if data, err := json.Marshal(h); err == nil {
+			_ = os.WriteFile(filepath.Join(c.dir, name), data, 0o600)
+		}
+	}
+	return got, nil
+}
+
+// trackName is what a song's answer is filed under: what it was asked with.
+func trackName(k TrackKey) string {
+	return "track-" + safe(strings.ToLower(k.Artist+"-"+k.Title)) + ".json"
 }
 
 // lookup answers from memory, then from disk.

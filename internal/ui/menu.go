@@ -51,13 +51,22 @@ type menuBox struct {
 }
 
 // popup is what one of them holds: where it was opened, what it is about, and
-// the rows to choose from — already styled, because which of them is marked is
-// the caller's business.
+// the rows — already styled, because which of them is marked is the caller's
+// business.
 type popup struct {
 	x, y     int
 	title    string
 	subtitle string
 	rows     []string
+
+	// plain says the rows are something to read rather than something to
+	// choose. Nothing is marked, nothing is chosen, and the next thing anybody
+	// does puts it away — which is what somebody does with a paragraph.
+	plain bool
+
+	// want is how wide it would like to be, where its rows are wrapped to a
+	// width rather than being as long as they happen to be.
+	want int
 }
 
 // openPopup is whichever box is up, and whether one is.
@@ -74,6 +83,8 @@ func (m Model) openPopup() (popup, bool) {
 		}, true
 	case m.devices.open:
 		return m.devicesPopup(), true
+	case m.story:
+		return m.storyPopup(), true
 	}
 	return popup{}, false
 }
@@ -90,9 +101,18 @@ func (m Model) menuShape(l layout, p popup) menuBox {
 		want = max(want, lipgloss.Width(line)+2*menuPad+2)
 	}
 
+	if p.want > want {
+		want = p.want
+	}
+
 	left, right := leftMargin, l.interior-rightMargin
 	w := min(want, right-left)
-	h := len(p.rows) + menuChrome
+
+	// Never taller than the body it stands in. A menu of verbs never comes near
+	// this; a paragraph does — sixty lines of prose in a box on a terminal of
+	// thirty rows is a box that cannot be drawn at all, and one that is not
+	// drawn is worse than one that ends in a mark saying there is more.
+	h := min(len(p.rows)+menuChrome, l.bodyHeight)
 
 	x := min(max(p.x, left), right-w)
 
@@ -140,7 +160,14 @@ func (m Model) drawMenu(lines []string, l layout) []string {
 	line(m.styles.Title.Render(fit(p.title, inner-2*menuPad)))
 	line(m.styles.Artist.Render(fit(p.subtitle, inner-2*menuPad)))
 	put(pen.Render(pointerTee + rule + pointerTeeR))
-	for _, row := range p.rows {
+
+	// Only the rows it has room for, and a mark on the last of them where there
+	// were more. See menuShape.
+	room := box.h - menuChrome
+	for i, row := range p.rows[:min(len(p.rows), room)] {
+		if i == room-1 && room < len(p.rows) {
+			row = fit(row, inner-2*menuPad-1) + "…"
+		}
 		line(fit(row, inner-2*menuPad))
 	}
 	put(pen.Render(pointerElbow + rule + pointerBR))
@@ -187,6 +214,11 @@ func (m Model) menuVerbAt(l layout, x, y int) (int, bool) {
 	if x < box.x || x >= box.x+box.w || y < box.y || y >= box.y+box.h {
 		return -1, false
 	}
+	if p.plain {
+		// Nothing in it to choose. Being inside it is the whole answer.
+		return -1, true
+	}
+
 	// menuChrome-1 of the rows the box spends on itself are above the choices:
 	// the edge, the two lines naming what it is about, and the rule under them.
 	if at := y - box.y - (menuChrome - 1); at >= 0 && at < len(p.rows) {

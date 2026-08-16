@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -74,6 +75,79 @@ func (m *Model) tookNotes(msg notesTook) {
 	}
 	m.artists[msg.artist] = msg.got
 	delete(m.asking, msg.artist)
+}
+
+// songTook is what was learned about a song coming back.
+type songTook struct {
+	track string
+	got   notes.TrackNote
+}
+
+// askSong sends for what is written about the song that is playing, once.
+func (m *Model) askSong(id, artist, title string) tea.Cmd {
+	if m.notes == nil || id == "" || artist == "" || title == "" {
+		return nil
+	}
+	if _, held := m.songs[id]; held {
+		return nil
+	}
+	if m.askingSong == nil {
+		m.askingSong = map[string]bool{}
+	}
+	if m.askingSong[id] {
+		return nil
+	}
+	m.askingSong[id] = true
+
+	source := m.notes
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), notesWait)
+		defer cancel()
+
+		got, err := source.Track(ctx, notes.TrackKey{Artist: artist, Title: title})
+		if err != nil {
+			return songTook{track: id}
+		}
+		return songTook{track: id, got: got}
+	}
+}
+
+// tookSong files one.
+func (m *Model) tookSong(msg songTook) {
+	if m.songs == nil {
+		m.songs = map[string]notes.TrackNote{}
+	}
+	m.songs[msg.track] = msg.got
+	delete(m.askingSong, msg.track)
+}
+
+// syncSong asks after the record that is playing. Only that one: it is the one
+// somebody might want the story of, and asking after every row a cursor passes
+// would be a request a keystroke.
+func (m *Model) syncSong() tea.Cmd {
+	if m.ps == nil || m.ps.TrackID == "" {
+		return nil
+	}
+	return m.askSong(m.ps.TrackID, firstOf(m.ps.Artists), m.ps.Title)
+}
+
+// songNote is what is written about the record that is playing, and whether
+// anything is.
+func (m Model) songNote() (notes.TrackNote, bool) {
+	if m.ps == nil {
+		return notes.TrackNote{}, false
+	}
+	got, held := m.songs[m.ps.TrackID]
+	return got, held && got.Known()
+}
+
+// firstOf is the name a song is looked up under: the first artist on it.
+// Somebody's guest is not who the song is filed under anywhere.
+func firstOf(names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	return names[0]
 }
 
 // syncNotes asks after whatever artist the screen is about. Only an artist page:
@@ -179,3 +253,57 @@ func (m Model) notesPanel(w, rows int) []string {
 // because it is several databases at a request a second each and nothing is
 // waiting for it; the screen is already drawn.
 const notesWait = 30 * time.Second
+
+// storyWidth is how wide the box holding a song's story is drawn, where there is
+// room for it.
+//
+// Sixty is where a paragraph reads: much narrower and the eye jumps a line every
+// few words, much wider and it loses its place coming back. The same argument as
+// maxInfoCols, and the same number within a few columns.
+const storyWidth = 60
+
+// storyPopup is the box with what is written about the record that is playing.
+//
+// A box rather than a panel on the screen, because it is read once: it costs
+// nothing while it is shut, it stands over whatever you were looking at, and the
+// next thing you do puts it away. The same shape as the menu of verbs and the
+// list of devices — a short thing about something named at the top of it.
+func (m Model) storyPopup() popup {
+	got, _ := m.songNote()
+
+	var rows []string
+	for _, line := range wrapWords(got.Note, storyWidth) {
+		rows = append(rows, m.styles.Detail.Render(line))
+	}
+
+	// What it is worth to the rest of the world, under the words. Not instead of
+	// them: a number about a song nobody wrote anything about is a box holding
+	// one line, which is not worth opening.
+	if got.Listeners > 0 {
+		rows = append(rows, "", m.styles.Album.Render(fmt.Sprintf(
+			"%s listeners · %s plays", formatCount(got.Listeners), formatCount(got.Plays))))
+	}
+	if len(got.Tags) > 0 {
+		rows = append(rows, m.styles.Empty.Render(strings.Join(got.Tags[:min(len(got.Tags), 5)], " · ")))
+	}
+	if got.NoteFrom != "" {
+		rows = append(rows, "", m.styles.Empty.Render("from "+got.NoteFrom))
+	}
+
+	title, sub := "", ""
+	if m.ps != nil {
+		title, sub = m.ps.Title, strings.Join(m.ps.Artists, ", ")
+	}
+	return popup{
+		x: leftMargin + 2, y: tabBarHeight + 1,
+		title: title, subtitle: sub, rows: rows, plain: true, want: storyWidth + 4,
+	}
+}
+
+// storyAvailable reports whether there is anything to open. The key is not
+// offered where there is nothing behind it: a box that opens on nothing is worse
+// than a key that is not there.
+func (m Model) storyAvailable() bool {
+	got, ok := m.songNote()
+	return ok && got.Note != ""
+}

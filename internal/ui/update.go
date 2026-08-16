@@ -104,6 +104,12 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 	case tea.MouseReleaseMsg:
 		return m.mouseRelease(message)
 
+	case songTook:
+		// What somebody wrote about the record that is playing. It puts a key on
+		// the help bar and a box behind it — see notes.go.
+		m.tookSong(message)
+		return m, nil
+
 	case notesTook:
 		// What another database had to say about an artist: a paragraph, and a
 		// photograph of them where the picture beside it was the sleeve of
@@ -155,7 +161,7 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		m.noDevice = false
 		m.err = nil
 
-		cmds := []tea.Cmd{m.syncCover()}
+		cmds := []tea.Cmd{m.syncCover(), m.syncSong()}
 		if m.stillWaitingForTrackChange(message.State) {
 			cmds = append(cmds, refetchCmd(confirmRetry))
 		}
@@ -722,6 +728,14 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 	}
 
+	// The box with a song's story in it is read rather than worked in, so the
+	// next key — whatever it is — puts it away and is not otherwise spent. The
+	// same bargain the big screen makes.
+	if m.story {
+		m.story = false
+		return m, nil
+	}
+
 	// A query being written answers everything, the way the menu does: every
 	// printable key belongs to it while it is open.
 	if cmd, handled := m.findKey(k); handled {
@@ -792,6 +806,15 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		// the waveform they left running in the corner of a working screen.
 		m.stage.on, m.stage.mode = true, stageOpens
 		return m, tea.Batch(m.startScope(), keepAwake(true))
+
+	case m.pressed(k, m.keys.Story):
+		// Only where there is something behind it. A box that opens on nothing
+		// is worse than a key that does nothing.
+		if !m.storyAvailable() {
+			return m, nil
+		}
+		m.story = true
+		return m, nil
 
 	case m.pressed(k, m.keys.Lyrics):
 		if !m.lyricsAvailable() {

@@ -77,6 +77,11 @@ const (
 
 	keyLyrics = "l"
 
+	// keyStory opens what somebody wrote about the record that is playing. It is
+	// offered only where there is something behind it — see storyAvailable — and
+	// i is what every program uses for "tell me about this".
+	keyStory = "i"
+
 	// keyClose folds the band above the queue away, a block at a time, so the
 	// list has the rows. Not z, which is where y sits on a Hungarian keyboard
 	// and is awkward on both — a reason that has since gone: a binding is now

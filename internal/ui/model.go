@@ -155,6 +155,14 @@ type Model struct {
 	artists map[string]notes.Artist
 	asking  map[string]bool
 
+	// songs is the same for the records themselves: what somebody wrote about
+	// this song, where anybody did. Asked for only about what is playing.
+	songs      map[string]notes.TrackNote
+	askingSong map[string]bool
+
+	// story says the box with that in it is up. See notes.go.
+	story bool
+
 	// tiles are the library's wall: one picture per thing on it, keyed by the
 	// thing rather than by where it sits, so scrolling a row does not re-fetch
 	// what only moved. What has scrolled away is dropped — see syncGridCovers.
@@ -527,7 +535,7 @@ func (m Model) helpKeysWith(scope, lyrics, peek bool) tabKeys {
 		// keys that do nothing would be worse than a shorter bar.
 		return m.keys.forReadOnlyQueue()
 	case m.tab == tabPlayer:
-		return m.keys.forPlayer(scope, lyrics, peek, m.width)
+		return m.keys.forPlayer(scope, lyrics, peek, m.storyAvailable(), m.width)
 	default:
 		return m.keys.forTab(m.tab, scope)
 	}
