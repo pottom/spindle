@@ -20,6 +20,17 @@ type Playlist struct {
 	// Spotify makes is the only place the reason for the list is written down.
 	// It arrives as HTML entities and, sometimes, as markup.
 	Description string
+
+	// Snapshot is Spotify's own name for this version of the list, changed by
+	// every edit anybody makes to it.
+	//
+	// It is the cheapest true answer to "is what I read yesterday still right".
+	// A list read to its end is dozens of requests, and comparing the first page
+	// only catches an edit that touched the first page; this catches every edit
+	// there is, and it arrives with the list of playlists spindle already asks
+	// for. Empty where the backend does not report one, and then the first page
+	// is compared instead. See listcache.go.
+	Snapshot string
 }
 
 // plainText turns a playlist description into something a terminal can show.

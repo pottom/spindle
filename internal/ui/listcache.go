@@ -25,13 +25,20 @@ import (
 // with three thousand tracks in it used to arrive fifty at a time while you
 // watched, and now it is simply there.
 //
-// It is not trusted, though. The live first page is asked for at the same time,
-// and what it says decides: a first page that repeats what the head of the held
-// list already says is a list nobody has touched, and everything read past it
-// stands. A first page that differs is a list that changed, so it is thrown away
-// and read through again. That is the freshness check spindle can afford —
-// Spotify's own `snapshot_id` would be cheaper still and is not in the player
-// interface yet.
+// Whether it is trusted depends on what can be known.
+//
+// A playlist carries Spotify's own name for its version — `snapshot_id`, changed
+// by every edit anybody makes — and it arrives with the list of playlists
+// spindle already asks for, so it costs nothing. Where the one written down
+// beside the list still matches, the list *is* the list: nothing is asked at
+// all, and opening a playlist of three thousand tracks costs no requests.
+//
+// Where there is no snapshot to compare — an album, a page reached from a search
+// — the live first page is asked for beside the held list and decides: a first
+// page that repeats what the head already says is a list nobody has touched, and
+// everything read past it stands. That one is a guess rather than an answer: an
+// edit past the fiftieth track leaves the head alone. It is the best that can be
+// had without a snapshot, and albums are not edited.
 
 // listsHeld is how long a written-down list is worth reading back.
 //
@@ -45,7 +52,12 @@ type heldList struct {
 	Albums []player.Album    `json:"albums,omitempty"`
 	Lists  []player.Playlist `json:"playlists,omitempty"`
 	People []player.Artist   `json:"artists,omitempty"`
-	At     time.Time         `json:"at"`
+
+	// Snapshot is what Spotify called this version of the list when it was read.
+	// Where it is known and still matches, the held list is not merely probably
+	// right — it is the same list, and nothing has to be asked at all.
+	Snapshot string    `json:"snapshot,omitempty"`
+	At       time.Time `json:"at"`
 }
 
 // listsDir is where they are kept, or "" where nothing can be.
@@ -124,20 +136,26 @@ func openedName(kind openKind, id string) string {
 	return "open-" + kind.String() + "-" + id
 }
 
-// readOpened hands a written-down page back as though it had just been fetched.
+// readOpened hands a written-down page back as though it had just been fetched,
+// and says whether it is certainly still right.
 //
-// As though, because it is the same thing: a list, from the top, complete. The
-// live first page that follows it decides whether it was right — see adopt.
-func readOpened(kind openKind, id string) tea.Cmd {
+// As though, because it is the same thing: a list, from the top, complete.
+// Certainly, where Spotify's own name for this version of the list was written
+// down beside it and still matches: then nothing needs asking, and opening a
+// playlist of three thousand tracks costs no requests at all. Where it does not
+// match, or where there is no snapshot to compare, the live first page follows
+// and decides — see adopt.
+func readOpened(kind openKind, id, snapshot string) (tea.Cmd, bool) {
 	held, ok := readList(openedName(kind, id))
 	if !ok || (len(held.Tracks) == 0 && len(held.Albums) == 0) {
-		return nil
+		return nil, false
 	}
+	sure := snapshot != "" && held.Snapshot == snapshot
 	return func() tea.Msg {
 		return msg.OpenedFetched{
 			ID: id, Tracks: held.Tracks, Albums: held.Albums, Offset: 0, More: false,
 		}
-	}
+	}, sure
 }
 
 // keepOpened writes one down, once its last page has arrived.
@@ -147,7 +165,7 @@ func (m Model) keepOpened() tea.Cmd {
 		return nil
 	}
 	return keepList(openedName(page.kind, page.id), heldList{
-		Tracks: page.tracks, Albums: page.albums,
+		Tracks: page.tracks, Albums: page.albums, Snapshot: page.snapshot,
 	})
 }
 

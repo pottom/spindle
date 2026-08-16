@@ -29,6 +29,12 @@ type openPage struct {
 	// above the list can say it too without asking the backend again.
 	subtitle string
 
+	// snapshot is Spotify's own name for this version of the list, as the row
+	// it was opened from reported it. Empty for anything that has none — an
+	// album is not edited — and then the first page is compared instead. See
+	// listcache.go.
+	snapshot string
+
 	tracks []player.Track
 	albums []player.Album
 
@@ -93,6 +99,10 @@ func openedPlaylist(p player.Playlist) openPage {
 	return openPage{
 		kind: openPlaylist, id: p.ID, name: p.Name,
 		coverURL: p.CoverURL, subtitle: p.Owner,
+		// What Spotify calls this version of the list. It comes with the list of
+		// playlists, so it costs nothing, and it is what says whether a list
+		// written down yesterday is still the list. See listcache.go.
+		snapshot: p.Snapshot,
 	}
 }
 
@@ -165,14 +175,21 @@ func (m *Model) push(page openPage) tea.Cmd {
 	m.find = find{}
 
 	m.stack = append(m.stack, page)
-	return tea.Batch(
-		// What was read through last time, from the disk, at once — and the
-		// live first page beside it, which is what decides whether it still
-		// holds. See listcache.go.
-		readOpened(page.kind, page.id),
-		fetchOpenCmd(m.player, page.kind, page.id, 0),
-		m.syncCover(), m.syncNotes(), m.spinner.Tick,
-	)
+
+	// What was read through last time, from the disk, at once.
+	held, sure := readOpened(page.kind, page.id, page.snapshot)
+
+	cmds := []tea.Cmd{held, m.syncCover(), m.syncNotes(), m.spinner.Tick}
+	if !sure {
+		// And the live first page beside it, which is what decides whether it
+		// still holds. Not where Spotify's own name for this version of the
+		// list says it does: then the list is the list, and asking would be
+		// asking a question already answered. See listcache.go.
+		cmds = append(cmds, fetchOpenCmd(m.player, page.kind, page.id, 0))
+	} else {
+		m.stack[len(m.stack)-1].pages.loading = false
+	}
+	return tea.Batch(cmds...)
 }
 
 // pop goes back one page, and reports whether there was one to go back from.

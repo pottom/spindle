@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui/msg"
 )
@@ -95,9 +97,12 @@ func TestAListWrittenDownComesBack(t *testing.T) {
 	}
 	cmd()
 
-	back := readOpened(openPlaylist, "p1")
+	back, sure := readOpened(openPlaylist, "p1", "")
 	if back == nil {
 		t.Fatal("what was written down did not come back")
+	}
+	if sure {
+		t.Error("a list with no snapshot to compare was called certain")
 	}
 	got, ok := back().(msg.OpenedFetched)
 	if !ok {
@@ -108,7 +113,7 @@ func TestAListWrittenDownComesBack(t *testing.T) {
 	}
 
 	// Another list is another file.
-	if readOpened(openAlbum, "p1") != nil {
+	if other, _ := readOpened(openAlbum, "p1", ""); other != nil {
 		t.Error("an album read a playlist's list")
 	}
 
@@ -123,7 +128,90 @@ func TestAListWrittenDownComesBack(t *testing.T) {
 	if err := os.WriteFile(listPath(openedName(openPlaylist, "p2")), data, 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	if readOpened(openPlaylist, "p2") != nil {
+	if stale, _ := readOpened(openPlaylist, "p2", ""); stale != nil {
 		t.Error("a list older than it is worth was read back")
 	}
+}
+
+// Spotify's own name for a version of a playlist is the cheapest true answer to
+// "is this still the list". Where it matches, nothing is asked at all.
+func TestASnapshotThatMatchesNeedsNoRequest(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+
+	held := heldList{
+		Tracks:   []player.Track{{ID: "a"}, {ID: "b"}},
+		Snapshot: "snap-1",
+	}
+	keepList(openedName(openPlaylist, "p1"), held)()
+
+	if _, sure := readOpened(openPlaylist, "p1", "snap-1"); !sure {
+		t.Error("a list whose snapshot matches was not trusted")
+	}
+	if _, sure := readOpened(openPlaylist, "p1", "snap-2"); sure {
+		t.Error("a list that has been edited since was trusted")
+	}
+	if _, sure := readOpened(openPlaylist, "p1", ""); sure {
+		t.Error("a list was trusted against a snapshot nobody knows")
+	}
+}
+
+// And end to end: opening a playlist whose snapshot matches what was written
+// down asks the backend for nothing, and the list is there.
+func TestOpeningAKnownPlaylistAsksForNothing(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+
+	tracks := []player.Track{{ID: "a", Title: "one"}, {ID: "b", Title: "two"}}
+	keepList(openedName(openPlaylist, "p1"), heldList{Tracks: tracks, Snapshot: "snap-p1"})()
+
+	m := likedModel(t)
+	cmd := m.push(openedPlaylist(player.Playlist{ID: "p1", Name: "Deep Cuts", Snapshot: "snap-p1"}))
+	if cmd == nil {
+		t.Fatal("opening it did nothing at all")
+	}
+
+	// Nothing is in flight: the only thing that was going to arrive is the list
+	// off the disk.
+	if m.open().pages.loading {
+		t.Error("it went to the backend for a list it already holds")
+	}
+
+	// And what came off the disk is the list.
+	var tm tea.Model = m
+	tm = drain(tm, cmd)
+	if got := tm.(Model).open(); got.count() != len(tracks) {
+		t.Errorf("the list came back with %d tracks, want %d", got.count(), len(tracks))
+	}
+
+	// A playlist edited since is asked for.
+	fresh := likedModel(t)
+	fresh.push(openedPlaylist(player.Playlist{ID: "p1", Snapshot: "snap-changed"}))
+	if !fresh.open().pages.loading {
+		t.Error("a playlist that has been edited was taken from the disk unasked")
+	}
+}
+
+// drain runs a command and everything it hands back through the model, a batch
+// at a time, the way the framework would.
+func drain(tm tea.Model, cmd tea.Cmd) tea.Model {
+	for range 8 {
+		if cmd == nil {
+			return tm
+		}
+		out := cmd()
+		if batch, ok := out.(tea.BatchMsg); ok {
+			var next []tea.Cmd
+			for _, one := range batch {
+				if one == nil {
+					continue
+				}
+				var from tea.Cmd
+				tm, from = tm.Update(one())
+				next = append(next, from)
+			}
+			cmd = tea.Batch(next...)
+			continue
+		}
+		tm, cmd = tm.Update(out)
+	}
+	return tm
 }

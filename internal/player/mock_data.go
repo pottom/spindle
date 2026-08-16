@@ -116,21 +116,24 @@ type mockPlaylistDef struct {
 	trackIDs []string
 }
 
+// Their snapshots are made up, and they are made up the same way every run: a
+// mock whose playlists changed on every launch would make the cache that
+// compares them useless exactly where it is looked at. See listcache.go.
 var mockPlaylists = []mockPlaylistDef{
 	{
-		Playlist: Playlist{ID: "p1", Name: "Deep Cuts", Owner: "you", CoverURL: coverOpera},
+		Playlist: Playlist{ID: "p1", Snapshot: "snap-p1", Name: "Deep Cuts", Owner: "you", CoverURL: coverOpera},
 		trackIDs: []string{"t05", "t07", "t09", "t10", "t14", "t06"},
 	},
 	{
-		Playlist: Playlist{ID: "p2", Name: "Bowie Essentials", Owner: "Spotify", CoverURL: coverBowie},
+		Playlist: Playlist{ID: "p2", Snapshot: "snap-p2", Name: "Bowie Essentials", Owner: "Spotify", CoverURL: coverBowie},
 		trackIDs: []string{"t03", "t11", "t12", "t13", "t14", "t02"},
 	},
 	{
-		Playlist: Playlist{ID: "p3", Name: "Live & Loud", Owner: "you", CoverURL: coverBudapest},
+		Playlist: Playlist{ID: "p3", Snapshot: "snap-p3", Name: "Live & Loud", Owner: "you", CoverURL: coverBudapest},
 		trackIDs: []string{"t16", "t18", "t17", "t15", "t04"},
 	},
 	{
-		Playlist: Playlist{ID: "p4", Name: "Queen Forever", Owner: "you", CoverURL: coverHotSpace},
+		Playlist: Playlist{ID: "p4", Snapshot: "snap-p4", Name: "Queen Forever", Owner: "you", CoverURL: coverHotSpace},
 		trackIDs: []string{"t01", "t02", "t05", "t06", "t07", "t08", "t09", "t10", "t16"},
 	},
 }

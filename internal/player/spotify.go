@@ -277,6 +277,7 @@ func (s *Spotify) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist]
 			ID          string          `json:"id"`
 			Name        string          `json:"name"`
 			Description string          `json:"description"`
+			Snapshot    string          `json:"snapshot_id"`
 			Images      []spotify.Image `json:"images"`
 			Owner       struct {
 				DisplayName string `json:"display_name"`
@@ -308,6 +309,7 @@ func (s *Spotify) PlaylistsPage(ctx context.Context, offset int) (Page[Playlist]
 			CoverURL:    bestImage(item.Images),
 			Tracks:      max(item.Tracks.Total, item.Contents.Total),
 			Description: plainText(item.Description),
+			Snapshot:    item.Snapshot,
 		})
 	}
 	return Page[Playlist]{Items: out, More: page.Next != "", Next: start + pageLimit}, nil
