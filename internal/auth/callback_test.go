@@ -14,7 +14,7 @@ func TestCallbackCapturesTheCode(t *testing.T) {
 	}
 	defer server.close()
 
-	resp, err := http.Get("http://" + callbackAddr() + callbackPath + "?code=abc123&state=xyz")
+	resp, err := http.Get("http://" + callbackAddr() + CallbackPath() + "?code=abc123&state=xyz")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestCallbackReportsRefusal(t *testing.T) {
 	}
 	defer server.close()
 
-	resp, err := http.Get("http://" + callbackAddr() + callbackPath + "?error=access_denied&state=xyz")
+	resp, err := http.Get("http://" + callbackAddr() + CallbackPath() + "?error=access_denied&state=xyz")
 	if err != nil {
 		t.Fatal(err)
 	}

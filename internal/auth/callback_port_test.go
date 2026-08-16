@@ -39,7 +39,7 @@ func TestWhereTheBrowserComesBackToIsASetting(t *testing.T) {
 	}
 	// The listener and the address Spotify is told must agree, or the browser
 	// comes back to a door nobody is behind.
-	if !strings.HasSuffix(RedirectURI(), callbackAddr()+callbackPath) {
+	if !strings.HasSuffix(RedirectURI(), callbackAddr()+CallbackPath()) {
 		t.Errorf("the address %q and the listener %q have come apart", RedirectURI(), callbackAddr())
 	}
 

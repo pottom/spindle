@@ -16,7 +16,21 @@ const (
 	// why the number lives there rather than here.
 	defaultCallbackPort = 3679
 
-	callbackPath = "/callback"
+	// ncspotClientID is another terminal player's registration, and the reason
+	// this file knows about anybody else's. It is registered in Spotify's
+	// extended quota mode and predates the 2024 changes to the Web API, so it is
+	// not held to the daily cap a newly registered application is — which is the
+	// cap a window left open for a day can reach. spotify-player ships it as its
+	// default for exactly that reason, and warns anyone who sets their own.
+	//
+	// spindle does not ship it. It is here so that setting it in the environment
+	// works rather than failing at the browser: an id and the address its
+	// registration sends the browser back to are a pair, and this one's is a
+	// loopback port of any number with /login on the end.
+	ncspotClientID = "d420a117a32841c2b3474932e49fb54b"
+
+	ownCallbackPath    = "/callback"
+	ncspotCallbackPath = "/login"
 
 	clientIDEnv = "SPINDLE_CLIENT_ID"
 	lastFMEnv   = "SPINDLE_LASTFM_KEY"
@@ -28,7 +42,19 @@ const (
 // RedirectURI is where Spotify sends the browser back to. It must match the
 // application's own configuration character for character; Spotify no longer
 // accepts "localhost" here, only the literal loopback address.
-func RedirectURI() string { return "http://" + callbackAddr() + callbackPath }
+func RedirectURI() string { return "http://" + callbackAddr() + CallbackPath() }
+
+// CallbackPath is the part of the address Spotify checks against what the
+// application registered. It belongs to the client id rather than to spindle:
+// an application somebody else registered sends the browser wherever they said
+// it would go, and a mismatched path is refused after the login rather than
+// before it — which is a long way from the cause.
+func CallbackPath() string {
+	if id, err := ClientID(); err == nil && id == ncspotClientID {
+		return ncspotCallbackPath
+	}
+	return ownCallbackPath
+}
 
 // callbackAddr is what the callback server listens on.
 func callbackAddr() string { return "127.0.0.1:" + strconv.Itoa(CallbackPort()) }

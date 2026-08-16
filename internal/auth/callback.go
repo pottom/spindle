@@ -48,7 +48,7 @@ func listenForCallback() (*callbackServer, error) {
 
 	c := &callbackServer{results: make(chan callbackResult, 1)}
 	mux := http.NewServeMux()
-	mux.HandleFunc(callbackPath, c.handle)
+	mux.HandleFunc(CallbackPath(), c.handle)
 	c.srv = &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 
 	go c.srv.Serve(ln) //nolint:errcheck // Serve always ends in ErrServerClosed here
