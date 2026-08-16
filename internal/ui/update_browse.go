@@ -426,22 +426,32 @@ func (m *Model) openSearchHit() tea.Cmd {
 // at a time, and what has not been scrolled to has not been asked for.
 func (m *Model) playOpenList(offset int) playRequest {
 	page := m.open()
+
+	// Which track that position is, as well as the position itself. Spotify is
+	// told the position and works out the track; the daemon is told the track
+	// and finds it — and the daemon is the one that still answers when Spotify
+	// has asked the account to be left alone. See Local.PlayContextFrom.
+	var from string
+	if t := at(page.tracks, offset); t != nil {
+		from = t.ID
+	}
+
 	switch {
 	case page.kind == openAlbum:
 		uri := player.AlbumURI(page.id)
 		return playRequest{
 			action: "play album",
 			call: func(ctx context.Context, p player.Player) error {
-				return p.PlayContextAt(ctx, uri, offset)
+				return p.PlayContextFrom(ctx, uri, from, offset)
 			},
 		}
 
 	case !isLiked(page.id):
-		id := page.id
+		uri := "spotify:playlist:" + page.id
 		return playRequest{
 			action: "play playlist",
 			call: func(ctx context.Context, p player.Player) error {
-				return p.PlayPlaylist(ctx, id, offset)
+				return p.PlayContextFrom(ctx, uri, from, offset)
 			},
 		}
 

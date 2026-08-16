@@ -106,6 +106,18 @@ type Player interface {
 	// album or playlist follows the track that was picked.
 	PlayContextAt(ctx context.Context, uri string, offset int) error
 
+	// PlayContextFrom is that again, naming the track as well as its place.
+	//
+	// Both, because the two backends start a list in different ways. Spotify is
+	// told a position and works out the rest; our own daemon is told which track
+	// and finds it — and the daemon is the one that still works when Spotify has
+	// asked the account to be left alone, which is exactly when somebody is
+	// pressing enter and hearing nothing.
+	//
+	// The track may be empty, and then it is the position alone. See
+	// Local.PlayContextFrom.
+	PlayContextFrom(ctx context.Context, uri, trackID string, offset int) error
+
 	// PlayTracks starts a list of tracks named one by one, from the given
 	// position, and everything after it follows.
 	//

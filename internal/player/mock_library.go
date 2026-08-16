@@ -43,14 +43,25 @@ func (m *Mock) AlbumTracks(ctx context.Context, albumID string, offset int) (Pag
 		return Page[Track]{}, fmt.Errorf("album tracks: unknown album %q", albumID)
 	}
 
+	return mockPage(mockAlbumTracks(album.Name), offset), nil
+}
+
+// mockAlbumTracks is a record's own track list, in the order it plays.
+//
+// Its own function because two things ask: the list, and whatever has to say
+// where in the list a track sits. Answered twice, from the same catalogue, they
+// came out in different orders — the list is sorted by track number and the
+// other walked the catalogue as written — and a play that named a track landed
+// on a different one.
+func mockAlbumTracks(name string) []Track {
 	var out []Track
 	for _, t := range mockCatalogue {
-		if t.Album == album.Name {
+		if t.Album == name {
 			out = append(out, t)
 		}
 	}
 	slices.SortFunc(out, func(a, b Track) int { return a.TrackNumber - b.TrackNumber })
-	return mockPage(out, offset), nil
+	return out
 }
 
 func (m *Mock) ArtistAlbums(ctx context.Context, artistID string, offset int) (Page[Album], error) {

@@ -466,6 +466,13 @@ func (s *Spotify) PlayContextAt(ctx context.Context, uri string, offset int) err
 	return s.PlayContextAtOn(ctx, uri, offset, "")
 }
 
+// PlayContextFrom is the same: Spotify is told a position and works out which
+// track that is, so the track named beside it is of no use here. It is there for
+// the backend that can only be told which track. See Local.PlayContextFrom.
+func (s *Spotify) PlayContextFrom(ctx context.Context, uri, _ string, offset int) error {
+	return s.PlayContextAtOn(ctx, uri, offset, "")
+}
+
 // PlayContextAtOn is PlayContextAt aimed at one device. See PlayTrackOn for why
 // the device has to be named.
 func (s *Spotify) PlayContextAtOn(ctx context.Context, uri string, offset int, deviceID string) error {

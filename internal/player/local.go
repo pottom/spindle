@@ -354,14 +354,47 @@ func (l *Local) PlayFrom(ctx context.Context, trackID string) error {
 }
 
 func (l *Local) PlayContext(ctx context.Context, uri string) error {
-	return l.web.PlayContextOn(ctx, uri, l.deviceID())
+	return l.PlayContextFrom(ctx, uri, "", 0)
+}
+
+// PlayContextFrom starts an album or a playlist at one of its tracks, through
+// the daemon where the daemon is the one playing.
+//
+// It went to the Web API always, and that is a request Spotify can refuse — and
+// does, for a whole day, once an account has asked too much of it. Measured on
+// this account: the daemon's own log carries "put state request failed with
+// status 429: Too many requests for user" while it goes on playing perfectly
+// well, so a play routed through Spotify vanishes without a word and a play sent
+// to the daemon works.
+//
+// The daemon takes the context and the track to skip to; Spotify takes the
+// context and a position. Both are passed in for that reason.
+func (l *Local) PlayContextFrom(ctx context.Context, uri, trackID string, offset int) error {
+	if l.Live() {
+		body := struct {
+			Uri       string `json:"uri"`
+			SkipToUri string `json:"skip_to_uri,omitempty"`
+			Paused    bool   `json:"paused"`
+		}{Uri: uri}
+		if trackID != "" {
+			body.SkipToUri = trackURI(trackID)
+		}
+		if err := l.post(ctx, "/player/play", body); err == nil {
+			return nil
+		}
+	}
+	return l.web.PlayContextAtOn(ctx, uri, offset, l.deviceID())
 }
 
 func (l *Local) PlayPlaylist(ctx context.Context, playlistID string, offset int) error {
-	return l.web.PlayPlaylistOn(ctx, playlistID, offset, l.deviceID())
+	return l.PlayContextFrom(ctx, "spotify:playlist:"+playlistID, "", offset)
 }
 
 func (l *Local) PlayContextAt(ctx context.Context, uri string, offset int) error {
+	return l.PlayContextFrom(ctx, uri, "", offset)
+}
+
+func (l *Local) playContextAtWeb(ctx context.Context, uri string, offset int) error {
 	return l.web.PlayContextAtOn(ctx, uri, offset, l.deviceID())
 }
 

@@ -505,6 +505,50 @@ func (m *Mock) PlayContext(ctx context.Context, uri string) error {
 }
 
 // PlayContextAt is the same from a chosen place in it.
+// positionIn is where a track sits in a context, or -1 where it is not in it.
+func (m *Mock) positionIn(uri, trackID string) int {
+	kind, id, ok := strings.Cut(strings.TrimPrefix(uri, "spotify:"), ":")
+	if !ok {
+		return -1
+	}
+
+	var ids []string
+	switch kind {
+	case "playlist":
+		for _, p := range mockPlaylists {
+			if p.ID == id {
+				ids = p.trackIDs
+			}
+		}
+	case "album":
+		album := mockAlbumByID(id)
+		if album == nil {
+			return -1
+		}
+		for _, t := range mockAlbumTracks(album.Name) {
+			ids = append(ids, t.ID)
+		}
+	}
+	for i, one := range ids {
+		if one == trackID {
+			return i
+		}
+	}
+	return -1
+}
+
+// PlayContextFrom starts a context at a track, which the mock does by its
+// position: it has no state machine to search, and the position is what its
+// lists are ordered by anyway.
+func (m *Mock) PlayContextFrom(ctx context.Context, uri, trackID string, offset int) error {
+	if trackID != "" {
+		if at := m.positionIn(uri, trackID); at >= 0 {
+			offset = at
+		}
+	}
+	return m.PlayContextAt(ctx, uri, offset)
+}
+
 func (m *Mock) PlayContextAt(ctx context.Context, uri string, offset int) error {
 	kind, id, ok := strings.Cut(strings.TrimPrefix(uri, "spotify:"), ":")
 	if !ok {
