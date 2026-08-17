@@ -312,7 +312,7 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			return m.switchTab(tabPlayer), true
 		}
 		m.search.input.SetValue("")
-		m.search.found = nil
+		m.forgetFound()
 		return m.syncCover(), true
 	}
 
@@ -369,10 +369,23 @@ func (m *Model) searchTypingKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	// A new query starts over in every kind: the counts beside it have to be
 	// about what is on screen now.
 	m.search.seq++
-	m.search.found = nil
-	m.search.top = topResult{}
+	m.forgetFound()
 	m.pagesOf(m.search.kind).loading = true
 	return tea.Batch(cmd, searchSettleCmd(m.search.seq), m.spinner.Tick), true
+}
+
+// forgetFound throws away what the last query matched — every kind of it, and
+// which of them answered best.
+//
+// One place, because the strongest answer is a place in a list rather than a
+// copy of what is there: clearing the lists and keeping the place left the
+// screen counting one result it could no longer name, and drawing the whole
+// scaffolding of a list — a band, a bar of views, a row of column names —
+// around a blank row, on a screen where nothing had been searched for.
+// Reported from a real screen. See topResult.
+func (m *Model) forgetFound() {
+	m.search.found = nil
+	m.search.top = topResult{}
 }
 
 // startTyping hands the keyboard to the query, from whichever tab asked.

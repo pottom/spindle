@@ -161,3 +161,40 @@ func TestTheSearchBandCarriesTheArtistNotes(t *testing.T) {
 		t.Errorf("with nothing known the band = %q, want Spotify's own facts", band)
 	}
 }
+
+// A screen with no query on it may not wear the furniture of a list of answers.
+//
+// Clearing the query threw away every kind's results and kept which of them had
+// answered best, which is a place in a list rather than a copy of what was
+// there: the screen went on counting one result it could no longer name, and
+// drew a band, a bar of views and a row of column names round a blank row.
+// Reported from a real screen. See forgetFound.
+func TestClearingTheQueryLeavesNoFurniture(t *testing.T) {
+	m := searched(t, "queen", player.Results{
+		Tracks:  page(player.Track{ID: "t1", Title: "Bohemian Rhapsody", Artists: []string{"Queen"}}),
+		Artists: page(player.Artist{ID: "a1", Name: "Queen", Followers: 42_000_000}),
+	})
+
+	// Escape, twice: the first hands the results to the keyboard, the second
+	// clears the query.
+	for range 2 {
+		tm, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+		m = tm.(Model)
+	}
+	if got := m.search.input.Value(); got != "" {
+		t.Fatalf("the query = %q, want it cleared", got)
+	}
+
+	if n := m.counted(); n != 0 {
+		t.Errorf("the screen counts %d results with no query", n)
+	}
+	screen := plain(strings.Join(m.searchPaneView(m.layout(), m.layout().bodyHeight), "\n"))
+	for _, gone := range []string{"all ", "title", "artist", "album"} {
+		if strings.Contains(screen, gone) {
+			t.Errorf("the empty screen still shows %q:\n%s", gone, screen)
+		}
+	}
+	if !strings.Contains(screen, "Type to search") {
+		t.Errorf("the empty screen does not invite a search:\n%s", screen)
+	}
+}

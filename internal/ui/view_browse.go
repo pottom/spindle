@@ -983,7 +983,10 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 	// cover to show, so the band they live in is not reserved: the field goes
 	// to the top of the screen, where a search box belongs, rather than sitting
 	// halfway down behind a wall of blank rows.
-	if m.counted() == 0 {
+	// Nothing asked is the same screen as nothing found, whatever is still lying
+	// about in the buckets: a screen with no query on it may not wear the
+	// furniture of a list of answers.
+	if m.counted() == 0 || strings.TrimSpace(m.search.input.Value()) == "" {
 		w := queueBlockWidth(l)
 
 		// A query still in flight looks exactly like one that matched nothing,
