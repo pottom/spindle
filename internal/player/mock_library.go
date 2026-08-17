@@ -14,7 +14,7 @@ func (m *Mock) LikedTracks(ctx context.Context, offset int) (Page[Track], error)
 	if err := m.delay(ctx); err != nil {
 		return Page[Track]{}, err
 	}
-	return mockPage(tracksByID(mockLikedIDs), offset), nil
+	return mockPage(tracksByID(m.savedIDs()), offset), nil
 }
 
 func (m *Mock) SavedAlbums(ctx context.Context, offset int) (Page[Album], error) {

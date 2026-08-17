@@ -63,6 +63,21 @@ func (m Model) actionsFor(t player.Track) []verb {
 		},
 	}}
 
+	// The one verb that says which way it goes: a heart is a state, and a menu
+	// that offered "Like" over a track already liked would be lying about what
+	// pressing it does.
+	if m.canSave() {
+		label := "Save to your liked songs"
+		if m.library.saved(id) {
+			label = "Remove from your liked songs"
+		}
+		verbs = append(verbs, verb{
+			key:   keyLike,
+			label: label,
+			do:    func(m *Model) tea.Cmd { return m.toggleSaved() },
+		})
+	}
+
 	if m.tab == tabQueue {
 		verbs = append(verbs, verb{
 			key:   keyDrop,

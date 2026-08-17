@@ -25,16 +25,17 @@ func TestEveryKeyNamedIsAKeyRead(t *testing.T) {
 	read := keysRead(k)
 
 	bars := map[string]tabKeys{
-		"no device":   k.forNoDevice(),
-		"devices":     k.forDevices(),
-		"read-only":   k.forReadOnlyQueue(),
-		"player":      k.forPlayer(true, true, true, true, 200),
-		"player bare": k.forPlayer(false, false, false, false, 200),
-		"open album":  k.forOpen(true, true),
-		"open list":   k.forOpen(false, false),
+		"no device":    k.forNoDevice(),
+		"devices":      k.forDevices(),
+		"read-only":    k.forReadOnlyQueue(true),
+		"player":       k.forPlayer(true, true, true, true, 200),
+		"player bare":  k.forPlayer(false, false, false, false, 200),
+		"open album":   k.forOpen(true, true, true),
+		"open list":    k.forOpen(false, false, true),
+		"open unliked": k.forOpen(false, false, false),
 	}
 	for tab := tabID(0); tab < tabCount; tab++ {
-		bars["tab "+tab.String()] = k.forTab(tab, true)
+		bars["tab "+tab.String()] = k.forTab(tab, true, true)
 	}
 
 	for where, bar := range bars {

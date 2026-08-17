@@ -85,6 +85,7 @@ type keyMap struct {
 	SearchKindBack key.Binding
 
 	Enqueue key.Binding
+	Like    key.Binding
 	// PlayOne plays the track under the cursor and nothing else, where enter
 	// would have played the list it belongs to.
 	PlayOne key.Binding
@@ -303,6 +304,10 @@ func newKeyMap() keyMap {
 			key.WithKeys(keyActionsHeld),
 			key.WithHelp(keyActionsHeld, "actions"),
 		),
+		Like: key.NewBinding(
+			key.WithKeys(keyLike),
+			key.WithHelp(keyLike, "like / unlike"),
+		),
 		Enqueue: key.NewBinding(
 			key.WithKeys(keyEnqueue),
 			key.WithHelp(keyEnqueue, "add to queue"),
@@ -447,14 +452,18 @@ func (k keyMap) forDevices() tabKeys {
 }
 
 // forReadOnlyQueue is the help for a queue that can be walked but not edited.
-func (k keyMap) forReadOnlyQueue() tabKeys {
+func (k keyMap) forReadOnlyQueue(like bool) tabKeys {
+	short := []key.Binding{
+		selectHint,
+		terse(k.Enter, "play"),
+	}
+	// Liking is nothing to do with whose device is playing: the collection is
+	// the account's, and a queue that can only be read can still be liked from.
+	if like {
+		short = append(short, terse(k.Like, "like"))
+	}
 	return tabKeys{
-		short: []key.Binding{
-			selectHint,
-			terse(k.Enter, "play"),
-			terse(k.NextTab, "switch"),
-			terse(k.Help, "help"),
-		},
+		short: append(short, terse(k.NextTab, "switch"), terse(k.Help, "help")),
 		full: [][]key.Binding{
 			{k.Down, k.Enter, k.NextTab, k.GoTab},
 			{k.PlayPause, k.Next, k.Help, k.Quit},
@@ -544,7 +553,7 @@ func (k keyMap) forPlayer(scope, lyrics, peek, story bool, width int) tabKeys {
 // be drawn, and never changes the bar's height, which the layout depends on.
 // forOpen is the help for an opened playlist, album or artist. An artist's list
 // is of records, so what enter does there is open one rather than play it.
-func (k keyMap) forOpen(albums, scope bool) tabKeys {
+func (k keyMap) forOpen(albums, scope, like bool) tabKeys {
 	enter := terse(k.Enter, "play")
 	if albums {
 		enter = terse(k.Enter, "open")
@@ -563,6 +572,10 @@ func (k keyMap) forOpen(albums, scope bool) tabKeys {
 		short = append(short, terse(k.Scope, "vis"))
 		second = append(second, k.Scope)
 	}
+	if like && !albums {
+		short = append(short, terse(k.Like, "like"))
+		second = append(second, k.Like)
+	}
 	return tabKeys{
 		short: append(short, terse(k.Help, "help")),
 		full: [][]key.Binding{
@@ -573,7 +586,7 @@ func (k keyMap) forOpen(albums, scope bool) tabKeys {
 	}
 }
 
-func (k keyMap) forTab(t tabID, scope bool) tabKeys {
+func (k keyMap) forTab(t tabID, scope, like bool) tabKeys {
 	switch t {
 	case tabQueue:
 		short := []key.Binding{
@@ -588,6 +601,10 @@ func (k keyMap) forTab(t tabID, scope bool) tabKeys {
 		if scope {
 			short = append(short, terse(k.Scope, "vis"))
 			second = append(second, k.Scope)
+		}
+		if like {
+			short = append(short, terse(k.Like, "like"))
+			second = append(second, k.Like)
 		}
 		return tabKeys{
 			short: append(short, terse(k.Help, "help")),

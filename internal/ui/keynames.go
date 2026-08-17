@@ -77,6 +77,13 @@ const (
 
 	keyLyrics = "l"
 
+	// keyLike saves the track under the cursor, or takes it back out. h for
+	// heart, which is what the column it fills in is drawn with. Offered only
+	// where the backend can do it at all: an application Spotify registered
+	// after 2024 is refused the whole family of library writes, and a key that
+	// cannot work is worse than no key. See player.Collector.
+	keyLike = "h"
+
 	// keyStory opens what somebody wrote about the record that is playing. It is
 	// offered only where there is something behind it — see storyAvailable — and
 	// i is what every program uses for "tell me about this".

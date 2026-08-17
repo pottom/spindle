@@ -105,6 +105,10 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 	case tea.MouseReleaseMsg:
 		return m.mouseRelease(message)
 
+	case savedTook:
+		// A heart that has reached Spotify, or has not. See collect.go.
+		return m, m.tookSaved(message)
+
 	case songTook:
 		// What somebody wrote about the record that is playing. It puts a key on
 		// the help bar and a box behind it — see notes.go.

@@ -446,6 +446,11 @@ func (l *Local) OwnDevice() string { return l.deviceID() }
 // Everything the daemon does not know about.
 
 func (l *Local) Devices(ctx context.Context) ([]Device, error) { return l.web.Devices(ctx) }
+
+// What the account has saved is the Web API's business: the daemon plays music
+// and knows nothing about a collection. See collect.go.
+func (l *Local) Save(ctx context.Context, trackID string) error   { return l.web.Save(ctx, trackID) }
+func (l *Local) Unsave(ctx context.Context, trackID string) error { return l.web.Unsave(ctx, trackID) }
 func (l *Local) TransferTo(ctx context.Context, id string, playing bool) error {
 	return l.web.TransferTo(ctx, id, playing)
 }

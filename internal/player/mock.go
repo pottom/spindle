@@ -31,6 +31,11 @@ type Mock struct {
 	volume    int
 	deviceID  string
 	devices   []Device
+
+	// saved is what this account has liked. A set rather than the slice the
+	// catalogue names, because the mock is where the like key is exercised and
+	// a key that cannot change anything proves nothing.
+	saved map[string]bool
 }
 
 // NewMock returns a mock player already playing the first track.
@@ -43,6 +48,7 @@ func NewMock() *Mock {
 		volume:   72,
 		deviceID: "mock-macbook",
 		devices:  mockDevices(),
+		saved:    mockSaved(),
 	}
 	m.startedAt = m.now()
 	return m
@@ -728,6 +734,62 @@ func (m *Mock) Waveform() []float32 {
 				math.Sin(x*81-t*8.2)*0.19 +
 				math.Sin(x*193+t*17.0)*0.085*(0.4+beat),
 		)
+	}
+	return out
+}
+
+// mockSaved is the catalogue's liked tracks as a set the key can change.
+func mockSaved() map[string]bool {
+	out := make(map[string]bool, len(mockLikedIDs))
+	for _, id := range mockLikedIDs {
+		out[id] = true
+	}
+	return out
+}
+
+// Save and Unsave are the like key against the mock. Idempotent, as the real
+// ones are: pressing it twice is the way it is used. See collect.go.
+func (m *Mock) Save(ctx context.Context, trackID string) error {
+	return m.collect(ctx, trackID, true)
+}
+
+func (m *Mock) Unsave(ctx context.Context, trackID string) error {
+	return m.collect(ctx, trackID, false)
+}
+
+func (m *Mock) collect(ctx context.Context, trackID string, saved bool) error {
+	if err := m.delay(ctx); err != nil {
+		return err
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.saved == nil {
+		m.saved = mockSaved()
+	}
+	if saved {
+		m.saved[trackID] = true
+	} else {
+		delete(m.saved, trackID)
+	}
+	return nil
+}
+
+// savedIDs is what has been liked, in the catalogue's own order so that a list
+// of them reads the same twice running.
+func (m *Mock) savedIDs() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.saved == nil {
+		return slices.Clone(mockLikedIDs)
+	}
+	out := make([]string, 0, len(m.saved))
+	for _, t := range mockCatalogue {
+		if m.saved[t.ID] {
+			out = append(out, t.ID)
+		}
 	}
 	return out
 }

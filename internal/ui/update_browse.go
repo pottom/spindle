@@ -64,6 +64,17 @@ func (m *Model) switchTab(t tabID) tea.Cmd {
 // browseKey handles the keys belonging to the playlists and search tabs. It
 // returns handled=false for anything the caller should deal with itself.
 func (m *Model) browseKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
+	// The heart, on every list of tracks there is: the queue, a playlist, an
+	// album, the saved songs themselves, what a search found. Here rather than
+	// in each of their switches because it is one act on one kind of thing, and
+	// it acts only where there is a track under the cursor and a column to draw
+	// the answer in. Not while a query is being typed, where h is an h.
+	//
+	// See collect.go, and player.Collector for why it can be missing entirely.
+	if m.pressed(k, m.keys.Like) && !m.search.typing && m.canSave() && m.cursorTrack() != nil {
+		return m.toggleSaved(), true
+	}
+
 	// Whatever is open is the screen, whichever tab it was opened from.
 	if cmd, done := m.openKey(k); done {
 		return cmd, true

@@ -160,6 +160,12 @@ type Model struct {
 	songs      map[string]notes.TrackNote
 	askingSong map[string]bool
 
+	// noSaving says Spotify has refused this application the library writes, so
+	// the like key is not offered again this run. It is the registration that is
+	// refused rather than the account, and that does not change while spindle is
+	// open. See collect.go.
+	noSaving bool
+
 	// story says the box with that in it is up, and storyAt how far down it has
 	// been scrolled. A paragraph is longer than a terminal. See notes.go.
 	story   bool
@@ -548,15 +554,15 @@ func (m Model) helpKeysWith(scope, lyrics, peek bool) tabKeys {
 	case m.open() != nil:
 		// What is open is the screen, and its keys are the same wherever it was
 		// opened from — which is the whole reason it is one screen.
-		return m.keys.forOpen(m.open().holdsAlbums(), scope)
+		return m.keys.forOpen(m.open().holdsAlbums(), scope, m.canSave())
 	case m.tab == tabQueue && !m.editable():
 		// Against a device that is not ours the queue can only be read. Listing
 		// keys that do nothing would be worse than a shorter bar.
-		return m.keys.forReadOnlyQueue()
+		return m.keys.forReadOnlyQueue(m.canSave())
 	case m.tab == tabPlayer:
 		return m.keys.forPlayer(scope, lyrics, peek, m.storyAvailable(), m.width)
 	default:
-		return m.keys.forTab(m.tab, scope)
+		return m.keys.forTab(m.tab, scope, m.canSave())
 	}
 }
 
