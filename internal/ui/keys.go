@@ -136,15 +136,15 @@ func newKeyMap() keyMap {
 		),
 		Prev: key.NewBinding(key.WithKeys(keyPrev)),
 		SeekFwd: key.NewBinding(
-			key.WithKeys(keySeekFwd, keySeekFwdAlt),
-			key.WithHelp("← / →", "seek ∓5s"),
+			key.WithKeys(keySeekFwd, keySeekFwdAlt, keySeekFwdAny),
+			key.WithHelp("← → or < >", "seek ∓5s"),
 		),
-		SeekBack: key.NewBinding(key.WithKeys(keySeekBack, keySeekBackAlt)),
+		SeekBack: key.NewBinding(key.WithKeys(keySeekBack, keySeekBackAlt, keySeekBackAny)),
 		VolUp: key.NewBinding(
-			key.WithKeys(keyVolUp, keyVolUpAlt),
-			key.WithHelp("↑ / ↓", "volume ±5"),
+			key.WithKeys(keyVolUp, keyVolUpAlt, keyVolUpAny, keyVolUpMore),
+			key.WithHelp("↑ ↓ or + −", "volume ±5"),
 		),
-		VolDown: key.NewBinding(key.WithKeys(keyVolDown, keyVolDownAlt)),
+		VolDown: key.NewBinding(key.WithKeys(keyVolDown, keyVolDownAlt, keyVolDownAny)),
 		Shuffle: key.NewBinding(
 			key.WithKeys(keyShuffle),
 			key.WithHelp(keyShuffle, "shuffle"),

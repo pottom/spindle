@@ -36,12 +36,9 @@ const (
 	osdWidth = 23
 	osdBar   = osdWidth - 4
 
-	// osdSpeaker is the glyph for the volume, and osdMute for none of it. Two
-	// shapes rather than one that changes colour, because the whole point of
-	// the thing is to be read at a glance and from the corner of an eye.
-	osdSpeaker = "🕪"
-	osdMute    = "🕨"
-	osdSeek    = "⏱"
+	// osdFoot is how many rows are kept clear under it: the notice line and the
+	// help bar, which are the other things on the screen that answer a key.
+	osdFoot = 2
 )
 
 // osdKind is what the card is about.
@@ -94,7 +91,17 @@ func (m Model) osdOver(screen string) string {
 	}
 
 	lines := strings.Split(screen, "\n")
-	top := max((len(lines)-len(card))/2, 0)
+
+	// In the middle of the lower half rather than of the whole screen. What the
+	// card is about is the sound rather than the screen, and the screen's own
+	// middle is where the record is: the artwork on the player, the picture on
+	// the big screen, the rows somebody is reading everywhere else. Low is where
+	// a laptop puts it, and it is the part of the screen the eye is not using.
+	//
+	// Never over the last rows, which are the notice and the keys: it would be
+	// covering the other thing on the screen that answers a keypress.
+	top := max(len(lines)*3/4-len(card)/2, 0)
+	top = min(top, max(len(lines)-len(card)-osdFoot, 0))
 	left := max((m.width-lipgloss.Width(card[0]))/2, 0)
 
 	for i, row := range card {
@@ -120,26 +127,31 @@ func overlay(under, over string, at, w int) string {
 	return left + "\x1b[0m" + over + "\x1b[0m" + right
 }
 
-// osdCard is the card itself: a glyph, a meter where the thing being changed
-// has one, and a reading under it.
+// osdCard is the card itself: what was changed on the left, what it now reads
+// on the right, and the meter under them where the thing has one.
+//
+// Words rather than pictograms. The first draft wore a speaker and a stopwatch,
+// which are rare enough code points that a terminal with an ordinary font drew
+// nothing at all — reported from a real screen, where the card came up with a
+// hole in it. Everything else in this program is set in words and rules, and
+// they cannot fail to arrive.
 func (m Model) osdCard() []string {
 	s := m.styles
 
-	var glyph, meter, reading string
+	var name, meter, reading string
 	switch m.osd.kind {
 	case osdVolume:
 		volume := m.heldVolume()
-		glyph, meter = osdSpeaker, m.osdMeter(volume, 100)
+		name, meter = "volume", m.osdMeter(volume, 100)
 		reading = fmt.Sprintf("%d%%", volume)
 		if volume == 0 {
-			glyph, reading = osdMute, "muted"
+			reading = "muted"
 		}
 
 	case osdPlaying:
-		glyph = iconPlay
-		reading = "playing"
+		name = "playing"
 		if m.ps != nil && !m.ps.Playing {
-			glyph, reading = iconPause, "paused"
+			name = "paused"
 		}
 
 	case osdSeeking:
@@ -147,25 +159,29 @@ func (m Model) osdCard() []string {
 			return nil
 		}
 		at := m.playhead()
-		glyph = osdSeek
+		name = formatDuration(at)
+		reading = formatDuration(m.ps.Duration)
 		meter = m.osdMeter(int(at/time.Second), int(m.ps.Duration/time.Second))
-		reading = formatDuration(at) + " / " + formatDuration(m.ps.Duration)
 
 	default:
 		return nil
 	}
 
-	// The glyph in the record's own colour, which is what the whole screen is
-	// wearing — see tone.go — and the reading under it quiet, because the glyph
-	// and the meter have already said it to anybody glancing.
-	rows := []string{
-		middle(s.Knob.Render(glyph), osdWidth),
+	// What is being changed in the record's own colour — which is what the rest
+	// of the screen is wearing, see tone.go — and what it now reads beside it,
+	// quiet. The same shape the player draws its own bars in: a line with its
+	// two ends named above it.
+	head := s.Knob.Render(name)
+	if reading != "" {
+		head = spread(s.Knob.Render(name), s.Detail.Render(reading), osdWidth)
+	} else {
+		head = middle(head, osdWidth)
 	}
+
+	rows := []string{head}
 	if meter != "" {
 		rows = append(rows, middle(meter, osdWidth))
 	}
-	rows = append(rows, middle(s.Detail.Render(reading), osdWidth))
-
 	return m.osdFrame(rows)
 }
 

@@ -48,8 +48,8 @@ func TestTheCardSaysWhatAKeyDidOnAnyTab(t *testing.T) {
 		if !strings.Contains(screen, "75%") {
 			t.Errorf("%v: the card does not say the new volume:\n%s", tab, screen)
 		}
-		if !strings.Contains(screen, osdSpeaker) {
-			t.Errorf("%v: the card carries no glyph", tab)
+		if !strings.Contains(screen, "volume") {
+			t.Errorf("%v: the card does not say what was changed", tab)
 		}
 	}
 }
@@ -60,19 +60,19 @@ func TestEachKindOfCard(t *testing.T) {
 
 	m.showOSD(osdPlaying)
 	m.ps.Playing = false
-	if got := ansi.Strip(m.render()); !strings.Contains(got, "paused") || !strings.Contains(got, iconPause) {
+	if got := ansi.Strip(m.render()); !strings.Contains(got, "paused") {
 		t.Error("the pause card does not say it is paused")
 	}
 
 	m.showOSD(osdSeeking)
 	m.setProgress(90 * time.Second)
-	if got := ansi.Strip(m.render()); !strings.Contains(got, "1:30 / 6:00") {
+	if got := ansi.Strip(m.render()); !strings.Contains(got, "1:30") || !strings.Contains(got, "6:00") {
 		t.Errorf("the seek card does not say where the track is:\n%s", got)
 	}
 
 	m.ps.Volume = 0
 	m.showOSD(osdVolume)
-	if got := ansi.Strip(m.render()); !strings.Contains(got, "muted") || !strings.Contains(got, osdMute) {
+	if got := ansi.Strip(m.render()); !strings.Contains(got, "muted") {
 		t.Error("silence is not drawn as silence")
 	}
 }
@@ -152,4 +152,77 @@ func leftOf(row string, cols int) string {
 		return string(runes)
 	}
 	return string(runes[:cols])
+}
+
+// Words rather than pictograms: the first draft wore a speaker and a stopwatch,
+// and a terminal with an ordinary font drew nothing at all where they should
+// have been. Nothing on this card may need a font nobody has.
+func TestTheCardIsWordsAndRules(t *testing.T) {
+	m := osdModel()
+	m.showOSD(osdVolume)
+
+	for _, row := range m.osdCard() {
+		for _, r := range ansi.Strip(row) {
+			if r > 0x2600 {
+				t.Errorf("the card carries %q, which is a code point a plain font may not have", r)
+			}
+		}
+	}
+}
+
+// The arrows belong to whatever list is on screen — the wall walks by them, and
+// so does the queue — which left the transport holding the shift key on every
+// tab but one, for the two things somebody reaches for most often. So there is
+// a set that needs no arrow: plus and minus for the level, the chevrons for
+// winding through a track.
+func TestTheTransportWithoutArrows(t *testing.T) {
+	// A fresh screen for each: the state they act on is shared between a model
+	// and its copies, so a reading taken after one press is not what the next
+	// one started from.
+	on := func(tab tabID) Model {
+		m := osdModel()
+		m.tab = tab
+		m.resize()
+		m.setProgress(time.Minute)
+		return m
+	}
+
+	for _, tab := range []tabID{tabPlayer, tabQueue, tabLibrary} {
+		if got := pressed(t, on(tab), "+").ps.Volume; got <= 60 {
+			t.Errorf("%v: + left the volume at %d, want louder than 60", tab, got)
+		}
+		if got := pressed(t, on(tab), "-").ps.Volume; got >= 60 {
+			t.Errorf("%v: - left the volume at %d, want quieter than 60", tab, got)
+		}
+		if got := pressed(t, on(tab), ">").playhead(); got <= time.Minute {
+			t.Errorf("%v: > wound the track to %s, want further on", tab, got)
+		}
+		if got := pressed(t, on(tab), "<").playhead(); got >= time.Minute {
+			t.Errorf("%v: < wound the track to %s, want further back", tab, got)
+		}
+	}
+}
+
+// And they are letters on the one screen that is a field to type in.
+func TestTheSearchFieldKeepsItsCharacters(t *testing.T) {
+	m := osdModel()
+	m.tab = tabSearch
+	m.search.typing = true
+	m.resize()
+
+	typed := pressed(t, m, "+")
+	if typed.ps.Volume != 60 {
+		t.Errorf("a character typed into the search field moved the volume to %d", typed.ps.Volume)
+	}
+	if !strings.Contains(typed.search.input.Value(), "+") {
+		t.Errorf("the character never reached the query: %q", typed.search.input.Value())
+	}
+}
+
+// pressed is press with a model to press it on: what the screen became.
+func pressed(t *testing.T, m Model, key string) Model {
+	t.Helper()
+	var tm tea.Model = m
+	tm, _ = tm.Update(press(key))
+	return tm.(Model)
 }

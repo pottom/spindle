@@ -29,6 +29,21 @@ const (
 	keySeekBackAlt = "shift+left"
 	keyVolUpAlt    = "shift+up"
 	keyVolDownAlt  = "shift+down"
+
+	// And a set that needs no arrow at all. The arrows belong to whatever list
+	// is on screen — the wall walks by them, so does the queue — which left the
+	// transport holding the shift key on every tab but one, for the two things
+	// somebody reaches for most often.
+	//
+	// These are the marks every player has used for them since tape: plus and
+	// minus for the level, the two chevrons for winding through a track. They
+	// are free on every screen here, and on the one screen where a printable key
+	// belongs to a search field the arrows above still answer.
+	keyVolUpAny    = "+"
+	keyVolUpMore   = "="
+	keyVolDownAny  = "-"
+	keySeekFwdAny  = ">"
+	keySeekBackAny = "<"
 	keySeekBack    = "left"
 	keyVolUp       = "up"
 	keyVolDown     = "down"
