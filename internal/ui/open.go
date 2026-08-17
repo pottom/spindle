@@ -40,6 +40,13 @@ type openPage struct {
 
 	cursor listState
 	pages  paging
+
+	// refused says Spotify would not hand this list over to the application
+	// spindle is authenticating as. It is not an error to report and clear: the
+	// answer will be the same for as long as that application is in use, and
+	// what the screen owes the reader is the reason rather than a blank. See
+	// player.Abilities.
+	refused bool
 }
 
 type openKind int

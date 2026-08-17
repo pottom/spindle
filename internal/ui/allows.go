@@ -127,3 +127,22 @@ func keepAllows(clientID string, allows player.Allowances) {
 	}
 	_ = os.WriteFile(path, data, 0o600)
 }
+
+// refuseOpen takes up a refusal of the page that is open: the screen says why
+// instead of saying "nothing here", and nothing offers that ability again this
+// run.
+//
+// Which ability it was is not asked of the error. What was refused is whatever
+// was being read, and the only thing that reads a list somebody else owns is a
+// playlist opened from the library or a search — so the page that was waiting
+// is the one that has been refused.
+func (m *Model) refuseOpen() {
+	if page := m.openMut(); page != nil {
+		page.refused = true
+		page.pages.loading = false
+	}
+	if m.allows == nil {
+		m.allows = player.Allowances{}
+	}
+	m.allows[player.Elsewhere] = false
+}

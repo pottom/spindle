@@ -392,6 +392,15 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 			m.noPremium = true
 			return m, nil
 		}
+		// Spotify refusing the application is not news to flash and clear: it
+		// will refuse it again in a second, and what the reader needs is the
+		// reason where the missing thing should have been. The screen that
+		// asked keeps it, and the list of what this application may do is
+		// mended so nothing else offers it either. See allows.go.
+		if errors.Is(message.Err, player.ErrNotPermitted) {
+			m.refuseOpen()
+			return m, nil
+		}
 		m.err, m.errAt = message.Err, time.Now()
 		return m, nil
 

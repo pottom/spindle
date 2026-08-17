@@ -347,7 +347,10 @@ func (s *Spotify) PlaylistTracksPage(ctx context.Context, playlistID string, off
 		return err
 	})
 	if err != nil {
-		return Page[Track]{}, fmt.Errorf("fetch playlist tracks: %w", err)
+		// A playlist somebody else owns is refused outright to an application
+		// registered since Spotify's 2024 clampdown, whoever asks. Named, so the
+		// screen can say that rather than "nothing here". See allows.go.
+		return Page[Track]{}, permitted("fetch playlist tracks", err)
 	}
 	if page == nil {
 		return Page[Track]{}, nil

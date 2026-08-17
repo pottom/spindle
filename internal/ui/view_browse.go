@@ -799,6 +799,20 @@ func (m Model) libraryDetail(w, rows int) []string {
 	}
 }
 
+// openEmpty is what stands where the tracks would be when there are none.
+//
+// A list somebody else owns is refused outright to an application registered
+// since Spotify's 2024 clampdown, and what comes back is empty rather than
+// angry. Saying "nothing here" about a playlist with three hundred tracks in it
+// is the program telling a lie it could have avoided.
+func openEmpty(page openPage) string {
+	if page.refused {
+		return "Spotify will not hand this list to the application spindle is using. " +
+			"The one it ships with can read it — see the settings screen."
+	}
+	return "Nothing here."
+}
+
 // openPageView is whatever has been opened: a playlist, an album, or an
 // artist's records. The same composition as every other list, because it is the
 // same act — the heading says what was opened and the panel describes the row
@@ -813,7 +827,7 @@ func (m Model) openPageView(l layout, rows int) []string {
 		count:    page.count(),
 		state:    &m.stack[len(m.stack)-1].cursor,
 		columns:  func(w int) string { return m.trackColumns(w, true) },
-		empty:    "Nothing here.",
+		empty:    openEmpty(page),
 		waiting:  "Reading it…",
 		row: func(i, w int, selected bool) string {
 			// An album's tracks are numbered by the record; a playlist's by
