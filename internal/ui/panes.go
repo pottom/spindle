@@ -437,6 +437,11 @@ type searchPane struct {
 	kind  player.SearchKind
 	found map[player.SearchKind]*searchResults
 
+	// wall is whether the answers that have a picture worth showing are shown as
+	// covers rather than as a table. Kept across the views, so walking the kinds
+	// does not keep changing the answer. See searchwall.go.
+	wall bool
+
 	// top is the strongest answer to the query, which is the first row of the
 	// view that holds all of them. Worked out when an answer lands rather than
 	// while drawing: it reads four lists, and a screen is drawn far oftener

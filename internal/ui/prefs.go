@@ -33,6 +33,11 @@ type prefs struct {
 	// reason: somebody who wants a wall of large sleeves wants it tomorrow as
 	// well.
 	Cols int `json:"cols,omitempty"`
+
+	// Covers is whether the answers to a query that have a sleeve are shown as
+	// one. Kept for the same reason again: somebody who reads their search
+	// results as pictures reads them that way tomorrow. See searchwall.go.
+	Covers bool `json:"covers,omitempty"`
 }
 
 // prefsMsg carries the file's contents back into the model.
@@ -77,6 +82,7 @@ func (m Model) savePrefs() tea.Cmd {
 		Peek:   m.peek.on,
 		Room:   int(m.queuePane.room),
 		Cols:   m.library.cols,
+		Covers: m.search.wall,
 	}
 	return func() tea.Msg {
 		path, err := prefsPath()
@@ -102,6 +108,7 @@ func (m *Model) applyPrefs(p prefs) {
 	}
 	m.lyrics.on = p.Lyrics
 	m.peek.on = p.Peek
+	m.search.wall = p.Covers
 
 	// Anything the file does not cover is left at its default, including a file
 	// written by a version that had never heard of it.

@@ -142,11 +142,11 @@ func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 		// A row of covers at a time, which is how the wall is walked and how it
 		// scrolls: a wheel that moved by one tile would put one row of the wall
 		// across two rows of the screen. See gridWindow.
-		g := m.libraryShape(m.layout(), m.layout().bodyHeight)
+		g, items, state := m.wallUnderPointer()
 		if !g.ok() {
 			return m, nil
 		}
-		m.library.cursor().move(delta*m.wheelStep()*g.cols, len(m.libraryTiles()))
+		state.move(delta*m.wheelStep()*g.cols, len(items))
 		return m, tea.Batch(m.previewCover(), m.readAhead(), m.syncGridCovers())
 
 	case spotList:
@@ -316,7 +316,8 @@ func (m Model) mouseClick(e tea.MouseClickMsg) (Model, tea.Cmd) {
 		return m, tea.Batch(m.setLibraryKind(libraryOrder[at.at]), m.syncGridCovers())
 
 	case spotTile:
-		m.library.cursor().moveTo(at.at, len(m.libraryTiles()))
+		_, items, state := m.wallUnderPointer()
+		state.moveTo(at.at, len(items))
 		return m, tea.Batch(m.previewCover(), m.readAhead(), m.syncGridCovers())
 
 	case spotDevice:

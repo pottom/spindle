@@ -65,6 +65,10 @@ type keyMap struct {
 	// has the rows. See queueRoom.
 	Close key.Binding
 
+	// Covers shows a list of answers as a wall of sleeves rather than as a
+	// table. See searchwall.go.
+	Covers key.Binding
+
 	Peek key.Binding
 	Mute key.Binding
 
@@ -278,6 +282,10 @@ func newKeyMap() keyMap {
 		Close: key.NewBinding(
 			key.WithKeys(keyClose),
 			key.WithHelp(keyClose, "fold the top away"),
+		),
+		Covers: key.NewBinding(
+			key.WithKeys(keyCovers),
+			key.WithHelp(keyCovers, "covers"),
 		),
 		Peek: key.NewBinding(
 			key.WithKeys(keyPeek),
@@ -680,10 +688,11 @@ func (k keyMap) forTab(t tabID, scope, like, fit bool) tabKeys {
 				selectHint,
 				terse(k.Enter, "play"),
 				terse(k.SearchKind, "kind"),
+				terse(k.Covers, "covers"),
 				terse(k.Actions, "actions"),
 			},
 			full: [][]key.Binding{
-				{k.SearchType, k.Down, k.Enter, k.SearchKind, k.Actions},
+				{k.SearchType, k.Down, k.Enter, k.SearchKind, k.Covers, k.Actions},
 				// The held quit rather than q, which types here.
 				{hint(keyQuitAlt, "quit"), k.Help},
 				// No g and G here: the query has them.

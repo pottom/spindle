@@ -198,6 +198,8 @@ func (m Model) spotAt(x, y int) spot {
 		return spot{spotHelp, -1}
 	case m.tab == tabLibrary && m.open() == nil:
 		return m.wallSpot(l, x, row)
+	case m.searchWall():
+		return m.searchWallSpot(l, x, row)
 	case m.tab == tabSettings:
 		// A list with a cursor, laid out its own way: a heading, a line saying
 		// what the screen is, a blank, and the switches under them. See
@@ -223,14 +225,27 @@ func (m Model) listSpot(l layout, x, row int) spot {
 
 	band := m.listBandRows(l)
 	head := band + m.listChrome(band)
-	body := m.listBodyRows(max(l.bodyHeight, 1), band)
+	body := m.listBodyRows(max(m.listRoom(l), 1), band)
 
-	// The box the catalogue is searched from stands at the head of the screen,
-	// above everything else it holds — see searchBox — so it is the first rows of
-	// the body whatever has or has not been found.
+	// The query stands at the head of the screen, above everything else it holds
+	// — see searchHead — so it is the first rows of the body whatever has or has
+	// not been found, and everything under it is that much further down. The
+	// drawing takes the same rows off in the same place: see listRoom.
 	if m.tab == tabSearch && m.open() == nil {
-		if row < m.searchHeadRows() && x >= leftMargin && x < leftMargin+queueBlockWidth(l) {
-			return spot{spotQuery, -1}
+		if row < m.searchHeadRows() {
+			if x >= leftMargin && x < leftMargin+queueBlockWidth(l) {
+				return spot{spotQuery, -1}
+			}
+			return here
+		}
+		row -= m.searchHeadRows()
+
+		// The views the answers are shown under stand in the list's own chrome,
+		// where the library's kinds stand over its wall: one row of names and a
+		// mark under the one on screen. A press on a name turns to it. See
+		// searchViewSpans.
+		if row == band+listBandGap {
+			return spot{spotKinds, spanAt(m.searchViewSpans(), x)}
 		}
 	}
 

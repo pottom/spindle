@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/pottom/spindle/internal/notes"
@@ -264,5 +265,93 @@ func TestAnAlbumsKindDoesNotCrowdItsYear(t *testing.T) {
 	}
 	if strings.Contains(row, "…") {
 		t.Errorf("the row = %q, want nothing cut at this width", row)
+	}
+}
+
+// The answers that are things with sleeves can be a wall, and a key chooses.
+// Whichever is up, what the pointer finds is what was drawn.
+func TestTheAnswersCanBeAWall(t *testing.T) {
+	m := searched(t, "queen", player.Results{
+		Tracks: page(player.Track{ID: "t1", Title: "Bohemian Rhapsody", Artists: []string{"Queen"}}),
+		Albums: page(
+			player.Album{ID: "al1", Name: "A Night at the Opera", Artists: []string{"Queen"}, Released: "1975", Tracks: 12},
+			player.Album{ID: "al2", Name: "Hot Space", Artists: []string{"Queen"}, Released: "1982", Tracks: 11},
+			player.Album{ID: "al3", Name: "The Game", Artists: []string{"Queen"}, Released: "1980", Tracks: 10},
+		),
+	})
+	m.width, m.height = 150, 42
+	m.resize()
+
+	// The songs are never a wall: twenty times the same sleeve, and what tells
+	// two songs apart is their names.
+	m.search.wall = true
+	m.search.kind = searchAll
+	if m.searchWall() {
+		t.Error("the songs are being shown as covers")
+	}
+
+	m.search.kind = player.SearchAlbums
+	if !m.searchWall() {
+		t.Fatal("the records are not being shown as covers")
+	}
+	if got := len(m.searchTiles()); got != 3 {
+		t.Fatalf("the wall holds %d records, want 3", got)
+	}
+
+	// Every tile is where the pointer says it is, and pressing one moves the
+	// cursor there and no further.
+	screen := strings.Split(m.render(), "\n")
+	for i, tile := range m.searchTiles() {
+		x, y := -1, -1
+		for row, line := range screen {
+			if j := strings.Index(plain(line), tile.name); j >= 0 && row > tabBarHeight {
+				x, y = lipgloss.Width(plain(line)[:j]), row
+				break
+			}
+		}
+		if y < 0 {
+			t.Errorf("%q is not on the wall", tile.name)
+			continue
+		}
+		if at := m.spotAt(x, y); at.kind != spotTile || at.at != i {
+			t.Errorf("%q is at column %d of row %d, and the pointer calls it %v/%d", tile.name, x, y, at.kind, at.at)
+			continue
+		}
+		got, _ := m.mouseClick(clickAt(x, y))
+		if at := got.search.current().cursor.cursor; at != i {
+			t.Errorf("pressing %q left the cursor on %d, want %d", tile.name, at, i)
+		}
+	}
+}
+
+// The query stands above everything else the screen holds, so every row under
+// it is that much further down — for the pointer as much as for the drawing.
+func TestTheSearchPointerCountsFromUnderTheQuery(t *testing.T) {
+	tracks := make([]player.Track, 0, 6)
+	for i := range 6 {
+		tracks = append(tracks, player.Track{ID: string(rune('a' + i)), Title: "Song " + string(rune('A'+i)), Artists: []string{"Queen"}})
+	}
+	m := searched(t, "queen", player.Results{Tracks: page(tracks...)})
+	m.search.kind = player.SearchTracks
+	m.width, m.height = 150, 42
+	m.resize()
+
+	// The last row it appears on: the first is the band, which describes
+	// whatever the cursor is resting on rather than being a row of the list.
+	screen := strings.Split(m.render(), "\n")
+	for i, track := range tracks {
+		x, y := -1, -1
+		for row, line := range screen {
+			if j := strings.Index(plain(line), track.Title); j >= 0 && row > tabBarHeight {
+				x, y = lipgloss.Width(plain(line)[:j]), row
+			}
+		}
+		if y < 0 {
+			t.Errorf("%q is not on the screen", track.Title)
+			continue
+		}
+		if at := m.spotAt(x, y); at.kind != spotList || at.at != i {
+			t.Errorf("%q is drawn on row %d, and the pointer calls it %v/%d", track.Title, y, at.kind, at.at)
+		}
 	}
 }

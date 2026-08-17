@@ -967,12 +967,13 @@ func (m Model) playlistDetailOf(p *player.Playlist, w, rows int) []string {
 	return lines
 }
 
-// searchFieldWidth is how wide the field the catalogue is searched from is
-// drawn, wherever on the screen it stands. Named so that a press can be measured
-// against the same number.
-func searchFieldWidth(l layout) int { return max(queueBlockWidth(l)/3, 8) }
-
 func (m Model) searchPaneView(l layout, rows int) []string {
+	// The same answers, as covers rather than as a table, where that is what was
+	// asked for. See searchwall.go.
+	if m.searchWall() {
+		return m.searchWallView(l, rows)
+	}
+
 	// Every row on this screen is an answer rather than something chosen, which
 	// is what its columns are laid out for — and each kind of answer says which
 	// of the optional columns it has anything to put in. See answersMain.
@@ -1033,28 +1034,6 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 		waiting:  "Asking Spotify…",
 		row:      m.searchRow,
 	})...)
-}
-
-// searchKinds is what else the query matched, set against the field.
-//
-// It is the whole argument for showing one kind at a time: the counts say that
-// three artists and eighteen albums are there, which is what a screen of mixed
-// sections would otherwise have to spend rows saying.
-func (m Model) searchKinds() string {
-	labels := m.viewLabels()
-	if len(labels) == 0 {
-		return ""
-	}
-
-	parts := make([]string, 0, len(labels))
-	for i, label := range labels {
-		style := m.styles.Album
-		if m.viewAt(i) == m.search.kind {
-			style = m.styles.Title
-		}
-		parts = append(parts, style.Render(label))
-	}
-	return strings.Join(parts, m.styles.Detail.Render(kindGap))
 }
 
 // searchRow draws one hit, whichever kind is on screen.

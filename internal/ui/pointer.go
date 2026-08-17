@@ -82,6 +82,12 @@ func (m Model) pointable() bool {
 	// Only once something has been found. A bracket round an empty screen points
 	// at a row that is not there, which is how it looked: an arm down the left of
 	// nothing.
+	// Never over a wall: the mark says which row of a list the band belongs to,
+	// and a wall has no band and no rows — it was drawn straight over the
+	// covers. See searchwall.go.
+	if m.searchWall() {
+		return false
+	}
 	return m.tab == tabQueue || (m.tab == tabSearch && m.open() == nil && m.counted() > 0)
 }
 

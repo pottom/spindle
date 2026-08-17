@@ -227,18 +227,31 @@ func (m Model) libraryWaiting() string {
 // is on the wall, which is what lets a terminal drawing real pictures tell them
 // apart — see freeSlot.
 func (m *Model) syncGridCovers() tea.Cmd {
-	if m.covers == nil || m.tab != tabLibrary || m.open() != nil || !fitsMinimum(m.width, m.height) {
+	if m.covers == nil || m.open() != nil || !fitsMinimum(m.width, m.height) {
 		return nil
 	}
 
+	// Whichever wall is up. The search has one now, and it wants its pictures
+	// the same way: one request per tile, once, each holding a slot of its own.
+	// See searchwall.go.
 	l := m.layout()
-	g := m.libraryShape(l, l.bodyHeight)
+	var (
+		g     gridShape
+		items []libraryTile
+		state *listState
+	)
+	switch {
+	case m.tab == tabLibrary:
+		g, items, state = m.libraryShape(l, l.bodyHeight), m.libraryTiles(), &m.library.cursors[m.library.kind]
+	case m.searchWall():
+		g, items, state = m.searchWallShape(l, l.bodyHeight), m.searchTiles(), &m.search.current().cursor
+	default:
+		return nil
+	}
 	if !g.ok() {
 		return nil
 	}
 
-	items := m.libraryTiles()
-	state := &m.library.cursors[m.library.kind]
 	from, to := state.gridWindow(len(items), g)
 
 	if m.tiles == nil {
@@ -297,6 +310,17 @@ func (m *Model) syncGridCovers() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// wallUnderPointer is the wall on screen: its shape, what is on it, and where
+// its cursor is. One question asked once, so a press and a wheel and the
+// pictures cannot disagree about which wall they are on. See searchwall.go.
+func (m *Model) wallUnderPointer() (gridShape, []libraryTile, *listState) {
+	l := m.layout()
+	if m.searchWall() {
+		return m.searchWallShape(l, l.bodyHeight), m.searchTiles(), &m.search.current().cursor
+	}
+	return m.libraryShape(l, l.bodyHeight), m.libraryTiles(), m.library.cursor()
+}
+
 // gridTook files a picture that has arrived under the tile that asked for it.
 func (m *Model) gridTook(url string, w, h int, art string) {
 	for id, tile := range m.tiles {
@@ -324,9 +348,13 @@ func (m *Model) libraryGridKey(k tea.KeyPressMsg) bool {
 	if !g.ok() {
 		return false
 	}
+	return m.gridKey(k, m.library.cursor(), len(m.libraryTiles()), g)
+}
 
-	state := m.library.cursor()
-	count := len(m.libraryTiles())
+// gridKey is that movement, for whichever wall is on screen. The search's is
+// the same wall with different pictures on it, and a wall somebody has to walk
+// two ways is not a wall. See searchwall.go.
+func (m *Model) gridKey(k tea.KeyPressMsg, state *listState, count int, g gridShape) bool {
 	switch {
 	case m.pressed(k, m.keys.Down):
 		state.move(g.cols, count)

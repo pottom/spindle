@@ -115,6 +115,12 @@ const (
 	// matched by the key a press came from as well as by the letter it sent, so
 	// a letter here is the same key on any layout. See keypress.go.
 	keyClose = "c"
+
+	// keyCovers turns a list of answers into a wall of covers and back. The same
+	// key as the queue's fold, because it is the same act read one way: what the
+	// screen spends its room on. They are on different tabs and never both
+	// answer a press.
+	keyCovers = "c"
 	keyPeek  = "u"
 
 	keyFind     = "/"

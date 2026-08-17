@@ -257,11 +257,29 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	found := m.search.current()
-	if m.listKey(k, &found.cursor, m.counted(), true) {
+	if m.searchWall() {
+		// The wall is walked across as well as down, which is the whole
+		// difference between a wall and a list — and it is why the arrows do not
+		// turn the view while it is up. The brackets still do. See gridKey.
+		l := m.layout()
+		if m.gridKey(k, &found.cursor, len(m.searchTiles()), m.searchWallShape(l, l.bodyHeight)) {
+			return tea.Batch(m.previewCover(), m.readAhead(), m.syncGridCovers()), true
+		}
+	} else if m.listKey(k, &found.cursor, m.counted(), true) {
 		return tea.Batch(m.previewCover(), m.readAhead()), true
 	}
 
 	switch {
+	case m.pressed(k, m.keys.Covers):
+		m.turnSearchWall()
+		if m.search.wall && !searchWallable(m.search.kind) {
+			// A key that does nothing on the view somebody is looking at says
+			// so, rather than leaving them pressing it again. The choice is
+			// still made: turning to the records shows them as covers.
+			m.said, m.saidAt = "The songs are a list — the records, artists and playlists have covers", time.Now()
+		}
+		return tea.Batch(m.previewCover(), m.readAhead(), m.syncGridCovers(), m.savePrefs()), true
+
 	case m.pressed(k, m.keys.SearchType):
 		m.startTyping()
 		return nil, true
@@ -278,7 +296,7 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			delta = -1
 		}
 		m.turnSearchKind(delta)
-		return tea.Batch(m.previewCover(), m.readAhead()), true
+		return tea.Batch(m.previewCover(), m.readAhead(), m.syncGridCovers()), true
 
 	case m.pressed(k, m.keys.Enter):
 		return m.openSearchHit(), true
@@ -709,7 +727,8 @@ func (m *Model) applySearchResults(res msg.SearchResults) tea.Cmd {
 	if m.counted() == 0 {
 		m.turnSearchKind(1)
 	}
-	return m.syncCover()
+	// And the pictures, where the answers are being shown as a wall.
+	return tea.Batch(m.syncCover(), m.syncGridCovers())
 }
 
 // adopt replaces a list with a first page and extends it with a later one. The
