@@ -167,6 +167,11 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		m.clearErr()
 
 		cmds := []tea.Cmd{m.syncCover(), m.syncSong()}
+		// The picture rests while nothing is playing — see WaveformReady — so
+		// music starting again is what has to wake it.
+		if cmd := m.startScope(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 		if m.stillWaitingForTrackChange(message.State) {
 			cmds = append(cmds, refetchCmd(confirmRetry))
 		}
@@ -415,6 +420,22 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		// silence would have left it.
 		if m.ps != nil && !m.ps.Playing {
 			m.scope.settle()
+
+			// And once it has sunk all the way, the loop stops. What arrives
+			// while nothing is playing is the last thing that was heard, over
+			// and over; drawing it sixty times a second costs a fifth to a
+			// third of a core — measured on a paused player, per picture:
+			// wave 31%, ladder 28%, mirror 26%, bars 21%, and six tenths of one
+			// per cent with no picture at all. Silence should cost nothing,
+			// which is the same rule the mark beside the device already keeps.
+			//
+			// The tick starts it again — see startScope — and so does the state
+			// coming back playing, which is what makes the picture move the
+			// moment the music does rather than a second later.
+			if m.scope.atRest() {
+				m.scope.running = false
+				return m, nil
+			}
 		} else {
 			m.scope.frame = message.Samples
 			m.scope.follow(message.Samples)

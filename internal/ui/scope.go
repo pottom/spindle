@@ -191,6 +191,41 @@ func (s *scopeState) settle() {
 	}
 }
 
+// atRest reports that everything the picture is drawn from has sunk to where
+// silence leaves it, so the next frame would be the same frame.
+//
+// settle multiplies by a factor under one, which never reaches nought and does
+// not need to: a value under a thousandth is a dot the screen cannot tell from
+// an empty one, and the trace has some hundreds of them.
+func (s *scopeState) atRest() bool {
+	const stillness = 0.001
+
+	for _, v := range s.bands {
+		if v > stillness {
+			return false
+		}
+	}
+	for _, v := range s.peaks {
+		if v > stillness {
+			return false
+		}
+	}
+	for _, v := range s.frame {
+		if v > stillness || v < -stillness {
+			return false
+		}
+	}
+	for _, spark := range s.sparks {
+		if spark.bright > stillness {
+			return false
+		}
+	}
+	// Not the envelope: it is the scale the trace is drawn against rather than
+	// anything drawn, and settle leaves it alone. With everything above at
+	// nought there is nothing for it to scale.
+	return true
+}
+
 // follow updates the loudness envelope from a new frame.
 func (s *scopeState) follow(frame []float32) {
 	var peak float32
