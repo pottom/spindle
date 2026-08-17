@@ -8,8 +8,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-
-	"github.com/pottom/spindle/internal/ui/style"
 )
 
 // What just happened, in the middle of the screen.
@@ -37,12 +35,6 @@ const (
 	// own.
 	osdWidth = 23
 	osdBar   = osdWidth - 4
-
-	// osdFade is how far along each arm the frame goes out. A third of the way,
-	// which leaves the middle of a run of twenty-five cells the ground's own
-	// colour: enough that the corners are what the eye reads and the box is
-	// still closed.
-	osdFade = (osdWidth + 2) / 3
 
 	// osdFoot is how many rows are kept clear under it: the help bar, the notice
 	// line that stands over it, and a row of air so the card does not read as
@@ -220,25 +212,20 @@ func (m Model) osdMeter(at, of int) string {
 // this is meant to read as something laid on it for a moment: bright where it
 // says what it is about, going out at the edges where it stops mattering.
 func (m Model) osdFrame(rows []string) []string {
-	// Out from the corners rather than in from them. A corner is what makes a box
-	// a box: fading those away leaves two strokes floating on the screen, which
-	// is what the first draft looked like. The wall's own frames take hold at the
-	// corner and let go along the arms — see gridFrame — and this is that.
-	fade := style.Fade(m.styles.Accent, m.screenGround(), osdFade+1)
-	held := fade[0]
-
-	width := osdWidth + 2
-	var line string
-	for i := range width {
-		line += fade[min(min(i, width-1-i), osdFade)].Render("─")
-	}
+	// One weight the whole way round. The arms were drawn going out from the
+	// corners first, the way the wall's frames do — those hold one edge of a
+	// picture and are meant to let go, while this is a closed box with four
+	// corners of its own, and a rule that fades in the middle of a card this
+	// small reads as a break in it rather than as air.
+	pen := lipgloss.NewStyle().Foreground(m.styles.Accent)
+	line := strings.Repeat("─", osdWidth+2)
 
 	out := make([]string, 0, len(rows)+2)
-	out = append(out, held.Render("╭")+line+held.Render("╮"))
+	out = append(out, pen.Render("╭"+line+"╮"))
 	for _, row := range rows {
-		out = append(out, held.Render("│")+" "+row+" "+held.Render("│"))
+		out = append(out, pen.Render("│")+" "+row+" "+pen.Render("│"))
 	}
-	return append(out, held.Render("╰")+line+held.Render("╯"))
+	return append(out, pen.Render("╰"+line+"╯"))
 }
 
 // middle puts one line in the middle of a width it is narrower than. Its
