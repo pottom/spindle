@@ -121,7 +121,7 @@ const (
 	// screen spends its room on. They are on different tabs and never both
 	// answer a press.
 	keyCovers = "c"
-	keyPeek  = "u"
+	keyPeek   = "u"
 
 	keyFind     = "/"
 	keyFindNext = ";"
