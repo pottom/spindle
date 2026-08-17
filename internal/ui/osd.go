@@ -36,9 +36,10 @@ const (
 	osdWidth = 23
 	osdBar   = osdWidth - 4
 
-	// osdFoot is how many rows are kept clear under it: the notice line and the
-	// help bar, which are the other things on the screen that answer a key.
-	osdFoot = 2
+	// osdFoot is how many rows are kept clear under it: the help bar, the notice
+	// line that stands over it, and a row of air so the card does not read as
+	// part of them.
+	osdFoot = 3
 )
 
 // osdKind is what the card is about.
@@ -92,16 +93,16 @@ func (m Model) osdOver(screen string) string {
 
 	lines := strings.Split(screen, "\n")
 
-	// In the middle of the lower half rather than of the whole screen. What the
-	// card is about is the sound rather than the screen, and the screen's own
-	// middle is where the record is: the artwork on the player, the picture on
-	// the big screen, the rows somebody is reading everywhere else. Low is where
-	// a laptop puts it, and it is the part of the screen the eye is not using.
+	// As low as it can go. What the card is about is the sound rather than the
+	// screen, and the screen's own middle is where the record is: the artwork on
+	// the player, the picture on the big screen, the rows somebody is reading
+	// everywhere else. Low is where a laptop puts it, and it is the part of the
+	// screen the eye is not using.
 	//
-	// Never over the last rows, which are the notice and the keys: it would be
-	// covering the other thing on the screen that answers a keypress.
-	top := max(len(lines)*3/4-len(card)/2, 0)
-	top = min(top, max(len(lines)-len(card)-osdFoot, 0))
+	// Never over the last rows, which are the notice and the keys: those are the
+	// other things on the screen that answer a keypress, and one of them is
+	// often answering the same one.
+	top := max(len(lines)-len(card)-osdFoot, 0)
 	left := max((m.width-lipgloss.Width(card[0]))/2, 0)
 
 	for i, row := range card {
