@@ -66,9 +66,11 @@ func TestLikedSongsHeadTheLibrary(t *testing.T) {
 		t.Errorf("the row says %d tracks once the list is read out, want %d", got, len(m.library.liked))
 	}
 
-	row := plain(m.playlistRow(first, 80, false))
-	if !strings.Contains(row, likedMark) || !strings.Contains(row, "Liked Songs") {
-		t.Errorf("the row reads %q, want the heart and the name", row)
+	// And it stands on the wall like everything else the library holds, under
+	// its own name and the cover of the last thing saved.
+	tiles := m.libraryTiles()
+	if len(tiles) == 0 || tiles[0].name != first.Name || tiles[0].url == "" {
+		t.Errorf("the wall starts with %+v, want the saved tracks with a cover", tiles[:min(1, len(tiles))])
 	}
 }
 

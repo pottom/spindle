@@ -270,16 +270,6 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	switch {
-	case m.pressed(k, m.keys.Covers):
-		m.turnSearchWall()
-		if m.search.wall && !searchWallable(m.search.kind) {
-			// A key that does nothing on the view somebody is looking at says
-			// so, rather than leaving them pressing it again. The choice is
-			// still made: turning to the records shows them as covers.
-			m.said, m.saidAt = "The songs are a list — the records, artists and playlists have covers", time.Now()
-		}
-		return tea.Batch(m.previewCover(), m.readAhead(), m.syncGridCovers(), m.savePrefs()), true
-
 	case m.pressed(k, m.keys.SearchType):
 		m.startTyping()
 		return nil, true

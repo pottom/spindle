@@ -120,20 +120,12 @@ func (m Model) trackColumns(w int, numbered bool) string {
 	})
 }
 
-// albumColumns names a list of records, and artistColumns a list of people.
+// albumColumns names a list of records — an artist's own, which is the one place
+// left that reads records as rows. Everywhere else they are a wall of sleeves.
 //
-// The third column is the album's on a list of tracks, and each of these lists
-// puts its own third fact there: what the record holds, what the list is for.
-// An artist arrives with nothing else worth a column, so that list says so and
-// its two names take the room instead. See rowLacks.
+// The third column is the album's on a list of tracks, and this list puts its
+// own third fact there: how many the record holds, and what sort of record it
+// is where it is not simply a record. See albumRow.
 func (m Model) albumColumns(w int, lead string) string {
 	return m.columnHead(w, lead, rowCells{primary: "album", secondary: "artist", third: "tracks", trailing: "released"})
-}
-
-func (m Model) artistColumns(w int, lead string) string {
-	return m.columnHead(w, lead, rowCells{primary: "artist", secondary: "genres", trailing: "followers"})
-}
-
-func (m Model) playlistColumns(w int) string {
-	return m.columnHead(w, blankMark, rowCells{primary: "playlist", secondary: "owner", third: "about", trailing: "tracks"})
 }

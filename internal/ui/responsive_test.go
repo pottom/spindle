@@ -389,7 +389,7 @@ func TestAnswerRowsKeepTheirColumnsAtEveryWidth(t *testing.T) {
 	var was struct{ second, third, stars bool }
 
 	for body := 20; body <= 400; body++ {
-		span := answerWidths(body, 0)
+		span := answerWidths(body)
 
 		// No tempo, ever. A record nobody has played has no measured beat, and
 		// nobody has played any of these.
@@ -430,20 +430,17 @@ func TestAnswerRowsKeepTheirColumnsAtEveryWidth(t *testing.T) {
 		{"the rating", func(s rowSpan) int { return s.stars }, firstWidth(t, func(b int) bool { return rowWidths(b).stars > 0 })},
 		{"the album", func(s rowSpan) int { return s.third }, firstWidth(t, func(b int) bool { return rowWidths(b).third > 0 })},
 	} {
-		answers := firstWidth(t, func(b int) bool { return c.of(answerWidths(b, 0)) > 0 })
+		answers := firstWidth(t, func(b int) bool { return c.of(answerWidths(b)) > 0 })
 		if answers >= c.queue {
 			t.Errorf("%s arrives at %d on a list of answers and %d on the queue, want it sooner", c.name, answers, c.queue)
 		}
 	}
 
-	// A list of things that are not tracks holds neither a rating nor a heart,
-	// and one with nothing to say in the middle holds no column for it.
+	// A list of things that are not tracks holds neither a rating nor a heart:
+	// an artist's own records are rows, and no record has either.
 	for body := 20; body <= 400; body++ {
-		if span := answerWidths(body, lacksRating); span.stars > 0 || span.liked > 0 {
+		if span := widths(body, false, true); span.stars > 0 || span.liked > 0 {
 			t.Fatalf("row %d: a list of records holds a rating column", body)
-		}
-		if span := answerWidths(body, lacksRating|lacksThird); span.third > 0 {
-			t.Fatalf("row %d: a list of artists holds a column it cannot fill", body)
 		}
 	}
 }

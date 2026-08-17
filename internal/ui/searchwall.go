@@ -16,11 +16,12 @@ import (
 // screen, it says how many tracks and what year, and it is what somebody
 // scanning for one word wants.
 //
-// So both, and a key to choose. Neither is the right answer for everybody, and
-// which one somebody wants changes with what they are looking for.
-//
-// The songs are never a wall. A list of tracks off one record is the same sleeve
-// twenty times over, and what tells two songs apart is their names.
+// The songs are the other half of it, and they are never a wall: a list of
+// tracks off one record is the same sleeve twenty times over, and what tells two
+// songs apart is their names. So the songs are a table and the rest are covers,
+// each shown the way it is recognised, and neither is a setting — a program that
+// asks somebody how they would like their records drawn is a program that has
+// not decided.
 
 // searchWallable reports that a view is of things a picture says something
 // about.
@@ -33,16 +34,10 @@ func searchWallable(view player.SearchKind) bool {
 	}
 }
 
-// searchWall reports that the answers on screen are being shown as a wall.
+// searchWall reports that the answers on screen are covers rather than rows.
 func (m Model) searchWall() bool {
 	return m.tab == tabSearch && m.open() == nil &&
-		m.search.wall && searchWallable(m.search.kind) && m.counted() > 0
-}
-
-// turnSearchWall is the key that chooses. It is remembered across the views, so
-// walking the kinds does not keep changing the answer.
-func (m *Model) turnSearchWall() {
-	m.search.wall = !m.search.wall
+		searchWallable(m.search.kind) && m.counted() > 0
 }
 
 // searchWallChrome is what the wall spends above itself: the query, the views

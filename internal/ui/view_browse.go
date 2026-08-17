@@ -883,6 +883,10 @@ func (m Model) openPageView(l layout, rows int) []string {
 	}
 
 	if page.holdsAlbums() {
+		// Records rather than tracks, so nothing is rated and nothing is liked:
+		// the two columns are not held open for cells that would always be
+		// empty. See widths.
+		m.rowsUnrated = true
 		screen.columns = func(w int) string { return m.albumColumns(w, "") }
 		// The panel on an artist page is about the artist, where anything is
 		// known about them, and about the record under the cursor otherwise.
@@ -978,7 +982,6 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 	// is what its columns are laid out for — and each kind of answer says which
 	// of the optional columns it has anything to put in. See answersMain.
 	m.rowsAreAnswers = true
-	m.rowsLack = searchLacks(m.search.kind)
 
 	empty := "Type to search the catalogue."
 	if strings.TrimSpace(m.search.input.Value()) != "" {
@@ -1050,49 +1053,18 @@ func (m Model) searchRow(i, w int, selected bool) string {
 			return m.trackRow(*t, w, selected, 0)
 		}
 		return strings.Repeat(" ", max(w, 0))
-	case player.SearchAlbums:
-		return m.albumRow("", found.albums[i], w, selected)
-	case player.SearchArtists:
-		return m.artistRow("", found.artists[i], w, selected)
-	case player.SearchPlaylists:
-		return m.playlistRow(found.playlists[i], w, selected)
 	default:
 		return m.trackRow(found.tracks[i], w, selected, 0)
 	}
 }
 
-// searchLacks is which columns a view of answers cannot fill: only tracks are
-// rated and liked, and only an artist arrives with no third fact worth a column.
-func searchLacks(view player.SearchKind) rowLacks {
-	switch view {
-	case player.SearchAlbums, player.SearchPlaylists:
-		return lacksRating
-	case player.SearchArtists:
-		return lacksRating | lacksThird
-	default:
-		return 0
-	}
-}
-
-// searchColumns names the columns of whichever kind of result is on screen.
-func (m Model) searchColumns(w int) string {
-	switch m.search.kind {
-	case searchAll:
-		// The columns of the songs, which is what nearly every row of this view
-		// is. The top result borrows them: a name, what it is, and who by.
-		return m.trackColumns(w, false)
-	case player.SearchAlbums:
-		return m.albumColumns(w, "")
-	case player.SearchArtists:
-		return m.artistColumns(w, "")
-	case player.SearchPlaylists:
-		return m.playlistColumns(w)
-	default:
-		// Search results carry no ordinal: what a track's place in a list of
-		// answers is worth is nothing.
-		return m.trackColumns(w, false)
-	}
-}
+// searchColumns names the columns of the answers on screen, which are songs: the
+// kinds that have a sleeve are a wall rather than a table. See searchwall.go.
+//
+// Search results carry no ordinal — what a track's place in a list of answers is
+// worth is nothing — and the top result of the view that holds all of them
+// borrows these columns: a name, what it is, and who by.
+func (m Model) searchColumns(w int) string { return m.trackColumns(w, false) }
 
 // albumRow is a record: its name, who made it, and how many tracks it holds.
 func (m Model) albumRow(lead string, a player.Album, w int, selected bool) string {
@@ -1125,30 +1097,6 @@ func (m Model) albumRow(lead string, a player.Album, w int, selected bool) strin
 		trailing:  m.styles.RowTrailing.Render(releaseYear(a.Released)),
 	})
 }
-
-// artistRow is a name and how many people follow it, which is the only measure
-// of an artist that arrives with the list.
-func (m Model) artistRow(lead string, a player.Artist, w int, selected bool) string {
-	primary := m.styles.RowPrimary
-	if selected {
-		primary = m.styles.RowSelected
-	}
-	// Genres and a follower count are what an artist row is made of, and
-	// neither is always sent: measured against a live account, the followed
-	// list answers with a name and a picture and nothing else. The columns stay
-	// empty rather than saying nought followers, which is a number and not an
-	// absence.
-	followers := ""
-	if a.Followers > 0 {
-		followers = m.styles.RowTrailing.Render(formatCount(a.Followers))
-	}
-	return m.row(w, selected,
-		lead+m.lit(primary, a.Name),
-		m.lit(m.styles.RowSecondary, strings.Join(a.Genres, ", ")),
-		followers,
-	)
-}
-
 // searchDetail is the panel beside the cover: whichever kind is on screen, it
 // describes the row under the cursor.
 func (m Model) searchDetail(w, rows int) []string {
@@ -1225,58 +1173,6 @@ func formatCount(n int) string {
 		return fmt.Sprintf("%d", n)
 	}
 }
-
-func (m Model) playlistRow(p player.Playlist, w int, selected bool) string {
-	primary := m.styles.RowPrimary
-	if selected {
-		primary = m.styles.RowSelected
-	}
-
-	// The saved tracks carry a heart where the others carry nothing: the row is
-	// a different kind of thing from the playlists under it, and one glyph says
-	// so without a heading and without a row of its own. The column is held
-	// open on the rows without one, the way the queue holds its marks, so every
-	// name in the list starts in the same place.
-	name := m.libraryMark(p) + m.lit(primary, p.Name)
-
-	// A count of nothing is not a count. The saved tracks arrive a page at a
-	// time and their number is not known until the last of them has, so the
-	// column stays empty rather than saying zero.
-	//
-	// The number alone: the column is named now, and "30 tracks" under a heading
-	// reading tracks is the word twice — which is what it was, except that the
-	// column is too narrow for it and it came out as "30 trac…".
-	count := ""
-	if p.Tracks > 0 {
-		count = m.styles.RowTrailing.Render(fmt.Sprintf("%d", p.Tracks))
-	}
-
-	// And what the owner wrote it for, where there is room for it. On the lists
-	// Spotify makes it is the only place the reason for the list is written
-	// down, and on a screen of twenty results called some variation of one
-	// artist's name it is the only thing telling them apart.
-	return m.drawRow(w, selected, rowCells{
-		primary:   name,
-		secondary: m.lit(m.styles.RowSecondary, p.Owner),
-		third:     m.lit(m.styles.RowTrailing, p.Description),
-		trailing:  count,
-	})
-}
-
-// libraryMark is the column in front of a library row, which says what kind of
-// thing the row is. Only the saved tracks have anything to say there; the rest
-// keep the column blank rather than closing it, so the names stay in line.
-func (m Model) libraryMark(p player.Playlist) string {
-	if isLiked(p.ID) {
-		return m.styles.Cursor.Render(likedMark) + " "
-	}
-	return blankMark
-}
-
-// blankMark is that column held open. Every library row carries it, whichever
-// kind is on screen, so turning between them moves no name sideways.
-const blankMark = "  "
-
 // trackRow draws one track. A number of 0 omits the ordinal, which is what the
 // search results want.
 func (m Model) trackRow(t player.Track, w int, selected bool, number int) string {
@@ -1386,13 +1282,6 @@ func (m Model) tempoCell(t player.Track) string {
 	return m.styles.Quality.Render(fmt.Sprintf("%.0f bpm", t.Tempo))
 }
 
-// row lays out the cursor gutter and the three columns of a list row. The two
-// right-hand columns are dropped when the pane is too narrow to carry them,
-// rather than squeezing every column into uselessness.
-func (m Model) row(w int, selected bool, primary, secondary, trailing string) string {
-	return m.rowCols(w, selected, primary, secondary, "", trailing)
-}
-
 const (
 	// rowGutter is the column the cursor stands in, to the left of every row.
 	rowGutter = 2
@@ -1466,27 +1355,6 @@ const (
 	albumLeast    = 16
 )
 
-// rowLacks names the optional columns a list has nothing to put in.
-//
-// A column held open for a cell that is always empty is a hole in every row of
-// the list, and at a wide terminal it is a wide one: measured on the search, a
-// list of records held its rating, its heart and its album column open — forty
-// cells of nothing between the artist and the year, on every row, at every width
-// above a hundred and twenty. The zero value lacks nothing, which is a list of
-// tracks.
-type rowLacks uint8
-
-const (
-	// lacksRating is a list of things that are not tracks: no stars, no heart.
-	lacksRating rowLacks = 1 << iota
-
-	// lacksThird is a list with nothing to say between the names and the number.
-	lacksThird
-)
-
-// has reports that a list can fill one of them.
-func (l rowLacks) has(what rowLacks) bool { return l&what == 0 }
-
 // rowSpan is how wide each of a row's columns is. A zero is a column this row
 // has not earned and will not draw.
 type rowSpan struct {
@@ -1502,33 +1370,35 @@ type rowSpan struct {
 // rowWidths divides a row of a list somebody has built, and answerWidths a row
 // of a list Spotify has just answered with. The difference is what each can
 // afford to hold open, and it is argued for at answersMain.
-func rowWidths(body int) rowSpan { return widths(body, false, 0) }
+func rowWidths(body int) rowSpan { return widths(body, false, false) }
 
-func answerWidths(body int, lacks rowLacks) rowSpan { return widths(body, true, lacks) }
+func answerWidths(body int) rowSpan { return widths(body, true, false) }
 
-func widths(body int, answers bool, lacks rowLacks) rowSpan {
+// widths is both, and unrated says the rows are of things that are not tracks:
+// no stars, no heart, and no column held open for either.
+//
+// A column held open for a cell that is always empty is a hole in every row of
+// the list, and at a wide terminal it is a wide one — measured on an artist's
+// records, forty cells between the artist and the year on every row at every
+// width above a hundred and twenty.
+func widths(body int, answers, unrated bool) rowSpan {
 	var span rowSpan
 
 	// Last in, first considered: the columns on the right are taken off the top
 	// so everything below divides what is genuinely left, rather than being
 	// squeezed after the fact.
 	stars, album := starsFrom, albumFrom
-	if !lacks.has(lacksRating) {
+	if unrated {
 		stars = body + 1
-	}
-	if !lacks.has(lacksThird) {
-		album = body + 1
 	}
 	if answers {
 		// No tempo is held: a record nobody has played has no measured beat, and
 		// on these lists nobody has played any of them. The column was seven
 		// cells of nothing at every width. See player.Track.Tempo.
-		if lacks.has(lacksRating) {
+		if !unrated {
 			stars = answersMain + answersSecond + trailingCols + starsCols + likedCols + 2
 		}
-		if lacks.has(lacksThird) {
-			album = answersMain + answersSecond + trailingCols + albumLeast + 1
-		}
+		album = answersMain + answersSecond + trailingCols + albumLeast + 1
 	}
 	if body >= stars {
 		span.stars, span.liked = starsCols, likedCols
@@ -1622,14 +1492,6 @@ type rowCells struct {
 	trailing string
 }
 
-// rowCols is a row of three columns, for the lists whose rows are a name, a
-// second name and a number.
-func (m Model) rowCols(w int, selected bool, primary, secondary, tempo, trailing string) string {
-	return m.drawRow(w, selected, rowCells{
-		primary: primary, secondary: secondary, tempo: tempo, trailing: trailing,
-	})
-}
-
 // drawRow lays out the cursor's gutter and the columns of one row.
 func (m Model) drawRow(w int, selected bool, c rowCells) string {
 	gutter := "  "
@@ -1648,10 +1510,7 @@ func (m Model) drawRow(w int, selected bool, c rowCells) string {
 		return gutter + fit(c.primary, max(body, 0))
 	}
 
-	span := rowWidths(body)
-	if m.rowsAreAnswers {
-		span = answerWidths(body, m.rowsLack)
-	}
+	span := widths(body, m.rowsAreAnswers, m.rowsUnrated)
 	if m.rowsMainAt > 0 && m.rowsMainAt < body-trailingCols {
 		// Widened or narrowed to line the second column up with something
 		// elsewhere on the screen. What the first column gives up or takes goes

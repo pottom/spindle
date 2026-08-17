@@ -412,8 +412,9 @@ type Model struct {
 	// differently. See answersMain.
 	rowsAreAnswers bool
 
-	// rowsLack is which of the optional columns this list has nothing to put in.
-	rowsLack rowLacks
+	// rowsUnrated marks the lists whose rows are not tracks: nothing on them is
+	// rated or liked, so no column is held open for either. See widths.
+	rowsUnrated bool
 
 	// rowsMainAt fixes the width of a row's first column, for the one list that
 	// has to line its second column up with something else on the screen rather

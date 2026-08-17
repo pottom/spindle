@@ -236,27 +236,23 @@ func TestBackspacingTheQueryAwayStopsTheSpinner(t *testing.T) {
 	}
 }
 
-// The year's column is eight cells because a year is four, so the kind of
-// record cannot ride along in it: "1991 compilation" came out as "1991 co…" on
-// a screen with sixty cells to spare. Reported from a real screen.
+// The year's column is eight cells because a year is four, so the kind of record
+// cannot ride along in it: "1991 compilation" came out as "1991 co…" on a screen
+// with sixty cells to spare. Reported from a real screen.
+//
+// An artist's own records are the list this is read on now — everywhere else
+// records are a wall of sleeves. See searchwall.go.
 func TestAnAlbumsKindDoesNotCrowdItsYear(t *testing.T) {
-	m := searched(t, "queen", player.Results{Albums: page(
-		player.Album{ID: "al1", Name: "Greatest Hits II", Artists: []string{"Queen"}, Released: "1991-10-28", Tracks: 17, AlbumType: "compilation"},
-	)})
-	m.search.kind = player.SearchAlbums
+	m := New(player.NewMock(), nil, defaultTestCell)
 	m.width, m.height = 165, 40
 	m.resize()
+	m.rowsUnrated = true
 
-	rows := m.searchPaneView(m.layout(), m.layout().bodyHeight)
-	var row string
-	for _, line := range rows {
-		if strings.Contains(plain(line), "Greatest Hits II") {
-			row = plain(line)
-		}
-	}
-	if row == "" {
-		t.Fatal("the record is not on the screen")
-	}
+	row := plain(m.albumRow("", player.Album{
+		ID: "al1", Name: "Greatest Hits II", Artists: []string{"Queen"},
+		Released: "1991-10-28", Tracks: 17, AlbumType: "compilation",
+	}, 150, false))
+
 	if !strings.Contains(row, "17 · compilation") {
 		t.Errorf("the row = %q, want the count and the kind together", row)
 	}
@@ -268,8 +264,8 @@ func TestAnAlbumsKindDoesNotCrowdItsYear(t *testing.T) {
 	}
 }
 
-// The answers that are things with sleeves can be a wall, and a key chooses.
-// Whichever is up, what the pointer finds is what was drawn.
+// The answers that are things with sleeves are a wall, and the songs are not.
+// What the pointer finds on it is what was drawn.
 func TestTheAnswersCanBeAWall(t *testing.T) {
 	m := searched(t, "queen", player.Results{
 		Tracks: page(player.Track{ID: "t1", Title: "Bohemian Rhapsody", Artists: []string{"Queen"}}),
@@ -284,7 +280,6 @@ func TestTheAnswersCanBeAWall(t *testing.T) {
 
 	// The songs are never a wall: twenty times the same sleeve, and what tells
 	// two songs apart is their names.
-	m.search.wall = true
 	m.search.kind = searchAll
 	if m.searchWall() {
 		t.Error("the songs are being shown as covers")
