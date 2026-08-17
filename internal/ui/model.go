@@ -155,6 +155,13 @@ type Model struct {
 	artists map[string]notes.Artist
 	asking  map[string]bool
 
+	// related is who else sounds like an artist, keyed by the Spotify id it was
+	// asked about — Spotify's answer, for the line the panel has drawn from
+	// last.fm since it went in. An entry with nothing in it is an answer: most
+	// of a real library is artists nobody has anybody to compare with. See
+	// related.go.
+	related map[string][]string
+
 	// songs is the same for the records themselves: what somebody wrote about
 	// this song, where anybody did. Asked for only about what is playing.
 	songs      map[string]notes.TrackNote

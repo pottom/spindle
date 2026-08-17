@@ -148,3 +148,21 @@ func mockArtistByID(id string) *Artist {
 	}
 	return nil
 }
+
+// RelatedArtists is who else the catalogue holds, which is as close as a mock
+// can honestly come to "who sounds like this". The artist asked about is left
+// out: nobody is related to themselves, and a list that answered with the name
+// already on screen would look like a bug rather than a joke.
+func (m *Mock) RelatedArtists(ctx context.Context, artistID string) ([]Artist, error) {
+	if err := m.delay(ctx); err != nil {
+		return nil, err
+	}
+
+	out := make([]Artist, 0, len(mockArtists))
+	for _, a := range mockArtists {
+		if a.ID != artistID {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}

@@ -156,6 +156,29 @@ func refusedApplication(err error) bool {
 	return apiErr.Status == http.StatusForbidden || apiErr.Status == http.StatusNotFound
 }
 
+// RelatedArtists is who else sounds like this one, as Spotify hears it.
+//
+// Refused to an application registered since the clampdown — it is what the
+// Suggesting ability is probed with — so the caller has to be ready for nothing.
+func (s *Spotify) RelatedArtists(ctx context.Context, artistID string) ([]Artist, error) {
+	found, err := s.client.GetRelatedArtists(ctx, spotify.ID(artistID))
+	if err != nil {
+		return nil, permitted("fetch related artists", err)
+	}
+
+	out := make([]Artist, 0, len(found))
+	for i := range found {
+		out = append(out, artistFromFull(&found[i]))
+	}
+	return out, nil
+}
+
+// RelatedArtists on the daemon is the Web API's answer: who sounds like whom is
+// not something a playback device knows.
+func (l *Local) RelatedArtists(ctx context.Context, artistID string) ([]Artist, error) {
+	return l.web.RelatedArtists(ctx, artistID)
+}
+
 // Allows on the daemon is the Web API's answer: what a device may play has
 // nothing to do with what an application may read.
 func (l *Local) Allows(ctx context.Context) (Allowances, error) { return l.web.Allows(ctx) }

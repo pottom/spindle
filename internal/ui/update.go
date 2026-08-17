@@ -105,6 +105,11 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 	case tea.MouseReleaseMsg:
 		return m.mouseRelease(message)
 
+	case relatedTook:
+		// Who else sounds like the artist on screen. See related.go.
+		m.tookRelated(message)
+		return m, nil
+
 	case allowsTook:
 		// What Spotify will let this application do. Until it lands, the
 		// optional features are off. See allows.go.

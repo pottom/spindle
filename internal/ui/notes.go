@@ -150,6 +150,16 @@ func firstOf(names []string) string {
 	return names[0]
 }
 
+// openArtistID is the Spotify id of the artist whose page is open, or empty
+// where the screen is about something else.
+func (m Model) openArtistID() string {
+	page := m.open()
+	if page == nil || page.kind != openArtist {
+		return ""
+	}
+	return page.id
+}
+
 // syncNotes asks after whatever artist the screen is about. Only an artist page:
 // that is the one screen with the room for a paragraph and the one where
 // somebody has asked about a person rather than about a record.
@@ -158,7 +168,9 @@ func (m *Model) syncNotes() tea.Cmd {
 	if page == nil || page.kind != openArtist {
 		return nil
 	}
-	return m.askNotes(page.id, page.name)
+	// And who else sounds like them, which is the same line of the panel from a
+	// different source. See related.go.
+	return tea.Batch(m.askNotes(page.id, page.name), m.askRelated(page.id))
 }
 
 // artistNotes is what is known about the artist whose page is open, and whether
@@ -216,14 +228,15 @@ func (m Model) notesPanel(w, rows int) []string {
 	// are. Not from a catalogue: this is the one line here that says something
 	// about how a record is heard rather than about how it was made, and it is
 	// the only one that works for a Hungarian artist. See internal/notes.
-	if len(got.Similar) > 0 || got.Listeners > 0 {
+	similar := m.relatedTo(m.openArtistID(), got.Similar)
+	if len(similar) > 0 || got.Listeners > 0 {
 		// The count first, because it is short and never worth losing, and the
 		// names after it, because they are what gets cut on a narrow panel.
 		var like []string
 		if got.Listeners > 0 {
 			like = append(like, formatCount(got.Listeners)+" listeners")
 		}
-		like = append(like, got.Similar[:min(len(got.Similar), 3)]...)
+		like = append(like, similar[:min(len(similar), 3)]...)
 		lines = append(lines, m.styles.Detail.Render(fit(strings.Join(like, " · "), w)))
 	}
 

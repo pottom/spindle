@@ -35,3 +35,14 @@ type ArtistTopTracks interface {
 	// top of it, and there is no rest to scroll to.
 	ArtistTopTracks(ctx context.Context, artistID string) ([]Track, error)
 }
+
+// RelatedArtists is implemented by backends that can say who else sounds like an
+// artist.
+//
+// Kept out of Player for the same reason as the top tracks: Spotify answers it
+// only to an application it has not clamped down on, so a backend may honestly
+// have no answer. What comes back is artists rather than names, because the
+// point of asking is being able to go there.
+type RelatedArtists interface {
+	RelatedArtists(ctx context.Context, artistID string) ([]Artist, error)
+}
