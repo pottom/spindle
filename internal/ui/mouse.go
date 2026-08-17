@@ -225,16 +225,11 @@ func (m Model) listSpot(l layout, x, row int) spot {
 	head := band + m.listChrome(band)
 	body := m.listBodyRows(max(l.bodyHeight, 1), band)
 
-	// The field the catalogue is searched from is this screen's heading — three
-	// rows above the first row of results, where the heading, the column names
-	// and the line under them stand — or the top of the screen while nothing has
-	// been found and there is no band to sit under. See searchPaneView.
+	// The box the catalogue is searched from stands at the head of the screen,
+	// above everything else it holds — see searchBox — so it is the first rows of
+	// the body whatever has or has not been found.
 	if m.tab == tabSearch && m.open() == nil {
-		field := head - 3
-		if m.search.current().count() == 0 {
-			field = 0
-		}
-		if row == field && x >= leftMargin && x < leftMargin+searchFieldWidth(l) {
+		if row < searchBoxRows && x >= leftMargin && x < leftMargin+queueBlockWidth(l) {
 			return spot{spotQuery, -1}
 		}
 	}

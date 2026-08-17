@@ -485,7 +485,7 @@ func (s *searchPane) current() *searchResults { return s.of(s.kind) }
 func newSearchPane() searchPane {
 	in := textinput.New()
 	// Tracks to begin with, which is what nearly every search is for.
-	in.Prompt = "⌕ "
+	in.Prompt = searchPrompt + " "
 	in.Placeholder = "title, artist or album"
 	in.Focus()
 	return searchPane{input: in, kind: player.SearchTracks}

@@ -953,30 +953,31 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 			line = m.spinner.View() + " " + m.styles.Empty.Render("Asking Spotify…")
 		}
 
-		out := []string{
-			fit(m.searchField(searchFieldWidth(l)), w),
-			strings.Repeat(" ", w),
-			fit(line, w),
-		}
+		out := append([]string(nil), m.searchBox(w)...)
+		out = append(out, strings.Repeat(" ", w), fit(line, w))
 		for len(out) < rows {
 			out = append(out, strings.Repeat(" ", w))
 		}
 		return out[:rows]
 	}
-	return m.listBlock(l, rows, listScreen{
-		detail: m.searchDetail,
-		// The field is the heading: it is what the screen is about, and it has
-		// to be where the eye already goes for a heading rather than in a band
-		// of its own above one.
-		heading:  func(int) string { return m.searchField(searchFieldWidth(l)) },
-		subtitle: m.searchKinds,
+	// The box stands above the list rather than being a line in it: it is the
+	// same box a list is searched with, and the same act. What it costs is its
+	// three rows, which come off the list under it.
+	box := m.searchBox(queueBlockWidth(l))
+	rows = max(rows-len(box), 1)
+
+	out := append([]string(nil), box...)
+	return append(out, m.listBlock(l, rows, listScreen{
+		detail:   m.searchDetail,
+		heading:  func(int) string { return "" },
+		subtitle: func() string { return "" },
 		columns:  m.searchColumns,
 		count:    found.count(),
 		state:    &found.cursor,
 		empty:    empty,
 		waiting:  "Asking Spotify…",
 		row:      m.searchRow,
-	})
+	})...)
 }
 
 // searchKinds is what else the query matched, set against the field.
@@ -1512,8 +1513,8 @@ func (m Model) drawRow(w int, selected bool, c rowCells) string {
 	return line + padLeft(c.trailing, trailingCols)
 }
 
-// searchField renders the query line, keeping the prompt in the accent.
-// searchField is the query line. It shows whether the keyboard belongs to it:
+// searchField is the query line inside the box. It shows whether the keyboard
+// belongs to it:
 // a prompt in the accent while typing, quiet otherwise, so there is never a
 // question about where a keystroke will go.
 func (m Model) searchField(w int) string {
@@ -1521,9 +1522,9 @@ func (m Model) searchField(w int) string {
 	in.SetWidth(max(w-4, 8))
 	if !m.search.typing {
 		if v := in.Value(); v != "" {
-			return m.styles.Album.Render("⌕ " + fit(v, max(w-2, 4)))
+			return m.styles.Album.Render(searchPrompt + " " + fit(v, max(w-2, 4)))
 		}
-		return m.styles.Empty.Render("⌕ press / to search")
+		return m.styles.Empty.Render(searchPrompt + " press / to search")
 	}
 	return in.View()
 }

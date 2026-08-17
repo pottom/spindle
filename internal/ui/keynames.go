@@ -51,7 +51,7 @@ const (
 	keyRepeat      = "r"
 	keyMute        = "m"
 
-	keyHelp    = "?"
+	keyHelp = "?"
 	// Leaving takes a modifier. q was the key for it, and q is a letter: a
 	// screen with a field on it — the search, the find box over a list — turns
 	// every letter into a character, and the one that closed the program was one

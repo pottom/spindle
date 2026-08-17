@@ -240,7 +240,10 @@ func TestTheSearchBandIsNotMarked(t *testing.T) {
 	m.tab = tabSearch
 	m.resize()
 
-	if got := plain(fmt.Sprint(m.View())); strings.Contains(got, pointerTL) {
+	// The box the query is typed into draws corners of its own — see searchBox —
+	// so what says a band was marked is the tee the line down to a row hangs
+	// from, as it is on the wall.
+	if got := plain(fmt.Sprint(m.View())); strings.Contains(got, pointerTee) {
 		t.Error("the search's band was marked")
 	}
 }

@@ -999,21 +999,24 @@ func TestSearchUsesTheSameShapeAsTheQueue(t *testing.T) {
 		t.Fatalf("the block is %d rows, want the whole body of %d", len(block), l.bodyHeight)
 	}
 
+	// The query is in a box at the head of the screen, the same box a list is
+	// searched with, and what else it matched is set against it — which is the
+	// whole argument for showing one kind at a time. See searchBox.
+	box := plain(strings.Join(block[:searchBoxRows], "\n"))
+	if !strings.Contains(box, "queen") || !strings.Contains(box, "tracks") {
+		t.Errorf("the box = %q, want the query and the kinds", box)
+	}
+
 	// The panel beside the cover describes what the cursor rests on.
-	head := plain(strings.Join(block[:l.artRows], "\n"))
+	head := plain(strings.Join(block[searchBoxRows:searchBoxRows+l.artRows], "\n"))
 	if !strings.Contains(head, res[0].Title) || !strings.Contains(head, res[0].Album) {
 		t.Errorf("the panel = %q, want the result under the cursor described", head)
 	}
 
-	// The field is the heading, and what else the query matched is set against
-	// it — which is the whole argument for showing one kind at a time.
-	heading := plain(block[l.artHeight])
-	if !strings.Contains(heading, "queen") || !strings.Contains(heading, "tracks") {
-		t.Errorf("heading = %q, want the query and the kinds", heading)
-	}
-
 	// And the results run the whole width, artists out where they are elsewhere.
-	row := plain(block[l.artHeight+3])
+	// Two rows of chrome under the band — the column names and the line — and
+	// then the results.
+	row := plain(block[searchBoxRows+l.artHeight+3])
 	if at := strings.Index(row, res[0].Artists[0]); at < len(row)/3 {
 		t.Errorf("the artists sit at column %d of %d, want them out with the others", at, len(row))
 	}
