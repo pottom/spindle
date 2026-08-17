@@ -160,10 +160,22 @@ type Model struct {
 	songs      map[string]notes.TrackNote
 	askingSong map[string]bool
 
+	// allows is what the application spindle authenticates as may do — see
+	// player.Abilities. Everything optional asks it rather than assuming, and
+	// the zero value offers nothing, so a screen drawn before the answer arrives
+	// is a screen missing a key rather than one that fails when it is pressed.
+	//
+	// clientID is which application it was asked about, and asksAllows says
+	// whether to ask at all: the one spindle ships with is known to be allowed
+	// everything, and a request spent hearing that again is a request wasted.
+	allows     player.Allowances
+	clientID   string
+	asksAllows bool
+
 	// noSaving says Spotify has refused this application the library writes, so
-	// the like key is not offered again this run. It is the registration that is
-	// refused rather than the account, and that does not change while spindle is
-	// open. See collect.go.
+	// the like key is not offered again this run. It is the backstop behind
+	// allows: the answer above can be a week old, and Spotify can change its
+	// mind between one press and the next. See collect.go.
 	noSaving bool
 
 	// story says the box with that in it is up, and storyAt how far down it has
@@ -394,6 +406,22 @@ type Model struct {
 // A setter rather than another argument, because it is genuinely optional: every
 // screen works without it, and a program built with no sources at all is the
 // case the tests run in. See notes.go.
+// WithApplication says which Spotify application spindle authenticates as, and
+// whether what it may do has to be found out.
+//
+// The one spindle ships with is allowed everything, so nothing is asked for it.
+// Somebody else's has to be asked about, and until the answer arrives the
+// optional features are off — see player.Abilities and allows.go.
+func (m Model) WithApplication(clientID string, own bool) Model {
+	m.clientID, m.asksAllows = clientID, own
+	if own {
+		// Somebody else's application, and nothing is known about it yet.
+		// Nothing optional is offered until the answer arrives.
+		m.allows = player.Allowances{}
+	}
+	return m
+}
+
 func (m Model) WithNotes(n *notes.Cached) Model {
 	m.notes = n
 	return m
@@ -406,6 +434,11 @@ func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 		cell:   cell,
 		isDark: true,
 		keys:   newKeyMap(),
+		// Everything, until something says otherwise. A backend with no
+		// registration behind it — the mock — is allowed the lot, and the one
+		// spindle ships with is too; WithApplication is what narrows this for an
+		// application whose permissions have to be found out. See allows.go.
+		allows: player.Everything(),
 		help:   help.New(),
 		search: newSearchPane(),
 		// The waveform is on to begin with: it is the thing that makes the
@@ -604,6 +637,11 @@ func (m Model) Init() tea.Cmd {
 	// A backend that reports its own changes is followed rather than polled.
 	if w, ok := m.player.(player.Watcher); ok {
 		cmds = append(cmds, watchCmd(w))
+	}
+	// And what this application is allowed to do, where that is not already
+	// known. Everything optional waits on the answer. See allows.go.
+	if cmd := m.askAllows(); cmd != nil {
+		cmds = append(cmds, cmd)
 	}
 	return tea.Batch(cmds...)
 }

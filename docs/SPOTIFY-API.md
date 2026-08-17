@@ -119,7 +119,11 @@ above is the corrected measurement.)
 
 ## What somebody who downloads spindle has to do
 
-Today, all three steps:
+Nothing. **Decided 2026-08-17**: spindle ships with ncspot's registration and
+authenticates as that unless it is told otherwise, so a fresh install lands in
+the right-hand column of the table above — everything works.
+
+Using your own instead is three steps:
 
 1. Register an application at
    [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard).
@@ -127,7 +131,36 @@ Today, all three steps:
    refuses the word `localhost`; it has to be the numeric form.
 3. `spindle login <client id>`.
 
-And they land in the left-hand column of the table above.
+And that lands in the left-hand column — which spindle then **handles rather
+than suffers**. See below.
+
+## What the program does about it
+
+Nothing optional is assumed. `player.Abilities` is a list of the things a
+registration may or may not be allowed to do, each with the request that settles
+it:
+
+| ability | what is lost without it |
+|---|---|
+| `Collecting` | the heart on every list, and the key that fills it |
+| `Elsewhere` | a shared playlist cannot be opened at all |
+| `Suggesting` | who else sounds like this, and what might come next |
+
+Adding a feature that needs Spotify's permission is one line in that list: the
+probe decides it, the settings screen lists it, and whatever draws the feature
+asks `Allowances.Has`.
+
+The asking happens **only where the listener has brought their own application**
+— the shipped one is known to be allowed everything, and a request spent hearing
+that again is a request wasted. The answer is written down next to the client id
+it was asked about (`~/.local/state/spindle/allows.json`, a week), because it is
+the same answer for as long as the registration is.
+
+Until the answer arrives, everything optional is off: a key that fails when it
+is pressed is worse than a key that is not there. A failure to ask is not an
+answer — nothing is written down and nothing is turned on, and the next run asks
+again. Behind all of it the runtime refusal still stands: a 403 on the way past
+turns the feature off for the rest of the run and says so once.
 
 **The client id and the address the browser comes back to are a pair.** Spotify
 checks the address against what the application registered, and it checks it
@@ -136,10 +169,11 @@ spindle's own registration uses `/callback`; ncspot's takes a loopback port of
 any number with `/login` on the end, and `auth.CallbackPath` knows about that one
 by name. Anything else has to match whatever its owner registered.
 
-### The choice that is open
+### The choice, as it was decided
 
-**Undecided as of 2026-08-17.** spindle ships no default client id. Three ways it
-could:
+**Decided 2026-08-17: the second, with the third's honesty.** spindle ships
+ncspot's id and handles a narrower one rather than refusing it. The three ways
+it could have gone:
 
 | | what the user configures | what they get | what it costs |
 |---|---|---|---|

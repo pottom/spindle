@@ -105,6 +105,12 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 	case tea.MouseReleaseMsg:
 		return m.mouseRelease(message)
 
+	case allowsTook:
+		// What Spotify will let this application do. Until it lands, the
+		// optional features are off. See allows.go.
+		m.tookAllows(message)
+		return m, nil
+
 	case savedTook:
 		// A heart that has reached Spotify, or has not. See collect.go.
 		return m, m.tookSaved(message)

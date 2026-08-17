@@ -78,25 +78,35 @@ adds to the queue, `x` removes, `j` / `k` move a queued track.
 
     go build -o spindle ./cmd/spindle
 
-spindle needs a Spotify application to authenticate as. Register one at
+Then
+
+    ./spindle login
+    ./spindle
+
+The browser opens once. The client secret is not needed: authorisation is PKCE.
+Playback needs a second authorisation, which the daemon asks for on its own the
+first time.
+
+spindle authenticates as a Spotify application, and ships with one — ncspot's,
+which is public in its source and which spotify-player ships for the same
+reason. It predates Spotify's November 2024 clampdown, so nothing spindle does
+is refused to it.
+
+You can use your own instead. Register an app at
 [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard), add
 this exact redirect URI
 
     http://127.0.0.1:3679/callback
 
-and then
+and then `./spindle login <client id>`. Know what it costs: an application
+registered today is in development mode, which has a daily quota and is refused
+a family of endpoints outright. **spindle asks Spotify what your application may
+do and turns off what it may not** rather than offering keys that fail — today
+that means liking tracks, opening a playlist somebody else owns, and related
+artists. The settings screen names which application is in use and what is gone.
 
-    ./spindle login <client id>
-    ./spindle
-
-The client secret is not needed: authorisation is PKCE. Playback needs a second
-authorisation, which the daemon asks for on its own the first time.
-
-An application registered today is in Spotify's development mode, which has a
-daily quota and refuses a family of endpoints outright: a playlist somebody else
-owns cannot be listed, and a track cannot be liked or even asked about. Which
-registration is asking decides that, not spindle — the measurements, and what
-else could be done about it, are in [docs/SPOTIFY-API.md](docs/SPOTIFY-API.md).
+The measurements behind all of it are in
+[docs/SPOTIFY-API.md](docs/SPOTIFY-API.md).
 
 If something on your machine already wants port 3679, `spindle callback <port>`
 moves it — add the new address to the application as well, which may list

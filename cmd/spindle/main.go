@@ -95,7 +95,11 @@ Options for the interface:
 }
 
 func reportFatal(err error) {
-	if errors.Is(err, auth.ErrNoClientID) {
+	if errors.Is(err, auth.ErrMalformedClientID) {
+		// The one way the application can be wrong now that there is always
+		// one: somebody has put their own in and mistyped it.
+		fmt.Fprintln(os.Stderr, "spindle:", err)
+		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, auth.SetupHelp())
 		os.Exit(1)
 	}
@@ -208,8 +212,17 @@ func main() {
 	loader := cover.NewLoader(renderer, &http.Client{Timeout: 15 * time.Second})
 	loader.SetGraphics(found)
 
+	// Which application this is authenticating as decides what Spotify will
+	// answer, and so what the screen may offer. See player.Abilities.
+	clientID, err := auth.ClientID()
+	if err != nil {
+		reportFatal(err)
+	}
+
 	final, err := tea.NewProgram(
-		ui.New(backendPlayer, loader, cell).WithNotes(artistNotes()),
+		ui.New(backendPlayer, loader, cell).
+			WithApplication(clientID, auth.OwnApplication()).
+			WithNotes(artistNotes()),
 	).Run()
 
 	// Whatever the debug bar wrote down goes with the session that wrote it.

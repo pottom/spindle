@@ -36,7 +36,7 @@ type savedTook struct {
 // canSave reports whether the like key is worth offering: a backend that can
 // save at all, and a registration that has not already refused.
 func (m Model) canSave() bool {
-	if m.noSaving {
+	if m.noSaving || !m.allows.Has(player.Collecting) {
 		return false
 	}
 	_, ok := m.player.(player.Collector)

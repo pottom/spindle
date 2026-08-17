@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -16,17 +15,21 @@ const (
 	// why the number lives there rather than here.
 	defaultCallbackPort = 3679
 
-	// ncspotClientID is another terminal player's registration, and the reason
-	// this file knows about anybody else's. It is registered in Spotify's
-	// extended quota mode and predates the 2024 changes to the Web API, so it is
-	// not held to the daily cap a newly registered application is — which is the
-	// cap a window left open for a day can reach. spotify-player ships it as its
-	// default for exactly that reason, and warns anyone who sets their own.
+	// ncspotClientID is what spindle authenticates as unless it is told
+	// otherwise: another terminal player's registration, public in ncspot's own
+	// source, which spotify-player ships as its default for the same reason.
 	//
-	// spindle does not ship it. It is here so that setting it in the environment
-	// works rather than failing at the browser: an id and the address its
-	// registration sends the browser back to are a pair, and this one's is a
-	// loopback port of any number with /login on the end.
+	// It is registered in Spotify's extended quota mode and predates the 2024
+	// changes to the Web API. An application registered today is not: it gets a
+	// daily cap a window left open can reach, and a family of endpoints refused
+	// outright — a playlist somebody else owns cannot be listed, and a track
+	// cannot be liked or even asked about. Which registration is asking decides
+	// that, not spindle. See docs/SPOTIFY-API.md.
+	//
+	// Anyone can use their own instead, and spindle then turns off what that
+	// registration is not allowed to do rather than offering keys that fail. An
+	// id and the address its registration sends the browser back to are a pair:
+	// this one takes a loopback port of any number with /login on the end.
 	ncspotClientID = "d420a117a32841c2b3474932e49fb54b"
 
 	ownCallbackPath    = "/callback"
@@ -136,10 +139,6 @@ var Scopes = []string{
 	"user-read-recently-played",
 }
 
-// ErrNoClientID reports that the application is not configured yet. Callers are
-// expected to answer it with SetupHelp rather than a bare error line.
-var ErrNoClientID = errors.New("no Spotify client id")
-
 // ClientID returns the application's client id.
 //
 // The environment wins so a different application can be tried without
@@ -158,14 +157,31 @@ func ClientID() (string, error) {
 		return "", err
 	}
 	if id == "" {
-		return "", ErrNoClientID
+		// Nobody has said otherwise, so it is the one spindle ships with.
+		// Nothing is written down: a saved copy of the default is a copy that
+		// goes stale the day the default changes.
+		return ncspotClientID, nil
 	}
 	return id, nil
 }
 
-// SetupHelp is what to tell someone who has not registered an application yet.
+// DefaultClientID is the registration spindle authenticates as out of the box.
+func DefaultClientID() string { return ncspotClientID }
+
+// OwnApplication reports that the listener has put their own registration in
+// place of the one spindle ships with. What Spotify allows depends on which is
+// asking, so it is the question every optional feature is decided by.
+func OwnApplication() bool {
+	id, err := ClientID()
+	return err == nil && id != ncspotClientID
+}
+
+// SetupHelp is what to tell somebody who wants to authenticate as their own
+// application rather than as the one spindle ships with.
 func SetupHelp() string {
-	return fmt.Sprintf(`spindle needs a Spotify application of its own.
+	return fmt.Sprintf(`spindle authenticates as a Spotify application, and ships with one.
+
+To use your own instead:
 
   1. Open https://developer.spotify.com/dashboard and create an app.
   2. Add this exact redirect URI:
@@ -173,12 +189,16 @@ func SetupHelp() string {
        %s
 
      Spotify rejects "localhost"; it has to be the numeric form.
-  3. Copy the client id from the app's settings.
+  3. Run "spindle login <client id>", or set %s for one run.
 
-Run "spindle login" and it will ask for the id once and remember it. Setting %s
-overrides what is saved, which is handy for trying a second application.
+Know what it costs. An application registered after November 2024 is in
+Spotify's development mode: it has a daily quota, and it is refused a family of
+endpoints outright — a playlist somebody else owns cannot be listed, and a track
+cannot be liked or even asked about. spindle turns those off rather than
+offering keys that fail, and the settings screen says which are gone.
 
-The client secret is not needed: spindle authenticates with PKCE.`, RedirectURI(), clientIDEnv)
+The client secret is not needed: spindle authenticates with PKCE.`,
+		RedirectURI(), clientIDEnv)
 }
 
 // oauthConfig builds the OAuth client for a given application.

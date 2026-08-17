@@ -34,6 +34,9 @@ func TestWhereTheBrowserComesBackToIsASetting(t *testing.T) {
 	if got := CallbackPort(); got != 45123 {
 		t.Errorf("the port was not remembered: %d", got)
 	}
+	// The path belongs to whichever registration is asking — see CallbackPath —
+	// and this test is about the port, so it names its own.
+	t.Setenv(clientIDEnv, "1c227ccd43c64c89918ce162bfc38c7b")
 	if want := "http://127.0.0.1:45123/callback"; RedirectURI() != want {
 		t.Errorf("the address is %q, want %q", RedirectURI(), want)
 	}

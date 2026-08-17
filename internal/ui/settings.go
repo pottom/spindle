@@ -11,6 +11,7 @@ import (
 	"github.com/pottom/spindle/internal/auth"
 	"github.com/pottom/spindle/internal/daemon"
 	"github.com/pottom/spindle/internal/notes"
+	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui/msg"
 
 	"github.com/pottom/spindle/internal/ui/cover"
@@ -84,6 +85,11 @@ const (
 	settingNotify
 	settingArtwork
 	settingNotes
+
+	// Which application spindle authenticates as. Like the two above it, this
+	// one reports rather than turns: it is changed by a command, and it is here
+	// because it decides what the other screens may offer.
+	settingApplication
 
 	settingsCount
 )
@@ -255,7 +261,53 @@ func (m Model) settingRows() []settingRow {
 		value: m.notesSays(),
 		says:  notesSays(m.notes),
 		live:  true,
+	}, {
+		name:  "Spotify application",
+		value: m.applicationSays(),
+		says:  m.applicationWhy(),
+		live:  true,
 	}}
+}
+
+// applicationSays names which registration spindle is authenticating as, and
+// what that costs.
+//
+// It is on this screen because it is the one setting that decides what other
+// screens may offer: an application registered since Spotify's 2024 clampdown
+// cannot like a track or open somebody else's playlist, and a listener who has
+// put their own id in deserves to be told which keys went missing rather than
+// left wondering. See player.Abilities and docs/SPOTIFY-API.md.
+func (m Model) applicationSays() string {
+	if !m.asksAllows {
+		return "the one spindle ships with"
+	}
+
+	var lost []string
+	for _, info := range player.Abilities {
+		if !m.allows.Has(info.Ability) {
+			lost = append(lost, info.Name)
+		}
+	}
+	if len(lost) == 0 {
+		return "your own · everything allowed"
+	}
+	return "your own · without " + strings.ToLower(strings.Join(lost, ", "))
+}
+
+// applicationWhy is the sentence under it.
+func (m Model) applicationWhy() string {
+	if !m.asksAllows {
+		return "Registered before Spotify's 2024 changes, so nothing here is refused. Your own: spindle login <client id>"
+	}
+	for _, info := range player.Abilities {
+		if !m.allows.Has(info.Ability) {
+			// The first thing missing, said in full. A list of everything lost
+			// would not fit on a line, and one example is what makes the
+			// trade-off real to somebody reading it.
+			return "Spotify refuses this application " + info.Lost + ". The one spindle ships with is not refused."
+		}
+	}
+	return "Your own registration, and Spotify allows it everything."
 }
 
 // notesSays names the databases spindle is asking about an artist, and

@@ -15,8 +15,13 @@ func tempConfig(t *testing.T) {
 func TestClientIDRoundTrip(t *testing.T) {
 	tempConfig(t)
 
-	if _, err := ClientID(); !errors.Is(err, ErrNoClientID) {
-		t.Fatalf("ClientID on a fresh config = %v, want ErrNoClientID", err)
+	// Nothing configured is not nothing: spindle ships with a registration, and
+	// what it can do is the whole reason it does. See DefaultClientID.
+	if got, err := ClientID(); err != nil || got != DefaultClientID() {
+		t.Fatalf("ClientID on a fresh config = %q, %v — want the one spindle ships with", got, err)
+	}
+	if OwnApplication() {
+		t.Error("a fresh config says the listener has brought their own application")
 	}
 
 	const id = "1c227ccd43c64c89918ce162bfc38c7b"
@@ -94,8 +99,10 @@ func TestUnreadableSettingsAreTreatedAsAbsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := ClientID(); !errors.Is(err, ErrNoClientID) {
-		t.Errorf("ClientID = %v, want ErrNoClientID", err)
+	// A file that cannot be read is a file that says nothing, and what it says
+	// nothing about falls back to what spindle ships with.
+	if got, err := ClientID(); err != nil || got != DefaultClientID() {
+		t.Errorf("ClientID = %q, %v — want the one spindle ships with", got, err)
 	}
 }
 

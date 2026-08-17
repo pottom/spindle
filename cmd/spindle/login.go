@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -30,10 +28,6 @@ func runLogin(ctx context.Context, args []string) error {
 		}
 		fmt.Fprintf(os.Stdout, "Saved to %s\n\n", auth.SettingsPath())
 	}
-	if err := ensureClientID(os.Stdin, os.Stdout); err != nil {
-		return err
-	}
-
 	session, err := auth.NewSession(ctx, os.Stdout)
 	if err != nil {
 		return err
@@ -57,30 +51,6 @@ func runLogin(ctx context.Context, args []string) error {
 		name = user.ID
 	}
 	fmt.Printf("Signed in as %s.\nToken stored at %s\n", name, session.TokenPath())
-	return nil
-}
-
-// ensureClientID asks for the application's client id if there is none saved.
-// It is asked once and remembered; a malformed answer is rejected on the spot
-// rather than turning into a confusing rejection halfway through the browser.
-func ensureClientID(in io.Reader, out io.Writer) error {
-	if _, err := auth.ClientID(); !errors.Is(err, auth.ErrNoClientID) {
-		return err
-	}
-
-	fmt.Fprintln(out, auth.SetupHelp())
-	fmt.Fprint(out, "\nClient id: ")
-
-	scanner := bufio.NewScanner(in)
-	if !scanner.Scan() {
-		return fmt.Errorf("no client id given")
-	}
-	id := strings.TrimSpace(scanner.Text())
-
-	if err := auth.SaveClientID(id); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "Saved to %s\n\n", auth.SettingsPath())
 	return nil
 }
 
