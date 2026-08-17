@@ -125,18 +125,28 @@ func (m *Model) fitQueue() tea.Cmd {
 	p := m.player
 	seed := m.ps.TrackID
 
-	// The related artists need an id, which the device's own report of what is
-	// playing does not carry; the queue's copy of the same track does, where the
-	// two agree. Without one that half is simply skipped — the suggestions are
-	// seeded by the track, which is always known.
+	// The related artists are asked about by id, and neither the device's report
+	// of what is playing nor the queue it comes with carries one: both hold
+	// artist names. So the track is looked up — one request, and the gate keeps
+	// the answer for an hour, so the same record costs nothing to ask about
+	// again. Without a lookup that half of the question never fired at all.
 	var artist string
 	if now, ok := m.nowPlayingRow(); ok && len(now.ArtistIDs) > 0 {
 		artist = now.ArtistIDs[0]
 	}
+	looker, canLook := m.player.(player.Looker)
 
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 		defer cancel()
+
+		if artist == "" && canLook {
+			// A failure here is not the question failing: the suggestions still
+			// answer, and they are seeded by the track rather than by the artist.
+			if full, err := looker.Look(ctx, seed); err == nil && len(full.ArtistIDs) > 0 {
+				artist = full.ArtistIDs[0]
+			}
+		}
 
 		near := map[string]bool{}
 		if source, ok := p.(player.RelatedArtists); ok && artist != "" {

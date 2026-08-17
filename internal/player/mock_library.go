@@ -186,3 +186,16 @@ func (m *Mock) Suggestions(ctx context.Context, seedTrackID string, limit int) (
 	}
 	return out, nil
 }
+
+// Look finds one track in the catalogue.
+func (m *Mock) Look(ctx context.Context, trackID string) (Track, error) {
+	if err := m.delay(ctx); err != nil {
+		return Track{}, err
+	}
+	for _, t := range mockCatalogue {
+		if t.ID == trackID {
+			return t, nil
+		}
+	}
+	return Track{}, nil
+}

@@ -173,6 +173,35 @@ func (s *Spotify) RelatedArtists(ctx context.Context, artistID string) ([]Artist
 	return out, nil
 }
 
+// Looker is a backend that can look one track up in full.
+//
+// What the daemon reports about what is playing carries artist names and no
+// ids — see localStatus — and an id is what the catalogue is asked with. One
+// lookup answers it, and the gate keeps that answer for an hour, so asking
+// again about the same record costs nothing.
+type Looker interface {
+	Look(ctx context.Context, trackID string) (Track, error)
+}
+
+// Look reads one track from the Web API. Allowed to every application: it is the
+// batch form of this that is refused. See docs/SPOTIFY-API.md.
+func (s *Spotify) Look(ctx context.Context, trackID string) (Track, error) {
+	full, err := s.client.GetTrack(ctx, spotify.ID(trackID))
+	if err != nil {
+		return Track{}, classify("fetch track", err)
+	}
+	if full == nil {
+		return Track{}, nil
+	}
+	return trackFromFull(full), nil
+}
+
+// Look on the daemon is the Web API's answer: the device knows what it is
+// playing, not what the catalogue says about it.
+func (l *Local) Look(ctx context.Context, trackID string) (Track, error) {
+	return l.web.Look(ctx, trackID)
+}
+
 // Suggester is a backend that can say what might go with a track.
 //
 // Optional for the same reason as the rest: Spotify answers /recommendations
