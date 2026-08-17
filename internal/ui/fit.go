@@ -48,16 +48,35 @@ const (
 	fitSuggestions = 50
 )
 
-// fitMarkFor is how long the rows that were brought forward stay marked.
+// How the rows that were brought forward announce themselves.
 //
-// A list that rearranges itself under the eye is a list nobody can check. Four
-// seconds is long enough to look down the column and see which rows came up,
-// and short enough that it is gone before it becomes part of the furniture.
+// A list that rearranges itself under the eye is a list nobody can check, so
+// they blink: four times, a quarter of a second each way, and then the mark
+// stays. The blinking is what catches the eye on a screen somebody was already
+// reading; the mark that stays is what lets them go down the column afterwards
+// and find every row that moved, at their own pace.
 //
-// Marked rather than flashing: a row that blinks is read as a fault, and this is
-// the program doing what it was asked. The mark is a ground behind the row that
-// leaves the colours in it alone — see raise.
-const fitMarkFor = 4 * time.Second
+// It stays until the arrangement it describes is no longer the one on screen —
+// the next ordering, the next track, or any edit by hand. See forgetMoved.
+const (
+	fitBlink      = 250 * time.Millisecond
+	fitBlinkTimes = 4
+)
+
+// fitBlinkMsg is one turn of the blink.
+type fitBlinkMsg struct{}
+
+// fitBlinkCmd keeps the blink going. It stops on its own: the model draws the
+// mark steadily once the flashes are over, so there is nothing left to redraw
+// for.
+func fitBlinkCmd() tea.Cmd {
+	return tea.Tick(fitBlink, func(time.Time) tea.Msg { return fitBlinkMsg{} })
+}
+
+// blinking reports that the marks are still in their flashing stretch.
+func (m Model) blinking() bool {
+	return len(m.fitMoved) > 0 && time.Since(m.fitMovedAt) < time.Duration(2*fitBlinkTimes)*fitBlink
+}
 
 // fitTook carries the opinion back: the artists worth being near.
 //
@@ -214,6 +233,7 @@ func (m *Model) tookFit(message fitTook) tea.Cmd {
 		}
 	}
 	m.fitMovedAt = time.Now()
+	blink := fitBlinkCmd()
 
 	// On screen at once, as every other edit to this list is. What was sent is
 	// what is drawn; a queue that rearranged itself half a second later would
@@ -224,15 +244,15 @@ func (m *Model) tookFit(message fitTook) tea.Cmd {
 
 	editor, ok := m.player.(player.QueueEditor)
 	if !ok {
-		return nil
+		return blink
 	}
 	ids := make([]string, 0, len(ordered))
 	for _, t := range ordered {
 		ids = append(ids, t.ID)
 	}
-	return controlCmd("order what is coming", func(ctx context.Context) error {
+	return tea.Batch(blink, controlCmd("order what is coming", func(ctx context.Context) error {
 		return editor.Reorder(ctx, ids)
-	})
+	}))
 }
 
 // fitOrder is the new order: what goes with the record playing first, and
@@ -278,11 +298,24 @@ func fitScore(t player.Track, same, near, suggested map[string]bool) int {
 // same, and this decides an order rather than an identity.
 func foldName(name string) string { return strings.ToLower(strings.TrimSpace(name)) }
 
-// justMoved reports that this track was brought forward a moment ago, and is
-// still worth marking.
+// justMoved reports that this track was brought forward and should be wearing
+// its mark this frame.
+//
+// False on the dark half of each flash, and true from the end of the flashing
+// until the arrangement changes.
 func (m Model) justMoved(id string) bool {
-	if len(m.fitMoved) == 0 || time.Since(m.fitMovedAt) >= fitMarkFor {
+	if !m.fitMoved[id] {
 		return false
 	}
-	return m.fitMoved[id]
+	if phase := time.Since(m.fitMovedAt) / fitBlink; phase < 2*fitBlinkTimes && phase%2 == 1 {
+		return false
+	}
+	return true
+}
+
+// forgetMoved takes the marks off. What they describe is one arrangement of the
+// list, so anything that arranges it differently — another ordering, the track
+// changing, an edit by hand — is the end of them.
+func (m *Model) forgetMoved() {
+	m.fitMoved = nil
 }

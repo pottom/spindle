@@ -54,6 +54,10 @@ func (m *Model) queueKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 // commonest reason to reach for the key at all, and skipping it is what taking
 // it out of the list means while it is sounding.
 func (m *Model) dropQueued() tea.Cmd {
+	// An edit by hand is a different arrangement from the one the marks are
+	// about. See fit.go.
+	m.forgetMoved()
+
 	at := m.queueIndex()
 	if at < 0 {
 		p := m.player
@@ -105,6 +109,8 @@ type pendingOrder struct {
 // rewrites what is coming — and the second press would be describing a list it
 // has not agreed to yet.
 func (m *Model) moveQueued(delta int) tea.Cmd {
+	m.forgetMoved()
+
 	at := m.queueIndex()
 	if at < 0 {
 		return nil

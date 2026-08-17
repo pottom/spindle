@@ -224,10 +224,29 @@ func TestTheRowsThatCameUpAreMarked(t *testing.T) {
 		t.Error("a row that did not come up is marked")
 	}
 
-	// And it goes away on its own, leaving the number behind it.
-	after.fitMovedAt = time.Now().Add(-2 * fitMarkFor)
+	// It blinks first: four flashes, and the dark half of each is the row as it
+	// always was.
+	if !after.blinking() {
+		t.Error("the marks went straight to standing still")
+	}
+	after.fitMovedAt = time.Now().Add(-fitBlink) // the first dark half
 	if after.justMoved(moved.ID) {
-		t.Error("the mark outlived its welcome")
+		t.Error("the mark is on through the dark half of a flash")
+	}
+
+	// Then it stays, so the column can be read down at leisure.
+	after.fitMovedAt = time.Now().Add(-time.Minute)
+	if after.blinking() {
+		t.Error("it is still flashing a minute later")
+	}
+	if !after.justMoved(moved.ID) {
+		t.Error("the mark did not stay after the flashing")
+	}
+
+	// And it goes when what it describes does.
+	after.forgetMoved()
+	if after.justMoved(moved.ID) {
+		t.Error("the mark survived the arrangement it was about")
 	}
 	if back := ansi.Strip(after.trackRow(moved, 100, false, 1)); !strings.Contains(back, "1 ") {
 		t.Errorf("the number did not come back: %q", back)

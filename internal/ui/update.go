@@ -105,6 +105,15 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 	case tea.MouseReleaseMsg:
 		return m.mouseRelease(message)
 
+	case fitBlinkMsg:
+		// One turn of the flashing that says which rows came up. It stops on its
+		// own — the mark is drawn steadily afterwards, so there is nothing left
+		// to redraw for. See fit.go.
+		if m.blinking() {
+			return m, fitBlinkCmd()
+		}
+		return m, nil
+
 	case fitTook:
 		// What Spotify says goes with the record playing, and the order that
 		// follows from it. See fit.go.
@@ -175,6 +184,11 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		if m.drivenFromElsewhere(message.State) {
 			m.followUntil = time.Now().Add(followWindow)
 			m.nextPollAt = time.Now().Add(activePoll)
+		}
+		if message.State != nil && m.ps != nil && message.State.TrackID != m.ps.TrackID {
+			// The list has moved on, so what the marks describe is not what is
+			// on screen any more. See fit.go.
+			m.forgetMoved()
 		}
 		m.adopt(message.State)
 		m.noteUnplayable(message.State)
