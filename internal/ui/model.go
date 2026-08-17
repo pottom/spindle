@@ -464,6 +464,13 @@ func New(p player.Player, covers *cover.Loader, cell cover.CellSize) Model {
 	}
 	m.help.ShortSeparator = " · "
 	m.restyle()
+
+	// The first fetch goes out with Init, so the clock the rest are paced
+	// against starts here rather than at nought. Left at nought, two answers to
+	// the same question left in the first instant — Init's own, and the one the
+	// device's first event asked for, which was inside a gap that had not begun
+	// — and the first tick a second later made a third.
+	m.polledAt, m.nextPollAt = time.Now(), time.Now().Add(idlePoll)
 	return m
 }
 

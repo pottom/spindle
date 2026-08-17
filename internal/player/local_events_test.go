@@ -137,3 +137,39 @@ func TestAQuietStreamIsLeftAlone(t *testing.T) {
 		t.Log("still connected after ten pings' worth of silence, which is the point")
 	}
 }
+
+// A daemon that is not there is not asked after every second.
+//
+// Every failed attempt tells whoever is watching that the device has gone, and
+// the screen answers that by asking Spotify what is playing instead — so a flat
+// second is a Web API request a second, out of a daily quota, for as long as
+// nothing is there. Measured on a machine whose daemon took half a minute to
+// come up: thirty requests, one a second, for an answer that never changed.
+func TestADaemonThatStaysAwayIsWaitedForLonger(t *testing.T) {
+	// The wait doubles to a ceiling, and the first ones are short so that a
+	// daemon restarting is not noticed.
+	wait := reconnectDelay
+	var waits []time.Duration
+	for range 8 {
+		waits = append(waits, wait)
+		wait = min(wait*2, reconnectMost)
+	}
+
+	if waits[0] != time.Second {
+		t.Errorf("the first wait is %s, want a second: a restart should not be noticed", waits[0])
+	}
+	if waits[1] <= waits[0] {
+		t.Error("the wait does not grow while the daemon stays away")
+	}
+
+	var total time.Duration
+	for _, w := range waits {
+		total += w
+	}
+	if total < 30*time.Second {
+		t.Errorf("eight attempts cover %s, which is still a request a second", total)
+	}
+	if waits[len(waits)-1] > reconnectMost {
+		t.Errorf("the wait grew past its ceiling, to %s", waits[len(waits)-1])
+	}
+}

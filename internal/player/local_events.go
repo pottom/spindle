@@ -8,10 +8,20 @@ import (
 )
 
 const (
-	// reconnectDelay is how long to wait before dialling the daemon again. The
-	// daemon is on loopback, so a failure means it is restarting rather than
-	// that the network is unhappy; there is no point backing off far.
+	// reconnectDelay is how long to wait before dialling the daemon again, and
+	// reconnectMost how far that wait grows while it stays away. The daemon is
+	// on loopback, so a failure usually means it is restarting — which is over
+	// in seconds — and the first waits are short so that a restart is not
+	// noticed.
+	//
+	// It grows because a daemon that is not coming back is not free to wait for.
+	// Every attempt tells whoever is watching that the device has gone, and the
+	// screen answers that by asking Spotify what is playing instead — so a flat
+	// second is a Web API request a second, out of a daily quota, for as long as
+	// nothing is there. Measured: half a minute without a daemon spent thirty of
+	// them.
 	reconnectDelay = time.Second
+	reconnectMost  = 30 * time.Second
 
 	// resyncEvery is a safety net. Every event the daemon sends is a hint that
 	// something moved, not the state itself, so a missed one would go unnoticed
@@ -55,6 +65,7 @@ func (l *Local) Watch(ctx context.Context) {
 
 	go l.resync(ctx)
 
+	wait := reconnectDelay
 	for ctx.Err() == nil {
 		if err := l.listen(ctx); err != nil && ctx.Err() == nil {
 			// A dropped connection is expected when the daemon restarts, and
@@ -65,9 +76,15 @@ func (l *Local) Watch(ctx context.Context) {
 
 			select {
 			case <-ctx.Done():
-			case <-time.After(reconnectDelay):
+			case <-time.After(wait):
 			}
+			wait = min(wait*2, reconnectMost)
+			continue
 		}
+
+		// A stream that was held open and then ended is a daemon that was there:
+		// the next one is worth trying for at once.
+		wait = reconnectDelay
 	}
 }
 

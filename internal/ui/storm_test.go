@@ -20,6 +20,9 @@ import (
 func TestAStormOfChangesIsOneRequest(t *testing.T) {
 	m := New(player.NewMock(), nil, defaultTestCell)
 	m.nextPollAt = time.Now().Add(time.Hour)
+	// Not a window that has just opened: Init's own fetch starts the clock, so a
+	// storm in the first second is a storm that has already been answered.
+	m.polledAt = time.Now().Add(-time.Minute)
 
 	asked := 0
 	var tm tea.Model = m
