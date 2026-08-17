@@ -127,7 +127,7 @@ func (m Model) visibleListRows() int {
 // how a page key and a screen come to disagree about how far a page is.
 func (m Model) listRoom(l layout) int {
 	if m.tab == tabSearch && m.open() == nil {
-		return l.bodyHeight - searchBoxRows
+		return l.bodyHeight - m.searchHeadRows()
 	}
 	return l.bodyHeight
 }

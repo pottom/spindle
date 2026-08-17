@@ -28,6 +28,53 @@ const searchPrompt = "⌕"
 // the bottom.
 const searchBoxRows = finderRows + 1
 
+// searchTitleRows is what the head takes once the query has been asked: the
+// query itself, and the row of air the pointer's head hangs in.
+const searchTitleRows = 2
+
+// searchRested reports that the query has been asked and the keyboard has gone
+// back to the results.
+//
+// The answer is not waited for. The head changing height when the results land
+// would move the whole screen a moment after a keypress that had already moved
+// it, and the reason to collapse it is the same either way: nobody is typing.
+func (m Model) searchRested() bool {
+	return !m.search.typing && strings.TrimSpace(m.search.input.Value()) != ""
+}
+
+// searchHeadRows is how much of the screen the head takes.
+func (m Model) searchHeadRows() int {
+	if m.searchRested() {
+		return searchTitleRows
+	}
+	return searchBoxRows
+}
+
+// searchHead draws it: the box while the query is being written, and the query
+// itself once it has been answered.
+//
+// A field standing empty over its own answers is three rows saying "you may
+// type here" to somebody who has stopped typing, and on a laptop screen those
+// three rows are two results. What the screen is about once the answer is in is
+// what was asked, so that is all that is left of it — and pressing / puts the
+// box back under the hand that wants it.
+func (m Model) searchHead(w int) []string {
+	if !m.searchRested() {
+		return m.searchBox(w)
+	}
+	return []string{
+		middle(m.searchTitle(), w),
+		strings.Repeat(" ", max(w, 0)),
+	}
+}
+
+// searchTitle is the query, named as one. The mark before it is the field's own,
+// so that what is standing there now reads as what was typed into the box that
+// was standing there a moment ago.
+func (m Model) searchTitle() string {
+	return m.styles.Empty.Render(searchPrompt) + " " + m.styles.Title.Render(m.search.input.Value())
+}
+
 // searchBox draws it, at the width of the block underneath.
 func (m Model) searchBox(w int) []string {
 	if w < finderLeast {

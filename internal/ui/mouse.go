@@ -229,7 +229,7 @@ func (m Model) listSpot(l layout, x, row int) spot {
 	// above everything else it holds — see searchBox — so it is the first rows of
 	// the body whatever has or has not been found.
 	if m.tab == tabSearch && m.open() == nil {
-		if row < searchBoxRows && x >= leftMargin && x < leftMargin+queueBlockWidth(l) {
+		if row < m.searchHeadRows() && x >= leftMargin && x < leftMargin+queueBlockWidth(l) {
 			return spot{spotQuery, -1}
 		}
 	}

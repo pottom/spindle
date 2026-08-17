@@ -994,7 +994,7 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 			line = m.spinner.View() + " " + m.styles.Empty.Render("Asking Spotify…")
 		}
 
-		out := append([]string(nil), m.searchBox(w)...)
+		out := append([]string(nil), m.searchHead(w)...)
 		out = append(out, strings.Repeat(" ", w), fit(line, w))
 		for len(out) < rows {
 			out = append(out, strings.Repeat(" ", w))
@@ -1004,7 +1004,7 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 	// The box stands above the list rather than being a line in it: it is the
 	// same box a list is searched with, and the same act. What it costs is its
 	// three rows, which come off the list under it.
-	box := m.searchBox(queueBlockWidth(l))
+	box := m.searchHead(queueBlockWidth(l))
 	rows = max(m.listRoom(l), 1)
 
 	out := append([]string(nil), box...)

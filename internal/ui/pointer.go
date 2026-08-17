@@ -119,7 +119,7 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 	// Where the band begins, which is where the body does except on the search:
 	// its box stands above the band. See searchBox.
 	if m.tab == tabSearch && m.open() == nil {
-		top += searchBoxRows
+		top += m.searchHeadRows()
 	}
 
 	from, _ := cursor.window(count, m.visibleListRows())

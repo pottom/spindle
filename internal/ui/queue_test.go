@@ -999,33 +999,34 @@ func TestSearchUsesTheSameShapeAsTheQueue(t *testing.T) {
 		t.Fatalf("the block is %d rows, want the whole body of %d", len(block), l.bodyHeight)
 	}
 
-	// The query is in a box at the head of the screen, the same box a list is
-	// searched with. See searchBox.
-	box := plain(strings.Join(block[:searchBoxRows], "\n"))
+	// The query stands at the head of the screen, named as what the answers
+	// under it are. See searchHead.
+	head := m.searchHeadRows()
+	box := plain(strings.Join(block[:head], "\n"))
 	if !strings.Contains(box, "queen") {
-		t.Errorf("the box = %q, want the query in it", box)
+		t.Errorf("the head = %q, want the query in it", box)
 	}
 	if strings.Contains(box, "tracks") {
-		t.Errorf("the box still holds the views: %q", box)
+		t.Errorf("the head still holds the views: %q", box)
 	}
 
 	// And the views are over the list they change, where the library keeps its
 	// own kinds — which is the whole argument for showing one at a time.
-	over := plain(strings.Join(block[searchBoxRows:], "\n"))
+	over := plain(strings.Join(block[head:], "\n"))
 	if !strings.Contains(over, "tracks") || !strings.Contains(over, "all") {
 		t.Error("the views are not named over the list")
 	}
 
 	// The panel beside the cover describes what the cursor rests on.
-	head := plain(strings.Join(block[searchBoxRows:searchBoxRows+l.artRows], "\n"))
-	if !strings.Contains(head, res[0].Title) || !strings.Contains(head, res[0].Album) {
-		t.Errorf("the panel = %q, want the result under the cursor described", head)
+	band := plain(strings.Join(block[head:head+l.artRows], "\n"))
+	if !strings.Contains(band, res[0].Title) || !strings.Contains(band, res[0].Album) {
+		t.Errorf("the panel = %q, want the result under the cursor described", band)
 	}
 
 	// And the results run the whole width, artists out where they are elsewhere.
 	// The bar of views, the mark under it, the column names and the line, and
 	// then the results.
-	row := plain(block[searchBoxRows+l.artHeight+4])
+	row := plain(block[head+l.artHeight+4])
 	if at := strings.Index(row, res[0].Artists[0]); at < len(row)/3 {
 		t.Errorf("the artists sit at column %d of %d, want them out with the others", at, len(row))
 	}
