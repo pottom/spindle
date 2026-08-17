@@ -234,3 +234,35 @@ func TestBackspacingTheQueryAwayStopsTheSpinner(t *testing.T) {
 		t.Errorf("the spinner is still turning:\n%s", screen)
 	}
 }
+
+// The year's column is eight cells because a year is four, so the kind of
+// record cannot ride along in it: "1991 compilation" came out as "1991 co…" on
+// a screen with sixty cells to spare. Reported from a real screen.
+func TestAnAlbumsKindDoesNotCrowdItsYear(t *testing.T) {
+	m := searched(t, "queen", player.Results{Albums: page(
+		player.Album{ID: "al1", Name: "Greatest Hits II", Artists: []string{"Queen"}, Released: "1991-10-28", Tracks: 17, AlbumType: "compilation"},
+	)})
+	m.search.kind = player.SearchAlbums
+	m.width, m.height = 165, 40
+	m.resize()
+
+	rows := m.searchPaneView(m.layout(), m.layout().bodyHeight)
+	var row string
+	for _, line := range rows {
+		if strings.Contains(plain(line), "Greatest Hits II") {
+			row = plain(line)
+		}
+	}
+	if row == "" {
+		t.Fatal("the record is not on the screen")
+	}
+	if !strings.Contains(row, "17 · compilation") {
+		t.Errorf("the row = %q, want the count and the kind together", row)
+	}
+	if !strings.HasSuffix(strings.TrimRight(row, " "), "1991") {
+		t.Errorf("the row = %q, want the year alone at its end", row)
+	}
+	if strings.Contains(row, "…") {
+		t.Errorf("the row = %q, want nothing cut at this width", row)
+	}
+}

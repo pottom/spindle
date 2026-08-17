@@ -1122,23 +1122,28 @@ func (m Model) albumRow(lead string, a player.Album, w int, selected bool) strin
 		primary = m.styles.RowSelected
 	}
 
-	year := releaseYear(a.Released)
-	if a.AlbumType != "" && a.AlbumType != "album" {
-		year = strings.TrimSpace(year + " " + a.AlbumType)
-	}
-
-	// How many tracks it holds, in the column a track list gives the album: it
-	// is the difference between a record and a compilation of everything
-	// somebody ever released, and it is in the answer already.
-	held := ""
+	// How many tracks it holds, and what sort of record it is where it is not
+	// simply a record: both are in the answer already, and between them they are
+	// the difference between the album and the single named after its one song.
+	//
+	// Together in the column a track list gives the album, rather than the kind
+	// riding along with the year: the year's column is eight cells because a
+	// year is four, and "1991 compilation" came out as "1991 co…" on a screen
+	// with sixty cells to spare. Reported from a real screen. The count is
+	// first, so a column too narrow for both loses the qualifier and keeps the
+	// number.
+	var held string
 	if a.Tracks > 0 {
-		held = m.styles.RowTrailing.Render(strconv.Itoa(a.Tracks))
+		held = strconv.Itoa(a.Tracks)
+	}
+	if a.AlbumType != "" && a.AlbumType != "album" {
+		held = strings.TrimPrefix(held+" · "+a.AlbumType, " · ")
 	}
 	return m.drawRow(w, selected, rowCells{
 		primary:   lead + m.lit(primary, a.Name),
 		secondary: m.lit(m.styles.RowSecondary, strings.Join(a.Artists, ", ")),
-		third:     held,
-		trailing:  m.styles.RowTrailing.Render(year),
+		third:     m.styles.RowTrailing.Render(held),
+		trailing:  m.styles.RowTrailing.Render(releaseYear(a.Released)),
 	})
 }
 
