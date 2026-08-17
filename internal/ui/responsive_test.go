@@ -113,7 +113,7 @@ func TestColumnsComeInOneOrderAndStay(t *testing.T) {
 
 	for body := 20; body <= 400; body++ {
 		span := rowWidths(body)
-		now := seen{span.second > 0, span.beat > 0, span.album > 0, span.stars > 0}
+		now := seen{span.second > 0, span.beat > 0, span.third > 0, span.stars > 0}
 
 		for _, c := range []struct {
 			name       string
@@ -146,7 +146,7 @@ func TestColumnsComeInOneOrderAndStay(t *testing.T) {
 		}
 
 		// And the row still adds up to what it was given.
-		used := span.main + span.second + span.beat + span.album + span.stars + span.liked + trailingCols
+		used := span.main + span.second + span.beat + span.third + span.stars + span.liked + trailingCols
 		if used > body {
 			t.Errorf("row %d: the columns come to %d, past the row", body, used)
 		}
@@ -163,8 +163,8 @@ func TestTheTitleKeepsTheLargestShare(t *testing.T) {
 		if span.main < span.second {
 			t.Errorf("row %d: the artists have %d columns and the title %d", body, span.second, span.main)
 		}
-		if span.album > 0 && span.main < span.album {
-			t.Errorf("row %d: the album has %d columns and the title %d", body, span.album, span.main)
+		if span.third > 0 && span.main < span.third {
+			t.Errorf("row %d: the album has %d columns and the title %d", body, span.third, span.main)
 		}
 	}
 }
@@ -365,7 +365,7 @@ func TestTheTitleStopsGrowing(t *testing.T) {
 		}
 
 		// The row still adds up to what it was given.
-		used := span.main + span.second + span.gap + span.album + span.stars + span.liked + span.beat + trailingCols
+		used := span.main + span.second + span.gap + span.third + span.stars + span.liked + span.beat + trailingCols
 		if used > body {
 			t.Errorf("row %d: the columns come to %d, past the row", body, used)
 		}
@@ -380,4 +380,82 @@ func TestTheTitleStopsGrowing(t *testing.T) {
 	if narrow := rowWidths(100).capped(); narrow.gap != 0 {
 		t.Errorf("a 100-column row has a gap of %d, want the pair to use it", narrow.gap)
 	}
+}
+
+// A list of answers is laid out for being read rather than for being kept: it
+// holds no column it cannot fill, and what it can fill arrives as early as the
+// width allows. Measured against the same rules the queue's rows follow.
+func TestAnswerRowsKeepTheirColumnsAtEveryWidth(t *testing.T) {
+	var was struct{ second, third, stars bool }
+
+	for body := 20; body <= 400; body++ {
+		span := answerWidths(body, 0)
+
+		// No tempo, ever. A record nobody has played has no measured beat, and
+		// nobody has played any of these.
+		if span.beat > 0 {
+			t.Fatalf("row %d: a list of answers holds %d columns for a tempo", body, span.beat)
+		}
+
+		now := struct{ second, third, stars bool }{span.second > 0, span.third > 0, span.stars > 0}
+		if was.second && !now.second {
+			t.Errorf("row %d: the artists went away on a wider row", body)
+		}
+		if was.third && !now.third {
+			t.Errorf("row %d: the album went away on a wider row", body)
+		}
+		if was.stars && !now.stars {
+			t.Errorf("row %d: the rating went away on a wider row", body)
+		}
+		if now.third && !now.stars {
+			t.Errorf("row %d: the album is shown but the rating is not", body)
+		}
+		if used := span.main + span.second + span.third + span.stars + span.liked + trailingCols; used > body {
+			t.Errorf("row %d: the columns come to %d, past the row", body, used)
+		}
+		if span.third > 0 && span.third > span.main {
+			t.Errorf("row %d: the album has %d columns and the title %d", body, span.third, span.main)
+		}
+		was = now
+	}
+
+	// And they arrive earlier than on a list of tracks somebody has built,
+	// which is the whole point: the columns are how one answer is told from
+	// twenty that look like it.
+	for _, c := range []struct {
+		name  string
+		of    func(rowSpan) int
+		queue int
+	}{
+		{"the rating", func(s rowSpan) int { return s.stars }, firstWidth(t, func(b int) bool { return rowWidths(b).stars > 0 })},
+		{"the album", func(s rowSpan) int { return s.third }, firstWidth(t, func(b int) bool { return rowWidths(b).third > 0 })},
+	} {
+		answers := firstWidth(t, func(b int) bool { return c.of(answerWidths(b, 0)) > 0 })
+		if answers >= c.queue {
+			t.Errorf("%s arrives at %d on a list of answers and %d on the queue, want it sooner", c.name, answers, c.queue)
+		}
+	}
+
+	// A list of things that are not tracks holds neither a rating nor a heart,
+	// and one with nothing to say in the middle holds no column for it.
+	for body := 20; body <= 400; body++ {
+		if span := answerWidths(body, lacksRating); span.stars > 0 || span.liked > 0 {
+			t.Fatalf("row %d: a list of records holds a rating column", body)
+		}
+		if span := answerWidths(body, lacksRating|lacksThird); span.third > 0 {
+			t.Fatalf("row %d: a list of artists holds a column it cannot fill", body)
+		}
+	}
+}
+
+// firstWidth is the narrowest row at which something is true.
+func firstWidth(t *testing.T, when func(body int) bool) int {
+	t.Helper()
+	for body := 20; body <= 400; body++ {
+		if when(body) {
+			return body
+		}
+	}
+	t.Fatal("never true at any width")
+	return 0
 }

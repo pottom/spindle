@@ -87,7 +87,7 @@ func (m Model) columnHead(w int, lead string, names rowCells) string {
 	return m.drawRow(w, false, rowCells{
 		primary:   lead + dress(names.primary),
 		secondary: dress(names.secondary),
-		album:     dress(names.album),
+		third:     dress(names.third),
 		stars:     dress(names.stars),
 		liked:     dress(names.liked),
 		tempo:     dress(names.tempo),
@@ -112,7 +112,7 @@ func (m Model) trackColumns(w int, numbered bool) string {
 	return m.columnHead(w, lead, rowCells{
 		primary:   "title",
 		secondary: "artist",
-		album:     "album",
+		third:     "album",
 		stars:     "stars",
 		liked:     "liked",
 		tempo:     "tempo",
@@ -121,8 +121,13 @@ func (m Model) trackColumns(w int, numbered bool) string {
 }
 
 // albumColumns names a list of records, and artistColumns a list of people.
+//
+// The third column is the album's on a list of tracks, and each of these lists
+// puts its own third fact there: what the record holds, what the list is for.
+// An artist arrives with nothing else worth a column, so that list says so and
+// its two names take the room instead. See rowLacks.
 func (m Model) albumColumns(w int, lead string) string {
-	return m.columnHead(w, lead, rowCells{primary: "album", secondary: "artist", trailing: "released"})
+	return m.columnHead(w, lead, rowCells{primary: "album", secondary: "artist", third: "tracks", trailing: "released"})
 }
 
 func (m Model) artistColumns(w int, lead string) string {
@@ -130,5 +135,5 @@ func (m Model) artistColumns(w int, lead string) string {
 }
 
 func (m Model) playlistColumns(w int) string {
-	return m.columnHead(w, blankMark, rowCells{primary: "playlist", secondary: "owner", trailing: "tracks"})
+	return m.columnHead(w, blankMark, rowCells{primary: "playlist", secondary: "owner", third: "about", trailing: "tracks"})
 }

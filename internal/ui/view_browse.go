@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -972,6 +973,12 @@ func (m Model) playlistDetailOf(p *player.Playlist, w, rows int) []string {
 func searchFieldWidth(l layout) int { return max(queueBlockWidth(l)/3, 8) }
 
 func (m Model) searchPaneView(l layout, rows int) []string {
+	// Every row on this screen is an answer rather than something chosen, which
+	// is what its columns are laid out for — and each kind of answer says which
+	// of the optional columns it has anything to put in. See answersMain.
+	m.rowsAreAnswers = true
+	m.rowsLack = searchLacks(m.search.kind)
+
 	empty := "Type to search the catalogue."
 	if strings.TrimSpace(m.search.input.Value()) != "" {
 		empty = "Nothing matched."
@@ -1075,6 +1082,19 @@ func (m Model) searchRow(i, w int, selected bool) string {
 	}
 }
 
+// searchLacks is which columns a view of answers cannot fill: only tracks are
+// rated and liked, and only an artist arrives with no third fact worth a column.
+func searchLacks(view player.SearchKind) rowLacks {
+	switch view {
+	case player.SearchAlbums, player.SearchPlaylists:
+		return lacksRating
+	case player.SearchArtists:
+		return lacksRating | lacksThird
+	default:
+		return 0
+	}
+}
+
 // searchColumns names the columns of whichever kind of result is on screen.
 func (m Model) searchColumns(w int) string {
 	switch m.search.kind {
@@ -1106,11 +1126,20 @@ func (m Model) albumRow(lead string, a player.Album, w int, selected bool) strin
 	if a.AlbumType != "" && a.AlbumType != "album" {
 		year = strings.TrimSpace(year + " " + a.AlbumType)
 	}
-	return m.row(w, selected,
-		lead+m.lit(primary, a.Name),
-		m.lit(m.styles.RowSecondary, strings.Join(a.Artists, ", ")),
-		m.styles.RowTrailing.Render(year),
-	)
+
+	// How many tracks it holds, in the column a track list gives the album: it
+	// is the difference between a record and a compilation of everything
+	// somebody ever released, and it is in the answer already.
+	held := ""
+	if a.Tracks > 0 {
+		held = m.styles.RowTrailing.Render(strconv.Itoa(a.Tracks))
+	}
+	return m.drawRow(w, selected, rowCells{
+		primary:   lead + m.lit(primary, a.Name),
+		secondary: m.lit(m.styles.RowSecondary, strings.Join(a.Artists, ", ")),
+		third:     held,
+		trailing:  m.styles.RowTrailing.Render(year),
+	})
 }
 
 // artistRow is a name and how many people follow it, which is the only measure
@@ -1238,7 +1267,16 @@ func (m Model) playlistRow(p player.Playlist, w int, selected bool) string {
 		count = m.styles.RowTrailing.Render(fmt.Sprintf("%d", p.Tracks))
 	}
 
-	return m.row(w, selected, name, m.lit(m.styles.RowSecondary, p.Owner), count)
+	// And what the owner wrote it for, where there is room for it. On the lists
+	// Spotify makes it is the only place the reason for the list is written
+	// down, and on a screen of twenty results called some variation of one
+	// artist's name it is the only thing telling them apart.
+	return m.drawRow(w, selected, rowCells{
+		primary:   name,
+		secondary: m.lit(m.styles.RowSecondary, p.Owner),
+		third:     m.lit(m.styles.RowTrailing, p.Description),
+		trailing:  count,
+	})
 }
 
 // libraryMark is the column in front of a library row, which says what kind of
@@ -1290,7 +1328,7 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 	row := m.drawRow(w, selected, rowCells{
 		primary:   title,
 		secondary: m.lit(m.styles.RowSecondary, strings.Join(t.Artists, ", ")),
-		album:     m.lit(m.styles.RowTrailing, t.Album),
+		third:     m.lit(m.styles.RowTrailing, t.Album),
 		stars:     m.starsCell(t),
 		liked:     m.likedCell(t),
 		tempo:     m.tempoCell(t),
@@ -1425,36 +1463,114 @@ const (
 	starsFrom = 2*secondaryCols + tempoCols + trailingCols + starsCols + likedCols + 2
 )
 
+// What a row of answers keeps for the two names while it works out whether it
+// can afford another column, and the least an album column is worth drawing.
+//
+// A list of answers is read differently from a list somebody has built. The
+// queue holds records already chosen, so the names are all of it; a search
+// holds twenty candidates, and which of them is wanted is decided by the things
+// in the columns — how popular it is, whether it is already liked, which record
+// it came off. Holding two full-width names before any of that could be afforded
+// meant a narrow terminal showed a title, an artist, and no way to tell the
+// remaster from the karaoke version.
+//
+// So the floors are what a name needs to be read rather than what it needs to be
+// comfortable, and the columns to the right arrive some forty cells earlier.
+const (
+	answersMain   = 30
+	answersSecond = 18
+	albumLeast    = 16
+)
+
+// rowLacks names the optional columns a list has nothing to put in.
+//
+// A column held open for a cell that is always empty is a hole in every row of
+// the list, and at a wide terminal it is a wide one: measured on the search, a
+// list of records held its rating, its heart and its album column open — forty
+// cells of nothing between the artist and the year, on every row, at every width
+// above a hundred and twenty. The zero value lacks nothing, which is a list of
+// tracks.
+type rowLacks uint8
+
+const (
+	// lacksRating is a list of things that are not tracks: no stars, no heart.
+	lacksRating rowLacks = 1 << iota
+
+	// lacksThird is a list with nothing to say between the names and the number.
+	lacksThird
+)
+
+// has reports that a list can fill one of them.
+func (l rowLacks) has(what rowLacks) bool { return l&what == 0 }
+
 // rowSpan is how wide each of a row's columns is. A zero is a column this row
 // has not earned and will not draw.
 type rowSpan struct {
 	main   int
 	second int
 	gap    int
-	album  int
+	third  int
 	stars  int
 	liked  int
 	beat   int
 }
 
-func rowWidths(body int) rowSpan {
+// rowWidths divides a row of a list somebody has built, and answerWidths a row
+// of a list Spotify has just answered with. The difference is what each can
+// afford to hold open, and it is argued for at answersMain.
+func rowWidths(body int) rowSpan { return widths(body, false, 0) }
+
+func answerWidths(body int, lacks rowLacks) rowSpan { return widths(body, true, lacks) }
+
+func widths(body int, answers bool, lacks rowLacks) rowSpan {
 	var span rowSpan
 
 	// Last in, first considered: the columns on the right are taken off the top
 	// so everything below divides what is genuinely left, rather than being
 	// squeezed after the fact.
-	if body >= starsFrom {
+	stars, album := starsFrom, albumFrom
+	if !lacks.has(lacksRating) {
+		stars = body + 1
+	}
+	if !lacks.has(lacksThird) {
+		album = body + 1
+	}
+	if answers {
+		// No tempo is held: a record nobody has played has no measured beat, and
+		// on these lists nobody has played any of them. The column was seven
+		// cells of nothing at every width. See player.Track.Tempo.
+		if lacks.has(lacksRating) {
+			stars = answersMain + answersSecond + trailingCols + starsCols + likedCols + 2
+		}
+		if lacks.has(lacksThird) {
+			album = answersMain + answersSecond + trailingCols + albumLeast + 1
+		}
+	}
+	if body >= stars {
 		span.stars, span.liked = starsCols, likedCols
 		body -= span.stars + span.liked + 2
 	}
-	if body >= albumFrom {
-		span.album = albumCols
-		body -= span.album + 1
+	if body >= album {
+		// A fixed share where there is room for one, and what is left of it
+		// where there is not: an album name in twenty cells is still which
+		// record this came off, and the alternative at that width is nothing.
+		span.third = albumCols
+		if answers {
+			// A share of the row rather than a fixed width: an album name in
+			// twenty cells is still which record this came off, and on a wide
+			// screen the names have more room than they can use while "The Dark
+			// Side of the Moon (2011 Remaster)" is cut in half. Never wider than
+			// a name, which is what it is standing next to.
+			span.third = min(max(body/4, albumLeast), secondaryCols)
+		}
+		body -= span.third + 1
 	}
 
 	span.second = min(body/3, secondaryCols)
 
-	span.beat = tempoCols
+	if !answers {
+		span.beat = tempoCols
+	}
 	span.main = body - span.second - span.beat - trailingCols - 2
 	if span.main < 16 {
 		// Too narrow for everything: the tempo goes first, then the artist.
@@ -1510,11 +1626,16 @@ func rowSecondaryAt(w int) int {
 type rowCells struct {
 	primary   string
 	secondary string
-	album     string
-	stars     string
-	liked     string
-	tempo     string
-	trailing  string
+
+	// third is the column between the two names and the numbers at the edge: the
+	// album on a list of tracks, and whatever the third fact about a thing is on
+	// the lists that hold something else. See rowLacks.
+	third string
+
+	stars    string
+	liked    string
+	tempo    string
+	trailing string
 }
 
 // rowCols is a row of three columns, for the lists whose rows are a name, a
@@ -1544,6 +1665,9 @@ func (m Model) drawRow(w int, selected bool, c rowCells) string {
 	}
 
 	span := rowWidths(body)
+	if m.rowsAreAnswers {
+		span = answerWidths(body, m.rowsLack)
+	}
 	if m.rowsMainAt > 0 && m.rowsMainAt < body-trailingCols {
 		// Widened or narrowed to line the second column up with something
 		// elsewhere on the screen. What the first column gives up or takes goes
@@ -1562,8 +1686,8 @@ func (m Model) drawRow(w int, selected bool, c rowCells) string {
 	if span.gap > 0 {
 		line += strings.Repeat(" ", span.gap)
 	}
-	if span.album > 0 {
-		line += fit(c.album, span.album) + " "
+	if span.third > 0 {
+		line += fit(c.third, span.third) + " "
 	}
 	if span.stars > 0 {
 		line += fit(c.stars, span.stars) + " " + fit(c.liked, span.liked) + " "

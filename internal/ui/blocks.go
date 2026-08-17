@@ -98,7 +98,7 @@ func (m Model) upNextBlock() block {
 
 		out := []string{glance.columnHead(w, name, rowCells{
 			secondary: "artist",
-			album:     "album",
+			third:     "album",
 			stars:     "stars",
 			liked:     "liked",
 			tempo:     "tempo",

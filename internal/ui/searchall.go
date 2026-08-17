@@ -176,7 +176,7 @@ func (m Model) topRow(w int, selected bool) string {
 	return m.drawRow(w, selected, rowCells{
 		primary:   m.leadIn(m.styles.Cursor.Render(topMark)) + m.lit(primary, name),
 		secondary: m.styles.RowSecondary.Render(what),
-		album:     m.lit(m.styles.RowTrailing, trailing),
+		third:     m.lit(m.styles.RowTrailing, trailing),
 	})
 }
 

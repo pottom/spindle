@@ -407,6 +407,14 @@ type Model struct {
 	// have no cursor. Set while drawing one and cleared straight after.
 	rowsAreFlush bool
 
+	// rowsAreAnswers marks the lists that hold what a query matched rather than
+	// what somebody has chosen, which are read differently and so are laid out
+	// differently. See answersMain.
+	rowsAreAnswers bool
+
+	// rowsLack is which of the optional columns this list has nothing to put in.
+	rowsLack rowLacks
+
 	// rowsMainAt fixes the width of a row's first column, for the one list that
 	// has to line its second column up with something else on the screen rather
 	// than with the row's own arithmetic. Zero leaves the row to divide itself.
