@@ -4,13 +4,19 @@ import "time"
 
 // localStatus is what the daemon's /status endpoint answers with.
 type localStatus struct {
-	DeviceID    string `json:"device_id"`
-	Unplayable  string `json:"unplayable"`
-	DeviceName  string `json:"device_name"`
-	Stopped     bool   `json:"stopped"`
-	Paused      bool   `json:"paused"`
-	Volume      int    `json:"volume"`
-	VolumeSteps int    `json:"volume_steps"`
+	DeviceID   string `json:"device_id"`
+	Unplayable string `json:"unplayable"`
+
+	// Deaf names what the device can no longer hear from. Its inputs close for
+	// good once it has given up reconnecting, and after that it plays and
+	// answers this API while being out of Spotify Connect's reach — which from
+	// here looks exactly like a device that is working.
+	Deaf        []string `json:"deaf"`
+	DeviceName  string   `json:"device_name"`
+	Stopped     bool     `json:"stopped"`
+	Paused      bool     `json:"paused"`
+	Volume      int      `json:"volume"`
+	VolumeSteps int      `json:"volume_steps"`
 
 	RepeatContext bool `json:"repeat_context"`
 	RepeatTrack   bool `json:"repeat_track"`
@@ -49,6 +55,7 @@ func (s *localStatus) toState() *State {
 		Volume:     percentOf(s.Volume, s.VolumeSteps),
 		DeviceID:   s.DeviceID,
 		Unplayable: trackIDFromURI(s.Unplayable),
+		Deaf:       s.Deaf,
 		DeviceName: s.DeviceName,
 		Bitrate:    s.Bitrate,
 		Tempo:      s.Tempo,

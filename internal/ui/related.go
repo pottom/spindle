@@ -16,14 +16,15 @@ import (
 // player.Suggesting — so where there is no key, or where last.fm has never heard
 // of somebody, this fills the same line.
 //
-// Spotify's answer is artists rather than names: it carries ids, and an id is
-// what would let a name on that line be somewhere to go rather than a fact. That
-// is not built yet; what is built is the line working for everybody.
+// Spotify's answer is artists rather than names, and the ids are what make them
+// somewhere to go: the menu over an artist offers each of them, so "who else
+// sounds like this" is a door rather than a fact. Last.fm's are names only, so
+// they stay a line of text — which is the honest difference between the two.
 
 // relatedTook is an answer arriving.
 type relatedTook struct {
 	artist string
-	names  []string
+	found  []player.Artist
 }
 
 // askRelated asks who else sounds like the artist on screen, once each.
@@ -45,7 +46,7 @@ func (m *Model) askRelated(artistID string) tea.Cmd {
 		return nil
 	}
 	if m.related == nil {
-		m.related = map[string][]string{}
+		m.related = map[string][]player.Artist{}
 	}
 	// Marked before the answer, so a screen redrawn while it is in flight does
 	// not ask again.
@@ -61,21 +62,22 @@ func (m *Model) askRelated(artistID string) tea.Cmd {
 			// empty. A refusal has already been recorded against the ability.
 			return relatedTook{artist: artistID}
 		}
-
-		names := make([]string, 0, len(found))
-		for _, a := range found {
-			names = append(names, a.Name)
-		}
-		return relatedTook{artist: artistID, names: names}
+		return relatedTook{artist: artistID, found: found}
 	}
 }
 
 // tookRelated files an answer.
 func (m *Model) tookRelated(message relatedTook) {
 	if m.related == nil {
-		m.related = map[string][]string{}
+		m.related = map[string][]player.Artist{}
 	}
-	m.related[message.artist] = message.names
+	m.related[message.artist] = message.found
+}
+
+// relatedArtists is who Spotify says sounds like this one, with the ids that
+// make them somewhere to go rather than a fact. See actionsForArtist.
+func (m Model) relatedArtists(artistID string) []player.Artist {
+	return m.related[artistID]
 }
 
 // relatedTo is who else sounds like an artist, from whichever source has an
@@ -86,5 +88,11 @@ func (m Model) relatedTo(artistID string, fromNotes []string) []string {
 	if len(fromNotes) > 0 {
 		return fromNotes
 	}
-	return m.related[artistID]
+
+	found := m.related[artistID]
+	names := make([]string, 0, len(found))
+	for _, a := range found {
+		names = append(names, a.Name)
+	}
+	return names
 }

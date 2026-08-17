@@ -500,7 +500,7 @@ func fitHints(short []key.Binding, width int) []key.Binding {
 	return short
 }
 
-func (k keyMap) forPlayer(scope, lyrics, peek, story bool, width int) tabKeys {
+func (k keyMap) forPlayer(scope, lyrics, peek, story, like bool, width int) tabKeys {
 	short := []key.Binding{
 		terse(k.PlayPause, "play/pause"),
 		tight(k.Next, "track"),
@@ -512,6 +512,9 @@ func (k keyMap) forPlayer(scope, lyrics, peek, story bool, width int) tabKeys {
 	}
 	if story {
 		short = append(short, terse(k.Story, "about"))
+	}
+	if like {
+		short = append(short, terse(k.Like, "like"))
 	}
 	if scope {
 		short = append(short, terse(k.Scope, "vis"))
@@ -525,6 +528,9 @@ func (k keyMap) forPlayer(scope, lyrics, peek, story bool, width int) tabKeys {
 	short = fitHints(short, width)
 
 	second := []key.Binding{k.Shuffle, k.Repeat, k.Devices}
+	if like {
+		second = append(second, k.Like)
+	}
 	if scope {
 		second = append(second, k.Scope)
 	}

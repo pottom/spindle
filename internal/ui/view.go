@@ -317,8 +317,16 @@ const (
 func (m Model) infoBlock(w int) []string {
 	s, ps := m.styles, m.ps
 
+	// The heart, where this one is in the collection. Beside the name, which is
+	// where the row in a list carries it too, and where the eye already is: a key
+	// that changes something invisible is a key nobody trusts. See collect.go.
+	title := s.Title.Render(ps.Title)
+	if m.library.saved(ps.TrackID) {
+		title += "  " + m.styles.Queued.Render(likedMark)
+	}
+
 	lines := []string{
-		s.Title.Render(ps.Title),
+		title,
 		s.Artist.Render(strings.Join(ps.Artists, ", ")),
 	}
 	if t, ok := m.nowPlayingRow(); ok {

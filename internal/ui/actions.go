@@ -146,9 +146,15 @@ func (m Model) actionsForAlbum(a player.Album) []verb {
 // can list — what they are best known for is an endpoint closed to this
 // application — so opening them means their releases, and playing them is left
 // to Spotify's own idea of the artist.
+// relatedVerbs is how many of the artists Spotify compares this one to the menu
+// offers. Three, which is what the panel beside them shows: a dozen would bury
+// the verbs above it, and the menu is a list of what can be done here rather
+// than a catalogue.
+const relatedVerbs = 3
+
 func (m Model) actionsForArtist(a player.Artist) []verb {
 	artist, id := a, a.ID
-	return []verb{{
+	verbs := []verb{{
 		key:   keyEnter,
 		label: "Open their records",
 		do:    func(m *Model) tea.Cmd { return m.push(openedArtist(artist)) },
@@ -159,10 +165,25 @@ func (m Model) actionsForArtist(a player.Artist) []verb {
 				Title: artist.Name, CoverURL: artist.ImageURL,
 			})
 		},
-	}, {
+	}}
+
+	// And who else sounds like them, each one somewhere to go. Only Spotify's
+	// answer carries ids; last.fm's are names, and a name cannot be opened. See
+	// related.go.
+	//
+	// Three of them: the menu is a list of what can be done here, and a dozen
+	// artists would bury the verbs above it. Three is what the panel shows too.
+	for _, near := range m.relatedArtists(id)[:min(len(m.relatedArtists(id)), relatedVerbs)] {
+		verbs = append(verbs, verb{
+			label: "Sounds like — " + near.Name,
+			do:    func(m *Model) tea.Cmd { return m.push(openedArtist(near)) },
+		})
+	}
+
+	return append(verbs, verb{
 		label: "Copy the Spotify link",
 		do:    func(m *Model) tea.Cmd { return m.copyLink(artistLink(id)) },
-	}}
+	})
 }
 
 // actionsForPlaylist is the menu for a whole playlist, which is what the cursor

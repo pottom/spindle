@@ -160,7 +160,7 @@ type Model struct {
 	// last.fm since it went in. An entry with nothing in it is an answer: most
 	// of a real library is artists nobody has anybody to compare with. See
 	// related.go.
-	related map[string][]string
+	related map[string][]player.Artist
 
 	// songs is the same for the records themselves: what somebody wrote about
 	// this song, where anybody did. Asked for only about what is playing.
@@ -607,7 +607,7 @@ func (m Model) helpKeysWith(scope, lyrics, peek bool) tabKeys {
 		// keys that do nothing would be worse than a shorter bar.
 		return m.keys.forReadOnlyQueue(m.canSave())
 	case m.tab == tabPlayer:
-		return m.keys.forPlayer(scope, lyrics, peek, m.storyAvailable(), m.width)
+		return m.keys.forPlayer(scope, lyrics, peek, m.storyAvailable(), m.canSave(), m.width)
 	default:
 		return m.keys.forTab(m.tab, scope, m.canSave())
 	}

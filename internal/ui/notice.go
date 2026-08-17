@@ -52,6 +52,17 @@ func (m Model) notice() (string, lipgloss.Style, bool) {
 	case m.ranOut():
 		return warnGlyph + " The list has run out — nothing follows this track",
 			m.styles.Warning, true
+
+	// Last, because it is the least like news: a device that has gone deaf will
+	// still be deaf in a second, and everything above is about this moment.
+	//
+	// It still plays and still answers, so nothing else on the screen looks
+	// wrong — it is simply out of Spotify Connect's reach, where no phone can
+	// drive it, until it is started again. Nothing here can mend it, so the line
+	// says the one thing that can. See player.State.Deaf.
+	case m.deviceDeaf():
+		return warnGlyph + " The device has lost touch with Spotify — restart it from the settings screen",
+			m.styles.Warning, true
 	}
 	return "", lipgloss.Style{}, false
 }
@@ -88,3 +99,7 @@ func (m Model) ranOut() bool {
 	// paused in the middle of the last track knows perfectly well what they did.
 	return m.elapsed() < ranOutSlack
 }
+
+// deviceDeaf reports that the device playing has lost an input it cannot get
+// back. Only our own daemon says so; every other backend leaves it empty.
+func (m Model) deviceDeaf() bool { return m.ps != nil && len(m.ps.Deaf) > 0 }

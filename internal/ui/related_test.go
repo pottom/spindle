@@ -76,7 +76,7 @@ func TestWhoElseSoundsLikeThisWithoutAKey(t *testing.T) {
 func TestLastFMKeepsTheLineWhereItHasOne(t *testing.T) {
 	m := artistPage(&countsRelated{Player: player.NewMock()})
 	m.artists["a1"] = notes.Artist{Name: "Majka", Similar: []string{"Ganxsta Zolee"}}
-	m.related = map[string][]string{"a1": {"Halott Pénz"}}
+	m.related = map[string][]player.Artist{"a1": {{ID: "a2", Name: "Halott Pénz"}}}
 
 	got := ansi.Strip(m.render())
 	if !strings.Contains(got, "Ganxsta Zolee") {
@@ -105,5 +105,51 @@ func TestARefusedApplicationAsksNobody(t *testing.T) {
 	tm, _ = tm.Update(cmd())
 	if got := ansi.Strip(tm.(Model).render()); strings.Contains(got, "refused") {
 		t.Error("a refusal was drawn where a name should be")
+	}
+}
+
+// The names Spotify gives are somewhere to go: the menu over an artist offers
+// each of them, and choosing one opens their records.
+func TestTheMenuOffersWhoTheySoundLike(t *testing.T) {
+	m := artistPage(&countsRelated{Player: player.NewMock()})
+	m.related = map[string][]player.Artist{"a1": {
+		{ID: "a2", Name: "Halott Pénz"},
+		{ID: "a3", Name: "Wellhello"},
+		{ID: "a4", Name: "Punnany Massif"},
+		{ID: "a5", Name: "Ganxsta Zolee"},
+	}}
+
+	verbs := m.actionsForArtist(player.Artist{ID: "a1", Name: "Majka"})
+	var offered []string
+	for _, v := range verbs {
+		if strings.HasPrefix(v.label, "Sounds like") {
+			offered = append(offered, v.label)
+		}
+	}
+	if len(offered) != relatedVerbs {
+		t.Errorf("the menu offers %d of them, want %d: %v", len(offered), relatedVerbs, offered)
+	}
+	if !strings.Contains(offered[0], "Halott Pénz") {
+		t.Errorf("the first is %q", offered[0])
+	}
+
+	// And it goes there.
+	for _, v := range verbs {
+		if strings.Contains(v.label, "Halott Pénz") {
+			v.do(&m)
+		}
+	}
+	if page := m.open(); page == nil || page.id != "a2" {
+		t.Error("choosing one did not open their records")
+	}
+}
+
+// An artist nobody is compared to gets no such verbs, rather than an empty one.
+func TestNoOneToSoundLikeIsNoVerb(t *testing.T) {
+	m := artistPage(&countsRelated{Player: player.NewMock()})
+	for _, v := range m.actionsForArtist(player.Artist{ID: "a1", Name: "Majka"}) {
+		if strings.HasPrefix(v.label, "Sounds like") {
+			t.Error("the menu offered somebody it has never heard of")
+		}
 	}
 }

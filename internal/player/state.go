@@ -36,6 +36,12 @@ type State struct {
 	// and the device moves past them. A list that skips a track on its own
 	// reads as a fault in the player, so it is worth saying.
 	Unplayable string
+
+	// Deaf names what the device that is playing can no longer hear from — see
+	// localStatus. Empty for a healthy one and for every backend that is not our
+	// own daemon, which is why nothing may treat it as an error: it is a device
+	// that still plays, and the only thing to do about it is start it again.
+	Deaf       []string
 	DeviceName string
 
 	// Bitrate is the stream actually playing, in kbps, or 0 when unknown. Only

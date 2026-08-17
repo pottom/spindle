@@ -940,6 +940,12 @@ func (m Model) handleKey(k tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.story, m.storyAt = true, 0
 		return m, nil
 
+	case m.pressed(k, m.keys.Like):
+		// The player screen has no cursor and one record on it, so the key means
+		// the one that is sounding. The heart beside its name is what answers.
+		// See collect.go.
+		return m, m.toggleSaved()
+
 	case m.pressed(k, m.keys.Lyrics):
 		if !m.lyricsAvailable() {
 			return m, nil

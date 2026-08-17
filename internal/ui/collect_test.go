@@ -149,3 +149,36 @@ func TestABackendWithNoLibraryOffersNothing(t *testing.T) {
 		t.Error("the help bar offers a key nothing is behind")
 	}
 }
+
+// The player screen has no cursor and one record on it, so the key means the
+// one that is sounding — and the heart beside its name is what answers.
+//
+// It was not offered there at all: an act with nowhere to show itself is an act
+// nobody can tell happened, and there was no heart on that screen to show it.
+func TestTheHeartOnThePlayerScreen(t *testing.T) {
+	m := playerModel()
+	m.tab = tabPlayer
+	m.width, m.height = 120, 40
+	m.resize()
+
+	if strings.Contains(ansi.Strip(m.render()), likedMark) {
+		t.Fatal("a heart was drawn for a track nobody has saved")
+	}
+
+	var tm tea.Model = m
+	tm, cmd := tm.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	if cmd == nil {
+		t.Fatal("the key did nothing on the player screen")
+	}
+
+	liked := tm.(Model)
+	if !liked.library.saved(liked.ps.TrackID) {
+		t.Error("what is playing was not taken into the collection")
+	}
+	if !strings.Contains(ansi.Strip(liked.render()), likedMark) {
+		t.Error("nothing on the screen says it was")
+	}
+	if !strings.Contains(ansi.Strip(liked.render()), "like") {
+		t.Error("the help bar does not offer the key")
+	}
+}

@@ -52,7 +52,7 @@ func (m *Model) toggleSaved() tea.Cmd {
 		return nil
 	}
 
-	t := m.cursorTrack()
+	t := m.likeTarget()
 	if t == nil || t.ID == "" {
 		return nil
 	}
@@ -74,6 +74,26 @@ func (m *Model) toggleSaved() tea.Cmd {
 		}
 		return savedTook{track: track.ID, saved: want, err: err}
 	}
+}
+
+// likeTarget is what the key acts on: the row under the cursor where there is
+// one, and otherwise what is playing.
+//
+// The player screen has no cursor and one record on it, which is the record the
+// key can only mean. Everywhere else a list is being walked, and the row under
+// the hand is what the hand means.
+func (m Model) likeTarget() *player.Track {
+	if t := m.cursorTrack(); t != nil {
+		return t
+	}
+	if m.tab == tabPlayer && m.ps != nil && m.ps.TrackID != "" {
+		now, ok := m.nowPlayingRow()
+		if !ok {
+			return nil
+		}
+		return &now
+	}
+	return nil
 }
 
 // tookSaved reads the answer. A refusal of the application is a fact about the
