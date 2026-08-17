@@ -535,8 +535,35 @@ func (m Model) queueRows() []player.Track {
 	if !ok {
 		return m.queue
 	}
-	rows := make([]player.Track, 0, len(m.queue)+1)
-	return append(append(rows, now), m.queue...)
+
+	coming := m.queue
+
+	// A skip is drawn the instant it is pressed, and the list of what comes next
+	// belongs to the track before it until the device answers with a new one. In
+	// that moment the track that has just started is both the row at the top and
+	// the head of what is still to come, and the screen shows it twice — which
+	// is what somebody pressing next actually sees.
+	//
+	// Only while the queue is known to be behind, and it says so itself: what it
+	// came with as the track playing is the track it was read for. Where that is
+	// not what is playing now, the list on screen belongs to the moment before
+	// the skip.
+	//
+	// A queue that has caught up and still begins with what is playing is saying
+	// something true — a track queued twice, or a record set to repeat itself —
+	// and hiding that would be the screen lying in the other direction.
+	if m.queueBehind() && len(coming) > 0 && coming[0].ID == m.ps.TrackID {
+		coming = coming[1:]
+	}
+
+	rows := make([]player.Track, 0, len(coming)+1)
+	return append(append(rows, now), coming...)
+}
+
+// queueBehind reports that what is on screen was read for a track that is no
+// longer the one playing.
+func (m Model) queueBehind() bool {
+	return m.ps != nil && m.nowQueued != nil && m.nowQueued.ID != m.ps.TrackID
 }
 
 // nowPlayingRow is the track sounding now. Its identity comes from the player
