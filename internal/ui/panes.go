@@ -437,7 +437,6 @@ type searchPane struct {
 	kind  player.SearchKind
 	found map[player.SearchKind]*searchResults
 
-
 	// top is the strongest answer to the query, which is the first row of the
 	// view that holds all of them. Worked out when an answer lands rather than
 	// while drawing: it reads four lists, and a screen is drawn far oftener

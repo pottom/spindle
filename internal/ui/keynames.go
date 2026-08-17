@@ -116,7 +116,7 @@ const (
 	// a letter here is the same key on any layout. See keypress.go.
 	keyClose = "c"
 
-	keyPeek   = "u"
+	keyPeek = "u"
 
 	keyFind     = "/"
 	keyFindNext = ";"

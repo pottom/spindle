@@ -1097,6 +1097,7 @@ func (m Model) albumRow(lead string, a player.Album, w int, selected bool) strin
 		trailing:  m.styles.RowTrailing.Render(releaseYear(a.Released)),
 	})
 }
+
 // searchDetail is the panel beside the cover: whichever kind is on screen, it
 // describes the row under the cursor.
 func (m Model) searchDetail(w, rows int) []string {
@@ -1173,6 +1174,7 @@ func formatCount(n int) string {
 		return fmt.Sprintf("%d", n)
 	}
 }
+
 // trackRow draws one track. A number of 0 omits the ordinal, which is what the
 // search results want.
 func (m Model) trackRow(t player.Track, w int, selected bool, number int) string {
