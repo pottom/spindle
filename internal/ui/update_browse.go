@@ -370,6 +370,15 @@ func (m *Model) searchTypingKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	// about what is on screen now.
 	m.search.seq++
 	m.forgetFound()
+
+	// An empty box is not a question. Backspacing the last letter away used to
+	// mark the screen as waiting and then never ask — the settling drops a blank
+	// query, and nothing was left to answer and clear it — so the spinner turned
+	// under an empty field for as long as the tab was open. Reported from a real
+	// screen.
+	if strings.TrimSpace(m.search.input.Value()) == "" {
+		return cmd, true
+	}
 	m.pagesOf(m.search.kind).loading = true
 	return tea.Batch(cmd, searchSettleCmd(m.search.seq), m.spinner.Tick), true
 }

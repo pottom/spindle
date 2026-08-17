@@ -198,3 +198,39 @@ func TestClearingTheQueryLeavesNoFurniture(t *testing.T) {
 		t.Errorf("the empty screen does not invite a search:\n%s", screen)
 	}
 }
+
+// An empty box is not a question, so nothing is waiting on one.
+//
+// Backspacing the last letter away marked the screen as waiting and then never
+// asked — the settling drops a blank query, and nothing was left to answer and
+// clear it — so the spinner turned under an empty field for as long as the tab
+// was open. Reported from a real screen.
+func TestBackspacingTheQueryAwayStopsTheSpinner(t *testing.T) {
+	m := New(player.NewMock(), nil, defaultTestCell)
+	m.width, m.height = 140, 40
+	m.tab = tabSearch
+	m.search.typing = true
+	m.resize()
+
+	var tm tea.Model = m
+	for _, r := range "qu" {
+		tm, _ = tm.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+	if !tm.(Model).listLoading() {
+		t.Fatal("a query being typed is not waiting for an answer")
+	}
+
+	for range 2 {
+		tm, _ = tm.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	}
+	got := tm.(Model)
+	if got.search.input.Value() != "" {
+		t.Fatalf("the query = %q, want it backspaced away", got.search.input.Value())
+	}
+	if got.listLoading() {
+		t.Error("the screen is still waiting for an answer to an empty box")
+	}
+	if screen := plain(strings.Join(got.searchPaneView(got.layout(), got.layout().bodyHeight), "\n")); strings.Contains(screen, "Asking Spotify") {
+		t.Errorf("the spinner is still turning:\n%s", screen)
+	}
+}
