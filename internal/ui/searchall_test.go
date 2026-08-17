@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/pottom/spindle/internal/notes"
 	"github.com/pottom/spindle/internal/player"
 	"github.com/pottom/spindle/internal/ui/msg"
 )
@@ -118,5 +119,45 @@ func TestNothingMatchedHasNoTopResult(t *testing.T) {
 	}
 	if got := ansi.Strip(m.render()); !strings.Contains(got, "Nothing matched") {
 		t.Error("the screen does not say that nothing matched")
+	}
+}
+
+// The search's band says what the other databases know about the artist under
+// the cursor: it is the same question their own page answers, and the band was
+// empty here while the answer existed one tab away. See artistPanel.
+func TestTheSearchBandCarriesTheArtistNotes(t *testing.T) {
+	p := player.NewMock()
+	m := New(p, nil, defaultTestCell)
+	m.tab = tabSearch
+	m.search.kind = player.SearchArtists
+	m.search.of(player.SearchArtists).artists = []player.Artist{
+		{ID: "a1", Name: "Queen", Genres: []string{"glam rock"}, Followers: 45_000_000},
+	}
+	m.artists = map[string]notes.Artist{"a1": {
+		Name:      "Queen",
+		Line:      "British rock band",
+		Area:      "London",
+		Listeners: 5_000_000,
+		Note:      "Formed in 1970 by Brian May, Roger Taylor and Freddie Mercury.",
+	}}
+	m.width, m.height = 150, 36
+	m.resize()
+
+	band := plain(strings.Join(m.searchDetail(60, 12), "\n"))
+	for _, want := range []string{"British rock band", "London", "5.0M listeners", "Formed in 1970"} {
+		if !strings.Contains(band, want) {
+			t.Errorf("the band = %q, want %q in it", band, want)
+		}
+	}
+
+	// And it is asked for once the cursor has stopped, not on the way past.
+	if cmd := m.syncCursorNotes(); cmd == nil {
+		t.Error("nothing was asked about the artist under the cursor")
+	}
+
+	// Nothing known is the screen it was: Spotify's own facts rather than a gap.
+	m.artists = nil
+	if band := plain(strings.Join(m.searchDetail(60, 12), "\n")); !strings.Contains(band, "glam rock") {
+		t.Errorf("with nothing known the band = %q, want Spotify's own facts", band)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/pottom/spindle/internal/notes"
+	"github.com/pottom/spindle/internal/player"
 )
 
 // What the other databases say, on the screen.
@@ -173,6 +174,34 @@ func (m *Model) syncNotes() tea.Cmd {
 	return tea.Batch(m.askNotes(page.id, page.name), m.askRelated(page.id))
 }
 
+// syncCursorNotes asks after the artist a browsing cursor has come to rest on.
+//
+// On rest rather than on every move: the walk is three databases at a request a
+// second, and a hand going down a list of twenty artists would start twenty of
+// them for the nineteen rows it passed through. It hangs off the same settling
+// the artwork preview waits for — see coverSettleCmd — so the paragraph and the
+// picture arrive together, which is also what they look like.
+//
+// Once per artist, and the answer is kept: coming back up the list costs
+// nothing. See askNotes.
+func (m *Model) syncCursorNotes() tea.Cmd {
+	a := m.cursorArtist()
+	if a == nil || a.ID == "" {
+		return nil
+	}
+	return tea.Batch(m.askNotes(a.ID, a.Name), m.askRelated(a.ID))
+}
+
+// cursorNotes is what is known about the artist under the cursor, and whether
+// anything is.
+func (m Model) cursorNotes(a *player.Artist) (notes.Artist, bool) {
+	if a == nil || a.ID == "" {
+		return notes.Artist{}, false
+	}
+	got, held := m.artists[a.ID]
+	return got, held && got.Known()
+}
+
 // artistNotes is what is known about the artist whose page is open, and whether
 // anything is.
 func (m Model) artistNotes() (notes.Artist, bool) {
@@ -197,7 +226,16 @@ func (m Model) notesPanel(w, rows int) []string {
 		// Nothing known yet, or nothing to know. The screen is what it was.
 		return m.openAlbumDetail(w, rows)
 	}
+	return m.artistPanel(got, m.openArtistID(), w, rows)
+}
 
+// artistPanel is that panel about any artist, wherever they are being looked at.
+//
+// The page is not the only place somebody meets an artist: searching for one and
+// walking the answers is asking the same question, and the search's band was
+// empty while this existed one tab away. One drawing for one thing, so the two
+// screens cannot drift into saying it differently. See searchDetail.
+func (m Model) artistPanel(got notes.Artist, artistID string, w, rows int) []string {
 	lines := []string{m.styles.Title.Render(fit(got.Name, w))}
 
 	// The line under the name: what a database keeps for telling two artists of
@@ -228,7 +266,7 @@ func (m Model) notesPanel(w, rows int) []string {
 	// are. Not from a catalogue: this is the one line here that says something
 	// about how a record is heard rather than about how it was made, and it is
 	// the only one that works for a Hungarian artist. See internal/notes.
-	similar := m.relatedTo(m.openArtistID(), got.Similar)
+	similar := m.relatedTo(artistID, got.Similar)
 	if len(similar) > 0 || got.Listeners > 0 {
 		// The count first, because it is short and never worth losing, and the
 		// names after it, because they are what gets cut on a narrow panel.

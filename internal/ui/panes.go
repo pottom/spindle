@@ -531,8 +531,47 @@ func (s *searchPane) selected() *player.Track {
 }
 
 // cover is the artwork of whatever the cursor rests on, whichever kind that is.
+// topCover is the picture of the strongest answer, whichever kind it is.
+func (s *searchPane) topCover() string {
+	found := s.of(s.top.kind)
+	switch s.top.kind {
+	case player.SearchArtists:
+		if a := atArtist(found.artists, s.top.at); a != nil {
+			return a.ImageURL
+		}
+	case player.SearchAlbums:
+		if a := atAlbum(found.albums, s.top.at); a != nil {
+			return a.CoverURL
+		}
+	case player.SearchPlaylists:
+		if p := atPlaylist(found.playlists, s.top.at); p != nil {
+			return p.CoverURL
+		}
+	}
+	return ""
+}
+
 func (s *searchPane) cover() string {
 	r := s.current()
+
+	// The view that holds all of them keeps its rows nowhere: they are the
+	// strongest answer and then the songs, out of two other buckets. Reading
+	// this one's own tracks gave an empty list and so no picture at all — which
+	// on screen was a note where a sleeve should be. See searchall.go.
+	if s.kind == searchAll {
+		if s.top.found() && r.cursor.cursor == 0 {
+			return s.topCover()
+		}
+		row := r.cursor.cursor
+		if s.top.found() {
+			row--
+		}
+		if t := at(s.of(player.SearchTracks).tracks, row); t != nil {
+			return t.CoverURL
+		}
+		return ""
+	}
+
 	switch s.kind {
 	case player.SearchAlbums:
 		if a := atAlbum(r.albums, r.cursor.cursor); a != nil {

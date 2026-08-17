@@ -61,6 +61,10 @@ func (l *listState) window(count, height int) (from, to int) {
 // names of the columns, and the line under those.
 const listChromeRows = 4
 
+// searchChromeRows is the one row more the search spends: the mark under
+// whichever view its bar of names is showing. See kindsBar.
+const searchChromeRows = 1
+
 // listChrome is that, given the band over it, and the field where a list is
 // being searched.
 //
@@ -78,6 +82,9 @@ func (m Model) listChrome(band int) int {
 	rows := listChromeRows
 	if band <= 0 {
 		rows -= listBandGap
+	}
+	if m.tab == tabSearch && m.open() == nil {
+		rows += searchChromeRows
 	}
 	return rows + m.finderTakes()
 }

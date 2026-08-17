@@ -313,7 +313,7 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 
 	case msg.CoverSettled:
 		if message.Seq == m.coverSeq {
-			return m, m.syncCover()
+			return m, tea.Batch(m.syncCover(), m.syncCursorNotes())
 		}
 		return m, nil
 

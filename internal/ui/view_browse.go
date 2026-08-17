@@ -199,6 +199,15 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 			out = append(out, spread(head, subtitle, w))
 		}
 	}
+
+	// And a rule under whichever of them the list is showing, where the row
+	// above is a bar of names rather than a heading. It is what the library
+	// draws under its kinds, and the search's views are the same thing: one
+	// drawing, so two screens doing one thing cannot look like two programs.
+	// See kindsBar.
+	if opts.rule != nil && len(out) < rows {
+		out = append(out, fit(opts.rule(), w))
+	}
 	// The blank under the heading names the columns, where the list has any and
 	// has anything in them. Over an empty list it would be a header for nothing.
 	named := opts.columns != nil && opts.count > 0 && m.listBodyRows(rows, m.listBandRows(l)) > 0
@@ -265,6 +274,10 @@ func (m Model) listBlock(l layout, rows int, opts listScreen) []string {
 
 // listScreen is what one list screen puts into that shape.
 type listScreen struct {
+	// rule is the mark under the bar of names in the subtitle, where the screen
+	// has one. See kindsBar.
+	rule func() string
+
 	// detail is the panel beside the artwork, given its width and the rows it
 	// may fill. heading and subtitle are the line under it, the subtitle set to
 	// the right.
@@ -738,22 +751,50 @@ func (m Model) libraryPaneView(l layout, rows int) []string {
 // It costs no rows: the labels take the heading's row and the underline the
 // blank under it, which was there to hold the heading clear of the wall.
 func (m Model) libraryKinds() (labels, rule string) {
-	var names, marks strings.Builder
-	for i, label := range m.kindLabels() {
+	at := 0
+	for i, kind := range libraryOrder {
+		if kind == m.library.kind {
+			at = i
+		}
+	}
+	return m.kindsBar(m.kindLabels(), at)
+}
+
+// kindsBar sets a row of names with a rule under whichever of them is on.
+//
+// One drawing for the library's kinds and the search's views, because they are
+// the same thing: a row of names across the top of a list, and the one the list
+// is showing marked under it. Two drawings of one bar is how two screens that
+// do the same thing come to look like two programs.
+func (m Model) kindsBar(labels []string, at int) (names, rule string) {
+	var out, marks strings.Builder
+	for i, label := range labels {
 		if i > 0 {
-			names.WriteString(kindGap)
+			out.WriteString(kindGap)
 			marks.WriteString(kindGap)
 		}
 
-		if libraryOrder[i] == m.library.kind {
-			names.WriteString(m.styles.TabActive.Render(label))
+		if i == at {
+			out.WriteString(m.styles.TabActive.Render(label))
 			marks.WriteString(m.styles.TabRule.Render(strings.Repeat(meterFull, lipgloss.Width(label))))
 			continue
 		}
-		names.WriteString(m.styles.TabIdle.Render(label))
+		out.WriteString(m.styles.TabIdle.Render(label))
 		marks.WriteString(strings.Repeat(" ", lipgloss.Width(label)))
 	}
-	return names.String(), marks.String()
+	return out.String(), marks.String()
+}
+
+// searchViewsBar is the same bar for the search's views.
+func (m Model) searchViewsBar() (names, rule string) {
+	labels := m.viewLabels()
+	at := 0
+	for i := range labels {
+		if m.viewAt(i) == m.search.kind {
+			at = i
+		}
+	}
+	return m.kindsBar(labels, at)
 }
 
 // kindGap is the air between two of those labels, and what a click steps by.
@@ -973,7 +1014,8 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 		// The views, over the list they change — where the library keeps its own
 		// kinds, and for the same reason: a name that changes what is under it
 		// belongs beside it rather than a screen's width away.
-		subtitle: m.searchKinds,
+		subtitle: func() string { names, _ := m.searchViewsBar(); return names },
+		rule:     func() string { _, rule := m.searchViewsBar(); return rule },
 		columns:  m.searchColumns,
 		count:    m.counted(),
 		state:    &found.cursor,
@@ -1094,14 +1136,24 @@ func (m Model) artistRow(lead string, a player.Artist, w int, selected bool) str
 // searchDetail is the panel beside the cover: whichever kind is on screen, it
 // describes the row under the cursor.
 func (m Model) searchDetail(w, rows int) []string {
-	found := m.search.current()
-	switch m.search.kind {
-	case player.SearchAlbums:
-		return m.albumDetail(atAlbum(found.albums, found.cursor.cursor), w)
-	case player.SearchArtists:
-		return m.artistDetail(atArtist(found.artists, found.cursor.cursor), w)
-	case player.SearchPlaylists:
-		return m.playlistDetailOf(atPlaylist(found.playlists, found.cursor.cursor), w, rows)
+	// Asked of the cursor rather than of the view, because the all view's first
+	// row is whichever kind answered the query best, and a row has to be
+	// described as what it is wherever it is standing. See searchall.go.
+	switch {
+	case m.cursorArtist() != nil:
+		a := m.cursorArtist()
+		// What the other databases know about them, where anything is known:
+		// who they are and where they are from, rather than a genre and a
+		// follower count. It is the same panel their own page carries, in a band
+		// that was empty until now. See artistPanel.
+		if got, ok := m.cursorNotes(a); ok {
+			return m.artistPanel(got, a.ID, w, rows)
+		}
+		return m.artistDetail(a, w)
+	case m.cursorAlbum() != nil:
+		return m.albumDetail(m.cursorAlbum(), w)
+	case m.cursorPlaylist() != nil:
+		return m.playlistDetailOf(m.cursorPlaylist(), w, rows)
 	default:
 		return m.trackDetail(w, rows)
 	}

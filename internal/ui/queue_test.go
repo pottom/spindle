@@ -1023,9 +1023,9 @@ func TestSearchUsesTheSameShapeAsTheQueue(t *testing.T) {
 	}
 
 	// And the results run the whole width, artists out where they are elsewhere.
-	// Two rows of chrome under the band — the column names and the line — and
+	// The bar of views, the mark under it, the column names and the line, and
 	// then the results.
-	row := plain(block[searchBoxRows+l.artHeight+3])
+	row := plain(block[searchBoxRows+l.artHeight+4])
 	if at := strings.Index(row, res[0].Artists[0]); at < len(row)/3 {
 		t.Errorf("the artists sit at column %d of %d, want them out with the others", at, len(row))
 	}

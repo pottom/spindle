@@ -78,7 +78,11 @@ func (m Model) pointable() bool {
 	// The search's band is the cursor's row as much as the queue's is: the cover
 	// up there is whatever the cursor has just moved onto, and without the mark
 	// the picture changes and nothing says why.
-	return m.tab == tabQueue || (m.tab == tabSearch && m.open() == nil)
+	//
+	// Only once something has been found. A bracket round an empty screen points
+	// at a row that is not there, which is how it looked: an arm down the left of
+	// nothing.
+	return m.tab == tabQueue || (m.tab == tabSearch && m.open() == nil && m.counted() > 0)
 }
 
 // pointAtCursor draws the frame and the line, over rows already laid out.
