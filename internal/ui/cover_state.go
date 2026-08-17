@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"charm.land/lipgloss/v2"
 	"image/color"
 	"strings"
 	"time"
@@ -74,6 +75,15 @@ func (c *coverState) took(art string) {
 		return
 	}
 	for i, line := range c.lines {
+		// In the middle of it where it is narrower. A cover is square and a cell
+		// is not, so a picture fitted into a box of whole cells comes out a few
+		// cells short of the tile more often than not — and left where it landed
+		// it sat against the left edge of its own frame, with the shortfall in
+		// one lump on the right. Reported from a real screen.
+		if lipgloss.Width(line) < c.want {
+			c.lines[i] = middle(line, c.want)
+			continue
+		}
 		c.lines[i] = fit(line, c.want)
 	}
 }
