@@ -964,13 +964,16 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 	// same box a list is searched with, and the same act. What it costs is its
 	// three rows, which come off the list under it.
 	box := m.searchBox(queueBlockWidth(l))
-	rows = max(rows-len(box), 1)
+	rows = max(m.listRoom(l), 1)
 
 	out := append([]string(nil), box...)
 	return append(out, m.listBlock(l, rows, listScreen{
-		detail:   m.searchDetail,
-		heading:  func(int) string { return "" },
-		subtitle: func() string { return "" },
+		detail:  m.searchDetail,
+		heading: func(int) string { return "" },
+		// The views, over the list they change — where the library keeps its own
+		// kinds, and for the same reason: a name that changes what is under it
+		// belongs beside it rather than a screen's width away.
+		subtitle: m.searchKinds,
 		columns:  m.searchColumns,
 		count:    m.counted(),
 		state:    &found.cursor,

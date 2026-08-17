@@ -230,12 +230,6 @@ func (m Model) listSpot(l layout, x, row int) spot {
 	// the body whatever has or has not been found.
 	if m.tab == tabSearch && m.open() == nil {
 		if row < searchBoxRows && x >= leftMargin && x < leftMargin+queueBlockWidth(l) {
-			// The counts in it are the views: a press on one turns to it, the
-			// way a press on the library's kinds does. Anywhere else in the box
-			// is the field itself.
-			if at := spanAt(m.searchViewSpans(queueBlockWidth(l)), x-leftMargin); at >= 0 {
-				return spot{spotKinds, at}
-			}
 			return spot{spotQuery, -1}
 		}
 	}

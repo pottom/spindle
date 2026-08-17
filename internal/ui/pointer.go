@@ -75,7 +75,10 @@ func (m Model) pointable() bool {
 	if m.tab == tabLibrary {
 		return m.open() != nil
 	}
-	return m.tab == tabQueue
+	// The search's band is the cursor's row as much as the queue's is: the cover
+	// up there is whatever the cursor has just moved onto, and without the mark
+	// the picture changes and nothing says why.
+	return m.tab == tabQueue || (m.tab == tabSearch && m.open() == nil)
 }
 
 // pointAtCursor draws the frame and the line, over rows already laid out.
@@ -108,6 +111,13 @@ func (m Model) pointAtCursor(lines []string, l layout, top int) []string {
 	if cursor == nil {
 		return lines
 	}
+
+	// Where the band begins, which is where the body does except on the search:
+	// its box stands above the band. See searchBox.
+	if m.tab == tabSearch && m.open() == nil {
+		top += searchBoxRows
+	}
+
 	from, _ := cursor.window(count, m.visibleListRows())
 	at := top + band + m.listChrome(band) + (cursor.cursor - from)
 

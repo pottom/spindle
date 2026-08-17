@@ -1000,11 +1000,20 @@ func TestSearchUsesTheSameShapeAsTheQueue(t *testing.T) {
 	}
 
 	// The query is in a box at the head of the screen, the same box a list is
-	// searched with, and what else it matched is set against it — which is the
-	// whole argument for showing one kind at a time. See searchBox.
+	// searched with. See searchBox.
 	box := plain(strings.Join(block[:searchBoxRows], "\n"))
-	if !strings.Contains(box, "queen") || !strings.Contains(box, "tracks") {
-		t.Errorf("the box = %q, want the query and the kinds", box)
+	if !strings.Contains(box, "queen") {
+		t.Errorf("the box = %q, want the query in it", box)
+	}
+	if strings.Contains(box, "tracks") {
+		t.Errorf("the box still holds the views: %q", box)
+	}
+
+	// And the views are over the list they change, where the library keeps its
+	// own kinds — which is the whole argument for showing one at a time.
+	over := plain(strings.Join(block[searchBoxRows:], "\n"))
+	if !strings.Contains(over, "tracks") || !strings.Contains(over, "all") {
+		t.Error("the views are not named over the list")
 	}
 
 	// The panel beside the cover describes what the cursor rests on.

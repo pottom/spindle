@@ -109,7 +109,20 @@ func (m Model) visibleListRows() int {
 	}
 
 	l := m.layout()
-	return m.listBodyRows(max(l.bodyHeight, 1), m.listBandRows(l))
+	return m.listBodyRows(max(m.listRoom(l), 1), m.listBandRows(l))
+}
+
+// listRoom is how much of the body the list and its band have between them.
+//
+// The whole of it everywhere but the search, whose box stands above both — see
+// searchBox. Read by the view to draw the list and by the keys to page by it,
+// which is why it is one number in one place: the two deriving it separately is
+// how a page key and a screen come to disagree about how far a page is.
+func (m Model) listRoom(l layout) int {
+	if m.tab == tabSearch && m.open() == nil {
+		return l.bodyHeight - searchBoxRows
+	}
+	return l.bodyHeight
 }
 
 // listBandRows is how tall the band above a list is: the artwork's height, and

@@ -177,6 +177,12 @@ func (m *Model) listCursor() (*listState, int) {
 		return &m.queuePane.cursor, len(m.queueRows())
 	case m.tab == tabLibrary:
 		return m.library.cursor(), m.library.count()
+	case m.tab == tabSearch:
+		// The search's rows are a list like any other: the mark over the band
+		// points at one of them, and the find box counts them. See counted,
+		// which knows that the view a query lands on composes its own.
+		found := m.search.current()
+		return &found.cursor, m.counted()
 	default:
 		return nil, 0
 	}

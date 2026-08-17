@@ -2,8 +2,6 @@ package ui
 
 import (
 	"strings"
-
-	"charm.land/lipgloss/v2"
 )
 
 // The box the catalogue is searched from.
@@ -21,9 +19,14 @@ import (
 // after wherever it is quoted back — see searchDetail.
 const searchPrompt = "⌕"
 
-// searchBoxRows is how tall it is: the two edges and the line between, exactly
-// as the finder's box.
-const searchBoxRows = finderRows
+// searchBoxRows is how much of the screen it takes: the two edges and the line
+// between, exactly as the finder's box, and a row of air under it.
+//
+// The air is not decoration. The mark that says which row the band belongs to
+// hangs its head in the blank row above the band — see pointAtCursor — and
+// without one it was drawn over the box's own foot, which left the box open at
+// the bottom.
+const searchBoxRows = finderRows + 1
 
 // searchBox draws it, at the width of the block underneath.
 func (m Model) searchBox(w int) []string {
@@ -34,34 +37,35 @@ func (m Model) searchBox(w int) []string {
 	edge := m.styles.Rule
 	rule := strings.Repeat(pointerH, w-2)
 
-	// The field draws itself: the caret is its own, and so is the window it
-	// keeps on a query longer than the room. All that is added here is the frame
-	// and what the query matched, set against it from the right.
-	kinds := m.searchKinds()
-	room := w - 2 - 2*finderPad - lipgloss.Width(kinds) - finderGap
-
+	// The field draws itself: the caret is its own, and so is the window it keeps
+	// on a query longer than the room. All the box adds is the frame.
+	//
+	// Nothing else in it. What the query matched used to be set against the field
+	// from the right, which put the names of the views a screen's width away from
+	// the list they change — see searchKinds, which draws them over it now.
 	return []string{
 		edge.Render(pointerTL + rule + pointerTR),
-		edge.Render(pointerV) + finderLine(m.searchField(max(room, 8)), kinds, w-2) + edge.Render(pointerV),
+		edge.Render(pointerV) + finderLine(m.searchField(searchRoom(w)), "", w-2) + edge.Render(pointerV),
 		edge.Render(pointerElbow + rule + pointerBR),
+		strings.Repeat(" ", w),
 	}
 }
 
-// searchViewSpans is where each of the counts sits inside the box, so a press on
-// one can be answered by turning to that view.
+// searchRoom is how much of the box the field itself has: the frame, the air
+// inside it, and the gap finderLine keeps at the right.
+func searchRoom(w int) int { return max(w-2-2*finderPad-finderGap, 8) }
+
+// searchViewSpans is where each of the views sits on the row over the list, so
+// a press on one can be answered by turning to it.
 //
-// Read back from the same pieces the line is drawn from — the labels, the gap
-// between them, and the width they were set into from the right. See
-// finderLine, which does the setting.
-func (m Model) searchViewSpans(w int) []span {
+// Read back from the same pieces the row is drawn from — the labels and the gap
+// between them, set flush left against the margin every block here keeps. See
+// searchKinds, which draws them, and kindSpans, which does this for the
+// library's own.
+func (m Model) searchViewSpans() []span {
 	labels := m.viewLabels()
-	if len(labels) == 0 || w < finderLeast {
+	if len(labels) == 0 {
 		return nil
 	}
-
-	line := strings.Join(labels, kindGap)
-	// The frame, the padding inside it, and then the labels set flush right.
-	at := 1 + (w - 2) - finderPad - lipgloss.Width(line)
-
-	return labelSpans(labels, len(kindGap), at)
+	return labelSpans(labels, len(kindGap), leftMargin)
 }

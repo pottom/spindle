@@ -231,20 +231,27 @@ func TestTheWallIsNotMarked(t *testing.T) {
 	}
 }
 
-// And the search's is not: its heading is the field being typed into, and a
-// bracket round the results while the question is still being written is an
-// answer arriving early.
-func TestTheSearchBandIsNotMarked(t *testing.T) {
+// And so is the search's, for the same reason: the cover up there is whatever
+// the cursor has just moved onto, and without the mark the picture changes and
+// nothing says why.
+//
+// It was not marked while the field was the screen's heading — a bracket round
+// the results while the question was still being written was an answer arriving
+// early. The field has a box of its own now, and the band underneath is nothing
+// but the row the cursor is on.
+func TestTheSearchBandIsMarked(t *testing.T) {
 	m := queueModel(0, "a", "b")
 	m.width, m.height = 150, 40
 	m.tab = tabSearch
+	m.search.of(player.SearchTracks).tracks = []player.Track{
+		{ID: "t1", Title: "One"}, {ID: "t2", Title: "Two"},
+	}
+	m.search.input.SetValue("one")
 	m.resize()
 
-	// The box the query is typed into draws corners of its own — see searchBox —
-	// so what says a band was marked is the tee the line down to a row hangs
-	// from, as it is on the wall.
-	if got := plain(fmt.Sprint(m.View())); strings.Contains(got, pointerTee) {
-		t.Error("the search's band was marked")
+	// The tee is what the line down to the row hangs from, as it is on the wall.
+	if got := plain(fmt.Sprint(m.View())); !strings.Contains(got, pointerTee) {
+		t.Error("the search's band was not marked")
 	}
 }
 
