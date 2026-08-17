@@ -185,6 +185,11 @@ type Model struct {
 	// mind between one press and the next. See collect.go.
 	noSaving bool
 
+	// osd is the card in the middle of the screen that says what a transport key
+	// just did. It belongs to no tab: the keys work from all of them, and on
+	// every tab but one there was nothing to see them on. See osd.go.
+	osd osdState
+
 	// story says the box with that in it is up, and storyAt how far down it has
 	// been scrolled. A paragraph is longer than a terminal. See notes.go.
 	story   bool

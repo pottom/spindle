@@ -105,6 +105,11 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 	case tea.MouseReleaseMsg:
 		return m.mouseRelease(message)
 
+	case osdMsg:
+		// The card takes itself down. Nothing to do but redraw without it — see
+		// osd.go — and the model is already the answer to that.
+		return m, nil
+
 	case fitBlinkMsg:
 		// One turn of the flashing that says which rows came up. It stops on its
 		// own — the mark is drawn steadily afterwards, so there is nothing left
@@ -1119,9 +1124,9 @@ func (m *Model) seek(pos time.Duration) tea.Cmd {
 	m.hold()
 
 	p := m.player
-	return controlCmd("seek", func(ctx context.Context) error {
+	return tea.Batch(m.showOSD(osdSeeking), controlCmd("seek", func(ctx context.Context) error {
 		return p.Seek(ctx, pos)
-	})
+	}))
 }
 
 // toggleMute silences the device and remembers what to come back to. The music
@@ -1163,7 +1168,10 @@ func (m *Model) setVolume(pct int) tea.Cmd {
 	m.hold()
 	m.volumeSeq++
 
-	cmds := []tea.Cmd{volumeSettleCmd(m.volumeSeq)}
+	// The card in the middle of the screen, which is the whole of what somebody
+	// on the library tab has to go on: nothing else there moves when the volume
+	// does, and what they are changing is the one thing they cannot hear yet.
+	cmds := []tea.Cmd{volumeSettleCmd(m.volumeSeq), m.showOSD(osdVolume)}
 	if time.Since(m.volumeSentAt) >= volumeDebounce {
 		cmds = append(cmds, m.sendVolume())
 	}

@@ -98,10 +98,14 @@ func (m Model) render() string {
 	// panel inside the player, it is instead of it.
 	if m.stage.on {
 		if art := m.stageView(); art != "" {
-			return art
+			return m.osdOver(art)
 		}
 	}
-	return m.renderPlayer()
+
+	// And the card that says what a transport key just did, over whatever the
+	// screen turned out to be: those keys work from every tab, including the one
+	// that is nothing but a picture. See osd.go.
+	return m.osdOver(m.renderPlayer())
 }
 
 func (m Model) renderPlayer() string {

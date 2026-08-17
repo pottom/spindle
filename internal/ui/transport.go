@@ -26,7 +26,9 @@ func (m *Model) togglePlay() tea.Cmd {
 	m.hold()
 
 	p, play := m.player, m.ps.Playing
-	return tea.Batch(m.spinDevice(), controlCmd("toggle playback", func(ctx context.Context) error {
+	// Said in the middle of the screen, because this key works from every tab
+	// and most of them have no transport on them to answer it. See osd.go.
+	return tea.Batch(m.showOSD(osdPlaying), m.spinDevice(), controlCmd("toggle playback", func(ctx context.Context) error {
 		if play {
 			return p.Play(ctx)
 		}
