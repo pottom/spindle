@@ -132,6 +132,10 @@ func (m Model) mouseWheel(e tea.MouseWheelMsg) (Model, tea.Cmd) {
 		return m, m.switchTab(m.tab.next(delta))
 
 	case spotKinds:
+		if m.tab == tabSearch {
+			m.turnSearchKind(delta)
+			return m, tea.Batch(m.previewCover(), m.readAhead())
+		}
 		return m, tea.Batch(m.turnLibraryKind(delta), m.syncGridCovers())
 
 	case spotTile:
@@ -296,6 +300,19 @@ func (m Model) mouseClick(e tea.MouseClickMsg) (Model, tea.Cmd) {
 		return m, m.switchTab(tabID(at.at))
 
 	case spotKinds:
+		// The search's are the views of one answer, the library's are its four
+		// lists. A press names one of them either way — see searchViewSpans and
+		// kindSpans, which say where each of them sits.
+		if m.tab == tabSearch {
+			if view := m.viewAt(at.at); view != "" {
+				m.search.kind = view
+				return m, tea.Batch(m.previewCover(), m.readAhead())
+			}
+			return m, nil
+		}
+		if at.at < 0 || at.at >= len(libraryOrder) {
+			return m, nil
+		}
 		return m, tea.Batch(m.setLibraryKind(libraryOrder[at.at]), m.syncGridCovers())
 
 	case spotTile:

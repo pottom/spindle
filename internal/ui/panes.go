@@ -437,6 +437,12 @@ type searchPane struct {
 	kind  player.SearchKind
 	found map[player.SearchKind]*searchResults
 
+	// top is the strongest answer to the query, which is the first row of the
+	// view that holds all of them. Worked out when an answer lands rather than
+	// while drawing: it reads four lists, and a screen is drawn far oftener
+	// than a query is answered. See searchall.go.
+	top topResult
+
 	// seq rises with every query, so a slow search that lands after a newer one
 	// can be thrown away.
 	seq int
@@ -482,19 +488,41 @@ func (s *searchPane) of(kind player.SearchKind) *searchResults {
 // current is the results of the kind on screen.
 func (s *searchPane) current() *searchResults { return s.of(s.kind) }
 
+// counted is how many rows the view on screen holds. The all view's rows are
+// composed rather than held — see allRows — and everything else counts its own.
+func (m Model) counted() int {
+	if m.search.kind == searchAll {
+		return m.allRows()
+	}
+	return m.search.current().count()
+}
+
 func newSearchPane() searchPane {
 	in := textinput.New()
 	// Tracks to begin with, which is what nearly every search is for.
 	in.Prompt = searchPrompt + " "
 	in.Placeholder = "title, artist or album"
 	in.Focus()
-	return searchPane{input: in, kind: player.SearchTracks}
+	// The view that holds all of them, which is where a fresh query lands: what
+	// was asked for is more often a name than a phrase, and that view is the one
+	// that answers a name.
+	return searchPane{input: in, kind: searchAll}
 }
 
 // selected returns the track under the cursor, and nothing when the kind on
 // screen is not tracks: the rest have their own accessors because they are not
 // interchangeable.
 func (s *searchPane) selected() *player.Track {
+	// The all view's rows are the top result and then the songs, so which song a
+	// row holds is not the row's own number. See allTrack.
+	if s.kind == searchAll {
+		row := s.of(searchAll).cursor.cursor
+		if s.top.found() {
+			row--
+		}
+		return at(s.of(player.SearchTracks).tracks, row)
+	}
+
 	r := s.current()
 	if s.kind != player.SearchTracks && s.kind != "" {
 		return nil
@@ -633,15 +661,30 @@ func (m Model) cursorAlbum() *player.Album {
 		}
 		return nil
 	}
-	if m.tab == tabSearch && m.search.kind == player.SearchAlbums {
-		found := m.search.current()
-		return atAlbum(found.albums, found.cursor.cursor)
+	if m.tab == tabSearch {
+		if m.onTop() && m.search.top.kind == player.SearchAlbums {
+			found := m.search.of(player.SearchAlbums)
+			return atAlbum(found.albums, m.search.top.at)
+		}
+		if m.search.kind == player.SearchAlbums {
+			found := m.search.current()
+			return atAlbum(found.albums, found.cursor.cursor)
+		}
 	}
 	return nil
 }
 
 func (m Model) cursorArtist() *player.Artist {
-	if m.open() != nil || m.tab != tabSearch || m.search.kind != player.SearchArtists {
+	if m.open() != nil || m.tab != tabSearch {
+		return nil
+	}
+	// The one row of the all view that is not a song may be an artist, and what
+	// the cursor is on has to answer as itself wherever it is. See searchall.go.
+	if m.onTop() && m.search.top.kind == player.SearchArtists {
+		found := m.search.of(player.SearchArtists)
+		return atArtist(found.artists, m.search.top.at)
+	}
+	if m.search.kind != player.SearchArtists {
 		return nil
 	}
 	found := m.search.current()
@@ -658,6 +701,9 @@ func (m Model) cursorPlaylist() *player.Playlist {
 		return nil
 	case m.tab == tabLibrary:
 		return m.library.selected()
+	case m.tab == tabSearch && m.onTop() && m.search.top.kind == player.SearchPlaylists:
+		found := m.search.of(player.SearchPlaylists)
+		return atPlaylist(found.playlists, m.search.top.at)
 	case m.tab == tabSearch && m.search.kind == player.SearchPlaylists:
 		found := m.search.current()
 		return atPlaylist(found.playlists, found.cursor.cursor)

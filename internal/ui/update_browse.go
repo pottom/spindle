@@ -257,7 +257,7 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 
 	found := m.search.current()
-	if m.listKey(k, &found.cursor, found.count(), true) {
+	if m.listKey(k, &found.cursor, m.counted(), true) {
 		return tea.Batch(m.previewCover(), m.readAhead()), true
 	}
 
@@ -266,9 +266,15 @@ func (m *Model) searchKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		m.startTyping()
 		return nil, true
 
-	case m.pressed(k, m.keys.SearchKind), m.pressed(k, m.keys.SearchKindBack):
+	case m.pressed(k, m.keys.SearchKind), m.pressed(k, m.keys.SearchKindBack),
+		m.pressed(k, m.keys.NextTile), m.pressed(k, m.keys.PrevTile):
+		// The arrows turn the view, as the brackets do. They are free here — the
+		// wall walks its tiles by them, the player seeks by them, and a list has
+		// nothing to its left or right — and the views are a row of names across
+		// the top of the screen, which is the direction the hand reaches in.
+		// Seeking has keys of its own on every screen now: see keySeekFwdAny.
 		delta := 1
-		if m.pressed(k, m.keys.SearchKindBack) {
+		if m.pressed(k, m.keys.SearchKindBack) || m.pressed(k, m.keys.PrevTile) {
 			delta = -1
 		}
 		m.turnSearchKind(delta)
@@ -321,7 +327,12 @@ func (m *Model) searchTypingKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	found := m.search.current()
 
 	// No g and G while typing: they are letters, and every letter is the query.
-	if m.listKey(k, &found.cursor, found.count(), false) {
+	//
+	// How many rows there are is the view's own count rather than the bucket's:
+	// the one a query lands on composes its rows out of two others, and asking
+	// the bucket gave nought — which pinned the cursor to the first row and read
+	// as the arrows being dead. See counted.
+	if m.listKey(k, &found.cursor, m.counted(), false) {
 		return tea.Batch(m.previewCover(), m.readAhead()), true
 	}
 
@@ -359,7 +370,8 @@ func (m *Model) searchTypingKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	// about what is on screen now.
 	m.search.seq++
 	m.search.found = nil
-	m.search.current().pages.loading = true
+	m.search.top = topResult{}
+	m.pagesOf(m.search.kind).loading = true
 	return tea.Batch(cmd, searchSettleCmd(m.search.seq), m.spinner.Tick), true
 }
 
@@ -381,19 +393,28 @@ func (m *Model) stopTyping() {
 // no albums does not have an empty screen among its four.
 func (m *Model) turnSearchKind(delta int) {
 	at := 0
-	for i, kind := range player.SearchKinds {
-		if kind == m.search.kind {
+	for i, view := range searchViews {
+		if view == m.search.kind {
 			at = i
 		}
 	}
 
-	for range player.SearchKinds {
-		at = (at + delta + len(player.SearchKinds)) % len(player.SearchKinds)
-		if m.search.of(player.SearchKinds[at]).count() > 0 {
-			m.search.kind = player.SearchKinds[at]
+	for range searchViews {
+		at = (at + delta + len(searchViews)) % len(searchViews)
+		if m.viewCount(searchViews[at]) > 0 {
+			m.search.kind = searchViews[at]
 			return
 		}
 	}
+}
+
+// viewCount is how many rows a view would hold. The all view's are composed of
+// two of the others, so it cannot be asked of a bucket. See allRows.
+func (m Model) viewCount(view player.SearchKind) int {
+	if view == searchAll {
+		return m.allRows()
+	}
+	return m.search.of(view).count()
 }
 
 // openSearchHit acts on whatever the cursor is on. A track plays; an album, an
@@ -404,6 +425,29 @@ func (m *Model) turnSearchKind(delta int) {
 func (m *Model) openSearchHit() tea.Cmd {
 	found := m.search.current()
 	switch m.search.kind {
+	case searchAll:
+		// The top result is whatever it is, so it opens as that kind would; the
+		// rest of the rows are songs. See searchall.go.
+		if m.onTop() {
+			switch {
+			case m.cursorArtist() != nil:
+				return m.push(openedArtist(*m.cursorArtist()))
+			case m.cursorAlbum() != nil:
+				return m.push(openedAlbum(*m.cursorAlbum()))
+			case m.cursorPlaylist() != nil:
+				return m.push(openedPlaylist(*m.cursorPlaylist()))
+			}
+			return nil
+		}
+		if t := m.search.selected(); t != nil {
+			id := t.ID
+			return m.startPlay(playRequest{
+				action: "play track",
+				track:  *t,
+				call:   func(ctx context.Context, p player.Player) error { return p.PlayNow(ctx, id) },
+			})
+		}
+		return nil
 	case player.SearchAlbums:
 		if a := atAlbum(found.albums, found.cursor.cursor); a != nil {
 			return m.push(openedAlbum(*a))
@@ -567,13 +611,21 @@ func (m *Model) readAhead() tea.Cmd {
 		return tea.Batch(fetchLibraryCmd(m.player, m.library.kind, m.library.paging().next), m.spinner.Tick)
 
 	case m.tab == tabSearch:
-		found := m.search.current()
-		if !found.pages.wants(found.cursor.cursor, found.count()) {
+		// Which list is being scrolled through, and which one has more of it.
+		// On the all view those are two different buckets: the cursor walks the
+		// composed rows, and what runs out is the songs. See searchall.go.
+		walking := m.search.current()
+		more := walking
+		if m.search.kind == searchAll {
+			more = m.search.of(player.SearchTracks)
+		}
+
+		if !more.pages.wants(walking.cursor.cursor, m.counted()) {
 			return nil
 		}
-		found.pages.loading = true
+		more.pages.loading = true
 		return tea.Batch(
-			searchCmd(m.player, m.search.input.Value(), m.search.kind, m.search.seq, found.pages.next),
+			searchCmd(m.player, m.search.input.Value(), askKind(m.search.kind), m.search.seq, more.pages.next),
 			m.spinner.Tick,
 		)
 
@@ -625,9 +677,14 @@ func (m *Model) applySearchResults(res msg.SearchResults) tea.Cmd {
 		r.pages.took(res.Results.Playlists.More, res.Results.Playlists.Next)
 	}
 
-	// A query whose tracks came back empty lands on whatever did match, rather
+	// The strongest answer, worked out once here rather than while drawing: it
+	// reads four lists, and a screen is drawn far oftener than a query is
+	// answered. See searchall.go.
+	m.search.top = m.search.topOf(res.Query)
+
+	// A query whose view came back empty lands on whatever did match, rather
 	// than opening on an empty screen with the answer one key away.
-	if m.search.current().count() == 0 {
+	if m.counted() == 0 {
 		m.turnSearchKind(1)
 	}
 	return m.syncCover()

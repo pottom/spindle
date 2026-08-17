@@ -942,7 +942,7 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 	// cover to show, so the band they live in is not reserved: the field goes
 	// to the top of the screen, where a search box belongs, rather than sitting
 	// halfway down behind a wall of blank rows.
-	if found.count() == 0 {
+	if m.counted() == 0 {
 		w := queueBlockWidth(l)
 
 		// A query still in flight looks exactly like one that matched nothing,
@@ -972,7 +972,7 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 		heading:  func(int) string { return "" },
 		subtitle: func() string { return "" },
 		columns:  m.searchColumns,
-		count:    found.count(),
+		count:    m.counted(),
 		state:    &found.cursor,
 		empty:    empty,
 		waiting:  "Asking Spotify…",
@@ -986,37 +986,36 @@ func (m Model) searchPaneView(l layout, rows int) []string {
 // three artists and eighteen albums are there, which is what a screen of mixed
 // sections would otherwise have to spend rows saying.
 func (m Model) searchKinds() string {
-	if m.search.current().count() == 0 && len(m.search.found) == 0 {
+	labels := m.viewLabels()
+	if len(labels) == 0 {
 		return ""
 	}
 
-	var parts []string
-	for _, kind := range player.SearchKinds {
-		found := m.search.of(kind)
-		if found.count() == 0 {
-			continue
-		}
-
-		count := fmt.Sprintf("%d", found.count())
-		if found.pages.more {
-			// What has been read, not what exists: Spotify's totals are not
-			// worth carrying through three layers for a heading.
-			count += "+"
-		}
-
+	parts := make([]string, 0, len(labels))
+	for i, label := range labels {
 		style := m.styles.Album
-		if kind == m.search.kind {
+		if m.viewAt(i) == m.search.kind {
 			style = m.styles.Title
 		}
-		parts = append(parts, style.Render(kind.String()+" "+count))
+		parts = append(parts, style.Render(label))
 	}
-	return strings.Join(parts, m.styles.Album.Render(" · "))
+	return strings.Join(parts, m.styles.Detail.Render(kindGap))
 }
 
 // searchRow draws one hit, whichever kind is on screen.
 func (m Model) searchRow(i, w int, selected bool) string {
 	found := m.search.current()
 	switch m.search.kind {
+	case searchAll:
+		// The one view that mixes kinds: the strongest answer, and then the
+		// songs. See searchall.go.
+		if m.topAt(i) {
+			return m.topRow(w, selected)
+		}
+		if t := m.allTrack(i); t != nil {
+			return m.trackRow(*t, w, selected, 0)
+		}
+		return strings.Repeat(" ", max(w, 0))
 	case player.SearchAlbums:
 		return m.albumRow("", found.albums[i], w, selected)
 	case player.SearchArtists:
@@ -1031,6 +1030,10 @@ func (m Model) searchRow(i, w int, selected bool) string {
 // searchColumns names the columns of whichever kind of result is on screen.
 func (m Model) searchColumns(w int) string {
 	switch m.search.kind {
+	case searchAll:
+		// The columns of the songs, which is what nearly every row of this view
+		// is. The top result borrows them: a name, what it is, and who by.
+		return m.trackColumns(w, false)
 	case player.SearchAlbums:
 		return m.albumColumns(w, "")
 	case player.SearchArtists:

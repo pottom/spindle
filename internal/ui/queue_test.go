@@ -1040,9 +1040,12 @@ func TestScrollingSendsForTheNextPage(t *testing.T) {
 			Items: make([]player.Track, 12), More: true, Next: 12,
 		}},
 	})
+	// The view a query lands on holds the songs and the strongest answer above
+	// them, so what runs out is the songs' own list. See searchall.go.
 	got := tm.(Model)
-	if !got.search.current().pages.more || got.search.current().pages.next != 12 {
-		t.Fatalf("the page's answer was not kept: %+v", got.search.current().pages)
+	songs := got.search.of(player.SearchTracks)
+	if !songs.pages.more || songs.pages.next != 12 {
+		t.Fatalf("the page's answer was not kept: %+v", songs.pages)
 	}
 
 	// Near the top, nothing is asked for.
@@ -1051,7 +1054,7 @@ func TestScrollingSendsForTheNextPage(t *testing.T) {
 	}
 
 	// Near the end, the next page is sent for — once, however many keys follow.
-	got.search.current().cursor.cursor = 11
+	got.search.current().cursor.cursor = got.counted() - 1
 	if cmd := got.readAhead(); cmd == nil {
 		t.Fatal("the cursor reached the end of the list and nothing was fetched")
 	}
@@ -1076,11 +1079,12 @@ func TestALaterPageIsAppended(t *testing.T) {
 	})
 
 	got := tm.(Model)
-	if len(got.search.current().tracks) != 20 {
-		t.Errorf("%d results after the second page, want the twelve plus the eight", len(got.search.current().tracks))
+	songs := got.search.of(player.SearchTracks)
+	if len(songs.tracks) != 20 {
+		t.Errorf("%d results after the second page, want the twelve plus the eight", len(songs.tracks))
 	}
-	if got.search.current().cursor.cursor != 11 {
-		t.Errorf("the cursor moved to %d when the page arrived, want it left alone", got.search.current().cursor.cursor)
+	if songs.cursor.cursor != 11 {
+		t.Errorf("the cursor moved to %d when the page arrived, want it left alone", songs.cursor.cursor)
 	}
 }
 
@@ -1171,17 +1175,22 @@ func TestSearchShowsOneKindAndCountsTheRest(t *testing.T) {
 		}
 	}
 
-	// Tracks to begin with, and the rows are tracks.
-	if m.search.kind != player.SearchTracks {
-		t.Fatalf("a query opens on %q, want tracks", m.search.kind)
+	// The view that holds all of them to begin with — the strongest answer and
+	// then the songs — which is what answers a name. See searchall.go.
+	if m.search.kind != searchAll {
+		t.Fatalf("a query opens on %q, want the view that holds all of them", m.search.kind)
 	}
 	if !strings.Contains(plain(m.render()), res.Tracks.Items[0].Title) {
 		t.Error("the first track is not listed")
 	}
 
-	// Turning the kind changes the rows and the panel, and each kind keeps its
-	// own place in its own list.
+	// Turning the kind walks the views in order — all, then the songs on their
+	// own, then the rest — and each keeps its own place in its own list.
 	m.search.of(player.SearchTracks).cursor.cursor = 3
+	m.turnSearchKind(1)
+	if m.search.kind != player.SearchTracks {
+		t.Fatalf("the first turn went to %q, want the songs on their own", m.search.kind)
+	}
 	m.turnSearchKind(1)
 	if m.search.kind != player.SearchAlbums {
 		t.Fatalf("the kind turned to %q, want albums", m.search.kind)
@@ -1195,6 +1204,9 @@ func TestSearchShowsOneKindAndCountsTheRest(t *testing.T) {
 	}
 
 	m.turnSearchKind(-1)
+	if m.search.kind != player.SearchTracks {
+		t.Fatalf("turning back went to %q, want the songs", m.search.kind)
+	}
 	if m.search.current().cursor.cursor != 3 {
 		t.Error("coming back to the tracks lost the place in them")
 	}
@@ -1208,6 +1220,12 @@ func TestSearchSkipsEmptyKinds(t *testing.T) {
 	m.search.of(player.SearchTracks).tracks = []player.Track{{ID: "t", Title: "t"}}
 	m.search.of(player.SearchPlaylists).playlists = []player.Playlist{{ID: "p", Name: "p"}}
 
+	// From the view that holds all of them: the songs on their own are next, and
+	// the albums and artists — which matched nothing — are skipped.
+	m.turnSearchKind(1)
+	if m.search.kind != player.SearchTracks {
+		t.Fatalf("turned to %q, want the songs", m.search.kind)
+	}
 	m.turnSearchKind(1)
 	if m.search.kind != player.SearchPlaylists {
 		t.Errorf("turned to %q, want the next kind that matched anything", m.search.kind)

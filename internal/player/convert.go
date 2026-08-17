@@ -73,6 +73,14 @@ func trackFromFull(t *spotify.FullTrack) Track {
 	out.DiscNumber = int(t.DiscNumber)
 	out.TotalTracks = int(t.Album.TotalTracks)
 	out.Explicit = t.Explicit
+
+	// Spotify's own rating, which is what the stars on a row are drawn from. It
+	// arrives with every full track and was being dropped: the column was drawn
+	// on every list and filled in only for what the daemon had played, so a
+	// search looked like a catalogue nobody had an opinion about.
+	popularity := int(t.Popularity)
+	out.Popularity = &popularity
+
 	return out
 }
 

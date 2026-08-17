@@ -37,7 +37,9 @@ func TestAQueryInFlightSaysSo(t *testing.T) {
 	m.width, m.height = 120, 40
 	m.resize()
 	m.search.input.SetValue("bowie")
-	m.search.current().pages.loading = true
+	// The list the view actually reads from, which for the one a query lands on
+	// is the songs. See pagesOf.
+	m.pagesOf(m.search.kind).loading = true
 
 	screen := plain(strings.Join(m.searchPaneView(m.layout(), m.layout().bodyHeight), "\n"))
 	if strings.Contains(screen, "Nothing matched") {

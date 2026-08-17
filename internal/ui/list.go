@@ -145,7 +145,9 @@ func (m Model) listLoading() bool {
 	case m.tab == tabLibrary:
 		return m.library.pages[m.library.kind].loading
 	case m.tab == tabSearch:
-		return m.search.current().pages.loading
+		// The list a view reads from, which for the one that holds all of them is
+		// the songs. See pagesOf.
+		return m.loadingOf(m.search.kind)
 	default:
 		return false
 	}

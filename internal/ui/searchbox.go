@@ -46,3 +46,22 @@ func (m Model) searchBox(w int) []string {
 		edge.Render(pointerElbow + rule + pointerBR),
 	}
 }
+
+// searchViewSpans is where each of the counts sits inside the box, so a press on
+// one can be answered by turning to that view.
+//
+// Read back from the same pieces the line is drawn from — the labels, the gap
+// between them, and the width they were set into from the right. See
+// finderLine, which does the setting.
+func (m Model) searchViewSpans(w int) []span {
+	labels := m.viewLabels()
+	if len(labels) == 0 || w < finderLeast {
+		return nil
+	}
+
+	line := strings.Join(labels, kindGap)
+	// The frame, the padding inside it, and then the labels set flush right.
+	at := 1 + (w - 2) - finderPad - lipgloss.Width(line)
+
+	return labelSpans(labels, len(kindGap), at)
+}
