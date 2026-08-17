@@ -18,6 +18,12 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 
+	// Spotify serves some playlist covers as WebP and others as JPEG, from the
+	// same host, without being asked either way: two of the pictures on a real
+	// library's wall were blank because of it, and the decoder's only complaint
+	// was "unknown format". Decoding it is not in the standard library.
+	_ "golang.org/x/image/webp"
+
 	"github.com/pottom/spindle/internal/xdg"
 )
 

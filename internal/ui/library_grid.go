@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"time"
+
 	"fmt"
 	"strings"
 
@@ -271,7 +273,7 @@ func (m *Model) syncGridCovers() tea.Cmd {
 		if item.url == "" {
 			continue
 		}
-		if m.tiles[item.id].matches(item.url, g.boxW, g.boxH) {
+		if held := m.tiles[item.id]; held.matches(item.url, g.boxW, g.boxH) && !held.worthRetrying() {
 			continue
 		}
 		slot := m.tiles[item.id].slot
@@ -309,7 +311,7 @@ func (m *Model) gridTook(url string, w, h int, art string) {
 func (m *Model) gridFailed(url string, w, h int) {
 	for id, tile := range m.tiles {
 		if tile.matches(url, w, h) {
-			tile.failed = true
+			tile.failed, tile.failedAt = true, time.Now()
 			m.tiles[id] = tile
 		}
 	}

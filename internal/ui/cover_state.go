@@ -3,6 +3,7 @@ package ui
 import (
 	"image/color"
 	"strings"
+	"time"
 )
 
 // coverState is what the view needs to know about the artwork area: which URL
@@ -45,6 +46,12 @@ type coverState struct {
 	accent    color.RGBA
 	hasAccent bool
 	failed    bool
+
+	// failedAt is when it failed, because a failure is not for ever. A picture
+	// can be missed for a moment — a request that timed out, a format nothing
+	// here could read until it could — and a tile that never asks again is a
+	// hole in the wall that only a resize will mend. See coverRetryAfter.
+	failedAt time.Time
 }
 
 // loading reports whether the spinner belongs in the artwork area.
@@ -72,6 +79,18 @@ func (c *coverState) took(art string) {
 }
 
 // matches reports whether a result belongs to what is currently on screen.
+// coverRetryAfter is how long a picture that would not come is left alone
+// before it is asked for again. Long enough that a wall of missing covers is
+// not a wall of requests, short enough that somebody who looks back at the
+// screen sees it mended.
+const coverRetryAfter = 30 * time.Second
+
+// worthRetrying reports that this tile failed long enough ago to be worth
+// asking about again.
+func (c coverState) worthRetrying() bool {
+	return c.failed && time.Since(c.failedAt) >= coverRetryAfter
+}
+
 func (c coverState) matches(url string, w, h int) bool {
 	return c.url == url && c.width == w && c.height == h
 }
