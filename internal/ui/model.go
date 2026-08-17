@@ -309,6 +309,12 @@ type Model struct {
 
 	// queue is what Spotify says comes next. It exists so that pressing n can
 	// put the right title on screen at once rather than half a second later.
+	// fitMoved are the tracks the last ordering brought forward, and fitMovedAt
+	// when it happened: they are marked for a few seconds so that a list which
+	// rearranged itself can be checked by eye. See fit.go.
+	fitMoved   map[string]bool
+	fitMovedAt time.Time
+
 	// queueFor is the track it was fetched for.
 	queue    []player.Track
 	queueFor string

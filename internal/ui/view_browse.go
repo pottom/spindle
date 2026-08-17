@@ -14,6 +14,10 @@ import (
 const (
 	rowCursor = "▸"
 	nowMark   = "♪"
+
+	// movedMark stands where the number would be, on a row the ordering has
+	// just brought forward. Up, because that is the direction it moved.
+	movedMark = "▲"
 	// queuedMark says a track is already waiting. Pressing the key that puts it
 	// there is otherwise an act with no visible result, and a list you have
 	// been picking from is worth being able to read back. A dot rather than a
@@ -1206,11 +1210,22 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 		// On the queue the playing track is marked rather than numbered: it is
 		// not waiting its turn, so a place in the running order would be a lie.
 		title = m.leadIn(m.styles.Cursor.Render(nowMark)) + title
+	case m.justMoved(t.ID):
+		// A row the ordering brought forward wears a mark where its number
+		// would be, for a few seconds. The number is the one thing on the row
+		// that is about to change anyway — everything below a moved track is
+		// renumbered — and it is the column the eye runs down.
+		//
+		// A glyph rather than a ground: a background a shade off the screen's
+		// own is invisible in a terminal that will not say what colour it is,
+		// which is most of them under tmux. Measured — the ground was there in
+		// the escape codes and not on the screen. See fit.go.
+		title = m.leadIn(m.styles.Cursor.Render(movedMark)) + title
 	case number > 0:
 		title = m.leadIn(primary.Render(fmt.Sprintf("%d", number))) + title
 	}
 
-	return m.drawRow(w, selected, rowCells{
+	row := m.drawRow(w, selected, rowCells{
 		primary:   title,
 		secondary: m.lit(m.styles.RowSecondary, strings.Join(t.Artists, ", ")),
 		album:     m.lit(m.styles.RowTrailing, t.Album),
@@ -1219,6 +1234,16 @@ func (m Model) trackRow(t player.Track, w int, selected bool, number int) string
 		tempo:     m.tempoCell(t),
 		trailing:  m.styles.RowTrailing.Render(formatDuration(t.Duration)),
 	})
+
+	// And a ground behind the whole row where the terminal has said what colour
+	// it draws on, which is what makes the marked rows read as a block rather
+	// than as a column of arrows. It leaves every colour in the row alone — see
+	// raise — and it is a mark rather than a flash: a row that blinks reads as a
+	// fault, and this is the program doing what it was asked.
+	if m.justMoved(t.ID) {
+		row = raise(row, 0, w, m.styles.Raised, w)
+	}
+	return row
 }
 
 // starsCell is a track's rating for a list row, and nothing at all for a track

@@ -48,6 +48,17 @@ const (
 	fitSuggestions = 50
 )
 
+// fitMarkFor is how long the rows that were brought forward stay marked.
+//
+// A list that rearranges itself under the eye is a list nobody can check. Four
+// seconds is long enough to look down the column and see which rows came up,
+// and short enough that it is gone before it becomes part of the furniture.
+//
+// Marked rather than flashing: a row that blinks is read as a fault, and this is
+// the program doing what it was asked. The mark is a ground behind the row that
+// leaves the colours in it alone — see raise.
+const fitMarkFor = 4 * time.Second
+
 // fitTook carries the opinion back: the artists worth being near.
 //
 // By name rather than by id. The names are the one thing every source here
@@ -190,6 +201,20 @@ func (m *Model) tookFit(message fitTook) tea.Cmd {
 		return nil
 	}
 
+	// Which rows came up, so the screen can say so. A track that moved forward
+	// is one somebody should be able to find again without watching for it.
+	was := make(map[string]int, len(m.queue))
+	for i, t := range m.queue {
+		was[t.ID] = i
+	}
+	m.fitMoved = map[string]bool{}
+	for i, t := range ordered {
+		if before, held := was[t.ID]; held && i < before {
+			m.fitMoved[t.ID] = true
+		}
+	}
+	m.fitMovedAt = time.Now()
+
 	// On screen at once, as every other edit to this list is. What was sent is
 	// what is drawn; a queue that rearranged itself half a second later would
 	// look like something else had done it.
@@ -252,3 +277,12 @@ func fitScore(t player.Track, same, near, suggested map[string]bool) int {
 // dropping punctuation, folding accents — would join artists who are not the
 // same, and this decides an order rather than an identity.
 func foldName(name string) string { return strings.ToLower(strings.TrimSpace(name)) }
+
+// justMoved reports that this track was brought forward a moment ago, and is
+// still worth marking.
+func (m Model) justMoved(id string) bool {
+	if len(m.fitMoved) == 0 || time.Since(m.fitMovedAt) >= fitMarkFor {
+		return false
+	}
+	return m.fitMoved[id]
+}

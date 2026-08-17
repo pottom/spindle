@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -184,5 +185,51 @@ func TestTheMenuDoesNotAskTwice(t *testing.T) {
 	}
 	if cmd := found.do(&m); cmd == nil {
 		t.Error("choosing it from the menu asked again instead of acting")
+	}
+}
+
+// A list that rearranges itself under the eye is a list nobody can check, so
+// the rows that came up are marked for a few seconds.
+func TestTheRowsThatCameUpAreMarked(t *testing.T) {
+	m := queueModel(0, "b", "c", "d")
+	m.width, m.height = 130, 40
+	m.tab = tabQueue
+	m.resize()
+	m.queue = tracksBy("Stranger", "Queen", "Other")
+	m.ps = &player.State{TrackID: "now", Title: "Bohemian Rhapsody", Artists: []string{"Queen"}, Playing: true}
+
+	var tm tea.Model = m
+	tm, _ = tm.Update(fitTook{near: map[string]bool{}, suggested: map[string]bool{}})
+	after := tm.(Model)
+
+	moved := after.queue[0]
+	if moved.Artists[0] != "Queen" {
+		t.Fatalf("the wrong track came up: %v", ordering(after.queue))
+	}
+	if !after.justMoved(moved.ID) {
+		t.Error("the row that came up is not marked")
+	}
+	if after.justMoved(after.queue[1].ID) {
+		t.Error("a row that only got pushed down is marked as though it moved up")
+	}
+
+	// The mark stands where the number would be, and it is drawn as a glyph: a
+	// ground a shade off the screen's own is invisible in a terminal that will
+	// not say what colour it draws on, which is most of them under tmux.
+	row := after.trackRow(moved, 100, false, 1)
+	if !strings.Contains(ansi.Strip(row), movedMark) {
+		t.Errorf("the row that came up carries no mark: %q", ansi.Strip(row))
+	}
+	if strings.Contains(ansi.Strip(after.trackRow(after.queue[1], 100, false, 2)), movedMark) {
+		t.Error("a row that did not come up is marked")
+	}
+
+	// And it goes away on its own, leaving the number behind it.
+	after.fitMovedAt = time.Now().Add(-2 * fitMarkFor)
+	if after.justMoved(moved.ID) {
+		t.Error("the mark outlived its welcome")
+	}
+	if back := ansi.Strip(after.trackRow(moved, 100, false, 1)); !strings.Contains(back, "1 ") {
+		t.Errorf("the number did not come back: %q", back)
 	}
 }
