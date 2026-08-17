@@ -120,10 +120,11 @@ func TestQuitWorksOnTheNoDeviceScreen(t *testing.T) {
 		}
 	}
 
-	// And it reaches the quit case for real.
+	// And it reaches the quit case for real. On a modifier, because a letter is
+	// one keystroke away from every field on every screen — see keyQuit.
 	var tm tea.Model = m
-	if _, cmd := tm.Update(tea.KeyPressMsg{Code: 'q', Text: "q"}); cmd == nil {
-		t.Error("q on the no-device screen quits nothing")
+	if _, cmd := tm.Update(tea.KeyPressMsg{Code: 'q', Mod: tea.ModCtrl}); cmd == nil {
+		t.Error("ctrl+q on the no-device screen quits nothing")
 	}
 }
 

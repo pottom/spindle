@@ -294,14 +294,14 @@ func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		return nil, false
 
 	case m.pressed(k, m.keys.Back), m.pressed(k, m.keys.Quit), m.pressed(k, m.keys.Stage):
-		// The way out. esc and q are what "back" means everywhere else, and f is
-		// the key that opened this — a key that puts a screen up is expected to
-		// take it down again, and reaching for it a second time is what a hand
-		// does before it remembers there is an esc.
+		// The way out. esc is what "back" means everywhere else, and f is the key
+		// that opened this — a key that puts a screen up is expected to take it
+		// down again, and reaching for it a second time is what a hand does
+		// before it remembers there is an esc.
 		//
-		// q and ctrl+c are the same binding, and only one of them means this:
-		// ctrl+c is not "leave this screen", it is "leave", and it has to mean
-		// that wherever it is pressed.
+		// Leaving the program is held on the same binding and does not mean this:
+		// ctrl+q and ctrl+c are not "leave this screen", they are "leave", and
+		// they have to mean that wherever they are pressed.
 		if k.Mod&tea.ModCtrl != 0 {
 			return nil, false
 		}

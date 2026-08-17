@@ -62,14 +62,11 @@ func TestStageTakesTheScreenAndGivesItBack(t *testing.T) {
 	}
 }
 
-// And q and f are the other two ways out: q means "back" everywhere else, and f
-// is the key that put the screen up in the first place. A hand that wants the
-// working screen back has three answers and does not have to remember which —
-// reaching for the key that opened it is what happens before anybody remembers
-// there is an esc.
-func TestThreeKeysLeaveTheBigScreen(t *testing.T) {
+// And f is the other way out: it is the key that put the screen up in the first
+// place, and reaching for it a second time is what a hand does before it
+// remembers there is an esc.
+func TestTwoKeysLeaveTheBigScreen(t *testing.T) {
 	for _, out := range []tea.KeyPressMsg{
-		{Code: 'q', Text: "q"},
 		{Code: 'f', Text: "f"},
 		{Code: tea.KeyEscape},
 	} {

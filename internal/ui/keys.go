@@ -159,7 +159,7 @@ func newKeyMap() keyMap {
 		),
 		Quit: key.NewBinding(
 			key.WithKeys(keyQuit, keyQuitAlt),
-			key.WithHelp(keyQuit, "quit"),
+			key.WithHelp("ctrl+q", "quit"),
 		),
 		QuitAll: key.NewBinding(
 			key.WithKeys(keyQuitAll),

@@ -52,9 +52,14 @@ const (
 	keyMute        = "m"
 
 	keyHelp    = "?"
-	keyQuit    = "q"
+	// Leaving takes a modifier. q was the key for it, and q is a letter: a
+	// screen with a field on it — the search, the find box over a list — turns
+	// every letter into a character, and the one that closed the program was one
+	// keystroke away from every one of those. A program should not be able to
+	// end by accident.
+	keyQuit    = "ctrl+q"
 	keyQuitAlt = "ctrl+c"
-	keyQuitAll = "Q"
+	keyQuitAll = "ctrl+shift+q"
 
 	keyNextTab   = "tab"
 	keyPrevTab   = "shift+tab"
