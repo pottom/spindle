@@ -79,6 +79,39 @@ func (m Model) fitAvailable() bool {
 	return suggests || relates
 }
 
+// askFit puts the question in a box rather than acting on it.
+//
+// One press of a key must not rearrange a list somebody spent a minute
+// building. Nothing is lost either way — every track stays — but the order they
+// were in is theirs, and it is not recoverable once it has gone, which is the
+// whole test of whether something should ask first.
+//
+// The box is the menu's own: a title, and what can be done about it. Choosing
+// this from the menu does not ask again, because opening a menu and picking a
+// line is already two deliberate acts, and asking twice teaches people to press
+// through questions without reading them.
+func (m *Model) askFit() bool {
+	if !m.fitAvailable() {
+		return false
+	}
+
+	x, y := m.cursorPoint(m.layout())
+	m.actions = actionsPane{
+		open:     true,
+		title:    "Order what is coming?",
+		subtitle: "to follow " + m.ps.Title,
+		x:        x, y: y,
+		verbs: []verb{{
+			label: "Order it — nothing is dropped, only the order changes",
+			do:    func(m *Model) tea.Cmd { return m.fitQueue() },
+		}, {
+			label: "Leave it as it is",
+			do:    func(*Model) tea.Cmd { return nil },
+		}},
+	}
+	return true
+}
+
 // fitQueue asks what goes with what is playing.
 //
 // The asking is where the time goes — two requests, both of them catalogue

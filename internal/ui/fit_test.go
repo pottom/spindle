@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -114,5 +115,74 @@ func TestItSaysWhatItDid(t *testing.T) {
 	}
 	if !strings.Contains(after.said, "Bohemian Rhapsody") {
 		t.Errorf("it said %q, which does not say what it followed", after.said)
+	}
+}
+
+// One press of a key must not rearrange a list somebody spent a minute
+// building. Nothing is lost either way — every track stays — but the order they
+// were in is not recoverable once it has gone, which is the test of whether
+// something should ask first.
+func TestTheKeyAsksBeforeItOrders(t *testing.T) {
+	m := queueModel(0, "b", "c", "d")
+	m.width, m.height = 130, 40
+	m.resize()
+	before := ids(m.queue)
+
+	var tm tea.Model = m
+	tm, cmd := tm.Update(tea.KeyPressMsg{Code: 'w', Text: "w"})
+	asked := tm.(Model)
+
+	if cmd != nil {
+		t.Error("the key went straight out and asked Spotify")
+	}
+	if !asked.actions.open {
+		t.Fatal("nothing was asked")
+	}
+	if !strings.Contains(ansi.Strip(asked.render()), "Order what is coming?") {
+		t.Error("the question is not on the screen")
+	}
+	if !strings.Contains(ansi.Strip(asked.render()), "Leave it as it is") {
+		t.Error("there is no way out of the question")
+	}
+	if !slices.Equal(ids(asked.queue), before) {
+		t.Error("the queue was rearranged before anybody answered")
+	}
+
+	// The way out leaves it alone.
+	var away tea.Model = asked
+	away, _ = away.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	if got := away.(Model); got.actions.open || !slices.Equal(ids(got.queue), before) {
+		t.Error("escaping the question did not leave the queue alone")
+	}
+
+	// And answering it acts.
+	var yes tea.Model = asked
+	yes, cmd = yes.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Error("answering the question did nothing")
+	}
+	if yes.(Model).actions.open {
+		t.Error("the box stayed up after it was answered")
+	}
+}
+
+// Choosing it from the menu does not ask again: opening a menu and picking a
+// line is already two deliberate acts.
+func TestTheMenuDoesNotAskTwice(t *testing.T) {
+	m := queueModel(0, "b", "c", "d")
+	m.queuePane.cursor.cursor = queueRowOf(0)
+
+	var found *verb
+	for _, v := range m.actionsFor(m.queue[0]) {
+		if strings.Contains(v.label, "Order what is coming") {
+			held := v
+			found = &held
+		}
+	}
+	if found == nil {
+		t.Fatal("the queue's menu does not offer it")
+	}
+	if cmd := found.do(&m); cmd == nil {
+		t.Error("choosing it from the menu asked again instead of acting")
 	}
 }
