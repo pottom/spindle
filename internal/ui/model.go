@@ -609,7 +609,7 @@ func (m Model) helpKeysWith(scope, lyrics, peek bool) tabKeys {
 	case m.tab == tabPlayer:
 		return m.keys.forPlayer(scope, lyrics, peek, m.storyAvailable(), m.canSave(), m.width)
 	default:
-		return m.keys.forTab(m.tab, scope, m.canSave())
+		return m.keys.forTab(m.tab, scope, m.canSave(), m.fitAvailable())
 	}
 }
 

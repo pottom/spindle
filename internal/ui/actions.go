@@ -84,6 +84,15 @@ func (m Model) actionsFor(t player.Track) []verb {
 			label: "Remove from the queue",
 			do:    func(m *Model) tea.Cmd { return m.dropQueued() },
 		})
+		// About the whole list rather than this row, and this is the only menu
+		// the queue has. See fit.go.
+		if m.fitAvailable() {
+			verbs = append(verbs, verb{
+				key:   keyFit,
+				label: "Order what is coming to follow this track",
+				do:    func(m *Model) tea.Cmd { return m.fitQueue() },
+			})
+		}
 	} else {
 		verbs = append(verbs, verb{
 			key:   keyEnqueue,

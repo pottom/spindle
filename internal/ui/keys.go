@@ -86,6 +86,7 @@ type keyMap struct {
 
 	Enqueue key.Binding
 	Like    key.Binding
+	Fit     key.Binding
 	// PlayOne plays the track under the cursor and nothing else, where enter
 	// would have played the list it belongs to.
 	PlayOne key.Binding
@@ -303,6 +304,10 @@ func newKeyMap() keyMap {
 		ActionsTyped: key.NewBinding(
 			key.WithKeys(keyActionsHeld),
 			key.WithHelp(keyActionsHeld, "actions"),
+		),
+		Fit: key.NewBinding(
+			key.WithKeys(keyFit),
+			key.WithHelp(keyFit, "follow this track"),
 		),
 		Like: key.NewBinding(
 			key.WithKeys(keyLike),
@@ -592,7 +597,7 @@ func (k keyMap) forOpen(albums, scope, like bool) tabKeys {
 	}
 }
 
-func (k keyMap) forTab(t tabID, scope, like bool) tabKeys {
+func (k keyMap) forTab(t tabID, scope, like, fit bool) tabKeys {
 	switch t {
 	case tabQueue:
 		short := []key.Binding{
@@ -602,6 +607,9 @@ func (k keyMap) forTab(t tabID, scope, like bool) tabKeys {
 			terse(k.Actions, "actions"),
 			terse(k.Drop, "remove"),
 			tight(k.MoveDn, "move"),
+		}
+		if fit {
+			short = append(short, terse(k.Fit, "follow"))
 		}
 		second := []key.Binding{k.Actions, k.PlayPause, k.Next, k.NextTab, k.Help}
 		if scope {

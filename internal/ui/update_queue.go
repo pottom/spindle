@@ -29,6 +29,11 @@ func (m *Model) queueKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		m.openActions()
 		return nil, true
 
+	case m.pressed(k, m.keys.Fit):
+		// What is coming, in an order that follows what is playing. Nothing is
+		// dropped and nothing is added — only the order changes. See fit.go.
+		return m.fitQueue(), true
+
 	case m.pressed(k, m.keys.Drop):
 		return m.dropQueued(), true
 

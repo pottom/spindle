@@ -173,6 +173,43 @@ func (s *Spotify) RelatedArtists(ctx context.Context, artistID string) ([]Artist
 	return out, nil
 }
 
+// Suggester is a backend that can say what might go with a track.
+//
+// Optional for the same reason as the rest: Spotify answers /recommendations
+// with 404 to an application it has clamped down on, which is the same no as a
+// 403 in different words.
+type Suggester interface {
+	// Suggestions is what Spotify thinks goes with this track. What comes back
+	// is other people's records rather than anything in the queue — the use of
+	// it here is the artists it names. See the ui's fit.go.
+	Suggestions(ctx context.Context, seedTrackID string, limit int) ([]Track, error)
+}
+
+// Suggestions asks Spotify what goes with a track.
+func (s *Spotify) Suggestions(ctx context.Context, seedTrackID string, limit int) ([]Track, error) {
+	seeds := spotify.Seeds{Tracks: []spotify.ID{spotify.ID(seedTrackID)}}
+
+	found, err := s.client.GetRecommendations(ctx, seeds, nil, spotify.Limit(limit))
+	if err != nil {
+		return nil, permitted("fetch suggestions", err)
+	}
+	if found == nil {
+		return nil, nil
+	}
+
+	out := make([]Track, 0, len(found.Tracks))
+	for i := range found.Tracks {
+		out = append(out, trackFromSimple(&found.Tracks[i]))
+	}
+	return out, nil
+}
+
+// Suggestions on the daemon is the Web API's answer: what goes with what is not
+// something a playback device knows.
+func (l *Local) Suggestions(ctx context.Context, seedTrackID string, limit int) ([]Track, error) {
+	return l.web.Suggestions(ctx, seedTrackID, limit)
+}
+
 // RelatedArtists on the daemon is the Web API's answer: who sounds like whom is
 // not something a playback device knows.
 func (l *Local) RelatedArtists(ctx context.Context, artistID string) ([]Artist, error) {

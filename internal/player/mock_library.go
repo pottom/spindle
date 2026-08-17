@@ -166,3 +166,23 @@ func (m *Mock) RelatedArtists(ctx context.Context, artistID string) ([]Artist, e
 	}
 	return out, nil
 }
+
+// Suggestions is the catalogue with the seed left out, in its own order. A mock
+// has no taste; what it has is enough tracks to exercise the screen that asks.
+func (m *Mock) Suggestions(ctx context.Context, seedTrackID string, limit int) ([]Track, error) {
+	if err := m.delay(ctx); err != nil {
+		return nil, err
+	}
+
+	out := make([]Track, 0, limit)
+	for _, t := range mockCatalogue {
+		if t.ID == seedTrackID {
+			continue
+		}
+		if len(out) >= limit {
+			break
+		}
+		out = append(out, t)
+	}
+	return out, nil
+}

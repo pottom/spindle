@@ -35,7 +35,7 @@ func TestEveryKeyNamedIsAKeyRead(t *testing.T) {
 		"open unliked": k.forOpen(false, false, false),
 	}
 	for tab := tabID(0); tab < tabCount; tab++ {
-		bars["tab "+tab.String()] = k.forTab(tab, true, true)
+		bars["tab "+tab.String()] = k.forTab(tab, true, true, true)
 	}
 
 	for where, bar := range bars {

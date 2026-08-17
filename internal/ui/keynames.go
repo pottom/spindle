@@ -118,6 +118,12 @@ const (
 	keyEnqueue     = "a"
 	keyEnqueueHeld = "ctrl+a"
 
+	// keyFit puts what is coming into an order that follows what is playing.
+	// w for "what goes with this", and it is free on every screen that has a
+	// queue: the letter's other use is the full screen's own, which swallows
+	// keys of its own. See fit.go.
+	keyFit = "w"
+
 	keyPlayOne = "o"
 	keyDrop    = "x"
 	keyMoveUp  = "k"
