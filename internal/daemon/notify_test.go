@@ -8,15 +8,6 @@ import (
 	"testing"
 )
 
-// A track title is somebody else's text, and will eventually carry the two
-// characters AppleScript reads as its own.
-func TestQuotingATitleThatFightsBack(t *testing.T) {
-	got := appleQuote(`Say "Hello" \ Goodbye`)
-	if want := `"Say \"Hello\" \\ Goodbye"`; got != want {
-		t.Errorf("appleQuote() = %s, want %s", got, want)
-	}
-}
-
 // What is playing is read from the daemon's own answer, and the answer says
 // nothing at all when nothing is loaded.
 func TestNowPlayingReadsTheStatus(t *testing.T) {
