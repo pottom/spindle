@@ -200,11 +200,13 @@ func leave(ctx context.Context, done <-chan error, wedge <-chan error, log libre
 // was not answered at all and cost a working device that played nothing.
 func playbackConfig(quality Quality, crossfade time.Duration, cacheDir string) *daemon.Config {
 	return &daemon.Config{
-		DeviceName:   deviceName,
-		DeviceType:   "computer",
-		AudioBackend: audioBackend,
-		AudioDevice:  audioDevice,
-		Bitrate:      quality.Bitrate(),
+		DeviceName:       deviceName,
+		DeviceType:       "computer",
+		AudioBackend:     audioBackend,
+		AudioDevice:      audioDevice,
+		AudioBufferTime:  audioBufferTime,
+		AudioPeriodCount: audioPeriodCount,
+		Bitrate:          quality.Bitrate(),
 		// go-librespot takes it in milliseconds, and applies it to the
 		// transitions it prefetches: a track running into the next one, not a
 		// skip, where an overlap would just delay the answer.

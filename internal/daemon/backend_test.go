@@ -44,3 +44,27 @@ func TestTheSettingsReachThePlayer(t *testing.T) {
 			cfg.Credentials.Interactive.CallbackPort, authCallbackPort)
 	}
 }
+
+// How often the picture moves is how often the audio device asks for samples:
+// the waveform, the spectrum and the beat all hang off that one read. So the
+// period the buffer is divided into has to be short enough to feed a screen,
+// and go-librespot's own default — half a second in four — is not.
+//
+// Thirty a second is what the tap is built for. A period longer than that is a
+// trace that steps while every frame counter says it is keeping up, which is
+// exactly how this was missed.
+func TestTheAudioPeriodKeepsUpWithThePicture(t *testing.T) {
+	cfg := playbackConfig(DefaultQuality, 0, t.TempDir())
+	if cfg.AudioBackend != "alsa" {
+		t.Skip("only alsa is handed its buffer in pieces")
+	}
+	if cfg.AudioPeriodCount <= 0 || cfg.AudioBufferTime <= 0 {
+		t.Fatal("the buffer is left to go-librespot, which divides it eight a second")
+	}
+
+	period := time.Duration(cfg.AudioBufferTime/cfg.AudioPeriodCount) * time.Microsecond
+	if want := 33 * time.Millisecond; period > want {
+		t.Errorf("the device reads every %s, want %s or less: the picture would move %.0f times a second",
+			period, want, float64(time.Second)/float64(period))
+	}
+}
