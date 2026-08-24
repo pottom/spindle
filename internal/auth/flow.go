@@ -8,6 +8,8 @@ import (
 	"io"
 
 	"golang.org/x/oauth2"
+
+	"github.com/pottom/spindle/internal/browser"
 )
 
 // Login runs the PKCE flow from end to end and returns a fresh token. Progress
@@ -38,7 +40,7 @@ func Login(ctx context.Context, w io.Writer) (*oauth2.Token, error) {
 
 	// Always print the URL, even when the browser opened. Over SSH the launcher
 	// fails silently and this line is the only way through.
-	if openBrowser(url) {
+	if browser.Open(url) {
 		fmt.Fprintln(w, "Opening your browser to sign in to Spotify.")
 	} else {
 		fmt.Fprintln(w, "Could not open a browser.")

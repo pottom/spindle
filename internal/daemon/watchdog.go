@@ -41,6 +41,15 @@ var (
 	// not, so anything in between is generous.
 	watchPatience = 3 * time.Second
 
+	// startPatience is how long a daemon that has never answered at all is left
+	// in silence before the log says so.
+	//
+	// Not a wedge, and not answered like one: see watch, which says what is
+	// wrong and leaves the process alone. Half a minute is longer than the
+	// twenty seconds readyTimeout allows a healthy one, so a slow login is
+	// never called a failure to come up.
+	startPatience = 30 * time.Second
+
 	// wedgeAfter is how long everything has to be failing before the device is
 	// declared lost.
 	//
@@ -62,12 +71,21 @@ var ErrWedged = errors.New("the playback device stopped answering")
 //
 // It waits for the first good answer before it starts counting: a daemon that
 // has not finished starting up is not a daemon that has stopped.
-func watch(ctx context.Context, port int, logf func(string, ...any)) error {
+//
+// Which leaves one that never starts up, and that was silent for as long as it
+// was left running. It is not ended — the commonest reason for it is a sign-in
+// waiting to be finished, and the process holding the browser's way back is the
+// one that would be killed, so ending it would break the very thing it is
+// waiting for. It is said instead, once, and with the reason where the reason
+// is known. See signin.go.
+func watch(ctx context.Context, port int, entry *signIn, logf func(string, ...any)) error {
 	client := &http.Client{Timeout: watchPatience}
 	url := fmt.Sprintf("http://%s:%d/status", DefaultHost, port)
 
 	var stuckSince time.Time
 	started := false
+	since := time.Now()
+	saidSlowStart := false
 
 	tick := time.NewTicker(watchEvery)
 	defer tick.Stop()
@@ -82,11 +100,25 @@ func watch(ctx context.Context, port int, logf func(string, ...any)) error {
 			if !stuckSince.IsZero() {
 				logf("the device is answering again")
 			}
+			// Answering at all means the playback loop is running, which is on
+			// the far side of the sign-in: whatever link was waiting is spent.
+			entry.done()
 			started, stuckSince = true, time.Time{}
 			continue
 		}
 		if !started {
-			continue // it has not come up yet, so it cannot have stopped
+			// It has not come up yet, so it cannot have stopped. But a device
+			// that has never come up plays nothing either, and nothing above
+			// this line necessarily says so.
+			if !saidSlowStart && time.Since(since) >= startPatience {
+				saidSlowStart = true
+				if link := entry.pending(); link != "" {
+					logf("the device has not come up: it is waiting to be signed in to Spotify. Visit: %s", link)
+				} else {
+					logf("the device has not answered in the %s since it started, and has never answered once", startPatience)
+				}
+			}
+			continue
 		}
 		if stuckSince.IsZero() {
 			stuckSince = time.Now()

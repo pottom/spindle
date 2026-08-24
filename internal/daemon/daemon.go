@@ -92,7 +92,14 @@ func Run(ctx context.Context, opts Options) error {
 	if quality == "" {
 		quality = DefaultQuality
 	}
-	log := newLogger(out)
+	// The sign-in reads the log on its way past, because the one line a first
+	// run needs a person to act on is written there and nowhere else. See
+	// signin.go.
+	entry := newSignIn()
+	// A link outlives nothing: a daemon that has gone is not waiting to be
+	// signed in, whatever it left on disk on its way past.
+	defer entry.forget()
+	log := newLogger(out, entry.notice)
 	// Which spindle is playing. The daemon outlives the interface that started
 	// it, so the two can be different builds, and this is the only place that
 	// says so.
@@ -166,16 +173,16 @@ func Run(ctx context.Context, opts Options) error {
 			return fmt.Errorf("run daemon: %w", err)
 		}
 		return nil
-	case err := <-wedged(ctx, port, log):
+	case err := <-wedged(ctx, port, entry, log):
 		return err
 	}
 }
 
 // wedged reports the watchdog's verdict, once.
-func wedged(ctx context.Context, port int, log librespot.Logger) <-chan error {
+func wedged(ctx context.Context, port int, entry *signIn, log librespot.Logger) <-chan error {
 	out := make(chan error, 1)
 	go func() {
-		if err := watch(ctx, port, func(format string, args ...any) { log.Warnf(format, args...) }); err != nil {
+		if err := watch(ctx, port, entry, func(format string, args ...any) { log.Warnf(format, args...) }); err != nil {
 			log.Warnf("the device has not answered for %s; leaving so a fresh one can take over", wedgeAfter)
 			out <- err
 		}

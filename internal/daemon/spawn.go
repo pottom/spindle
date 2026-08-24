@@ -20,6 +20,10 @@ import (
 // worth being able to restart the device from, and making the screen shell out
 // to the command line for that would be the same code written twice.
 
+// ErrSigningIn reports that the daemon came up and is waiting to be signed in
+// to Spotify before it can play anything. The link is daemon.Waiting.
+var ErrSigningIn = errors.New("the device is waiting to be signed in to Spotify")
+
 // Start launches a detached daemon and waits until it answers, unless one is
 // already running — in which case there is nothing to do and nothing to say.
 // The path of the log it writes to comes back either way, because that is where
@@ -31,6 +35,13 @@ func Start(ctx context.Context) (logPath string, err error) {
 	}
 
 	if err := WaitReady(ctx); err != nil {
+		// A daemon waiting for a person is not a daemon that failed. It has the
+		// port, it has the lock, and it will play as soon as the sign-in it is
+		// waiting on is finished — so it is reported as itself rather than as
+		// twenty seconds of silence. See signin.go.
+		if Waiting() != "" {
+			return logPath, ErrSigningIn
+		}
 		return logPath, fmt.Errorf("%w (see %s)", err, logPath)
 	}
 	return logPath, nil
@@ -90,6 +101,12 @@ func Restart(ctx context.Context) error {
 		return err
 	}
 	_, err := Start(ctx)
+	// The device is there and the sign-in is not this caller's to finish: the
+	// screen that asked for a restart got one. The daemon's own log, and
+	// whoever started it from a terminal, say the rest.
+	if errors.Is(err, ErrSigningIn) {
+		return nil
+	}
 	return err
 }
 

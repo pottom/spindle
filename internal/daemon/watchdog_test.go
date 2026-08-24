@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -37,10 +38,17 @@ func serveOn(t *testing.T, h http.Handler) int {
 
 func quickly(t *testing.T) {
 	t.Helper()
-	every, patience, wedge := watchEvery, watchPatience, wedgeAfter
-	t.Cleanup(func() { watchEvery, watchPatience, wedgeAfter = every, patience, wedge })
+	every, patience, wedge, start := watchEvery, watchPatience, wedgeAfter, startPatience
+	t.Cleanup(func() {
+		watchEvery, watchPatience, wedgeAfter, startPatience = every, patience, wedge, start
+	})
 	watchEvery, watchPatience, wedgeAfter = 10*time.Millisecond, 50*time.Millisecond, 60*time.Millisecond
+	startPatience = 30 * time.Millisecond
 }
+
+// silent is a sign-in nothing has been written to: a device coming up with
+// credentials already stored, which is every start after the first.
+func silent() *signIn { return &signIn{open: func(string) bool { return false }} }
 
 // A daemon whose playback loop has wedged answers 503 to everything — that is
 // the guard in the API doing its job — and never recovers. After long enough
@@ -64,7 +72,7 @@ func TestTheWatchdogGivesUpOnAStuckDevice(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := watch(ctx, port, func(string, ...any) {}); !errors.Is(err, ErrWedged) {
+	if err := watch(ctx, port, silent(), func(string, ...any) {}); !errors.Is(err, ErrWedged) {
 		t.Errorf("the watchdog answered %v, want it to give up", err)
 	}
 }
@@ -88,7 +96,7 @@ func TestTheWatchdogWaitsForOneThatComesBack(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*watchEvery)
 	defer cancel()
-	if err := watch(ctx, port, func(string, ...any) {}); err != nil {
+	if err := watch(ctx, port, silent(), func(string, ...any) {}); err != nil {
 		t.Errorf("the watchdog gave up on a device that came back: %v", err)
 	}
 }
@@ -104,7 +112,73 @@ func TestTheWatchdogWaitsToBeStarted(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 4*wedgeAfter)
 	defer cancel()
-	if err := watch(ctx, port, func(string, ...any) {}); err != nil {
+	if err := watch(ctx, port, silent(), func(string, ...any) {}); err != nil {
 		t.Errorf("the watchdog gave up on a device that had never answered: %v", err)
+	}
+}
+
+// Waiting to be started is not the same as being left waiting. A daemon that
+// never answers at all holds the port, holds the lock, and plays nothing, and
+// what it used to write about that was every reason but the reason.
+func TestTheWatchdogSaysWhyItNeverCameUp(t *testing.T) {
+	quickly(t)
+
+	port := serveOn(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+
+	entry := silent()
+	entry.notice(signInPrefix + "https://accounts.spotify.com/authorize?x=1")
+
+	said := make(chan string, 8)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*startPatience)
+	defer cancel()
+	if err := watch(ctx, port, entry, func(format string, args ...any) {
+		select {
+		case said <- fmt.Sprintf(format, args...):
+		default:
+		}
+	}); err != nil {
+		t.Fatalf("the watchdog gave up on a device that had never answered: %v", err)
+	}
+
+	close(said)
+	var lines []string
+	for line := range said {
+		lines = append(lines, line)
+	}
+	if len(lines) != 1 {
+		t.Fatalf("said %d things about a device that never came up, want one:\n%s",
+			len(lines), strings.Join(lines, "\n"))
+	}
+	if !strings.Contains(lines[0], "signed in") || !strings.Contains(lines[0], "authorize?x=1") {
+		t.Errorf("said %q, want the sign-in and the link it is waiting on", lines[0])
+	}
+}
+
+// And once the device answers, that link is spent: a later silence has some
+// other reason, and offering the old one as the reason would be a lie.
+func TestTheSignInIsSpentOnceTheDeviceAnswers(t *testing.T) {
+	quickly(t)
+
+	var served atomic.Int32
+	port := serveOn(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if served.Add(1) > 2 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	entry := silent()
+	entry.notice(signInPrefix + "https://accounts.spotify.com/authorize?x=1")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := watch(ctx, port, entry, func(string, ...any) {}); !errors.Is(err, ErrWedged) {
+		t.Fatalf("the watchdog answered %v, want it to give up", err)
+	}
+	if link := entry.pending(); link != "" {
+		t.Errorf("the device is still said to be waiting on %q after it answered", link)
 	}
 }

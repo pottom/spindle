@@ -39,6 +39,11 @@ type sink struct {
 	out io.Writer
 	day string
 
+	// notice is shown every line as it is written and may answer with a line of
+	// its own. It is how the one thing go-librespot writes for a person to read
+	// reaches one — see signin.go. Nil means nobody is reading.
+	notice func(text string) (string, bool)
+
 	// now is the clock, so a test can hold it still. Nil is time.Now.
 	now func() time.Time
 }
@@ -72,9 +77,24 @@ type logger struct {
 	fields string
 }
 
-func newLogger(out io.Writer) librespot.Logger { return &logger{sink: &sink{out: out}} }
+// newLogger writes to out. notice, which may be nil, is shown every line and
+// may answer with one to put after it.
+func newLogger(out io.Writer, notice func(text string) (string, bool)) librespot.Logger {
+	return &logger{sink: &sink{out: out, notice: notice}}
+}
 
-func (l *logger) write(level, text string) { l.sink.write(level, text, l.fields) }
+// write puts the line down and then lets the reader answer it. The answer goes
+// straight to the sink rather than back through here, so a reader that returns
+// a line beginning with whatever it was watching for cannot start a loop.
+func (l *logger) write(level, text string) {
+	l.sink.write(level, text, l.fields)
+	if l.sink.notice == nil {
+		return
+	}
+	if say, ok := l.sink.notice(text); ok {
+		l.sink.write("info", say, "")
+	}
+}
 
 func (l *logger) Tracef(string, ...any)     {}
 func (l *logger) Debugf(string, ...any)     {}

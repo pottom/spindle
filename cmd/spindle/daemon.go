@@ -136,6 +136,17 @@ func detachDaemon() error {
 	}
 
 	logPath, err := daemon.Start(context.Background())
+	if errors.Is(err, daemon.ErrSigningIn) {
+		// Not a failure to start. The device is up and cannot play until it has
+		// been authorised, which is a thing only a person can do — and saying
+		// "the daemon did not come up" about it sends them looking for a fault
+		// that is not there. See internal/daemon/signin.go.
+		fmt.Printf("spindle: daemon started, logging to %s\n", logPath)
+		fmt.Print("\nIt cannot play yet: this device is not signed in to Spotify.\n")
+		fmt.Print("A browser should have opened. If nothing happened, visit:\n\n  ")
+		fmt.Printf("%s\n\nIt starts playing as soon as that is done.\n", daemon.Waiting())
+		return nil
+	}
 	if err != nil {
 		return err
 	}
