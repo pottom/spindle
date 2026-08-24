@@ -46,6 +46,13 @@ func TestThePlayerGrowsIntoTheRoomItIsGiven(t *testing.T) {
 		if ceiling := maxArtPx / defaultTestCell.Width; l.artWidth >= ceiling-3 {
 			continue
 		}
+		// And the ceiling counted in rows, which is the one that binds on a
+		// display that does not report two pixels to the point. Same rule: a
+		// picture that has stopped growing because it was told to is not a
+		// picture that stopped growing by accident.
+		if l.artHeight >= maxArtRows {
+			continue
+		}
 		spare := l.bodyHeight - l.artHeight
 		if spare > playerBelowArt {
 			t.Errorf("%dx%d: %d rows spare under the picture, want no more than %d — "+

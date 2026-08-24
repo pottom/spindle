@@ -51,6 +51,28 @@ const (
 	// competing with the room rather than sitting in it.
 	maxArtPx = 1100
 
+	// maxArtRows is the same ceiling counted in rows, and it is the one that
+	// binds on an ordinary display.
+	//
+	// maxArtPx is in device pixels, and a device pixel is not a size: the same
+	// number is twice the picture on a screen that reports two of them per
+	// point. Measured on the two machines this is developed on — a cell of
+	// 17x41 on one and 7x17 on the other — 1100 is 64 cells on the first and
+	// 157 on the second, which no terminal on a 1080p screen can reach. So the
+	// ceiling held one machine and was never once touched on the other, and on
+	// that one the cover simply took every row nothing else had asked for:
+	// forty-five rows of a fifty-seven row body, four fifths of the screen.
+	//
+	// A row is a row on any display. This is what stops it there, and it stops
+	// nothing that was not already too big: below it the picture still takes the
+	// rows the trace does not, which is the rule this screen is built on. See
+	// TestThePlayerGrowsIntoTheRoomItIsGiven, which knows about both ceilings.
+	//
+	// Thirty-one rows: a little over half the body on a sixty-three row
+	// terminal, and past the reach of a forty-one row one, which is the size the
+	// screen was drawn at and looks right at.
+	maxArtRows = 31
+
 	// maxBrowseArt caps the picture on the screens where it is a preview rather
 	// than the subject. Left to grow with the terminal it would take half of a
 	// very wide screen from the list, which is the thing being read there.
@@ -242,6 +264,7 @@ func artworkArea(interior, bodyHeight int, mode layoutMode, cell cover.CellSize)
 		// that the picture is the one that grows.
 		grown := max(bodyHeight-playerBelowArt, bodyHeight*2/3)
 		maxHeight = max(min(maxHeight, grown), 1)
+		maxHeight = max(min(maxHeight, maxArtRows), 1)
 	}
 	if mode.isList() {
 		maxHeight = max(min(maxHeight, bodyHeight/3), 1)
@@ -273,7 +296,10 @@ func squareOff(offered, bodyHeight int, cell cover.CellSize) (width, height int)
 	if cell.Width > 0 {
 		offered = max(min(offered, maxArtPx/cell.Width), 1)
 	}
-	rows := max(bodyHeight-playerBelowArt, 1)
+	// The ceiling in rows holds on this path too. It is the path the words hand
+	// their surplus back on, and a surplus is exactly when a picture would walk
+	// past it.
+	rows := max(min(bodyHeight-playerBelowArt, maxArtRows), 1)
 	height = max(min(rows, offered*cell.Width/cell.Height), 1)
 	width = max(min(height*cell.Height/cell.Width, offered), 1)
 	return width, height
