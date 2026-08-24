@@ -120,25 +120,7 @@ func Run(ctx context.Context, opts Options) error {
 		Logger:     log,
 		StateStore: newStore(filepath.Join(dir, "daemon.json")),
 		APIServer:  api,
-		Config: &daemon.Config{
-			DeviceName:   deviceName,
-			DeviceType:   "computer",
-			AudioBackend: audioBackend,
-			Bitrate:      quality.Bitrate(),
-			// go-librespot takes it in milliseconds, and applies it to the
-			// transitions it prefetches: a track running into the next one,
-			// not a skip, where an overlap would just delay the answer.
-			CrossfadeDuration: int(opts.Crossfade / time.Millisecond),
-			VolumeSteps:       100,
-			InitialVolume:     50,
-			Credentials: daemon.CredentialsConfig{
-				Type:        "interactive",
-				Interactive: daemon.InteractiveCredentials{CallbackPort: authCallbackPort},
-			},
-			// Not for the audio, which is left to stream: this is where the
-			// measured tempos live, and they are only worth measuring once.
-			Cache: daemon.CacheConfig{Dir: cacheDir},
-		},
+		Config:     playbackConfig(quality, opts.Crossfade, cacheDir),
 	})
 	if err != nil {
 		return fmt.Errorf("create daemon: %w", err)
@@ -207,6 +189,35 @@ func leave(ctx context.Context, done <-chan error, wedge <-chan error, log libre
 			log.Warnf("the device was asked to stop and did not finish within %s; leaving without it", shutdownGrace)
 		}
 		return nil
+	}
+}
+
+// playbackConfig is everything go-librespot is told about how to play.
+//
+// It is lifted out of Run so that it can be looked at without a Spotify account
+// and a sound card: what is in here is a set of answers to somebody else's
+// questions, and getting one of them wrong is silent — see audioDevice, which
+// was not answered at all and cost a working device that played nothing.
+func playbackConfig(quality Quality, crossfade time.Duration, cacheDir string) *daemon.Config {
+	return &daemon.Config{
+		DeviceName:   deviceName,
+		DeviceType:   "computer",
+		AudioBackend: audioBackend,
+		AudioDevice:  audioDevice,
+		Bitrate:      quality.Bitrate(),
+		// go-librespot takes it in milliseconds, and applies it to the
+		// transitions it prefetches: a track running into the next one, not a
+		// skip, where an overlap would just delay the answer.
+		CrossfadeDuration: int(crossfade / time.Millisecond),
+		VolumeSteps:       100,
+		InitialVolume:     50,
+		Credentials: daemon.CredentialsConfig{
+			Type:        "interactive",
+			Interactive: daemon.InteractiveCredentials{CallbackPort: authCallbackPort},
+		},
+		// Not for the audio, which is left to stream: this is where the
+		// measured tempos live, and they are only worth measuring once.
+		Cache: daemon.CacheConfig{Dir: cacheDir},
 	}
 }
 
