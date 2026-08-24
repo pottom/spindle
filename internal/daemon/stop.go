@@ -20,6 +20,18 @@ import (
 // caller is told it did not.
 const stopTimeout = 5 * time.Second
 
+// shutdownGrace is how long a daemon gives its own playback loop to come back
+// after it has been asked to stop, before ending the process without it. See
+// leave.
+//
+// It has to be comfortably less than stopTimeout, because whoever asked is
+// waiting on that: a daemon that takes longer to leave than the caller will
+// wait is a daemon that cannot be restarted, which is the whole of the bug this
+// is here for. A healthy one goes in milliseconds and never touches this.
+//
+// A variable so that a test need not spend two seconds watching it.
+var shutdownGrace = 2 * time.Second
+
 // ErrNoDaemon reports that there was nothing to stop.
 var ErrNoDaemon = errors.New("no daemon is running")
 

@@ -167,14 +167,46 @@ func Run(ctx context.Context, opts Options) error {
 	done := make(chan error, 1)
 	go func() { done <- app.Run(ctx) }()
 
+	return leave(ctx, done, wedged(ctx, port, entry, log), log)
+}
+
+// leave decides how Run ends: the playback loop coming back on its own, the
+// watchdog giving up on it, or the daemon being asked to stop.
+//
+// The last of those is here because being asked to stop is not the same as
+// stopping. go-librespot closes its API the moment the context ends and then
+// goes on doing whatever it was doing, and one of the things it may be doing is
+// waiting to be signed in — a wait that ignores the context it was given; see
+// signin.go. The process was left with no API, its lock still held, and no way
+// out.
+//
+// Measured, on a machine with no stored credentials: `spindle daemon restart`
+// answered "the daemon stopped answering but did not let go within 5s" and
+// started nothing at all. The daemon it had told to leave was still holding the
+// lock the new one needed, and would have held it until somebody found it with
+// pgrep. A stop that cannot stop is worse than no stop: it takes the device
+// away and puts nothing back.
+//
+// So the loop is given a moment to come back tidily, and then it is left
+// behind. It is the same bargain the wedged case makes, for the same reason:
+// nothing outside a goroutine can unwedge it, the process is ending anyway, and
+// the goroutine goes with the process.
+func leave(ctx context.Context, done <-chan error, wedge <-chan error, log librespot.Logger) error {
 	select {
 	case err := <-done:
 		if err != nil && !errors.Is(err, context.Canceled) {
 			return fmt.Errorf("run daemon: %w", err)
 		}
 		return nil
-	case err := <-wedged(ctx, port, entry, log):
+	case err := <-wedge:
 		return err
+	case <-ctx.Done():
+		select {
+		case <-done:
+		case <-time.After(shutdownGrace):
+			log.Warnf("the device was asked to stop and did not finish within %s; leaving without it", shutdownGrace)
+		}
+		return nil
 	}
 }
 
