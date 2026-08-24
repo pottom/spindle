@@ -96,15 +96,18 @@ func (m Model) render() string {
 	}
 	// The big screen answers before anything else is laid out: it is not a
 	// panel inside the player, it is instead of it.
+	//
+	// And it is given back untouched. Nothing is laid over the picture — see
+	// osdUp, where that is decided and said.
 	if m.stage.on {
 		if art := m.stageView(); art != "" {
-			return m.osdOver(art)
+			return art
 		}
 	}
 
 	// And the card that says what a transport key just did, over whatever the
-	// screen turned out to be: those keys work from every tab, including the one
-	// that is nothing but a picture. See osd.go.
+	// screen turned out to be: those keys work from every tab, and on all of
+	// these there is nothing else that answers them. See osd.go.
 	return m.osdOver(m.renderPlayer())
 }
 

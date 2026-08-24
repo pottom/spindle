@@ -65,13 +65,35 @@ type osdMsg struct{}
 
 // showOSD puts the card up, or keeps it up. The clock starts again on every
 // press, so a run of them is one card rather than a flicker of them.
+//
+// Nothing goes up on the big screen — see osdUp, which is where that is
+// decided. It is refused here as well so that no card is left waiting: raised
+// and then not drawn, it would come up on the player a moment after leaving,
+// about a key pressed on a screen that had deliberately not answered it.
 func (m *Model) showOSD(kind osdKind) tea.Cmd {
+	if m.stage.on {
+		return nil
+	}
 	m.osd = osdState{kind: kind, at: time.Now()}
 	return tea.Tick(osdFor, func(time.Time) tea.Msg { return osdMsg{} })
 }
 
 // osdUp reports whether the card is still standing.
+//
+// Never on the big screen. That screen has already had this argument and
+// settled it the other way: the track's name, the clock and the progress bar
+// were taken off it because they were a caption on something that does not need
+// one — see stageView. A card laid over the picture is the same caption with a
+// box round it, and it lands in the middle of the one screen whose whole
+// content is what the middle of it looks like.
+//
+// It is asked here rather than at the one place that draws it, so that a card
+// already standing when the big screen opens goes with it. Pressing volume and
+// then f would otherwise carry the card up onto the picture.
 func (m Model) osdUp() bool {
+	if m.stage.on {
+		return false
+	}
 	return m.osd.kind != osdNothing && time.Since(m.osd.at) < osdFor
 }
 

@@ -226,3 +226,70 @@ func pressed(t *testing.T, m Model, key string) Model {
 	tm, _ = tm.Update(press(key))
 	return tm.(Model)
 }
+
+// The big screen is the one place the card does not go.
+//
+// That screen settled this argument once already: the track's name, the clock
+// and the progress bar came off it because they were a caption on something
+// that does not need one. A card is the same caption with a box round it, and
+// it lands in the middle of the only screen whose whole content is what the
+// middle of it looks like.
+func TestNoCardOnTheBigScreen(t *testing.T) {
+	m := osdModel()
+	m.stage.on = true
+	m.resize()
+
+	m.setVolume(75)
+	if m.osd.kind != osdNothing {
+		// Not merely undrawn: nothing is put up at all, so there is no card
+		// left to appear on the player a moment after leaving.
+		t.Error("the volume raised a card on the big screen")
+	}
+	if m.osdUp() {
+		t.Error("a card is standing on the big screen")
+	}
+	if screen := ansi.Strip(m.render()); strings.Contains(screen, "volume") {
+		t.Errorf("the card is drawn over the picture:\n%s", screen)
+	}
+}
+
+// And a card already standing goes with the screen it was raised on. Pressing
+// volume and then f would otherwise carry it up onto the picture for the rest
+// of its second and a half.
+func TestACardDoesNotFollowYouOntoTheBigScreen(t *testing.T) {
+	m := osdModel()
+	m.resize()
+
+	m.setVolume(75)
+	if !m.osdUp() {
+		t.Fatal("the volume raised no card on the player")
+	}
+
+	m.stage.on = true
+	m.resize()
+	if m.osdUp() {
+		t.Error("the card followed the reader onto the big screen")
+	}
+	if screen := ansi.Strip(m.render()); strings.Contains(screen, "75%") {
+		t.Errorf("the card is drawn over the picture:\n%s", screen)
+	}
+}
+
+// Everywhere else it still stands, which is what it is for.
+func TestTheCardStillStandsOffTheBigScreen(t *testing.T) {
+	m := osdModel()
+	m.stage.on = true
+	m.resize()
+	m.setVolume(75)
+
+	m.stage.on = false
+	m.resize()
+	m.setVolume(80)
+
+	if !m.osdUp() {
+		t.Fatal("no card after leaving the big screen")
+	}
+	if screen := ansi.Strip(m.render()); !strings.Contains(screen, "80%") {
+		t.Errorf("the card does not say the new volume:\n%s", screen)
+	}
+}
