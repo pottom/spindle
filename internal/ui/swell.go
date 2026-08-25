@@ -116,13 +116,29 @@ const swingSteps = 3
 
 var swingAt = [swingSteps + 1]float32{1, 1, 2, 3}
 
-// stageSwing is the multiplier in force, which is one everywhere but the big
-// screen.
-func (m Model) stageSwing() float32 {
+// swingLeanAt is what each step does to the lean instead.
+//
+// Far less, because the two do not read the same. The throw is the row riding
+// the sound and there is a screen's worth of room for it; the lean is a shear,
+// and a shear that grows with the throw stops looking like a row leaning into
+// the beat and starts looking like a row falling over. Reported from a real
+// screen at the throw's own figures — three times the slant is too much — so
+// the lean is pulled back to half again at the top step and the height keeps
+// the rest.
+var swingLeanAt = [swingSteps + 1]float32{1, 1, 1.25, 1.5}
+
+// stageSwing is the multiplier on how far the picture is thrown, which is one
+// everywhere but the big screen.
+func (m Model) stageSwing() float32 { return m.swingStepAt(swingAt) }
+
+// stageLean is the same for the lean, which is given much less of it.
+func (m Model) stageLean() float32 { return m.swingStepAt(swingLeanAt) }
+
+func (m Model) swingStepAt(steps [swingSteps + 1]float32) float32 {
 	if !m.stage.on || m.stage.swing < 1 || m.stage.swing > swingSteps {
 		return 1
 	}
-	return swingAt[m.stage.swing]
+	return steps[m.stage.swing]
 }
 
 // swingStep reads which of the three was pressed, from the key the keyboard

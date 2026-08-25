@@ -65,6 +65,33 @@ func TestTheBigScreenThrowsFurtherOnTheKey(t *testing.T) {
 	}
 }
 
+// The lean is not the throw. A shear that grows with the height stops looking
+// like a row leaning into the beat and starts looking like a row falling over —
+// reported from a real screen at the throw's own figures.
+func TestTheLeanIsGivenLessThanTheThrow(t *testing.T) {
+	for step := 2; step <= swingSteps; step++ {
+		m := stageWords("a")
+		m.stage.on = true
+		m.stage.swing = step
+
+		lean, throw := m.stageLean(), m.stageSwing()
+		if lean >= throw {
+			t.Errorf("step %d leans by %v against a throw of %v", step, lean, throw)
+		}
+		if lean <= 1 {
+			t.Errorf("step %d does not lean any further than the first step", step)
+		}
+	}
+
+	// And the first step is neither: it is the picture as it was.
+	m := stageWords("a")
+	m.stage.on = true
+	m.stage.swing = 1
+	if got := m.stageLean(); got != 1 {
+		t.Errorf("the first step leans at %v, want the picture unchanged", got)
+	}
+}
+
 // However far the step asks for, the row stays on the screen. A mark is a third
 // of the height on its own; thrown further than the room left over it is not a
 // bigger movement, it is a missing one.

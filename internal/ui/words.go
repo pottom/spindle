@@ -2393,11 +2393,11 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 		// share of its height; a mark turns about the row across its middle and
 		// leans like an italic, by a slant that does not depend on how wide the
 		// shape happens to be.
-		// The height and the lean are one movement between them — see the
-		// note on the ride — so the big screen's step carries both. A row that
-		// throws itself twice as far and leans by the same degree is a row
-		// sliding rather than dancing.
-		swing := m.stageSwing()
+		// The big screen's step carries the lean as well as the height: a row
+		// that throws itself twice as far and leans by the same degree is a row
+		// sliding rather than dancing. Much less of it, though — see
+		// swingLeanAt, and the screen it was reported from.
+		swing := m.stageLean()
 		lean := min(wordsLeanRise*swing*float32(tall[i])/float32(wide), wordsTiltMost*swing)
 		middle[i] = (max(first[i], 0) + max(last[i], 0)) / 2
 		if m.words.beats {
