@@ -696,6 +696,53 @@ func (m Model) wordsNow() []string {
 	return lines
 }
 
+// wordsHeld is what a stopped record says, set in the type this screen already
+// writes in rather than drawn.
+//
+// A figure holding a pause up was here before, and a badge is what it read as:
+// a small thing in the middle of a big picture, saying its one thing the same
+// way every time. The word is the screen's own voice at the screen's own size,
+// and it arrives and leaves the way every other line does — dealt a different
+// move each time, because a picture that only ever does one thing is furniture.
+const wordsHeld = "paused"
+
+// wordsDriven reports that the big screen is showing the picture this file
+// builds, and so that the frame loop is what moves it. The same question
+// decides whether the picture is ground each frame and whether the loop waits
+// for it before it stops — one condition, asked in one place.
+func (m Model) wordsDriven() bool {
+	return m.stage.on && (m.scopeMode().words() || m.muted())
+}
+
+// wordsSettled reports that this screen is showing the picture it ought to be,
+// and has finished putting it there.
+//
+// A stopped record stops the frames as well — silence should cost nothing, and
+// the loop is what a picture costs. But stopping is itself a change of picture:
+// the word that says so has to be sent for, gathered and drawn, and all of that
+// is a frame at a time like everything else here. Asked only whether what is up
+// has finished moving, the answer is yes before the new picture has even been
+// asked for — the line before it stopped moving long ago — and the loop cuts
+// out on the frame the music does, leaving whatever the last frame of it drew.
+// Measured: the notes stayed up, and a resize wiped them to nothing.
+//
+// So it asks the other question. What is wanted, is it what is up, and has it
+// finished arriving.
+func (m Model) wordsSettled() bool {
+	// Nothing here is on screen, so there is nothing to wait for. Without this
+	// the player's own strip held the loop open for a picture that is not being
+	// drawn, which is the cost the loop stops to avoid.
+	if !m.wordsDriven() {
+		return true
+	}
+
+	lines, _ := m.wordsComing()
+	if strings.Join(lines, "\n") != m.words.text {
+		return false
+	}
+	return m.words.since.IsZero() || time.Since(m.words.since) >= max(wordsGather, wordsLeaving)
+}
+
 // wordsComing is the line to show and when it is sung, on the playback clock.
 //
 // It looks a little ahead: a line takes a moment to gather, and a picture that
@@ -725,7 +772,7 @@ func (m Model) wordsComing() ([]string, int64) {
 	// the record stopped — the clock is pinned while it is stopped, so that
 	// number does not move either.
 	if m.held() {
-		return []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)}, m.elapsed().Milliseconds()
+		return []string{wordsHeld}, m.elapsed().Milliseconds()
 	}
 	if m.muted() {
 		return []string{wordsMarks(m.width*dotsPerCellX, m.height*dotsPerCellY)}, m.mutedAt.UnixMilli()
@@ -1926,10 +1973,11 @@ func (m *Model) wordsGrind() tea.Cmd {
 		// Silenced, and the row says so: the same company with their fingers in
 		// their ears, for as long as it lasts. Last, because it is a state
 		// rather than a request — whatever else was up, this is what is true.
-		switch {
-		case m.held():
-			cast = markHeld
-		case m.muted():
+		//
+		// Stopped is not here. A stopped record is not a bar of music dealt a
+		// different set, it is the screen saying so in words — see wordsHeld,
+		// which never reaches this because it is not a bar of marks at all.
+		if m.muted() {
 			cast = markHush
 		}
 	}
@@ -2045,7 +2093,12 @@ func (m *Model) wordsAdopt(grain cover.Grain, where msg.WordLayout, text string)
 	// there — wound back it would be complete before anybody saw it move, and
 	// the card that comes up on the key would be the livelier of the two for no
 	// reason anyone could name.
-	if m.words.telling {
+	//
+	// And nor is the word a stopped record says. Its clock is pinned where the
+	// record stopped, so the wait works out at nothing and the whole gathering
+	// is wound off: the word simply was there, and the one thing asked of it
+	// was that it be seen to arrive.
+	if m.words.telling || text == wordsHeld {
 		m.words.since = time.Now()
 		return
 	}

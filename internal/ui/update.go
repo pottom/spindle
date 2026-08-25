@@ -476,7 +476,13 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 			// The tick starts it again — see startScope — and so does the state
 			// coming back playing, which is what makes the picture move the
 			// moment the music does rather than a second later.
-			if m.scope.atRest() {
+			// The word that says the record is stopped is put up by the same
+			// loop, and it arrives a frame at a time like every other line. Cut
+			// the frames the moment the sound has sunk and it never gets there:
+			// what is on screen is whatever the last frame of the music left,
+			// and the resize that follows clears even that. So the loop is held
+			// open until the picture has finished moving too.
+			if m.scope.atRest() && m.wordsSettled() {
 				m.scope.running = false
 				return m, nil
 			}
@@ -519,7 +525,7 @@ func (m Model) answer(message tea.Msg) (Model, tea.Cmd) {
 		m.tideFlow()
 		tideAsk := m.tideCmd()
 
-		if m.stage.on && (m.scopeMode().words() || m.muted()) {
+		if m.wordsDriven() {
 			m.joinsFlow(int(time.Second / scopeInterval))
 			m.wordsRollFlow()
 			m.wordsFlow(m.width, m.height)

@@ -1,80 +1,130 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/pottom/spindle/internal/player"
 )
 
-// A stopped record looks stopped.
+// A stopped record says so, in the type this screen already writes in.
 //
-// The other half of the hush: a bar of music with no music in it should look
-// like something, so one unimpressed figure holds the pause up and stands there
-// until the record goes on again.
-func TestAStoppedRecordLooksStopped(t *testing.T) {
-	if set, ok := markSets[markHeld]; !ok {
-		t.Fatal("there is no held set")
-	} else if !set.apart {
-		t.Error("the held set is in the deal, so it can arrive while a record plays")
-	}
-	for _, tall := range markHeights() {
-		for _, one := range markEveryone(tall) {
-			if one.set == markHeld {
-				t.Fatalf("%q was in the pool at %d dots", one.name, tall)
-			}
-		}
-	}
-
-	m := New(player.NewMock(), nil, defaultTestCell)
-	m.width, m.height = 120, 40
-	m.stage.on = true
-	m.stage.mode = scopeWords
-	m.ps = &player.State{TrackID: "one", Title: "x", Duration: 3 * time.Minute, Playing: true, Volume: 60}
+// A figure holding a pause up was here before, and a badge is what it read as:
+// one small drawing in the middle of a big picture, saying its one thing the
+// same way every time. The word is the screen's own voice at the screen's own
+// size.
+func TestAStoppedRecordSaysSo(t *testing.T) {
+	m := stageWords("a")
 	m.setProgress(40 * time.Second)
-	m.words.forTrack = "one"
-
-	m.wordsGrind()
-	if m.words.cast == markHeld {
-		t.Fatal("a playing record was drawn as stopped")
+	if cmd := m.wordsGrind(); cmd != nil {
+		m.wordsTake(cmd)
+	}
+	if m.words.text == wordsHeld {
+		t.Fatal("a playing record said it was paused")
 	}
 
 	m.ps.Playing = false
-	m.wordsGrind()
-	if m.words.cast != markHeld {
-		t.Errorf("a stopped record was drawn as %q", m.words.cast)
+	if cmd := m.wordsGrind(); cmd != nil {
+		m.wordsTake(cmd)
+	}
+	if m.words.text != wordsHeld {
+		t.Errorf("a stopped record put up %q, want %q", m.words.text, wordsHeld)
+	}
+	if m.words.have.DotsX == 0 {
+		t.Error("the word was chosen and never drawn")
 	}
 	if !m.wordsStill() {
-		t.Error("he moved to a record that is not playing")
+		t.Error("the picture went on answering a record that is not playing")
+	}
+
+	// It is a line like any other, which is what gives it an arrival and a
+	// departure. A bar of marks is neither.
+	if m.words.beats {
+		t.Error("the word was taken for a bar of marks")
+	}
+	if m.words.cast != "" {
+		t.Errorf("the word was dealt the %q drawings", m.words.cast)
 	}
 
 	// Stopped beats silenced: a record nobody is playing is not playing to
 	// anybody, silenced or not.
 	m.toggleMute()
-	m.wordsGrind()
-	if m.words.cast != markHeld {
-		t.Errorf("stopped and silenced at once was drawn as %q", m.words.cast)
+	if cmd := m.wordsGrind(); cmd != nil {
+		m.wordsTake(cmd)
 	}
-
-	// It takes the screen rather than the band the words stand in: it is a
-	// scene with a character in it, and squeezed into a band it would be a
-	// postage stamp of a scene.
-	set, ok := markCastSet(markHeld)
-	if !ok {
-		t.Fatal("no held set")
-	}
-	dotsY := m.height * dotsPerCellY
-	got, _, _, ok := markCrowdFor(set, dotsY, m.width*dotsPerCellX, 1)
-	if !ok {
-		t.Fatal("the picture did not fit")
-	}
-	if band := int(float64(wordsMark) * float64(dotsY)); got.tall <= band {
-		t.Errorf("the scene was drawn at %d dots, no bigger than the %d dot band", got.tall, band)
+	if m.words.text != wordsHeld {
+		t.Errorf("stopped and silenced at once put up %q", m.words.text)
 	}
 
 	// And a device that has said nothing yet is not a stopped record.
 	m.ps = &player.State{}
 	if m.held() {
 		t.Error("a status with no track in it read as stopped")
+	}
+}
+
+// It arrives and leaves the way every other line does, and it is dealt its move
+// like every other line: a picture that only ever does one thing is furniture.
+func TestTheWordIsDealtAMoveLikeAnyOtherLine(t *testing.T) {
+	seen := map[wordsMove]bool{}
+	for _, at := range []time.Duration{9, 23, 41, 67, 88, 113, 140, 171} {
+		m := stageWords("a")
+		m.setProgress(at * time.Second)
+		if cmd := m.wordsGrind(); cmd != nil {
+			m.wordsTake(cmd)
+		}
+		m.ps.Playing = false
+		if cmd := m.wordsGrind(); cmd != nil {
+			m.wordsTake(cmd)
+		}
+		if m.words.text != wordsHeld {
+			t.Fatalf("stopped at %s and put up %q", at, m.words.text)
+		}
+		seen[m.words.move] = true
+	}
+	if len(seen) < 2 {
+		t.Errorf("stopped eight times and came in %d way(s); it is a badge again", len(seen))
+	}
+}
+
+// The frames stop when the music does — silence should cost nothing — and
+// stopping is itself a change of picture. Cut on the frame the sound sinks and
+// the word is never drawn: what stays up is whatever the last frame of the
+// music left, and the first resize wipes even that. Measured on screen.
+func TestTheLoopWaitsForTheWordBeforeItStops(t *testing.T) {
+	m := stageWords("a")
+	m.setProgress(40 * time.Second)
+	if cmd := m.wordsGrind(); cmd != nil {
+		m.wordsTake(cmd)
+	}
+	if !m.wordsSettled() {
+		t.Fatal("a picture that is up and finished was called unsettled")
+	}
+
+	// The moment it stops, what is on screen is not what should be.
+	m.ps.Playing = false
+	if m.wordsSettled() {
+		t.Fatal("the loop was free to stop before the word had been asked for")
+	}
+
+	if cmd := m.wordsGrind(); cmd != nil {
+		m.wordsTake(cmd)
+	}
+	if m.wordsSettled() {
+		t.Error("the loop was free to stop while the word was still gathering")
+	}
+
+	m.words.since = time.Now().Add(-time.Second)
+	if !m.wordsSettled() {
+		t.Error("the loop was held open after the word had arrived and stopped moving")
+	}
+}
+
+// And the word is one word, not a sentence: it is read at a glance across a
+// whole terminal.
+func TestTheWordIsOneWord(t *testing.T) {
+	if strings.Fields(wordsHeld) == nil || len(strings.Fields(wordsHeld)) != 1 {
+		t.Errorf("what a stopped record says is %q", wordsHeld)
 	}
 }

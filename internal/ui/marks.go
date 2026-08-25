@@ -103,15 +103,6 @@ type markSize struct {
 	marks []markDots
 }
 
-// markHeld is the set that stands in while the record is stopped: one drawing,
-// unimpressed, holding the pause up where anybody can see it.
-//
-// The other half of markHush, and for the same reason — a bar of music with no
-// music in it should look like something. Which of the two is up when both are
-// true is settled in wordsComing: stopped beats silenced, because a stopped
-// record is not playing to anybody, silenced or not.
-const markHeld = "held"
-
 // markHush is the set that stands in while the room is silenced: the same faces
 // as the rest of them, with their fingers in their ears.
 //
