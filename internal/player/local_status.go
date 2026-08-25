@@ -11,12 +11,19 @@ type localStatus struct {
 	// good once it has given up reconnecting, and after that it plays and
 	// answers this API while being out of Spotify Connect's reach — which from
 	// here looks exactly like a device that is working.
-	Deaf        []string `json:"deaf"`
-	DeviceName  string   `json:"device_name"`
-	Stopped     bool     `json:"stopped"`
-	Paused      bool     `json:"paused"`
-	Volume      int      `json:"volume"`
-	VolumeSteps int      `json:"volume_steps"`
+	Deaf []string `json:"deaf"`
+
+	// OutOfTouch names what the device has lost its connection to and is trying
+	// to get back — "accesspoint", "dealer" — against how many seconds it has
+	// been trying. Empty while everything is connected. Nothing in the daemon
+	// gives up on its own any more, so this is a state that can last, and one
+	// that from outside looks exactly like a device that is working.
+	OutOfTouch  map[string]float64 `json:"out_of_touch"`
+	DeviceName  string             `json:"device_name"`
+	Stopped     bool               `json:"stopped"`
+	Paused      bool               `json:"paused"`
+	Volume      int                `json:"volume"`
+	VolumeSteps int                `json:"volume_steps"`
 
 	RepeatContext bool `json:"repeat_context"`
 	RepeatTrack   bool `json:"repeat_track"`
@@ -56,6 +63,7 @@ func (s *localStatus) toState() *State {
 		DeviceID:   s.DeviceID,
 		Unplayable: trackIDFromURI(s.Unplayable),
 		Deaf:       s.Deaf,
+		OutOfTouch: outOfTouch(s.OutOfTouch),
 		DeviceName: s.DeviceName,
 		Bitrate:    s.Bitrate,
 		Tempo:      s.Tempo,
@@ -105,4 +113,24 @@ func trackIDFromURI(uri string) string {
 		}
 	}
 	return uri
+}
+
+// outOfTouch converts the daemon's seconds into durations, dropping anything
+// that is not a positive number: a connection that has been gone for no time at
+// all is one that is there.
+func outOfTouch(secs map[string]float64) map[string]time.Duration {
+	if len(secs) == 0 {
+		return nil
+	}
+	out := make(map[string]time.Duration, len(secs))
+	for what, s := range secs {
+		if s <= 0 {
+			continue
+		}
+		out[what] = time.Duration(s * float64(time.Second))
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

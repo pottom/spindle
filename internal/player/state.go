@@ -41,7 +41,15 @@ type State struct {
 	// localStatus. Empty for a healthy one and for every backend that is not our
 	// own daemon, which is why nothing may treat it as an error: it is a device
 	// that still plays, and the only thing to do about it is start it again.
-	Deaf       []string
+	Deaf []string
+
+	// OutOfTouch is what the device has lost its connection to, against how
+	// long it has been trying to get it back. Empty for a healthy device and
+	// for every backend that is not our own daemon. Unlike Deaf this mends
+	// itself, so nothing may treat it as a fault: it is a device that is still
+	// playing what it has and still trying — see localStatus.
+	OutOfTouch map[string]time.Duration
+
 	DeviceName string
 
 	// Bitrate is the stream actually playing, in kbps, or 0 when unknown. Only

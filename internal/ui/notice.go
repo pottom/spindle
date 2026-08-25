@@ -42,6 +42,18 @@ func (m Model) notice() (string, lipgloss.Style, bool) {
 		return fmt.Sprintf("%s Rate limited — pausing for %s", warnGlyph, left),
 			m.styles.Warning, true
 
+	// Above everything it causes. When the network goes, the Web API fails too
+	// and m.err fills with whatever the transport said; "dial tcp: no such
+	// host" is the same news told worse. Below the two above it because those
+	// are about this very moment, and this is a state that lasts.
+	case m.outOfTouch() >= outOfTouchAfter:
+		if m.soundAtStake() {
+			return fmt.Sprintf("%s Out of touch with Spotify for %s — playing what is here, and trying to get back",
+				warnGlyph, howLong(m.outOfTouch())), m.styles.Warning, true
+		}
+		return fmt.Sprintf("%s Out of Spotify Connect's reach for %s — the device is trying to get back",
+			warnGlyph, howLong(m.outOfTouch())), m.styles.Warning, true
+
 	case m.noPremium:
 		return errorGlyph + " Playback control requires Spotify Premium",
 			m.styles.Error, true
@@ -103,3 +115,47 @@ func (m Model) ranOut() bool {
 // deviceDeaf reports that the device playing has lost an input it cannot get
 // back. Only our own daemon says so; every other backend leaves it empty.
 func (m Model) deviceDeaf() bool { return m.ps != nil && len(m.ps.Deaf) > 0 }
+
+// outOfTouchAfter is how long a connection has to have been gone before it is
+// worth a line. Measured from the daemon's own log: an ordinary reconnection
+// lands in under two seconds and happens dozens of times a day, and none of
+// those is news. What this is for is the outage that lasts.
+const outOfTouchAfter = 20 * time.Second
+
+// outOfTouch is how long the device has been without one of its connections to
+// Spotify, counting the one that has been gone longest. Zero when it has them
+// all — or when the backend is not our own daemon, which is the only one that
+// can say.
+func (m Model) outOfTouch() time.Duration {
+	if m.ps == nil {
+		return 0
+	}
+	var worst time.Duration
+	for _, since := range m.ps.OutOfTouch {
+		worst = max(worst, since)
+	}
+	return worst
+}
+
+// soundAtStake reports that what is missing is the connection the audio itself
+// comes down. The device plays out what it has already fetched and can start
+// nothing new; the other one only carries the remote control.
+func (m Model) soundAtStake() bool {
+	return m.ps != nil && m.ps.OutOfTouch["accesspoint"] >= outOfTouchAfter
+}
+
+// howLong spells a stretch of time the way somebody would say it: seconds up to
+// a minute, then whole minutes, then hours and minutes. Never a decimal — the
+// number is here to say roughly how long this has been going on.
+func howLong(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	case int(d.Minutes())%60 == 0:
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
+	}
+}

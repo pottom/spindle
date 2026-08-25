@@ -235,3 +235,27 @@ func TestALostDaemonReportsNothing(t *testing.T) {
 		t.Error("nobody was woken when the daemon went away")
 	}
 }
+
+// The daemon counts in seconds and the rest of spindle counts in durations, and
+// a connection that has been gone for no time at all is one that is there.
+func TestOutOfTouchArrivesAsDurations(t *testing.T) {
+	st := (&localStatus{OutOfTouch: map[string]float64{
+		"dealer":      742.5,
+		"accesspoint": 0,
+	}}).toState()
+
+	if got, want := st.OutOfTouch["dealer"], 742500*time.Millisecond; got != want {
+		t.Errorf("the dealer has been gone %s, want %s", got, want)
+	}
+	if _, ok := st.OutOfTouch["accesspoint"]; ok {
+		t.Error("an accesspoint gone for no time at all was reported as gone")
+	}
+}
+
+// A device with everything connected says nothing, and neither does a backend
+// that cannot say.
+func TestAConnectedDeviceIsNotOutOfTouch(t *testing.T) {
+	if got := (&localStatus{}).toState().OutOfTouch; got != nil {
+		t.Errorf("a healthy device reported %v", got)
+	}
+}
