@@ -167,6 +167,22 @@ func wordsImage(lines []string, w, h int) (*image.Gray, msg.WordLayout, bool) {
 	block := lead * (len(lines) - 1)
 	top := (h*wordsOver-block)/2 + metrics.Ascent.Round()/2
 
+	// A line is placed by its metrics rather than by its ink, so that a line
+	// with a descender in it and the line after it without one sit at the same
+	// height. Ink-centred they would differ by half a descent — two rows at a
+	// hundred by thirty — and a lyric would walk up and down the screen from
+	// line to line.
+	//
+	// The word a stopped record says has nobody to line up with: it is alone on
+	// the screen for as long as it is there, and what is asked of it is that it
+	// be in the middle. Measured against the metrics it sat two to four rows
+	// low, further at every size, because its ink reaches cap height above the
+	// line and a descender below it while the metrics reserve the whole ascent.
+	if len(lines) == 1 && lines[0] == wordsHeld {
+		ink, _ := font.BoundString(face, lines[0])
+		top = h*wordsOver/2 - (ink.Min.Y.Round()+ink.Max.Y.Round())/2
+	}
+
 	// Where every word lands is worked out here rather than afterwards: this is
 	// the only place the widths are known, because a proportional face gives no
 	// formula for how wide a word is, only a measurement.

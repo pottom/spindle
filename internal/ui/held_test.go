@@ -121,6 +121,55 @@ func TestTheLoopWaitsForTheWordBeforeItStops(t *testing.T) {
 	}
 }
 
+// In the middle of the screen, at every size.
+//
+// A line is placed by the face's metrics, which reserve the whole ascent above
+// the baseline whatever the letters actually reach. That is right for a lyric,
+// where every line has to sit at the same height as the one before it, and
+// wrong for a word that is alone: measured against the metrics this one sat two
+// rows low at eighty by twenty-four and nearly four at a hundred and sixty by
+// fifty, further the bigger the screen.
+func TestTheWordSitsInTheMiddle(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {100, 30}, {140, 40}, {160, 50}} {
+		m := stageWords("a")
+		m.width, m.height = size[0], size[1]
+		m.resize()
+		m.setProgress(40 * time.Second)
+		m.ps.Playing = false
+		if cmd := m.wordsGrind(); cmd != nil {
+			m.wordsTake(cmd)
+		}
+		if m.words.text != wordsHeld {
+			t.Fatalf("%dx%d put up %q", size[0], size[1], m.words.text)
+		}
+
+		g := m.words.have
+		top, bottom := -1, -1
+		for y := range g.DotsY {
+			for x := range g.DotsX {
+				if g.Lum[y*g.DotsX+x] > 0 {
+					if top < 0 {
+						top = y
+					}
+					bottom = y
+					break
+				}
+			}
+		}
+		if top < 0 {
+			t.Fatalf("%dx%d drew nothing", size[0], size[1])
+		}
+
+		// Half a dot for the rounding, and not a dot more: the whole point is
+		// that it does not drift as the screen grows.
+		off := float64(top+bottom)/2 - float64(g.DotsY-1)/2
+		if off < -0.5 || off > 0.5 {
+			t.Errorf("%dx%d: the word's ink runs %d..%d of %d dots, %+.1f off the middle",
+				size[0], size[1], top, bottom, g.DotsY, off)
+		}
+	}
+}
+
 // And the word is one word, not a sentence: it is read at a glance across a
 // whole terminal.
 func TestTheWordIsOneWord(t *testing.T) {
