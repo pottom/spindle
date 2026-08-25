@@ -153,6 +153,12 @@ type stageState struct {
 	// written down or carried out.
 	mode scopeMode
 
+	// swing is how far the picture throws itself about with the record, in
+	// steps: 1 is what it did before there was a key for it, and the two above
+	// it are for finding out whether it was doing enough. Nothing is written
+	// down — like the mode, this is opened, looked at, and left behind.
+	swing int
+
 	// loose says the picture keeps time with the record rather than only
 	// answering how loud it is. On unless the key has turned it off, because
 	// the two ways cannot be judged against each other unless both can be seen
@@ -242,6 +248,24 @@ func (m *Model) leaveStage() tea.Cmd {
 func (m *Model) stageKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	if !m.stage.on {
 		return nil, false
+	}
+
+	// How far the picture throws itself about: an amount rather than a choice,
+	// so it is the digits, and shifted because the bare ones are the tabs.
+	//
+	// Asked of the key itself rather than through a binding, because a binding
+	// cannot say this. Shift and a digit produces a character — ! on one layout,
+	// ' on another — and Bubble Tea drops the modifier from a press that carried
+	// text, so "shift+1" matches nothing that was ever typed. What every layout
+	// agrees on is the digit underneath. See baseKey.
+	//
+	// Nothing is said about it either. The picture answers on the next beat,
+	// which is the only answer worth having, and there is nowhere on this screen
+	// a line of text belongs. The debug bar carries the number for anybody
+	// measuring rather than watching.
+	if step, ok := swingStep(k); ok {
+		m.stage.swing = step
+		return nil, true
 	}
 
 	switch {

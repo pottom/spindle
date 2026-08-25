@@ -349,6 +349,11 @@ func (m Model) debugWords() []debugField {
 	if m.held() {
 		b.put("", "HELD")
 	}
+	if m.stage.on && m.stage.swing > 1 {
+		// Only when it has been moved off what it always was, because a field
+		// that is always there is a field nobody reads.
+		b.put("swing", "%d×%.0f", m.stage.swing, swingAt[m.stage.swing])
+	}
 	b.add(debugDeal(m))
 	b.put("leave", "%s", debugMoveName(w.leave))
 	b.put("sung", "%s", debugClock(time.Duration(w.starts)*time.Millisecond))

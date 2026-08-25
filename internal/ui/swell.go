@@ -1,5 +1,7 @@
 package ui
 
+import tea "charm.land/bubbletea/v2"
+
 // How much the record is giving, and how much the picture gives back.
 //
 // Everything on this screen is drawn from the spectrum, and the spectrum cannot
@@ -84,4 +86,61 @@ func (m Model) swell() float32 {
 	span := max(m.words.swellHigh-m.words.swellLow, swellSpan)
 	at := float32((db - m.words.swellLow) / span)
 	return swellLeast + (swellMost-swellLeast)*min(max(at, 0), 1)
+}
+
+// How far the picture throws itself about, which is the one thing on this
+// screen that is set by hand.
+//
+// Everything here answers the record: how loud it is, where its beat falls, how
+// much it is giving against what it gave a minute ago. What none of that can
+// settle is how much movement is the right amount of movement — that is a
+// judgement about the room and the screen it is being watched on, and the only
+// way to make it is to see the same record at two sizes of it.
+//
+// So the big screen has three steps and nothing else does. It is not written
+// down: like the picture it is opened, looked at, and left behind.
+
+// swingSteps is how many there are, and swingAt what each of them multiplies
+// the travel by.
+//
+// The first is exactly what the screen did before there was a key, so that the
+// thing being judged against is the thing that was there.
+//
+// The other two are as far apart as the screen allows. Measured on a hundred by
+// thirty, a row of marks rode three and a half rows either side of where it was
+// set; at these it rides seven and ten and a half, and past that it is not a
+// bigger movement — a mark is ten rows tall, so a row thrown further than that
+// leaves the screen rather than dancing on it. See wordsTravel, which is what
+// holds it there.
+const swingSteps = 3
+
+var swingAt = [swingSteps + 1]float32{1, 1, 2, 3}
+
+// stageSwing is the multiplier in force, which is one everywhere but the big
+// screen.
+func (m Model) stageSwing() float32 {
+	if !m.stage.on || m.stage.swing < 1 || m.stage.swing > swingSteps {
+		return 1
+	}
+	return swingAt[m.stage.swing]
+}
+
+// swingStep reads which of the three was pressed, from the key the keyboard
+// would have sent on a US layout rather than from the text it produced: shift
+// and a digit is a different character on nearly every layout there is, and the
+// one thing they agree on is the digit underneath. See baseKey.
+func swingStep(k tea.KeyPressMsg) (int, bool) {
+	if k.Mod&tea.ModShift == 0 {
+		return 0, false
+	}
+
+	code := k.Code
+	if k.BaseCode != 0 {
+		code = k.BaseCode
+	}
+	step := int(code - '0')
+	if step < 1 || step > swingSteps {
+		return 0, false
+	}
+	return step, true
 }

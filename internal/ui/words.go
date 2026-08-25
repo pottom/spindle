@@ -2226,7 +2226,7 @@ func (m Model) wordsRiding(count int) []int {
 		// had climbed clear of where the picture put it. Half the travel down
 		// puts the middle of the movement back on the line: a quiet band rests a
 		// little below it, a loud one goes as far above.
-		travel := wordsBounce * m.swell()
+		travel := m.wordsTravel(wordsBounce)
 		out := make([]int, count)
 		for i := range out {
 			out[i] = int(travel/2) - int(m.wordsBeatRide(i, count)*travel)
@@ -2238,12 +2238,37 @@ func (m Model) wordsRiding(count int) []int {
 	// as well, and it is the same mistake it was on the marks: a height that
 	// answers how loud a band is *and* where the beat is answers neither. The
 	// beat is the marks' to keep — a line of a song is there to be read.
-	travel := wordsWordRide * m.swell()
+	travel := m.wordsTravel(wordsWordRide)
 	out := make([]int, count)
 	for i := range out {
 		out[i] = -int(m.wordsBeatRide(i, count) * travel)
 	}
 	return m.wordsSettleMarks(out)
+}
+
+// wordsTravel is how far the picture rides its own part of the sound: the
+// distance it is given, what the record is giving back, and what the big
+// screen's key has been set to.
+//
+// Bounded by the room there is. However far the step asks for, the picture stays
+// on the screen — a row of marks carried clean off the top is not a bigger
+// movement, it is a missing one, and the third step asks for more than a thirty
+// row terminal has. What is left over is the picture's own height, so a taller
+// picture is thrown less far, which is also what looks right: the bigger the
+// thing moving, the less of a screen it takes to read the movement.
+func (m Model) wordsTravel(reach float32) float32 {
+	travel := reach * m.swell() * m.stageSwing()
+
+	tall := 0
+	for i, top := range m.words.where.Tops {
+		if i < len(m.words.where.Bottoms) {
+			tall = max(tall, m.words.where.Bottoms[i]-top+1)
+		}
+	}
+	if room := float32(m.height*dotsPerCellY - tall); room > 0 {
+		return min(travel, room)
+	}
+	return travel
 }
 
 // wordsSettleMarks stops a mark being carried higher than the word it hangs off.
@@ -2368,10 +2393,15 @@ func (m Model) wordsTilting(count int) ([]float32, []int) {
 		// share of its height; a mark turns about the row across its middle and
 		// leans like an italic, by a slant that does not depend on how wide the
 		// shape happens to be.
-		lean := min(wordsLeanRise*float32(tall[i])/float32(wide), wordsTiltMost)
+		// The height and the lean are one movement between them — see the
+		// note on the ride — so the big screen's step carries both. A row that
+		// throws itself twice as far and leans by the same degree is a row
+		// sliding rather than dancing.
+		swing := m.stageSwing()
+		lean := min(wordsLeanRise*swing*float32(tall[i])/float32(wide), wordsTiltMost*swing)
 		middle[i] = (max(first[i], 0) + max(last[i], 0)) / 2
 		if m.words.beats {
-			lean, middle[i] = wordsTiltMark, mid[i]
+			lean, middle[i] = wordsTiltMark*swing, mid[i]
 		}
 
 		// Swaying, the lean is the beat's and the deal is not asked. Which way
