@@ -97,8 +97,10 @@ func (m Model) swell() float32 {
 // judgement about the room and the screen it is being watched on, and the only
 // way to make it is to see the same record at two sizes of it.
 //
-// So the big screen has three steps and nothing else does. It is not written
-// down: like the picture it is opened, looked at, and left behind.
+// So the big screen has three steps and nothing else does, and they move the
+// marks — the notes, and the drawings that stand in for them — and not the
+// words. It is not written down: like the picture it is opened, looked at, and
+// left behind.
 
 // swingSteps is how many there are, and swingAt what each of them multiplies
 // the travel by.
@@ -135,7 +137,16 @@ func (m Model) stageSwing() float32 { return m.swingStepAt(swingAt) }
 func (m Model) stageLean() float32 { return m.swingStepAt(swingLeanAt) }
 
 func (m Model) swingStepAt(steps [swingSteps + 1]float32) float32 {
-	if !m.stage.on || m.stage.swing < 1 || m.stage.swing > swingSteps {
+	// The marks' alone — the notes, and the drawings that stand in for them.
+	// A lyric is there to be read, and it was already given far less movement
+	// than a row of marks for that reason: a line of a dozen words cannot throw
+	// itself about the way seven marks can without coming apart. Multiplying
+	// what was already the careful number is how a line stops being readable,
+	// and reported from a real screen the words were right as they were.
+	if !m.stage.on || !m.words.beats {
+		return 1
+	}
+	if m.stage.swing < 1 || m.stage.swing > swingSteps {
 		return 1
 	}
 	return steps[m.stage.swing]

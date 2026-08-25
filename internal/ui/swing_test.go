@@ -7,9 +7,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// swingRide is how far the marks are thrown either side of where they were set,
-// in dots, over a sweep of the spectrum.
-func swingRide(t *testing.T, step int, loud float64) (low, high int) {
+// swungStage is the big screen with a bar of marks up on it, which is what the
+// step moves.
+func swungStage(t *testing.T, step int) Model {
 	t.Helper()
 
 	m := stageWords("a")
@@ -20,6 +20,18 @@ func swingRide(t *testing.T, step int, loud float64) (low, high int) {
 	if cmd := m.wordsGrind(); cmd != nil {
 		m.wordsTake(cmd)
 	}
+	if !m.words.beats {
+		t.Fatalf("the picture up is %q, wanted a bar of marks", m.words.text)
+	}
+	return m
+}
+
+// swingRide is how far the marks are thrown either side of where they were set,
+// in dots, over a sweep of the spectrum.
+func swingRide(t *testing.T, step int, loud float64) (low, high int) {
+	t.Helper()
+
+	m := swungStage(t, step)
 	m.scope.beat.Loud = loud
 	m.words.swellLow, m.words.swellHigh = -20, -8
 
@@ -70,9 +82,7 @@ func TestTheBigScreenThrowsFurtherOnTheKey(t *testing.T) {
 // reported from a real screen at the throw's own figures.
 func TestTheLeanIsGivenLessThanTheThrow(t *testing.T) {
 	for step := 2; step <= swingSteps; step++ {
-		m := stageWords("a")
-		m.stage.on = true
-		m.stage.swing = step
+		m := swungStage(t, step)
 
 		lean, throw := m.stageLean(), m.stageSwing()
 		if lean >= throw {
@@ -84,9 +94,7 @@ func TestTheLeanIsGivenLessThanTheThrow(t *testing.T) {
 	}
 
 	// And the first step is neither: it is the picture as it was.
-	m := stageWords("a")
-	m.stage.on = true
-	m.stage.swing = 1
+	m := swungStage(t, 1)
 	if got := m.stageLean(); got != 1 {
 		t.Errorf("the first step leans at %v, want the picture unchanged", got)
 	}
@@ -131,6 +139,34 @@ func TestTheStepIsReadFromTheDigitNotTheCharacter(t *testing.T) {
 		}
 		if m.stage.swing != step {
 			t.Errorf("shift and %d (%q) set step %d", step, text, m.stage.swing)
+		}
+	}
+}
+
+// The words are left out of it. A lyric is there to be read, and it was already
+// given far less movement than a row of marks for exactly that reason: a line of
+// a dozen words cannot throw itself about the way seven marks can without coming
+// apart. Reported from a real screen — the words were right as they were.
+func TestTheStepLeavesTheWordsAlone(t *testing.T) {
+	for step := 1; step <= swingSteps; step++ {
+		m := stageWords("a")
+		m.width, m.height = 100, 30
+		m.resize()
+		m.stage.swing = step
+		m.lyrics.forTrack, m.lyrics.missing = "a", false
+		m.setProgress(40 * time.Second)
+		if cmd := m.wordsGrind(); cmd != nil {
+			m.wordsTake(cmd)
+		}
+
+		// Whatever is up, the moment it is not a bar of marks the step is not
+		// in it.
+		m.words.beats = false
+		if got := m.stageSwing(); got != 1 {
+			t.Errorf("step %d threw a line of words at %v", step, got)
+		}
+		if got := m.stageLean(); got != 1 {
+			t.Errorf("step %d leaned a line of words at %v", step, got)
 		}
 	}
 }
