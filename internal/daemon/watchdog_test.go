@@ -50,6 +50,10 @@ func quickly(t *testing.T) {
 // credentials already stored, which is every start after the first.
 func silent() *signIn { return &signIn{open: func(string) bool { return false }} }
 
+// signedIn is a daemon that is not waiting on the network to sign in, which is
+// every case but the one TestItSaysWhenItCannotReachSpotify is about.
+func signedIn() (time.Duration, bool) { return 0, false }
+
 // A daemon whose playback loop has wedged answers 503 to everything — that is
 // the guard in the API doing its job — and never recovers. After long enough
 // the watchdog gives up on it, which is what ends the process and lets a fresh
@@ -72,7 +76,7 @@ func TestTheWatchdogGivesUpOnAStuckDevice(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := watch(ctx, port, silent(), func(string, ...any) {}); !errors.Is(err, ErrWedged) {
+	if err := watch(ctx, port, silent(), signedIn, func(string, ...any) {}); !errors.Is(err, ErrWedged) {
 		t.Errorf("the watchdog answered %v, want it to give up", err)
 	}
 }
@@ -96,7 +100,7 @@ func TestTheWatchdogWaitsForOneThatComesBack(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*watchEvery)
 	defer cancel()
-	if err := watch(ctx, port, silent(), func(string, ...any) {}); err != nil {
+	if err := watch(ctx, port, silent(), signedIn, func(string, ...any) {}); err != nil {
 		t.Errorf("the watchdog gave up on a device that came back: %v", err)
 	}
 }
@@ -112,7 +116,7 @@ func TestTheWatchdogWaitsToBeStarted(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 4*wedgeAfter)
 	defer cancel()
-	if err := watch(ctx, port, silent(), func(string, ...any) {}); err != nil {
+	if err := watch(ctx, port, silent(), signedIn, func(string, ...any) {}); err != nil {
 		t.Errorf("the watchdog gave up on a device that had never answered: %v", err)
 	}
 }
@@ -133,7 +137,7 @@ func TestTheWatchdogSaysWhyItNeverCameUp(t *testing.T) {
 	said := make(chan string, 8)
 	ctx, cancel := context.WithTimeout(context.Background(), 8*startPatience)
 	defer cancel()
-	if err := watch(ctx, port, entry, func(format string, args ...any) {
+	if err := watch(ctx, port, entry, signedIn, func(format string, args ...any) {
 		select {
 		case said <- fmt.Sprintf(format, args...):
 		default:
@@ -156,6 +160,44 @@ func TestTheWatchdogSaysWhyItNeverCameUp(t *testing.T) {
 	}
 }
 
+// The other reason a device stays away with nothing wrong with it: Spotify
+// cannot be reached, and it is waiting on the network rather than on a person.
+// It comes up on its own when the network does — so the line says what is
+// happening, and does not ask anybody to do anything about it.
+func TestItSaysWhenItCannotReachSpotify(t *testing.T) {
+	quickly(t)
+
+	port := serveOn(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+
+	said := make(chan string, 8)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*startPatience)
+	defer cancel()
+
+	trying := func() (time.Duration, bool) { return 7 * time.Minute, true }
+	if err := watch(ctx, port, silent(), trying, func(format string, args ...any) {
+		select {
+		case said <- fmt.Sprintf(format, args...):
+		default:
+		}
+	}); err != nil {
+		t.Fatalf("the watchdog gave up on a device that was still trying: %v", err)
+	}
+
+	close(said)
+	var lines []string
+	for line := range said {
+		lines = append(lines, line)
+	}
+	if len(lines) != 1 {
+		t.Fatalf("said %d things, want one:\n%s", len(lines), strings.Join(lines, "\n"))
+	}
+	if !strings.Contains(lines[0], "cannot reach Spotify") || !strings.Contains(lines[0], "7m") {
+		t.Errorf("said %q, want the reason and how long it has been going on", lines[0])
+	}
+}
+
 // And once the device answers, that link is spent: a later silence has some
 // other reason, and offering the old one as the reason would be a lie.
 func TestTheSignInIsSpentOnceTheDeviceAnswers(t *testing.T) {
@@ -175,7 +217,7 @@ func TestTheSignInIsSpentOnceTheDeviceAnswers(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := watch(ctx, port, entry, func(string, ...any) {}); !errors.Is(err, ErrWedged) {
+	if err := watch(ctx, port, entry, signedIn, func(string, ...any) {}); !errors.Is(err, ErrWedged) {
 		t.Fatalf("the watchdog answered %v, want it to give up", err)
 	}
 	if link := entry.pending(); link != "" {

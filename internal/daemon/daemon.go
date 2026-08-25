@@ -149,7 +149,7 @@ func Run(ctx context.Context, opts Options) error {
 	done := make(chan error, 1)
 	go func() { done <- app.Run(ctx) }()
 
-	return leave(ctx, done, wedged(ctx, port, entry, log), log)
+	return leave(ctx, done, wedged(ctx, port, entry, app.SigningIn, log), log)
 }
 
 // leave decides how Run ends: the playback loop coming back on its own, the
@@ -224,10 +224,10 @@ func playbackConfig(quality Quality, crossfade time.Duration, cacheDir string) *
 }
 
 // wedged reports the watchdog's verdict, once.
-func wedged(ctx context.Context, port int, entry *signIn, log librespot.Logger) <-chan error {
+func wedged(ctx context.Context, port int, entry *signIn, reaching func() (time.Duration, bool), log librespot.Logger) <-chan error {
 	out := make(chan error, 1)
 	go func() {
-		if err := watch(ctx, port, entry, func(format string, args ...any) { log.Warnf(format, args...) }); err != nil {
+		if err := watch(ctx, port, entry, reaching, func(format string, args ...any) { log.Warnf(format, args...) }); err != nil {
 			log.Warnf("the device has not answered for %s; leaving so a fresh one can take over", wedgeAfter)
 			out <- err
 		}

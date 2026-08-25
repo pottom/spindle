@@ -77,8 +77,12 @@ var ErrWedged = errors.New("the playback device stopped answering")
 // waiting to be finished, and the process holding the browser's way back is the
 // one that would be killed, so ending it would break the very thing it is
 // waiting for. It is said instead, once, and with the reason where the reason
-// is known. See signin.go.
-func watch(ctx context.Context, port int, entry *signIn, logf func(string, ...any)) error {
+// is known. See signin.go, and reaching, which is the other reason there is.
+//
+// reaching says how long the daemon has been unable to get to Spotify to sign
+// in, and whether it still cannot. It is a function rather than a value because
+// the answer changes while this waits — see App.SigningIn in the fork.
+func watch(ctx context.Context, port int, entry *signIn, reaching func() (time.Duration, bool), logf func(string, ...any)) error {
 	client := &http.Client{Timeout: watchPatience}
 	url := fmt.Sprintf("http://%s:%d/status", DefaultHost, port)
 
@@ -114,6 +118,12 @@ func watch(ctx context.Context, port int, entry *signIn, logf func(string, ...an
 				saidSlowStart = true
 				if link := entry.pending(); link != "" {
 					logf("the device has not come up: it is waiting to be signed in to Spotify. Visit: %s", link)
+				} else if trying, yes := reaching(); yes {
+					// The other way a device stays away without anything being
+					// wrong with it: Spotify cannot be reached, and it is
+					// waiting for that rather than for a person. It will come
+					// up on its own when the network does.
+					logf("the device has not come up: it cannot reach Spotify to sign in, and has been trying for %s", trying.Round(time.Second))
 				} else {
 					logf("the device has not answered in the %s since it started, and has never answered once", startPatience)
 				}
